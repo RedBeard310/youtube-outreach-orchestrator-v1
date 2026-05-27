@@ -1,0 +1,10 @@
+node_modules/
+.env
+.env.*
+!.env.example
+logs/*.jsonl
+logs/.tick-lock
+logs/lead-finder-state.json
+*.log
+.DS_Store
+dist/

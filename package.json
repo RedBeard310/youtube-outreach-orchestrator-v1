@@ -1,0 +1,22 @@
+{
+  "name": "youtube-outreach-orchestrator-v1",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "tick": "tsx src/cli/orchestrate.ts",
+    "tick:dry": "tsx src/cli/orchestrate.ts --dry-run",
+    "finder": "tsx src/cli/run-finder.ts",
+    "finder:dry": "tsx src/cli/run-finder.ts --dry-run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "airtable": "^0.12.2",
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}
