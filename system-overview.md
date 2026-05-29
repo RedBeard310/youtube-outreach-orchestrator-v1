@@ -104,7 +104,7 @@ you → npm run finder (in the orchestrator repo)
 | API | What it's for | Cost shape | Bottleneck? |
 |---|---|---|---|
 | **Airtable** | All lead state; per-prospect D100 bases; enrichment scratch base | $25/mo Team plan, 10,000 records per base | No on records; **base count** could become one (D100 path creates one base per prospect) |
-| **YouTube Data API v3** | Channel/video/search lookups in finder + both enrichment pipelines | Free up to 10,000 units/day/project, 10 searches/min/project | **Yes — the binding constraint.** You currently have 20 keys in `youtube-deep-research-v1/.env` across 20 projects, plus 4 more validated and ready to add. Spec for `youtube-key-collector-v1` exists to scale to ~300. |
+| **YouTube Data API v3 (via RapidAPI)** | Channel/video/search lookups in finder + both enrichment pipelines | Paid RapidAPI subscription to `youtube-data-api-v33.p.rapidapi.com` (Pawan Jadam). Verified bit-perfect against Google's direct API across channels.list, videos.list, commentThreads.list, search.list, playlistItems.list. | Rate limit is now whatever RapidAPI's product tier allows (not Google's 10/min/project). Direct Google keys are parked in each downstream repo's `.env` as fallback — flip via `YOUTUBE_API_BACKEND=direct` per repo. See the [RapidAPI swap context](#why-rapidapi-not-direct-keys) note below. |
 | **Anthropic API** | Haiku for finder + classifiers; **Opus 4.7** for compose | Per-token. Opus ~60× Haiku | No, but compose is the priciest single call per lead |
 | **ZeroBounce** | Email verification | ~$0.001–0.003 per verification depending on tier | No |
 | **Firecrawl** | Web scraping in finder + page-scraping enrichment stage | Subscription or ~$0.005–0.01 per scrape | No |
@@ -151,6 +151,16 @@ So your `lead_candidates` table grows monotonically — but only when the lead-f
 
 ## Other costs / constraints worth knowing
 
-- **YouTube quota is the only hard rate limit.** Money is not the wall — YouTube searches/min is. Adding keys = adding throughput. Per-project, not per-account or per-key (we verified this empirically).
+- **YouTube rate limit is now RapidAPI's, not Google's.** As of 2026-05-29 the pipeline routes every YouTube call through the RapidAPI mirror. Throughput ceiling is whatever the subscribed RapidAPI tier allows — measure under load before assuming a number. Direct keys are parked for fallback (`YOUTUBE_API_BACKEND=direct`).
 - **Airtable base count.** Your workspace has a base-count limit by plan. The D100 path creates one new base per prospect. Worth checking your plan's base ceiling if you're driving toward hundreds of D100 prospects.
 - **Anthropic spend scales linearly with leads processed.** The Opus 4.7 compose call is the single heaviest line item per-lead on the approved path. If you ever need to cut cost, swapping compose to Sonnet 4.6 would be the highest-leverage knob (~5× cheaper, modest quality drop).
+
+### Why RapidAPI, not direct keys
+
+Google's free YouTube Data API v3 tier gives each Google Cloud project 10,000 quota units/day and 10 searches/min — modest, but multipliable by spinning up additional projects, each with its own key. The pipeline ran that pattern with ~225 keys across separate projects.
+
+Google noticed. They began emailing warnings about keys being discontinued for "circumventing quotas via multiple Google Cloud projects" — which is exactly what the multi-project rotation does. Continuing on that pattern risked losing all the keys at once and stalling the pipeline.
+
+The switch to a paid RapidAPI mirror (`youtube-data-api-v33.p.rapidapi.com`) puts every request on a legitimate paid contract, with no per-project sleight of hand. The direct keys aren't deleted — they stay parked so the system can flip back via `YOUTUBE_API_BACKEND=direct` per-repo if free quota replenishes or for A/B testing.
+
+Backend swap implemented in each downstream repo individually; the orchestrator itself doesn't talk to YouTube and needs no changes.

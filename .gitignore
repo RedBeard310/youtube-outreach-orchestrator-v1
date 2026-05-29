@@ -5,6 +5,7 @@ node_modules/
 logs/*.jsonl
 logs/.tick-lock
 logs/lead-finder-state.json
+logs/detached/
 *.log
 .DS_Store
 dist/

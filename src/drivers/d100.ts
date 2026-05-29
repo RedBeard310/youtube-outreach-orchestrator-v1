@@ -125,7 +125,8 @@ export async function driveD100(leads: Lead[], opts: DriverOpts = {}): Promise<D
   }
 
   // Step B: per-lead deep research, with auto-bootstrap of clients.json entry + per-prospect base.
-  // Sleep between leads to stay under YouTube's 10 searches/min/project quota.
+  // Sleep between leads to stay under per-minute YouTube rate limits — Google's
+  // 10/min/project on the direct backend, RapidAPI's tier limit on the rapidapi backend.
   for (let i = 0; i < readyForStepB.length; i++) {
     const lead = readyForStepB[i]!;
     if (i > 0 && !opts.dryRun && delaySeconds > 0) {
