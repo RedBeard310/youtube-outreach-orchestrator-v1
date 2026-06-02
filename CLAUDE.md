@@ -93,6 +93,15 @@ Between consecutive step-B invocations, the driver sleeps `D100_STEP_B_DELAY_SEC
 
 Estimated ~200–300 lines TS across `src/cli/orchestrate.ts` + a lead-query helper + branch drivers + logger. Keep it lean.
 
-## Default cron
+## Ticks are manual-only (since 2026-06-01)
 
-`17 */4 * * *` (every 4h, off-zero minute per skill-cron-best-practices). Subject to change — see open questions.
+**The 4-hour `launchd` cron is DISABLED** — agent unloaded, plist renamed `com.caseybrown.youtube-outreach-orchestrator.plist.disabled`. Reason: the Mac is usually asleep or the repo closed at scheduled tick times, so scheduled ticks silently no-fired (a stale `ENRICHMENT_REPO_PATH` had also been killing them — now fixed). **Run ticks by hand: `npm run tick`. Do NOT re-enable the cron unless Casey explicitly says so.** The nightly enrichment-cleanup cron (`com.caseybrown.airtable-cleanup`) is likewise disabled — run `airtable-cleanup.ts --auto` manually after each send batch, then `rollup-archived-runs.ts`. The durable fix for both is an always-on host (VPS / trigger.dev); until then, everything is manual.
+
+Former cron (for reference if ever re-enabled): `17 */4 * * *` (every 4h, off-zero minute).
+
+## Operational gotchas (verified 2026-06-01)
+
+- **SmartLead "sent" ≠ emailed.** Our push only LOADS leads into a campaign; SmartLead's scheduler sends on Mon–Thu 09:00–15:00 ET (Fri/Sat/Sun = 0 by design). The SmartLead UI/Ask-AI lag and lie about volume — verify real sends with `youtube-email-outreach-v1/scripts/sl-sent-per-day.ts`, never the UI. See `system-overview.md` → "Verifying SmartLead sends".
+- **YouTube backend is `auto` (direct-keys-first), merged to `main`.** No active branch landmine. Each downstream repo configures its own backend; enrichment repo is separate.
+- **`last_contacted_at` is polluted** (historical backfill from `outreach_processed_at`); the pipeline never reads it, so it doesn't affect sending, but don't trust it as a "contacted" signal.
+- **New email volume comes from a fresh `npm run finder` run**, not re-running outreach — the approved pipeline is essentially drained. (The 268 "unreviewed" leads are NOT untapped volume: all score 4–5, below the ≥6 bar; everything ≥6 is already triaged. Reject or ignore them.)
