@@ -29,6 +29,8 @@ export interface DriverOpts {
   force?: boolean;
   /** Override --top-n passed to the lead-finder agent. Default: agent's own default (8). */
   topN?: number;
+  /** Override --llm-cap passed to the lead-finder agent. Default: agent's own default (500). */
+  llmCap?: number;
 }
 
 interface State {
@@ -129,8 +131,10 @@ export async function driveLeadFinder(opts: DriverOpts = {}): Promise<LeadFinder
   }
 
   const args = ['run', 'agent'];
-  if (opts.topN !== undefined) {
-    args.push('--', '--top-n', String(opts.topN));
+  if (opts.topN !== undefined || opts.llmCap !== undefined) {
+    args.push('--');
+    if (opts.topN !== undefined) args.push('--top-n', String(opts.topN));
+    if (opts.llmCap !== undefined) args.push('--llm-cap', String(opts.llmCap));
   }
 
   if (opts.dryRun) {
@@ -148,7 +152,7 @@ export async function driveLeadFinder(opts: DriverOpts = {}): Promise<LeadFinder
   // Capture the start time so we can identify leads discovered by THIS run.
   const runStartedAt = new Date().toISOString();
   console.log(
-    `[lead-finder] running (top-n=${opts.topN ?? 'default'}, last=${state.last_run_at ?? 'never'})`
+    `[lead-finder] running (top-n=${opts.topN ?? 'default'}, llm-cap=${opts.llmCap ?? 'default'}, last=${state.last_run_at ?? 'never'})`
   );
   const result = await runChild('npm', args, repoPath);
 

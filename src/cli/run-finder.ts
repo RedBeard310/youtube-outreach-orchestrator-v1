@@ -6,15 +6,16 @@ import { driveLeadFinder } from '../drivers/lead-finder.ts';
 import { acquireLock, releaseLock } from '../lock.ts';
 import { writeTickLog } from '../logger.ts';
 
-function parseTopN(): number | undefined {
-  const idx = process.argv.indexOf('--top-n');
+function parseNumericFlag(flag: string): number | undefined {
+  const idx = process.argv.indexOf(flag);
   if (idx >= 0 && process.argv[idx + 1]) {
     const n = Number(process.argv[idx + 1]);
     if (Number.isFinite(n) && n > 0) return n;
   }
+  const prefix = `${flag}=`;
   for (const arg of process.argv) {
-    if (arg.startsWith('--top-n=')) {
-      const n = Number(arg.slice('--top-n='.length));
+    if (arg.startsWith(prefix)) {
+      const n = Number(arg.slice(prefix.length));
       if (Number.isFinite(n) && n > 0) return n;
     }
   }
@@ -23,7 +24,8 @@ function parseTopN(): number | undefined {
 
 async function main() {
   const dryRun = process.argv.includes('--dry-run');
-  const topN = parseTopN();
+  const topN = parseNumericFlag('--top-n');
+  const llmCap = parseNumericFlag('--llm-cap');
   const startedAt = new Date().toISOString();
 
   if (!acquireLock()) {
@@ -32,8 +34,8 @@ async function main() {
   }
 
   try {
-    console.log(`[finder] manual run ts=${startedAt} dry_run=${dryRun} top_n=${topN ?? 'default'}`);
-    const result = await driveLeadFinder({ dryRun, force: true, topN });
+    console.log(`[finder] manual run ts=${startedAt} dry_run=${dryRun} top_n=${topN ?? 'default'} llm_cap=${llmCap ?? 'default'}`);
+    const result = await driveLeadFinder({ dryRun, force: true, topN, llmCap });
     writeTickLog({
       ts: startedAt,
       dry_run: dryRun,
