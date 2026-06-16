@@ -51,6 +51,17 @@ Persisted on the singleSelect:
 
 Pseudo-code in spec §"Sequential stage handoffs".
 
+## Inbox health gate (lives in youtube-email-outreach-v1, not here)
+
+Since 2026-06-16 the `approved` path self-protects against sending from bad inboxes. When the orchestrator shells out `npm run outreach`, `youtube-email-outreach-v1` first runs a staleness-gated **inbox health gate** (`ensureInboxHealthFresh()`): it reads per-mailbox warmup health from InboxKit and pauses/resumes the matching SmartLead inbox via `is_suspended`. Pause rules: health_score < 90, OR warmup day < 14, OR landing rate < 90 with real volume. It runs at most once per 24h, never on `--dry-run`, and never blocks sending if it errors.
+
+Implications for the orchestrator (no code changes needed here — keep it that way per "No business logic"):
+
+- **Sending capacity floats automatically.** Inboxes drop out when InboxKit health dips and come back when they recover, so live send volume can change tick-to-tick without anyone touching SmartLead. Expected, not a bug.
+- **Don't reach for SmartLead inbox suspend/resume from the orchestrator.** That lever is owned by the gate in `youtube-email-outreach-v1`; doing it here would fight the gate's state file.
+- **Manual check:** `cd $EMAIL_OUTREACH_REPO_PATH && npm run inbox-health -- --status` shows current per-inbox assessment without changing anything.
+- A local SessionStart hook (in this repo's gitignored `.claude/settings.local.json`) also runs the gate when you open the orchestrator, so health is refreshed at your usual entry point.
+
 ## Repos / skills this depends on
 
 | Component | How we call it |
