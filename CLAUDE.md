@@ -25,7 +25,11 @@ Branched on `review_status` (case-sensitive — Airtable values are `approved` l
 - `approved` → shell out to `youtube-email-outreach-v1` for find → verify → enrich (Quick research) → compose → push to SmartLead (paused). Terminal: `outreach_status = "sent_to_smartlead"`.
 - `D100` → step A: `youtube-email-outreach-v1 --stop-after verify`; step B: per-lead invocation of `youtube-deep-research-v1`'s `scripts/run-channel.ts` (with auto-bootstrap via `scripts/setup-airtable.ts` if the slug is new to `clients.json`). Each d100 lead gets its own Airtable base. **No compose, no SmartLead in v1.** Terminal: `outreach_status = "deep_research_complete"`.
 
-All other `review_status` values (`unreviewed`, `rejected`, `sent`, `below_threshold`, `scoring_failed`, `demo_niche_excluded`) are ignored.
+All other `review_status` values (`unreviewed`, `rejected`, `sent`, `below_threshold`, `scoring_failed`, `demo_niche_excluded`, `approved_hold`, `needs_contact`) are ignored.
+
+`approved_hold` (added 2026-07-07) is a **deliberate parking status**: leads that are approved and validated (email found/verified) but must NOT be auto-composed/sent yet — e.g. awaiting a different email process. The tick ignores it. Park/release via `youtube-email-outreach-v1/scripts/hold-batch.ts` (`<ids-file>` to hold, `--release` to flip all `approved_hold` → `approved`). Release only when the intended email process is ready.
+
+`needs_contact` (added 2026-07-09) is a **recovery-lane parking status**, parallel to `approved_hold`: score-≥6 leads that are found + host-identified but have **no verified email yet** (`outreach_status` = `no_email_found` / `email_invalid`). Not discarded — held for a future contact-recovery process; on obtaining a valid email they flip to `approved_hold`. The tick ignores it. Sweep failures into it after each `approved_hold` push via `youtube-email-outreach-v1/scripts/demote-failed-to-needs-contact.ts --apply`. Full context: `casey-assistant/brain/lead-gen/youtube-run-playbook.md` §8b.
 
 ### `outreach_status` values
 
@@ -93,6 +97,13 @@ Defaults: `--business-model = high_ticket_service` (env-overridable via `D100_BU
 
 Between consecutive step-B invocations, the driver sleeps `D100_STEP_B_DELAY_SECONDS` (default 60s) to stay under per-minute YouTube rate limits. Google's direct backend caps at 10 searches/min/project; the RapidAPI backend has its own tier-dependent limit (see [system-overview.md](system-overview.md) "Why RapidAPI, not direct keys"). Set to 0 to disable.
 
+## Run debriefs go to the second brain
+
+When a session produces a run debrief (the HTML "Lead Run Debrief" report), its canonical home is
+**`~/Claude/casey-assistant/brain/lead-gen/runs/lead-run-<YYYY-MM-DD>.html`** — and add a row to the
+run log table in `~/Claude/casey-assistant/brain/lead-gen/INDEX.md`. Do not invent a new location
+(the 2026-07-08 debrief originally landed in `brain/infrastructure/lead-gen-runs/`, since moved).
+
 ## Out of scope for v1
 
 - d100 outreach composition (future separate agent).
@@ -109,6 +120,23 @@ Estimated ~200–300 lines TS across `src/cli/orchestrate.ts` + a lead-query hel
 **The 4-hour `launchd` cron is DISABLED** — agent unloaded, plist renamed `com.caseybrown.youtube-outreach-orchestrator.plist.disabled`. Reason: the Mac is usually asleep or the repo closed at scheduled tick times, so scheduled ticks silently no-fired (a stale `ENRICHMENT_REPO_PATH` had also been killing them — now fixed). **Run ticks by hand: `npm run tick`. Do NOT re-enable the cron unless Casey explicitly says so.** The nightly enrichment-cleanup cron (`com.caseybrown.airtable-cleanup`) is likewise disabled — run `airtable-cleanup.ts --auto` manually after each send batch, then `rollup-archived-runs.ts`. The durable fix for both is an always-on host (VPS / trigger.dev); until then, everything is manual.
 
 Former cron (for reference if ever re-enabled): `17 */4 * * *` (every 4h, off-zero minute).
+
+## Autonomous campaign runs (`approved_hold` pushes) — added 2026-07-09
+
+`npm run campaign -- --target 500` drives a whole `approved_hold` push end-to-end without hand-holding. It is a **thin coordination loop** (still no business logic here — all intelligence lives in the finder + email repos); it just sequences their scripts and logs decisions to `logs/campaign-<date>.jsonl`. Always sanity-check with `npm run campaign:dry` first — dry-run prints every shell command and touches nothing.
+
+What each pass does (`src/drivers/campaign.ts`):
+
+1. **Pre-flight reservoir gate (#2).** Shells `youtube-lead-finder-v1/scripts/reservoir-check.ts --json`. If the fresh-term reservoir can't cover the target runs (verdict `STOCK-UP`), it first runs discovery to stock up. **Standing rule: never start a big run under-stocked** — the 2026-07-08 run proved net conversion HALVES (32%→15%) once fresh terms drain and passes re-hit overlapping terms.
+2. **Finder pass**, then **overlapped verify (#1)** — verification of the accumulating pitchable pool runs *concurrently* with the next finder pass; they never wait on each other. (Locked-in change: verify overlaps the finder from the start of the session.)
+3. **Adaptive discovery on fade (#3).** If a pass yields few fresh pitchable leads (`--fade-threshold`, default 12), the driver does NOT stop or grind — it shells `discover-veins.ts`, which asks Claude (grounded in the ICP + live term-performance table) to invent the next professions / sub-niches / phrasings, writes them as low-priority **probes** (`parent_term=probe:<date>`), and runs them. `evaluate-probes.ts` then promotes winners to the fresh tier and retires losers. Relentless by pivoting, not by brute force. Every choice logs to `logs/discovery-decisions.jsonl`. Fully autonomous; review the log after.
+4. **Finish:** final verify sweep → `promote-verified-to-hold.ts` (which now **auto-sweeps** dead-email score-≥6 leads into `needs_contact`, #5 — no separate manual step).
+
+Stops only on: target hit, `--max-runs` cap, or a **hard wall** (finder exits nonzero twice in a row → quota/keys exhausted or Airtable down). Transient single failures are shrugged off.
+
+**Firm-tilt (#4)** lives in the finder (`src/scoring/firm_tilt.ts`): while the send path needs a verified email, firm-heavy niches (legal/tax/financial/RE/clinics) are run *slightly sooner* — a non-persisted selection nudge, NOT a filter. Coaches & personal brands keep **full eligibility** and still flow in (they pile into `needs_contact` for the future recovery engine — a coach who invests hours in YouTube is obviously reachable, we just can't auto-verify their email yet). Disable with `FIRM_TILT=false` once contact-recovery makes those emails reachable.
+
+The interactive playbook path (`casey-assistant/brain/lead-gen/youtube-run-playbook.md`) still works and stays the reference for what the campaign automates. New env: `EMAIL_OUTREACH_REPO_PATH` must be set for `npm run campaign`.
 
 ## Operational gotchas (verified 2026-06-01)
 

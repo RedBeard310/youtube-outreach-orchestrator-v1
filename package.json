@@ -8,6 +8,8 @@
     "tick:dry": "tsx src/cli/orchestrate.ts --dry-run",
     "finder": "tsx src/cli/run-finder.ts",
     "finder:dry": "tsx src/cli/run-finder.ts --dry-run",
+    "campaign": "tsx src/cli/run-campaign.ts",
+    "campaign:dry": "tsx src/cli/run-campaign.ts --dry-run",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

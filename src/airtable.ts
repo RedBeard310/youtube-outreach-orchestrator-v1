@@ -69,6 +69,32 @@ function getBase() {
   return new Airtable({ apiKey }).base(baseId);
 }
 
+// Airtable throws transient 5xx "Try again" errors under load. They abort a
+// call mid-pass even though the request would succeed on a retry — and when
+// that call is the post-run yield query, the run's JSONL line ends up with a
+// null breakdown (the "logging gap" seen on 2026-07-08). Wrap the hot reads so
+// a blip retries instead of propagating. Writes are safe to retry too: a lead
+// update is idempotent (same id + same fields). Rate-limit (429) and 5xx are
+// retried; a 422/permission error is not — those won't fix themselves.
+const RETRYABLE = /try again|rate limit|timeout|ECONNRESET|ETIMEDOUT|socket hang up|\b5\d\d\b|\b429\b/i;
+
+async function withRetry<T>(op: () => Promise<T>, label: string, attempts = 5): Promise<T> {
+  let lastErr: unknown;
+  for (let i = 1; i <= attempts; i++) {
+    try {
+      return await op();
+    } catch (err) {
+      lastErr = err;
+      const msg = err instanceof Error ? err.message : String(err);
+      if (i === attempts || !RETRYABLE.test(msg)) throw err;
+      const backoffMs = Math.min(1000 * 2 ** (i - 1), 15000);
+      console.error(`[airtable] ${label} attempt ${i}/${attempts} failed (${msg}); retrying in ${backoffMs}ms`);
+      await new Promise(r => setTimeout(r, backoffMs));
+    }
+  }
+  throw lastErr;
+}
+
 function tableName() {
   return process.env.LEAD_TABLE_NAME ?? 'lead_candidates';
 }
@@ -92,7 +118,10 @@ function recordToLead(record: { id: string; get: (field: string) => unknown }): 
 export async function getLeadsForOrchestration(): Promise<Lead[]> {
   const base = getBase();
   const formula = `OR({review_status}='approved', {review_status}='D100')`;
-  const records = await base(tableName()).select({ filterByFormula: formula }).all();
+  const records = await withRetry(
+    () => base(tableName()).select({ filterByFormula: formula }).all(),
+    'getLeadsForOrchestration',
+  );
   const leads = records.map(recordToLead);
 
   return leads.filter(l => {
@@ -108,18 +137,54 @@ export async function getLeadsByIds(ids: string[]): Promise<Lead[]> {
   const base = getBase();
   const conditions = ids.map(id => `RECORD_ID()='${id}'`).join(',');
   const formula = `OR(${conditions})`;
-  const records = await base(tableName()).select({ filterByFormula: formula }).all();
+  const records = await withRetry(
+    () => base(tableName()).select({ filterByFormula: formula }).all(),
+    'getLeadsByIds',
+  );
   return records.map(recordToLead);
 }
 
 export async function getLeadsDiscoveredSince(sinceISO: string): Promise<Lead[]> {
   const base = getBase();
   const formula = `IS_AFTER({first_discovered_at}, "${sinceISO}")`;
-  const records = await base(tableName()).select({ filterByFormula: formula }).all();
+  const records = await withRetry(
+    () => base(tableName()).select({ filterByFormula: formula }).all(),
+    'getLeadsDiscoveredSince',
+  );
   return records.map(recordToLead);
 }
 
 export async function updateLead(id: string, fields: Partial<FieldSet>): Promise<void> {
   const base = getBase();
-  await base(tableName()).update([{ id, fields }]);
+  await withRetry(() => base(tableName()).update([{ id, fields }]), `updateLead(${id})`);
+}
+
+// Score>=6 leads still eligible for the verify step of an approved_hold run:
+// review_status='unreviewed' AND not yet carrying a resolved email outcome. These
+// are what the campaign driver hands to `--stop-after verify` (find + ZeroBounce)
+// before promotion. Excludes leads already verified/failed so repeated calls
+// during a run don't re-verify the same rows.
+export async function getVerifiablePitchableLeads(): Promise<Lead[]> {
+  const base = getBase();
+  const formula = `AND(
+    {review_status}='unreviewed',
+    {signal_score}>=6,
+    OR({outreach_status}='', {outreach_status}='pending', {outreach_status}='email_found', {outreach_status}='failed')
+  )`;
+  const records = await withRetry(
+    () => base(tableName()).select({ filterByFormula: formula }).all(),
+    'getVerifiablePitchableLeads',
+  );
+  return records.map(recordToLead);
+}
+
+// Count rows at a given review_status (e.g. 'approved_hold') so the campaign driver
+// can measure how many leads it has parked this session against the target.
+export async function countByReviewStatus(status: string): Promise<number> {
+  const base = getBase();
+  const records = await withRetry(
+    () => base(tableName()).select({ filterByFormula: `{review_status}='${status}'`, fields: ['review_status'] }).all(),
+    `countByReviewStatus(${status})`,
+  );
+  return records.length;
 }
