@@ -34,6 +34,7 @@ export interface CampaignOpts {
   discoveryCount: number;  // probe veins to generate when fading / under-stocked
   discovery: boolean;      // enable adaptive discovery
   maxMinutes: number;      // wall-clock budget; stop starting new passes past this (0 = unlimited)
+  llmCap?: number;         // per-pass finder LLM budget (channels scored); higher = more leads/pass
   dryRun: boolean;
 }
 
@@ -153,7 +154,7 @@ export async function driveCampaign(opts: CampaignOpts): Promise<void> {
 
     console.log(`\n[campaign] ===== run ${run}/${opts.maxRuns} — parked so far: ${opts.dryRun ? 'n/a' : gained}/${opts.target} =====`);
     const passStart = Date.now();
-    const finder = await driveLeadFinder({ force: true, topN: opts.topN, dryRun: opts.dryRun });
+    const finder = await driveLeadFinder({ force: true, topN: opts.topN, llmCap: opts.llmCap, dryRun: opts.dryRun });
     lastPassMin = (Date.now() - passStart) / 60000;
 
     // Hard-wall detection: finder exiting nonzero twice in a row => quota/keys/Airtable.

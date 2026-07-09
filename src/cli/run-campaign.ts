@@ -28,6 +28,7 @@ async function main(): Promise<void> {
     discoveryCount: numFlag('--discovery-count', 40),
     discovery: !process.argv.includes('--no-discovery'),
     maxMinutes: numFlag('--max-minutes', 0),
+    llmCap: numFlag('--llm-cap', 0) || undefined,
     dryRun: process.argv.includes('--dry-run'),
   };
 
