@@ -27,6 +27,7 @@ async function main(): Promise<void> {
     fadeThreshold: numFlag('--fade-threshold', 12),
     discoveryCount: numFlag('--discovery-count', 40),
     discovery: !process.argv.includes('--no-discovery'),
+    maxMinutes: numFlag('--max-minutes', 0),
     dryRun: process.argv.includes('--dry-run'),
   };
 

@@ -19,7 +19,7 @@
 // logs/campaign-<date>.jsonl.
 
 import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { driveLeadFinder } from './lead-finder.ts';
 import { runChild, runChildCapture } from '../run.ts';
 import { countByReviewStatus, getVerifiablePitchableLeads } from '../airtable.ts';
@@ -33,6 +33,7 @@ export interface CampaignOpts {
   fadeThreshold: number;   // fresh pitchable/run below this => vein fading => discover
   discoveryCount: number;  // probe veins to generate when fading / under-stocked
   discovery: boolean;      // enable adaptive discovery
+  maxMinutes: number;      // wall-clock budget; stop starting new passes past this (0 = unlimited)
   dryRun: boolean;
 }
 
@@ -69,7 +70,11 @@ async function verifyPending(opts: CampaignOpts, seen: Set<string>): Promise<num
   if (ids.length === 0) return 0;
 
   mkdirSync('logs', { recursive: true });
-  const idsFile = join('logs', `verify-pool-${Date.now()}.txt`);
+  // ABSOLUTE path — this file is read by a child process whose cwd is the EMAIL
+  // repo, not here. A relative 'logs/...' path resolves against the child's cwd and
+  // ENOENTs (the bug that zeroed the 2026-07-09 run). resolve() anchors it to the
+  // campaign's own cwd (the orchestrator repo).
+  const idsFile = resolve('logs', `verify-pool-${Date.now()}.txt`);
   writeFileSync(idsFile, ids.join('\n') + '\n');
 
   const args = ['run', 'outreach', '--', '--stop-after', 'verify', '--lead-ids-file', idsFile,
@@ -122,8 +127,23 @@ export async function driveCampaign(opts: CampaignOpts): Promise<void> {
   const seen = new Set<string>();       // every pitchable id sent to verify this session
   let pendingVerify: Promise<number> = Promise.resolve(0);
   let consecutiveFinderFailures = 0;
+  const startedMs = Date.now();
+  const elapsedMin = () => (Date.now() - startedMs) / 60000;
+  let lastPassMin = 0; // wall-clock of the previous finder pass, for deadline reservation
 
   for (let run = 1; run <= opts.maxRuns; run++) {
+    // Wall-clock budget: don't START a pass that would likely finish PAST the
+    // deadline. A pass runs tens of minutes, so we reserve the last pass's duration
+    // (+15% slack) — otherwise a pass starting just under budget overruns (the
+    // 2026-07-09 run finished ~26 min late this way). The final verify+promote below
+    // still runs, so we always checkpoint cleanly before stopping.
+    const reserve = lastPassMin > 0 ? lastPassMin * 1.15 : 0;
+    if (opts.maxMinutes > 0 && elapsedMin() + reserve >= opts.maxMinutes) {
+      console.log(`[campaign] wall-clock budget reached (${elapsedMin().toFixed(0)}min + ~${reserve.toFixed(0)}min/pass reserve >= ${opts.maxMinutes}) — finishing up before deadline.`);
+      log({ event: 'time_budget_stop', run, elapsed_min: Math.round(elapsedMin()), reserve_min: Math.round(reserve) });
+      break;
+    }
+
     const parked = opts.dryRun ? 0 : await countByReviewStatus('approved_hold');
     const gained = parked - startParked;
     if (!opts.dryRun && gained >= opts.target) {
@@ -132,7 +152,9 @@ export async function driveCampaign(opts: CampaignOpts): Promise<void> {
     }
 
     console.log(`\n[campaign] ===== run ${run}/${opts.maxRuns} — parked so far: ${opts.dryRun ? 'n/a' : gained}/${opts.target} =====`);
+    const passStart = Date.now();
     const finder = await driveLeadFinder({ force: true, topN: opts.topN, dryRun: opts.dryRun });
+    lastPassMin = (Date.now() - passStart) / 60000;
 
     // Hard-wall detection: finder exiting nonzero twice in a row => quota/keys/Airtable.
     if (!opts.dryRun && finder.exit_code !== 0 && finder.exit_code !== null) {
@@ -171,7 +193,8 @@ export async function driveCampaign(opts: CampaignOpts): Promise<void> {
 
   if (seen.size > 0) {
     mkdirSync('logs', { recursive: true });
-    const allIds = join('logs', `campaign-pitchable-${new Date().toISOString().slice(0, 10)}.txt`);
+    // ABSOLUTE — read by the promote child running in the EMAIL repo (see idsFile note).
+    const allIds = resolve('logs', `campaign-pitchable-${new Date().toISOString().slice(0, 10)}.txt`);
     writeFileSync(allIds, [...seen].join('\n') + '\n');
     const promoteArgs = ['tsx', 'scripts/promote-verified-to-hold.ts', allIds];
     if (opts.dryRun) {
