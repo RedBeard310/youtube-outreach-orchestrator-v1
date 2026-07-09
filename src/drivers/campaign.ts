@@ -90,6 +90,25 @@ async function verifyPending(opts: CampaignOpts, seen: Set<string>): Promise<num
   return ids.length;
 }
 
+// Promote everything verified in the pitchable pool so far → approved_hold (the
+// promote child also auto-sweeps dead-email leads into needs_contact). Idempotent:
+// it only flips rows currently at outreach_status=email_verified, so re-running
+// across passes is safe and cheap. No-op until at least one lead has been seen.
+async function promoteSeen(opts: CampaignOpts, seen: Set<string>): Promise<void> {
+  if (seen.size === 0) return;
+  if (opts.dryRun) {
+    console.log(`[campaign] DRY RUN — would promote verified leads → approved_hold (${seen.size} in pool, auto-sweeps needs_contact)`);
+    return;
+  }
+  mkdirSync('logs', { recursive: true });
+  // ABSOLUTE — read by the promote child running in the EMAIL repo (see idsFile note).
+  const allIds = resolve('logs', `campaign-pitchable-${new Date().toISOString().slice(0, 10)}.txt`);
+  writeFileSync(allIds, [...seen].join('\n') + '\n');
+  console.log(`[campaign] promoting verified leads → approved_hold (auto-sweeps needs_contact)…`);
+  const r = await runChild('npx', ['tsx', 'scripts/promote-verified-to-hold.ts', allIds], emailRepo());
+  log({ event: 'promote', exit: r.exit_code, pool_size: seen.size });
+}
+
 // Ask the finder to invent + write a batch of probe veins (adaptive discovery).
 async function discover(opts: CampaignOpts, focus?: string): Promise<void> {
   const args = ['tsx', 'scripts/discover-veins.ts', '--count', String(opts.discoveryCount), '--apply'];
@@ -183,29 +202,19 @@ export async function driveCampaign(opts: CampaignOpts): Promise<void> {
     // Overlap verify (#1): make sure the prior verify finished, then kick the next
     // one WITHOUT awaiting it — it runs while the next finder pass starts.
     await pendingVerify;
+    // Promote what verified so far, EACH pass — so approved_hold grows live, the
+    // target check above can self-limit, and an interruption leaves little unparked
+    // (verified-but-unpromoted). Idempotent: promote skips already-parked rows.
+    await promoteSeen(opts, seen);
     pendingVerify = verifyPending(opts, seen);
   }
 
   await pendingVerify;
 
-  // --- Finish: final verify sweep, then promote (auto-sweeps needs_contact) ---
+  // --- Finish: final verify sweep, then a last promote (auto-sweeps needs_contact) ---
   console.log(`\n[campaign] final verify sweep…`);
   await verifyPending(opts, seen);
-
-  if (seen.size > 0) {
-    mkdirSync('logs', { recursive: true });
-    // ABSOLUTE — read by the promote child running in the EMAIL repo (see idsFile note).
-    const allIds = resolve('logs', `campaign-pitchable-${new Date().toISOString().slice(0, 10)}.txt`);
-    writeFileSync(allIds, [...seen].join('\n') + '\n');
-    const promoteArgs = ['tsx', 'scripts/promote-verified-to-hold.ts', allIds];
-    if (opts.dryRun) {
-      console.log(`[campaign] DRY RUN — would promote verified leads: npx ${promoteArgs.join(' ')} (auto-sweeps needs_contact)`);
-    } else {
-      console.log(`[campaign] promoting verified leads → approved_hold (auto-sweeps needs_contact)…`);
-      const r = await runChild('npx', promoteArgs, emailRepo());
-      log({ event: 'promote', exit: r.exit_code, pool_size: seen.size });
-    }
-  }
+  await promoteSeen(opts, seen);
 
   const endParked = opts.dryRun ? 0 : await countByReviewStatus('approved_hold');
   const finalGain = endParked - startParked;
