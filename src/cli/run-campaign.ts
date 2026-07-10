@@ -28,7 +28,11 @@ async function main(): Promise<void> {
     discoveryCount: numFlag('--discovery-count', 40),
     discovery: !process.argv.includes('--no-discovery'),
     maxMinutes: numFlag('--max-minutes', 0),
-    llmCap: numFlag('--llm-cap', 0) || undefined,
+    // 500 is the proven-best throughput setting (llm-cap 800 was ~60% slower for
+    // only ~35% more yield, 2026-07-09). Override with --llm-cap.
+    llmCap: numFlag('--llm-cap', 500),
+    concurrentPasses: numFlag('--concurrent', 1),
+    frontier: process.argv.includes('--frontier'),
     dryRun: process.argv.includes('--dry-run'),
   };
 

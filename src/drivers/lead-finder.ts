@@ -31,6 +31,11 @@ export interface DriverOpts {
   topN?: number;
   /** Override --llm-cap passed to the lead-finder agent. Default: agent's own default (500). */
   llmCap?: number;
+  /** Override --max-channels-per-term. Default: agent's own default (50). Raise to crawl deeper for fresh channels. */
+  maxChannelsPerTerm?: number;
+  /** Slice offset into the ranked active-term queue (`--term-offset`). Used to run
+   *  concurrent finder passes over DISJOINT term slices. Default 0. */
+  termOffset?: number;
 }
 
 interface State {
@@ -131,10 +136,13 @@ export async function driveLeadFinder(opts: DriverOpts = {}): Promise<LeadFinder
   }
 
   const args = ['run', 'agent'];
-  if (opts.topN !== undefined || opts.llmCap !== undefined) {
+  if (opts.topN !== undefined || opts.llmCap !== undefined || opts.maxChannelsPerTerm !== undefined || opts.termOffset) {
     args.push('--');
     if (opts.topN !== undefined) args.push('--top-n', String(opts.topN));
     if (opts.llmCap !== undefined) args.push('--llm-cap', String(opts.llmCap));
+    if (opts.maxChannelsPerTerm !== undefined)
+      args.push('--max-channels-per-term', String(opts.maxChannelsPerTerm));
+    if (opts.termOffset) args.push('--term-offset', String(opts.termOffset));
   }
 
   if (opts.dryRun) {

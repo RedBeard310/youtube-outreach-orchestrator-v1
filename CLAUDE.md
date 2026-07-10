@@ -138,6 +138,16 @@ Stops only on: target hit, `--max-runs` cap, or a **hard wall** (finder exits no
 
 The interactive playbook path (`casey-assistant/brain/lead-gen/youtube-run-playbook.md`) still works and stays the reference for what the campaign automates. New env: `EMAIL_OUTREACH_REPO_PATH` must be set for `npm run campaign`.
 
+**2026-07-10 improvements (from the 07-09 debut-run debrief):**
+- **`--frontier`** — discovery explores the un-mined edge (`youtube-lead-finder-v1/src/discovery/icp.ts` → `FRONTIER_VERTICALS`) instead of re-mining the saturated core. **This is the #1 volume lever**: the 07-09 run proved we're *term-supply-limited, not channel-supply-limited* (every fresh term still yields ~0.9 pitchable, but re-mining the same ~10 niches yields ~0 net-new terms). Use `--frontier` once the proven niches stop producing net-new terms.
+- **`--concurrent N`** (default 1) — runs N finder passes in parallel over **disjoint** term slices (`--term-offset`), ~N× throughput against the ~45-min/pass wall-clock. Caveat: concurrency can create rare duplicate lead rows (same channel under terms in two slices) — run `youtube-lead-finder-v1/scripts/dedupe-leads.ts --apply` after a concurrent session. Default 1 = sequential/safe.
+- **`--llm-cap` defaults to 500** — the proven-best throughput (llm-cap 800 was ~60% slower for only ~35% more yield; don't raise it).
+- **Auto `evaluate-probes`** — the campaign now promotes probe winners (qr≥10%)→fresh tier and retires losers at the end of every run (was a manual step on 07-09).
+- **firm-tilt firstPage bug fixed** — `listActiveTerms` now pages the full active set (`.all()`), not the 100-row `firstPage()` cap that silently hid terms ranked 101+.
+- **Cut:** llm-cap >500, unfocused/broad discovery calls (always 0 net-new — always `--focus` or `--frontier`), and re-mining fully-saturated niches.
+
+**Biggest remaining lever (not built): the `needs_contact` recovery engine.** 2,173 found-and-scored creators with no verifiable email are parked there; recovering even 40% (~870 leads) likely out-yields a day of fresh finding. Deferred by Casey — a separate build in `youtube-email-outreach-v1` when greenlit.
+
 ## Operational gotchas (verified 2026-06-01)
 
 - **SmartLead "sent" ≠ emailed.** Our push only LOADS leads into a campaign; SmartLead's scheduler sends on Mon–Thu 09:00–15:00 ET (Fri/Sat/Sun = 0 by design). The SmartLead UI/Ask-AI lag and lie about volume — verify real sends with `youtube-email-outreach-v1/scripts/sl-sent-per-day.ts`, never the UI. See `system-overview.md` → "Verifying SmartLead sends".

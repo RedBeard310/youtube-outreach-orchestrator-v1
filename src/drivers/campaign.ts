@@ -35,6 +35,8 @@ export interface CampaignOpts {
   discovery: boolean;      // enable adaptive discovery
   maxMinutes: number;      // wall-clock budget; stop starting new passes past this (0 = unlimited)
   llmCap?: number;         // per-pass finder LLM budget (channels scored); higher = more leads/pass
+  concurrentPasses: number;// finder passes to run in parallel over disjoint term slices (1 = sequential)
+  frontier: boolean;       // discovery runs in frontier mode (explore un-mined verticals)
   dryRun: boolean;
 }
 
@@ -110,16 +112,50 @@ async function promoteSeen(opts: CampaignOpts, seen: Set<string>): Promise<void>
 }
 
 // Ask the finder to invent + write a batch of probe veins (adaptive discovery).
+// In frontier mode it explores un-mined verticals instead of re-mining the
+// saturated core (the 2026-07-09 lesson: re-mining yields ~0 net-new terms).
 async function discover(opts: CampaignOpts, focus?: string): Promise<void> {
   const args = ['tsx', 'scripts/discover-veins.ts', '--count', String(opts.discoveryCount), '--apply'];
-  if (focus) { args.push('--focus', focus); }
+  if (opts.frontier) args.push('--frontier');
+  else if (focus) args.push('--focus', focus);
   if (opts.dryRun) {
     console.log(`[campaign] DRY RUN — would discover veins: npx ${args.join(' ')}`);
     return;
   }
-  console.log(`[campaign] vein fading — inventing ${opts.discoveryCount} probe veins${focus ? ` (focus: ${focus})` : ''}…`);
+  console.log(`[campaign] restocking — inventing ${opts.discoveryCount} probe veins${opts.frontier ? ' [FRONTIER]' : focus ? ` (focus: ${focus})` : ''}…`);
   const r = await runChild('npx', args, finderRepo());
-  log({ event: 'discover', focus: focus ?? null, exit: r.exit_code });
+  log({ event: 'discover', frontier: opts.frontier, focus: focus ?? null, exit: r.exit_code });
+}
+
+// At the end of a run, promote the probe winners (qr>=threshold) to the fresh tier
+// and retire the losers — so discovered veins that converted come back with the
+// good terms and duds stop wasting quota. Was manual on 2026-07-09; now automatic.
+async function evaluateProbes(opts: CampaignOpts): Promise<void> {
+  if (opts.dryRun) {
+    console.log('[campaign] DRY RUN — would run evaluate-probes.ts --apply');
+    return;
+  }
+  console.log('[campaign] evaluating probes (promote winners / retire losers)…');
+  const r = await runChild('npx', ['tsx', 'scripts/evaluate-probes.ts', '--apply'], finderRepo());
+  log({ event: 'evaluate_probes', exit: r.exit_code });
+}
+
+// Run N finder passes over DISJOINT term slices concurrently (offset 0, topN,
+// 2·topN…). Returns an aggregate: worst exit code + summed fresh-pitchable yield.
+// NOTE: concurrency>1 can create rare duplicate lead rows when the same channel
+// surfaces under terms in two different slices within the race window — run
+// scripts/dedupe-leads.ts after a concurrent session. Default 1 = sequential/safe.
+async function runFinderPasses(opts: CampaignOpts): Promise<{ exit_code: number | null; freshPitchable: number }> {
+  const n = Math.max(1, opts.concurrentPasses);
+  const runs = Array.from({ length: n }, (_, i) =>
+    driveLeadFinder({ force: true, topN: opts.topN, llmCap: opts.llmCap, termOffset: i * opts.topN, dryRun: opts.dryRun }),
+  );
+  const results = await Promise.all(runs);
+  const exit_code = results.some(r => r.exit_code !== 0 && r.exit_code !== null)
+    ? (results.find(r => r.exit_code !== 0 && r.exit_code !== null)?.exit_code ?? 1)
+    : 0;
+  const freshPitchable = results.reduce((s, r) => s + (r.yield_breakdown?.score_6_plus_AND_host_identified ?? 0), 0);
+  return { exit_code, freshPitchable };
 }
 
 export async function driveCampaign(opts: CampaignOpts): Promise<void> {
@@ -171,26 +207,26 @@ export async function driveCampaign(opts: CampaignOpts): Promise<void> {
       break;
     }
 
-    console.log(`\n[campaign] ===== run ${run}/${opts.maxRuns} — parked so far: ${opts.dryRun ? 'n/a' : gained}/${opts.target} =====`);
+    console.log(`\n[campaign] ===== run ${run}/${opts.maxRuns} — parked so far: ${opts.dryRun ? 'n/a' : gained}/${opts.target}${opts.concurrentPasses > 1 ? ` (×${opts.concurrentPasses} concurrent)` : ''} =====`);
     const passStart = Date.now();
-    const finder = await driveLeadFinder({ force: true, topN: opts.topN, llmCap: opts.llmCap, dryRun: opts.dryRun });
+    const finder = await runFinderPasses(opts);
     lastPassMin = (Date.now() - passStart) / 60000;
 
     // Hard-wall detection: finder exiting nonzero twice in a row => quota/keys/Airtable.
     if (!opts.dryRun && finder.exit_code !== 0 && finder.exit_code !== null) {
       consecutiveFinderFailures++;
-      console.error(`[campaign] finder exit ${finder.exit_code} (reason: ${finder.reason}) — consecutive failures: ${consecutiveFinderFailures}`);
+      console.error(`[campaign] finder exit ${finder.exit_code} — consecutive failures: ${consecutiveFinderFailures}`);
       if (consecutiveFinderFailures >= 2) {
         console.error(`[campaign] two consecutive finder failures — likely a hard wall (quota/keys/Airtable). Stopping.`);
-        log({ event: 'hard_stop', run, reason: finder.reason });
+        log({ event: 'hard_stop', run });
         break;
       }
     } else {
       consecutiveFinderFailures = 0;
     }
 
-    const freshPitchable = finder.yield_breakdown?.score_6_plus_AND_host_identified ?? 0;
-    log({ event: 'finder_run', run, exit: finder.exit_code, reason: finder.reason, fresh_pitchable: freshPitchable, yield: finder.yield_breakdown });
+    const freshPitchable = finder.freshPitchable;
+    log({ event: 'finder_run', run, exit: finder.exit_code, fresh_pitchable: freshPitchable, concurrent: opts.concurrentPasses });
 
     // Fade → pivot to discovery instead of grinding (#3).
     if (!opts.dryRun && finder.exit_code === 0 && freshPitchable < opts.fadeThreshold && opts.discovery) {
@@ -211,10 +247,12 @@ export async function driveCampaign(opts: CampaignOpts): Promise<void> {
 
   await pendingVerify;
 
-  // --- Finish: final verify sweep, then a last promote (auto-sweeps needs_contact) ---
+  // --- Finish: final verify sweep, last promote (auto-sweeps needs_contact),
+  //     then evaluate this run's probes (promote winners / retire losers). ---
   console.log(`\n[campaign] final verify sweep…`);
   await verifyPending(opts, seen);
   await promoteSeen(opts, seen);
+  await evaluateProbes(opts);
 
   const endParked = opts.dryRun ? 0 : await countByReviewStatus('approved_hold');
   const finalGain = endParked - startParked;
