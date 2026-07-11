@@ -68,7 +68,14 @@ function emailRepo(): string {
 function readFinderQuotaUsedPct(): number | null {
   try {
     const raw = readFileSync(join(finderRepo(), 'logs', 'quota-state.json'), 'utf8');
-    const snap = JSON.parse(raw) as Record<string, { used_pct?: number }>;
+    const snap = JSON.parse(raw) as { ts?: string } & Record<string, { used_pct?: number }>;
+    // STALENESS GUARD: a snapshot older than QUOTA_STALE_MINUTES is meaningless —
+    // e.g. last night's 99.9% still on disk at 00:07 after the midnight quota reset,
+    // when the finder is back on fresh direct keys and hasn't rewritten it yet.
+    // Ignoring it prevents the governor from falsely hard-stopping a fresh run.
+    const staleMin = Number(process.env.QUOTA_STALE_MINUTES ?? 90);
+    const ts = typeof snap.ts === 'string' ? Date.parse(snap.ts) : NaN;
+    if (Number.isFinite(ts) && (Date.now() - ts) / 60000 > staleMin) return null;
     const pcts = Object.values(snap)
       .map((v) => (v && typeof v === 'object' ? v.used_pct : undefined))
       .filter((n): n is number => typeof n === 'number' && Number.isFinite(n));
