@@ -18,7 +18,7 @@
 // row — quota/keys exhausted, Airtable down). Every decision is logged to
 // logs/campaign-<date>.jsonl.
 
-import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs';
+import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { driveLeadFinder } from './lead-finder.ts';
 import { runChild, runChildCapture } from '../run.ts';
@@ -58,6 +58,34 @@ function emailRepo(): string {
   return p;
 }
 
+// --- YouTube quota governor (#4, 2026-07-10) ---
+// The finder writes the latest RapidAPI quota snapshot to its logs/quota-state.json
+// after each metered call. We read it BEFORE launching a pass so a long autonomous
+// session can throttle/stop itself instead of draining the day's quota unattended
+// (2026-07-10 hit 99.9% of the RapidAPI cap because nothing governed across passes).
+// Returns the WORST (highest) used-% across buckets, or null if no snapshot yet
+// (e.g. still on direct keys, which are the cheap-preferred path and self-abort).
+function readFinderQuotaUsedPct(): number | null {
+  try {
+    const raw = readFileSync(join(finderRepo(), 'logs', 'quota-state.json'), 'utf8');
+    const snap = JSON.parse(raw) as Record<string, { used_pct?: number }>;
+    const pcts = Object.values(snap)
+      .map((v) => (v && typeof v === 'object' ? v.used_pct : undefined))
+      .filter((n): n is number => typeof n === 'number' && Number.isFinite(n));
+    return pcts.length ? Math.max(...pcts) : null;
+  } catch {
+    return null; // no snapshot / unreadable → governor inactive
+  }
+}
+function quotaSoftPct(): number {
+  const n = Number(process.env.YT_QUOTA_SOFT_PCT ?? 80);
+  return Number.isFinite(n) ? n : 80;
+}
+function quotaHardPct(): number {
+  const n = Number(process.env.YT_QUOTA_HARD_PCT ?? 95);
+  return Number.isFinite(n) ? n : 95;
+}
+
 // Verify the currently-pitchable pool (score>=6 unreviewed, no resolved email yet)
 // via the email repo's `--stop-after verify`. Returns the IDs it touched so the
 // caller can accumulate them for the final promote. Runs concurrently with the
@@ -80,8 +108,11 @@ async function verifyPending(opts: CampaignOpts, seen: Set<string>): Promise<num
   const idsFile = resolve('logs', `verify-pool-${Date.now()}.txt`);
   writeFileSync(idsFile, ids.join('\n') + '\n');
 
+  // Verify concurrency 8 default (was 4): 2 concurrent finders out-produce a single
+  // concurrency-4 verify lane, so the pitchable pool backs up (2026-07-10). 8 drains
+  // it as fast as the finders fill it; same total ZeroBounce credits, just faster.
   const args = ['run', 'outreach', '--', '--stop-after', 'verify', '--lead-ids-file', idsFile,
-    '--concurrency', process.env.APPROVED_CONCURRENCY ?? '4'];
+    '--concurrency', process.env.APPROVED_CONCURRENCY ?? '8'];
   if (opts.dryRun) {
     console.log(`[campaign] DRY RUN — would verify ${ids.length} pitchable leads: npm ${args.join(' ')}`);
     return ids.length;
@@ -145,8 +176,8 @@ async function evaluateProbes(opts: CampaignOpts): Promise<void> {
 // NOTE: concurrency>1 can create rare duplicate lead rows when the same channel
 // surfaces under terms in two different slices within the race window — run
 // scripts/dedupe-leads.ts after a concurrent session. Default 1 = sequential/safe.
-async function runFinderPasses(opts: CampaignOpts): Promise<{ exit_code: number | null; freshPitchable: number }> {
-  const n = Math.max(1, opts.concurrentPasses);
+async function runFinderPasses(opts: CampaignOpts, concurrencyOverride?: number): Promise<{ exit_code: number | null; freshPitchable: number }> {
+  const n = Math.max(1, concurrencyOverride ?? opts.concurrentPasses);
   const runs = Array.from({ length: n }, (_, i) =>
     driveLeadFinder({ force: true, topN: opts.topN, llmCap: opts.llmCap, termOffset: i * opts.topN, dryRun: opts.dryRun }),
   );
@@ -183,6 +214,8 @@ export async function driveCampaign(opts: CampaignOpts): Promise<void> {
   const seen = new Set<string>();       // every pitchable id sent to verify this session
   let pendingVerify: Promise<number> = Promise.resolve(0);
   let consecutiveFinderFailures = 0;
+  let fadeCount = 0; // fades since the last mid-run evaluate-probes (#3)
+  const probeEvalEveryFades = Number(process.env.PROBE_EVAL_EVERY_FADES ?? 3);
   const startedMs = Date.now();
   const elapsedMin = () => (Date.now() - startedMs) / 60000;
   let lastPassMin = 0; // wall-clock of the previous finder pass, for deadline reservation
@@ -207,9 +240,27 @@ export async function driveCampaign(opts: CampaignOpts): Promise<void> {
       break;
     }
 
-    console.log(`\n[campaign] ===== run ${run}/${opts.maxRuns} — parked so far: ${opts.dryRun ? 'n/a' : gained}/${opts.target}${opts.concurrentPasses > 1 ? ` (×${opts.concurrentPasses} concurrent)` : ''} =====`);
+    // Quota governor (#4): read the finder's last quota snapshot and self-limit
+    // BEFORE spending more searches. Hard-stop past the hard floor; throttle
+    // concurrent passes → 1 past the soft floor (each pass costs ~topN×100 units).
+    let effectiveConcurrency = opts.concurrentPasses;
+    if (!opts.dryRun) {
+      const usedPct = readFinderQuotaUsedPct();
+      if (usedPct !== null && usedPct >= quotaHardPct()) {
+        console.error(`[campaign] YouTube quota at ${usedPct}% (>= hard floor ${quotaHardPct()}%) — stopping to preserve remaining credits.`);
+        log({ event: 'quota_stop', run, used_pct: usedPct });
+        break;
+      }
+      if (usedPct !== null && usedPct >= quotaSoftPct() && effectiveConcurrency > 1) {
+        console.warn(`[campaign] YouTube quota at ${usedPct}% (>= soft floor ${quotaSoftPct()}%) — throttling ${opts.concurrentPasses}→1 concurrent to conserve.`);
+        log({ event: 'quota_throttle', run, used_pct: usedPct });
+        effectiveConcurrency = 1;
+      }
+    }
+
+    console.log(`\n[campaign] ===== run ${run}/${opts.maxRuns} — parked so far: ${opts.dryRun ? 'n/a' : gained}/${opts.target}${effectiveConcurrency > 1 ? ` (×${effectiveConcurrency} concurrent)` : ''} =====`);
     const passStart = Date.now();
-    const finder = await runFinderPasses(opts);
+    const finder = await runFinderPasses(opts, effectiveConcurrency);
     lastPassMin = (Date.now() - passStart) / 60000;
 
     // Hard-wall detection: finder exiting nonzero twice in a row => quota/keys/Airtable.
@@ -233,6 +284,14 @@ export async function driveCampaign(opts: CampaignOpts): Promise<void> {
       console.log(`[campaign] only ${freshPitchable} fresh pitchable this pass (< ${opts.fadeThreshold}) — vein fading, pivoting to discovery.`);
       log({ event: 'fade_detected', run, fresh_pitchable: freshPitchable });
       await discover(opts);
+      // Promote probe winners MID-RUN (#3), not just at the end: every N fades,
+      // run evaluate-probes so veins the day's discovery already validated re-enter
+      // the fresh/active tier the SAME session instead of auto-pausing unused. On
+      // 2026-07-10 winners sat paused until run-end and never got mined live.
+      if (++fadeCount >= probeEvalEveryFades) {
+        fadeCount = 0;
+        await evaluateProbes(opts);
+      }
     }
 
     // Overlap verify (#1): make sure the prior verify finished, then kick the next
@@ -242,7 +301,14 @@ export async function driveCampaign(opts: CampaignOpts): Promise<void> {
     // target check above can self-limit, and an interruption leaves little unparked
     // (verified-but-unpromoted). Idempotent: promote skips already-parked rows.
     await promoteSeen(opts, seen);
-    pendingVerify = verifyPending(opts, seen);
+    // Kick the next verify WITHOUT awaiting — but attach a .catch so a transient
+    // failure (network blip mid-query) can NEVER become an unhandled rejection that
+    // hard-crashes the whole autonomous run (the 2026-07-10 ENOTFOUND crash). A
+    // failed verify is non-fatal: those leads stay pitchable and retry next pass.
+    pendingVerify = verifyPending(opts, seen).catch((e) => {
+      console.error('[campaign] verify pass errored (non-fatal; leads retry next pass):', e instanceof Error ? e.message : String(e));
+      return 0;
+    });
   }
 
   await pendingVerify;

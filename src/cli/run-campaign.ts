@@ -18,6 +18,15 @@ function numFlag(flag: string, dflt: number): number {
   return dflt;
 }
 
+// Resilience net for a long autonomous run: a stray transient rejection (a network
+// blip in a floating promise) should be logged LOUDLY, not hard-crash the process
+// mid-campaign. The main loop already handles real stop conditions (target,
+// max-runs, hard wall); this just prevents a momentary DNS/socket error from
+// killing hours of progress. (Added after the 2026-07-10 ENOTFOUND crash.)
+process.on('unhandledRejection', (reason) => {
+  console.error('[campaign] UNHANDLED REJECTION (logged, not fatal):', reason instanceof Error ? (reason.stack ?? reason.message) : String(reason));
+});
+
 async function main(): Promise<void> {
   const opts: CampaignOpts = {
     target: numFlag('--target', 500),

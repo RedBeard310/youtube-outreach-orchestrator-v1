@@ -76,7 +76,11 @@ function getBase() {
 // a blip retries instead of propagating. Writes are safe to retry too: a lead
 // update is idempotent (same id + same fields). Rate-limit (429) and 5xx are
 // retried; a 422/permission error is not — those won't fix themselves.
-const RETRYABLE = /try again|rate limit|timeout|ECONNRESET|ETIMEDOUT|socket hang up|\b5\d\d\b|\b429\b/i;
+// Transient network/DNS failures (ENOTFOUND/EAI_AGAIN from a WiFi blip or a
+// laptop that just woke) are retryable — they clear in seconds. A 2026-07-10
+// autonomous run hard-crashed because ENOTFOUND wasn't matched here and threw
+// straight through withRetry. Permission/422 errors stay non-retryable.
+const RETRYABLE = /try again|rate limit|timeout|ECONNRESET|ETIMEDOUT|ECONNREFUSED|ENETUNREACH|EPIPE|ENOTFOUND|EAI_AGAIN|getaddrinfo|fetch failed|socket hang up|network|\b5\d\d\b|\b429\b/i;
 
 async function withRetry<T>(op: () => Promise<T>, label: string, attempts = 5): Promise<T> {
   let lastErr: unknown;
