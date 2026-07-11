@@ -10,3 +10,5 @@ logs/detached/
 .DS_Store
 dist/
 backups/
+logs/
+lead-candidates-export*.csv

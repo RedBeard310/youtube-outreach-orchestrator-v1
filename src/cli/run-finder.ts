@@ -26,6 +26,7 @@ async function main() {
   const dryRun = process.argv.includes('--dry-run');
   const topN = parseNumericFlag('--top-n');
   const llmCap = parseNumericFlag('--llm-cap');
+  const maxChannelsPerTerm = parseNumericFlag('--max-channels-per-term');
   const startedAt = new Date().toISOString();
 
   if (!acquireLock()) {
@@ -34,8 +35,8 @@ async function main() {
   }
 
   try {
-    console.log(`[finder] manual run ts=${startedAt} dry_run=${dryRun} top_n=${topN ?? 'default'} llm_cap=${llmCap ?? 'default'}`);
-    const result = await driveLeadFinder({ dryRun, force: true, topN, llmCap });
+    console.log(`[finder] manual run ts=${startedAt} dry_run=${dryRun} top_n=${topN ?? 'default'} llm_cap=${llmCap ?? 'default'} max_per_term=${maxChannelsPerTerm ?? 'default'}`);
+    const result = await driveLeadFinder({ dryRun, force: true, topN, llmCap, maxChannelsPerTerm });
     writeTickLog({
       ts: startedAt,
       dry_run: dryRun,
