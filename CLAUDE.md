@@ -146,6 +146,14 @@ The interactive playbook path (`casey-assistant/brain/lead-gen/youtube-run-playb
 - **firm-tilt firstPage bug fixed** — `listActiveTerms` now pages the full active set (`.all()`), not the 100-row `firstPage()` cap that silently hid terms ranked 101+.
 - **Cut:** llm-cap >500, unfocused/broad discovery calls (always 0 net-new — always `--focus` or `--frontier`), and re-mining fully-saturated niches.
 
+**2026-07-10 self-healing fixes (from the 07-10 debrief — a term-starvation + quota-blowout day):**
+- **Anti-starvation floor (finder).** When the active term pool decays to all-negative priority, `listActiveTerms` auto-reactivates the best never-run paused terms so the finder never grinds mined-out terms while good untapped supply sits idle. This was the day's root cause: the active pool went all-negative while 274 good terms sat paused → 17 consecutive 0-yield passes. Tune with `STARVATION_FLOOR` (default 1). Manual equivalent: `youtube-lead-finder-v1/scripts/reactivate-untapped.ts --apply`.
+- **Fast dead-term pause (finder).** A fully-overlapping term (≥10 seen, 0 new) auto-pauses after **one** run (was two) — stops paying a second 100-unit `search.list` on a term already proven saturated. The dominant YouTube cost is the search (100 units) not the channel fetch (1 unit), so this is the main quota-efficiency lever.
+- **Quota governor (campaign).** The finder persists its RapidAPI quota to `logs/quota-state.json`; the campaign reads it before each pass and **throttles concurrent→1 at `YT_QUOTA_SOFT_PCT` (80%)**, **hard-stops at `YT_QUOTA_HARD_PCT` (95%)**. Prevents an unattended run from draining the day's quota (07-10 hit 99.9%).
+- **Mid-run probe promotion (campaign).** `evaluate-probes` now runs every `PROBE_EVAL_EVERY_FADES` fades (default 3), not just at run-end, so validated veins re-enter the active pool the same session.
+- **Crash resilience (orchestrator).** DNS/network errors (`ENOTFOUND` etc.) are retryable in `withRetry`; the floating verify promise has a `.catch` + a global `unhandledRejection` guard — a network blip can no longer hard-crash a multi-hour run (it did on 07-10).
+- **Verify concurrency default 4 → 8** (`APPROVED_CONCURRENCY`): keeps the verify lane ahead of 2 concurrent finders so the pitchable pool doesn't back up.
+
 **Biggest remaining lever (not built): the `needs_contact` recovery engine.** 2,173 found-and-scored creators with no verifiable email are parked there; recovering even 40% (~870 leads) likely out-yields a day of fresh finding. Deferred by Casey — a separate build in `youtube-email-outreach-v1` when greenlit.
 
 ## Operational gotchas (verified 2026-06-01)
