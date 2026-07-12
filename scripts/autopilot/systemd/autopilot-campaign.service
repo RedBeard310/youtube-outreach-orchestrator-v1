@@ -1,0 +1,20 @@
+[Unit]
+Description=Autopilot: relentless lead-gen campaign driver
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=casey
+WorkingDirectory=/home/casey/repos/youtube-outreach-orchestrator-v1
+Environment=HOME=/home/casey
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+ExecStart=/home/casey/repos/youtube-outreach-orchestrator-v1/scripts/autopilot/campaign-loop.sh
+# on-failure (not always): a crash/kill (non-zero) restarts for resilience, but an
+# INTENTIONAL stop — the loop exits 0 after writing the halt flag or hitting the hard $
+# ceiling — stays stopped. Resume after clearing the flag with: systemctl restart autopilot-campaign
+Restart=on-failure
+RestartSec=30
+
+[Install]
+WantedBy=multi-user.target

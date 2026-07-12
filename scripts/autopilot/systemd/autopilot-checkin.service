@@ -1,0 +1,10 @@
+[Unit]
+Description=Autopilot: hourly health check-in + guardrail
+
+[Service]
+Type=oneshot
+User=casey
+WorkingDirectory=/home/casey/repos/youtube-outreach-orchestrator-v1
+Environment=HOME=/home/casey
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+ExecStart=/home/casey/repos/youtube-outreach-orchestrator-v1/scripts/autopilot/checkin.sh

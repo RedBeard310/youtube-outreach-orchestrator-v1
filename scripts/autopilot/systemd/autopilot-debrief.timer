@@ -1,0 +1,11 @@
+[Unit]
+Description=Autopilot: run the daily debrief just after the midnight-PT cycle boundary
+
+[Timer]
+# 00:20 America/Los_Angeles — just after the direct-YouTube-key quota reset that anchors
+# the cycle. systemd >= 244 supports the timezone suffix (this box is 259).
+OnCalendar=*-*-* 00:20:00 America/Los_Angeles
+Persistent=true
+
+[Install]
+WantedBy=timers.target
