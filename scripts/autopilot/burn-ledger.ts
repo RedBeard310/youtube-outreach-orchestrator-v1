@@ -16,6 +16,7 @@
 // `today` exit code: 0 = under soft, 10 = over soft (warn), 20 = over hard (halt).
 // Ceilings via env: ANTHROPIC_SOFT_USD (default 75), ANTHROPIC_HARD_USD (default 150).
 
+import 'dotenv/config';
 import { appendFileSync, mkdirSync, readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 
