@@ -100,9 +100,11 @@ Between consecutive step-B invocations, the driver sleeps `D100_STEP_B_DELAY_SEC
 ## Run debriefs go to the second brain
 
 When a session produces a run debrief (the HTML "Lead Run Debrief" report), its canonical home is
-**`~/Claude/casey-assistant/brain/lead-gen/runs/lead-run-<YYYY-MM-DD>.html`** — and add a row to the
-run log table in `~/Claude/casey-assistant/brain/lead-gen/INDEX.md`. Do not invent a new location
+**`/home/casey/repos/casey-assistant/brain/lead-gen/runs/lead-run-<YYYY-MM-DD>.html`** — and add a row to the
+run log table in `/home/casey/repos/casey-assistant/brain/lead-gen/INDEX.md`. Do not invent a new location
 (the 2026-07-08 debrief originally landed in `brain/infrastructure/lead-gen-runs/`, since moved).
+(Path corrected 2026-07-12 for the Linux VPS: the old `~/Claude/...` home was a Mac path and does not exist here;
+the lead-gen brain was fast-forward-merged into `casey-assistant` `main` during the migration sweep.)
 
 ## Out of scope for v1
 
