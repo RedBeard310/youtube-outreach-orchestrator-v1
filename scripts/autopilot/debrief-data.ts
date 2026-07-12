@@ -33,14 +33,14 @@ function readJsonl(file: string): Array<Record<string, unknown>> {
   return out;
 }
 
-// All campaign events at/after the cycle start (spans the UTC-dated files).
-function cycleCampaignEvents(sinceISO: string): Array<Record<string, unknown>> {
+// All campaign events within the cycle window [sinceISO, untilISO) (spans the UTC-dated files).
+function cycleCampaignEvents(sinceISO: string, untilISO: string): Array<Record<string, unknown>> {
   const ev: Array<Record<string, unknown>> = [];
   for (const f of readdirSync(LOGS)) {
     if (!/^campaign-\d{4}-\d{2}-\d{2}\.jsonl$/.test(f)) continue;
     for (const e of readJsonl(join(LOGS, f))) {
       const ts = typeof e.ts === 'string' ? e.ts : '';
-      if (ts >= sinceISO) ev.push(e);
+      if (ts >= sinceISO && ts < untilISO) ev.push(e);
     }
   }
   return ev;
@@ -83,7 +83,12 @@ function fatalSignaturesToday(sinceMs: number): string[] {
 async function main(): Promise<void> {
   const now = new Date();
   const date = pacificDate(now);
-  const sinceISO = pacificMidnightISO(now);
+  // The debrief timer fires ~00:20 PT to summarize the 24h cycle that JUST ENDED.
+  // pacificMidnightISO(now) is that cycle's END (the most-recent PT midnight); the cycle
+  // START is 24h earlier. (Bug fixed 2026-07-12: previously sinceISO = pacificMidnightISO,
+  // so at the 00:20 fire the window collapsed to ~20 min and the debrief saw almost nothing.)
+  const untilISO = pacificMidnightISO(now);
+  const sinceISO = new Date(Date.parse(untilISO) - 24 * 60 * 60 * 1000).toISOString();
   const sinceMs = Date.parse(sinceISO);
 
   const [parkedNow, needsContact] = await Promise.all([
@@ -105,7 +110,7 @@ async function main(): Promise<void> {
   }
   const emailVerified = discovered.filter((l) => l.outreach_status === 'email_verified').length;
 
-  const ev = cycleCampaignEvents(sinceISO);
+  const ev = cycleCampaignEvents(sinceISO, untilISO);
   const count = (name: string) => ev.filter((e) => e.event === name).length;
   const sum = (name: string, field: string) =>
     ev.filter((e) => e.event === name).reduce((s, e) => s + (Number(e[field]) || 0), 0);
@@ -116,6 +121,7 @@ async function main(): Promise<void> {
   const snapshot = {
     date,
     cycle_start_iso: sinceISO,
+    cycle_end_iso: untilISO,
     generated_at: now.toISOString(),
     parked: {
       approved_hold_now: parkedNow,
