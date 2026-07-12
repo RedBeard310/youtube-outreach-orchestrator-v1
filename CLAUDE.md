@@ -158,6 +158,29 @@ The interactive playbook path (`casey-assistant/brain/lead-gen/youtube-run-playb
 
 **Biggest remaining lever (not built): the `needs_contact` recovery engine.** 2,173 found-and-scored creators with no verifiable email are parked there; recovering even 40% (~870 leads) likely out-yields a day of fresh finding. Deferred by Casey — a separate build in `youtube-email-outreach-v1` when greenlit.
 
+## Autopilot — the daily autonomous loop (since 2026-07-12)
+
+On the always-on Linux VPS the campaign no longer needs hand-running. `scripts/autopilot/`
+drives it around the clock via **system-level systemd units** (mirroring the `auto-sync`
+pattern; install with `scripts/autopilot/install.sh`):
+
+- **`autopilot-campaign.service`** (always-on) — `campaign-loop.sh` relaunches
+  `npm run campaign --frontier` relentlessly, sleeps through quota exhaustion instead of
+  grinding, and stops only on the halt flag or the Anthropic hard-$ ceiling. Zero Claude tokens.
+- **`autopilot-checkin.timer`** (hourly) — `checkin.ts` is a code-only health check (free);
+  it spends a `claude -p` fix-agent (cheap model) ONLY on a real anomaly (fatal error
+  signatures, or approved_hold flat while the finder keeps producing — the 2026-07-11
+  missing-skill shape).
+- **`autopilot-debrief.timer`** (00:20 PT, the midnight-PT cycle boundary) — writes the HTML
+  debrief + analysis.md + INDEX row into the casey-assistant brain, and ships self-improvement
+  fixes across the 5 pipeline repos.
+
+Cost is governed by `burn-ledger.ts` (soft `ANTHROPIC_SOFT_USD`=75 / hard=150, model tiering).
+Escalation = write `logs/autopilot-halt.flag` and stop (no external notify). Self-improvement
+agents may edit + commit any of the 5 repos but NEVER `.env`. Full detail:
+[scripts/autopilot/README.md](scripts/autopilot/README.md). This supersedes "manual-only"
+below for the campaign; `npm run campaign` by hand still works and shares the same lock.
+
 ## Operational gotchas (verified 2026-06-01)
 
 - **SmartLead "sent" ≠ emailed.** Our push only LOADS leads into a campaign; SmartLead's scheduler sends on Mon–Thu 09:00–15:00 ET (Fri/Sat/Sun = 0 by design). The SmartLead UI/Ask-AI lag and lie about volume — verify real sends with `youtube-email-outreach-v1/scripts/sl-sent-per-day.ts`, never the UI. See `system-overview.md` → "Verifying SmartLead sends".
