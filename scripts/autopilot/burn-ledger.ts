@@ -19,6 +19,7 @@
 import 'dotenv/config';
 import { appendFileSync, mkdirSync, readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 const LOG_DIR = 'logs';
 
@@ -150,4 +151,8 @@ function main(): void {
   process.exit(1);
 }
 
-main();
+// Only run the CLI when executed directly — NOT when imported (e.g. by checkin.ts),
+// otherwise the `today` branch would exit the importing process.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main();
+}

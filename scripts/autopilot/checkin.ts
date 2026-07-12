@@ -1,33 +1,38 @@
 // Autopilot hourly check-in — code-first health check + guardrail (component B).
 //
 // Runs every hour with NO LLM cost. It reads the campaign's own logs, the burn ledger,
-// and the quota file, applies the mechanical guardrails (halt on the Anthropic hard
-// ceiling), and decides whether anything needs *intelligent* attention. Only when it
-// finds a real, fixable anomaly does it exit 7 — the signal for checkin.sh to spend a
-// `claude -p` fix-agent. Most hours it exits 0 and costs nothing.
+// the quota file, and the live approved_hold count, applies the mechanical guardrails
+// (halt on the Anthropic hard ceiling), and decides whether anything needs *intelligent*
+// attention. Only when it finds a real, fixable anomaly does it exit 7 — the signal for
+// checkin.sh to spend a `claude -p` fix-agent. Most hours it exits 0 and costs nothing.
 //
 // Exit codes:
 //   0  healthy (or only a soft warning) — no agent needed
 //   5  halt flag already present / just written — loop is stopping, no agent
 //   7  anomaly needs a fix-agent (evidence written to logs/autopilot-attention.jsonl)
 //
-// Anomaly detection is deliberately tuned to the migration-class failures we actually
-// hit: a finding-but-not-parking pipeline, repeated fatal error signatures, and the
-// campaign-loop's own rapid-fail halt.
+// Anomaly detection is tuned to the migration-class failures we actually hit: repeated
+// fatal error signatures, and a finding-but-not-parking pipeline (approved_hold flat
+// across consecutive check-ins while the finder keeps exiting cleanly).
 
 import 'dotenv/config';
 import { appendFileSync, existsSync, readdirSync, readFileSync, writeFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { summarizeToday, pacificDate } from './burn-ledger.js';
+import { countByReviewStatus } from '../../src/airtable.ts';
 
 const REPO = '/home/casey/repos/youtube-outreach-orchestrator-v1';
 const LOGS = join(REPO, 'logs');
 const HALT_FLAG = join(LOGS, 'autopilot-halt.flag');
 const ATTENTION = join(LOGS, 'autopilot-attention.jsonl');
+const PARKED_HIST = join(LOGS, 'autopilot-parked-history.jsonl');
+
+// How long approved_hold may stay flat (while the finder is working) before we treat it
+// as a broken verify/park path. In minutes.
+const FLAT_PARK_MINUTES = Number(process.env.AUTOPILOT_FLAT_PARK_MINUTES ?? 100);
 
 // Fatal signatures — the exact classes of migration/config break we've seen take the
-// pipeline down. Any of these in a recent session log means "find but don't park" or a
-// hard crash a fix-agent should investigate.
+// pipeline down. Any in a recent session log means a crash a fix-agent should investigate.
 const FATAL_PATTERNS = [
   /ERR_MODULE_NOT_FOUND/,
   /Cannot find package/,
@@ -54,6 +59,13 @@ function readEvents(file: string): Array<Record<string, unknown>> {
   return out;
 }
 
+function recentFinderOkCount(): { ok: number; total: number } {
+  const jf = newestCampaignJsonl();
+  if (!jf) return { ok: 0, total: 0 };
+  const runs = readEvents(jf).filter((e) => e.event === 'finder_run').slice(-6);
+  return { ok: runs.filter((e) => e.exit === 0).length, total: runs.length };
+}
+
 // The 1-2 most-recent session logs the campaign-loop wrote (fallback: console logs).
 function recentSessionLogs(n = 2): string[] {
   const dirs = [join(LOGS, 'autopilot-sessions'), LOGS];
@@ -68,13 +80,22 @@ function recentSessionLogs(n = 2): string[] {
 }
 
 interface Attention { ts: string; kind: string; detail: string; evidence?: string }
-
 function raiseAttention(a: Omit<Attention, 'ts'>): void {
-  const line: Attention = { ts: new Date().toISOString(), ...a };
-  appendFileSync(ATTENTION, JSON.stringify(line) + '\n');
+  appendFileSync(ATTENTION, JSON.stringify({ ts: new Date().toISOString(), ...a }) + '\n');
 }
 
-function main(): void {
+interface ParkedPoint { ts: string; parked: number }
+function readParkedHistory(): ParkedPoint[] {
+  if (!existsSync(PARKED_HIST)) return [];
+  const out: ParkedPoint[] = [];
+  for (const raw of readFileSync(PARKED_HIST, 'utf8').split('\n')) {
+    if (!raw.trim()) continue;
+    try { out.push(JSON.parse(raw)); } catch { /* skip */ }
+  }
+  return out;
+}
+
+async function main(): Promise<void> {
   const burn = summarizeToday();
   const day = pacificDate();
 
@@ -103,35 +124,41 @@ function main(): void {
     }
   }
 
-  // 4) Finding-but-not-parking: recent sessions finish with parked_gain 0 while the
-  //    finder is exiting cleanly (finds leads) — the exact shape of the skill-missing bug.
-  const jf = newestCampaignJsonl();
-  if (jf) {
-    const ev = readEvents(jf);
-    const dones = ev.filter((e) => e.event === 'done').slice(-3);
-    const finderRuns = ev.filter((e) => e.event === 'finder_run').slice(-6);
-    const finderOkCount = finderRuns.filter((e) => e.exit === 0).length;
-    const parkedRecent = dones.reduce((s, e) => s + (Number(e.parked_gain) || 0), 0);
-    if (dones.length >= 2 && parkedRecent === 0 && finderOkCount >= 3) {
+  // 4) Finding-but-not-parking: approved_hold flat for FLAT_PARK_MINUTES while the finder
+  //    keeps exiting 0 — the exact shape of the skill-missing bug we hit this migration.
+  //    Uses the live Airtable count vs a rolling history file (robust across long sessions).
+  let parked: number | null = null;
+  try {
+    parked = await countByReviewStatus('approved_hold');
+    appendFileSync(PARKED_HIST, JSON.stringify({ ts: new Date().toISOString(), parked }) + '\n');
+    const hist = readParkedHistory();
+    const cutoff = Date.now() - FLAT_PARK_MINUTES * 60000;
+    const older = hist.filter((p) => Date.parse(p.ts) <= cutoff);
+    const baseline = older.length ? older[older.length - 1] : null; // most recent point older than the window
+    const finder = recentFinderOkCount();
+    if (baseline && parked <= baseline.parked && finder.ok >= 3) {
       anomalies.push({
         kind: 'find_no_park',
-        detail: `last ${dones.length} campaign sessions parked 0 to approved_hold while ${finderOkCount}/${finderRuns.length} recent finder passes exited 0 — pipeline finds but doesn't verify/park`,
+        detail: `approved_hold flat at ${parked} for ≥${FLAT_PARK_MINUTES}min (was ${baseline.parked} at ${baseline.ts}) while ${finder.ok}/${finder.total} recent finder passes exited 0 — pipeline finds but doesn't verify/park`,
       });
     }
+  } catch (e) {
+    // Airtable blip — do NOT treat as an anomaly (transient); just note it.
+    console.log(`[checkin ${day}] note: approved_hold count unavailable (${e instanceof Error ? e.message : String(e)})`);
   }
 
-  // Soft warning is informational only — never spends an agent.
   const softNote = burn.over_soft ? ` [OVER SOFT $${burn.soft_usd}]` : '';
+  const parkedNote = parked === null ? '' : ` parked=${parked}`;
 
   if (anomalies.length === 0) {
-    console.log(`[checkin ${day}] healthy — burn=$${burn.total_usd.toFixed(2)}/$${burn.hard_usd}${softNote}`);
+    console.log(`[checkin ${day}] healthy — burn=$${burn.total_usd.toFixed(2)}/$${burn.hard_usd}${parkedNote}${softNote}`);
     process.exit(0);
   }
 
   for (const a of anomalies) raiseAttention(a);
-  console.log(`[checkin ${day}] ${anomalies.length} anomaly(ies) → fix-agent. burn=$${burn.total_usd.toFixed(2)}${softNote}`);
+  console.log(`[checkin ${day}] ${anomalies.length} anomaly(ies) → fix-agent. burn=$${burn.total_usd.toFixed(2)}${parkedNote}${softNote}`);
   for (const a of anomalies) console.log(`   - ${a.kind}: ${a.detail}`);
   process.exit(7);
 }
 
-main();
+main().catch((e) => { console.error(`[checkin] fatal: ${e instanceof Error ? e.stack : e}`); process.exit(1); });
