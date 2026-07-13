@@ -66,10 +66,21 @@ newest_campaign_jsonl() { ls -t "$REPO"/logs/campaign-*.jsonl 2>/dev/null | head
 
 # Classify why the last session stopped by scanning its tail for stop events.
 last_stop_reason() {
-  local f; f="$(newest_campaign_jsonl)"
+  local f tail8; f="$(newest_campaign_jsonl)"
   [ -z "$f" ] && { echo "unknown"; return; }
-  tail -6 "$f" | grep -oE '"event":"(quota_stop|hard_stop|time_budget_stop|done)"' | tail -1 \
-    | sed -E 's/.*"event":"([a-z_]+)".*/\1/'
+  # A session logs its stop CAUSE (quota_stop / hard_stop / time_budget_stop) and THEN a
+  # `done` checkpoint — the final verify+promote always runs and logs `done` before exit.
+  # So classify by the CAUSE, not the chronologically-last event: the old `... | tail -1`
+  # always saw the trailing `done` and masked every hard wall, dropping us into the 20s
+  # CLEAN_PAUSE instead of the 30-min QUOTA_WAIT back-off. That dead back-off is exactly
+  # what let term-supply exhaustion ("No active terms to process" → finder exit 1 → hard_stop)
+  # thrash 168× at ~2.5-min intervals on 2026-07-13, re-burning a discovery LLM call each
+  # relaunch. Prefer the cause event so the intended back-off actually fires. (autopilot-improve 2026-07-13)
+  tail8="$(tail -8 "$f")"
+  if grep -q '"event":"quota_stop"'       <<<"$tail8"; then echo "quota_stop";       return; fi
+  if grep -q '"event":"hard_stop"'        <<<"$tail8"; then echo "hard_stop";        return; fi
+  if grep -q '"event":"time_budget_stop"' <<<"$tail8"; then echo "time_budget_stop"; return; fi
+  echo "done"
 }
 
 rapid_fails=0
