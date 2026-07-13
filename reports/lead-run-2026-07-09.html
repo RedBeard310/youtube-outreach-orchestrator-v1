@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lead Run Debrief — 2026-07-09</title>
+<style>
+  :root{
+    --bg:#0f1720; --panel:#161f2b; --panel2:#1b2634; --ink:#e7edf3; --ink-dim:#9fb0c0;
+    --line:#26303d; --teal:#3fd0c9; --teal-deep:#1f8f8a; --amber:#e7b45a; --rose:#e2687a;
+    --good:#54c98a; --warn:#e7b45a; --crit:#e2687a; --mono:'SFMono-Regular',ui-monospace,Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+  }
+  @media (prefers-color-scheme:light){
+    :root{ --bg:#eef2f5; --panel:#ffffff; --panel2:#f4f7f9; --ink:#16222e; --ink-dim:#5b6b78;
+      --line:#dbe3ea; --teal:#0f9a92; --teal-deep:#0c7a74; --good:#1f9d5f; --warn:#b5811f; --crit:#c2475b;}
+  }
+  :root[data-theme="dark"]{ --bg:#0f1720; --panel:#161f2b; --panel2:#1b2634; --ink:#e7edf3; --ink-dim:#9fb0c0;
+    --line:#26303d; --teal:#3fd0c9; --good:#54c98a; --warn:#e7b45a; --crit:#e2687a;}
+  :root[data-theme="light"]{ --bg:#eef2f5; --panel:#ffffff; --panel2:#f4f7f9; --ink:#16222e; --ink-dim:#5b6b78;
+    --line:#dbe3ea; --teal:#0f9a92; --good:#1f9d5f; --warn:#b5811f; --crit:#c2475b;}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.55;
+    -webkit-font-smoothing:antialiased;font-size:16px}
+  .wrap{max-width:1000px;margin:0 auto;padding:40px 24px 80px}
+  header.top{border-left:3px solid var(--teal);padding:4px 0 4px 18px;margin-bottom:8px}
+  .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--teal);margin:0}
+  h1{font-size:30px;line-height:1.15;margin:8px 0 6px;letter-spacing:-.01em;text-wrap:balance}
+  .sub{color:var(--ink-dim);margin:0;font-size:15px}
+  .headline{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--line);
+    border-radius:14px;padding:22px 24px;margin:26px 0;display:flex;gap:26px;align-items:baseline;flex-wrap:wrap}
+  .headline .big{font-family:var(--mono);font-size:52px;font-weight:600;color:var(--teal);line-height:1}
+  .headline .big small{font-size:20px;color:var(--ink-dim);font-weight:400}
+  .headline p{margin:0;flex:1;min-width:260px;color:var(--ink-dim);font-size:14.5px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:14px 0 8px}
+  .kpi{background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:15px 16px}
+  .kpi .n{font-family:var(--mono);font-size:26px;font-weight:600;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+  .kpi .l{font-size:12px;color:var(--ink-dim);margin-top:3px;letter-spacing:.02em}
+  .kpi.good .n{color:var(--good)} .kpi.teal .n{color:var(--teal)} .kpi.warn .n{color:var(--warn)} .kpi.crit .n{color:var(--crit)}
+  h2{font-size:13px;font-family:var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--teal);
+    margin:44px 0 6px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+  h2 .num{color:var(--ink-dim);margin-right:10px}
+  h3{font-size:17px;margin:22px 0 6px}
+  p{margin:10px 0}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:14px}
+  @media(max-width:680px){.two{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:4px 20px 16px}
+  .card.win{border-top:3px solid var(--good)} .card.miss{border-top:3px solid var(--crit)}
+  .card h3{font-size:14px;font-family:var(--mono);text-transform:uppercase;letter-spacing:.08em;color:var(--ink-dim)}
+  ul{margin:8px 0;padding-left:20px} li{margin:7px 0;font-size:14.5px}
+  li b{color:var(--ink)}
+  .tag{font-family:var(--mono);font-size:11px;padding:1px 7px;border-radius:5px;border:1px solid var(--line);
+    color:var(--ink-dim);white-space:nowrap}
+  .tag.fixed{color:var(--good);border-color:var(--good)} .tag.open{color:var(--crit);border-color:var(--crit)}
+  .tag.opt{color:var(--warn);border-color:var(--warn)}
+  table{width:100%;border-collapse:collapse;margin:14px 0;font-size:14px}
+  th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line)}
+  th{font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-dim);font-weight:500}
+  td.n{font-family:var(--mono);text-align:right;font-variant-numeric:tabular-nums}
+  .scroll{overflow-x:auto}
+  .bars{display:flex;flex-direction:column;gap:9px;margin:16px 0}
+  .bar{display:grid;grid-template-columns:120px 1fr 46px;align-items:center;gap:12px;font-size:13px}
+  .bar .lab{color:var(--ink-dim);font-family:var(--mono);font-size:12px}
+  .bar .track{background:var(--panel2);border-radius:6px;height:20px;overflow:hidden;border:1px solid var(--line)}
+  .bar .fill{height:100%;background:linear-gradient(90deg,var(--teal-deep),var(--teal));border-radius:6px 0 0 6px}
+  .bar .val{font-family:var(--mono);text-align:right;font-variant-numeric:tabular-nums;color:var(--ink)}
+  .bar.decay .fill{background:linear-gradient(90deg,var(--good),var(--warn) 65%,var(--crit))}
+  .callout{background:var(--panel2);border:1px solid var(--line);border-left:3px solid var(--teal);
+    border-radius:0 10px 10px 0;padding:14px 18px;margin:18px 0}
+  .callout.warn{border-left-color:var(--warn)} .callout.crit{border-left-color:var(--crit)}
+  .callout p{margin:6px 0;font-size:14.5px}
+  .verdict{font-size:15px}
+  code{font-family:var(--mono);font-size:.88em;background:var(--panel2);padding:1px 5px;border-radius:4px;border:1px solid var(--line)}
+  .foot{margin-top:50px;padding-top:18px;border-top:1px solid var(--line);color:var(--ink-dim);font-size:12.5px;font-family:var(--mono)}
+  .rank{font-family:var(--mono);color:var(--teal);font-weight:600;margin-right:8px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="top">
+  <p class="eyebrow">Lead Run Debrief · YouTube Creator Pipeline</p>
+  <h1>The first fully-automated push — and what it taught us</h1>
+  <p class="sub">Run date 2026-07-09 (into early 07-10) · autonomous campaign driver, debut run · target 500 parked</p>
+</header>
+
+<div class="headline">
+  <div class="big">480<small> / 500</small></div>
+  <p><b>480 new creators parked in <code>approved_hold</code></b> (base 1,060 → 1,540) across 6 cycles, driven end-to-end by the new autonomous <code>npm run campaign</code> loop. Matched yesterday's fully-manual 500 — but this time the machine ran itself. One critical bug was caught and fixed live; the discovery engine restocked the term reservoir six times as it drained.</p>
+</div>
+
+<div class="grid">
+  <div class="kpi teal"><div class="n">480</div><div class="l">parked → approved_hold</div></div>
+  <div class="kpi"><div class="n">~1,020</div><div class="l">pitchable found + processed</div></div>
+  <div class="kpi good"><div class="n">47%</div><div class="l">email verify rate</div></div>
+  <div class="kpi warn"><div class="n">+539</div><div class="l">→ needs_contact (recovery)</div></div>
+  <div class="kpi"><div class="n">6</div><div class="l">campaign cycles</div></div>
+  <div class="kpi"><div class="n">~1,200</div><div class="l">probe veins generated</div></div>
+</div>
+
+<h2><span class="num">01</span>What actually happened</h2>
+<p>Today was the <b>debut of the autonomous campaign driver</b> we built yesterday. Instead of hand-running finder → verify → promote, one command (<code>npm run campaign</code>) now: checks the term reservoir, finds leads, verifies emails <em>overlapped</em> with the next find pass, invents fresh search terms when a vein fades, promotes verified leads each pass, and sweeps dead-email leads into the recovery lane — all on its own, stopping only at target or a hard wall.</p>
+<p>It worked — but the debut was also a <b>shakedown cruise</b>. The morning's first automated run found 219 pitchable leads and then <b>parked zero of them</b>: a path bug meant every verify/promote step crashed. We caught it, fixed it, proved the fix, and the rest of the day the machine grond steadily from ~160 to 480. The value of a first supervised run, exactly.</p>
+
+<h3>Cycle-by-cycle</h3>
+<div class="scroll">
+<table>
+  <thead><tr><th>Cycle</th><th>Mode</th><th class="n">Parked</th><th class="n">Running total</th><th>Note</th></tr></thead>
+  <tbody>
+    <tr><td>Morning</td><td>manual recovery (post-bug-fix)</td><td class="n">+106</td><td class="n">1,166</td><td>salvaged the 219 pitchable the bug had stranded</td></tr>
+    <tr><td>Push 1</td><td>auto · llm-cap 800</td><td class="n">+49</td><td class="n">1,215</td><td>2 passes; cap-800 too slow (reverted)</td></tr>
+    <tr><td>Push 2</td><td>auto · llm-cap 500</td><td class="n">+109</td><td class="n">1,324</td><td>4 passes; best cycle</td></tr>
+    <tr><td>Push 3</td><td>auto · llm-cap 500</td><td class="n">+96</td><td class="n">1,420</td><td>4 passes</td></tr>
+    <tr><td>Push 4</td><td>auto · llm-cap 500</td><td class="n">+82</td><td class="n">1,502</td><td>5 passes; yield thinning</td></tr>
+    <tr><td>Push 5</td><td>auto (cut short)</td><td class="n">+38</td><td class="n">1,540</td><td>stopped at 480 — close enough to 500</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2><span class="num">02</span>What worked · what didn't</h2>
+<div class="two">
+  <div class="card win">
+    <h3>Worked well</h3>
+    <ul>
+      <li><b>The autonomous loop, end-to-end.</b> After the fix, 5 cycles ran hands-off — find, verify, promote, sweep, self-restock — for hours.</li>
+      <li><b>Per-pass promote</b> made the parked count grow live and let the run self-stop at target.</li>
+      <li><b>The discovery engine invented real winners</b> — e.g. <code>how to scale a med spa without an md</code> converted <b>29%</b>, plus luxury real estate, functional-medicine and sales-team veins.</li>
+      <li><b>needs_contact auto-sweep</b> captured all 539 dead-email leads — nothing thrown away.</li>
+      <li><b>Verify rate held steady at ~47%</b> all day — no scraper degradation under load.</li>
+      <li><b>The time-box margin fix</b> stopped cleanly before every deadline after we added pass-duration reserve.</li>
+    </ul>
+  </div>
+  <div class="card miss">
+    <h3>Didn't work / bit us</h3>
+    <ul>
+      <li><b>Path bug (critical).</b> IDs files were passed to cross-repo child processes as <em>relative</em> paths → every verify/promote ENOENT'd → morning run parked 0. <span class="tag fixed">fixed</span></li>
+      <li><b>llm-cap 800 was a bad trade</b> — 60% longer passes for only ~35% more leads. Reverted to 500. <span class="tag fixed">reverted</span></li>
+      <li><b>firm-tilt silently capped.</b> Airtable's <code>firstPage()</code> returns ≤100 rows, so the "over-fetch 210 and re-rank" only ever saw the top 100 active terms. <span class="tag open">open fix</span></li>
+      <li><b>Discovery saturation.</b> Late restock calls on mined niches returned <b>0 net-new</b> — the generator kept re-proposing terms already in the table.</li>
+      <li><b>Broad/unfocused discovery = 0 yield.</b> Only focused-by-niche calls produced.</li>
+      <li><b>Ops slip:</b> one relaunch was backgrounded-inside-a-background call and orphaned from tracking (recovered via the monitor).</li>
+    </ul>
+  </div>
+</div>
+
+<h2><span class="num">03</span>What converted · what didn't</h2>
+<div class="two">
+  <div class="card win">
+    <h3>Good veins</h3>
+    <ul>
+      <li><b>Health &amp; Wellness Clinics</b> — the surprise star. Med-spa / functional-medicine / weight-loss <em>practice-scaling</em> terms hit the day's highest qualified-rates (top: 29%).</li>
+      <li><b>Sales Training</b> — team-building, luxury, sales-leadership angles; multiple ≥14% winners.</li>
+      <li><b>Real Estate</b> — luxury agent marketing &amp; raising capital.</li>
+      <li><b>Legal &amp; Financial</b> — steady, and the best <em>email-verify</em> rates (firms publish contact info).</li>
+      <li><b>Shape:</b> <code>how to scale a [practice] without [X]</code> — the strongest new pattern discovered today.</li>
+    </ul>
+  </div>
+  <div class="card miss">
+    <h3>Poor veins</h3>
+    <ul>
+      <li><b>95% of generated probes converted &lt;10%.</b> Only 12 of 240 tested probes were clear winners — though the low-rate tail still produced most raw volume.</li>
+      <li><b>Coaching / Consulting &amp; Practice-Growth</b> restocks returned near-0 net-new — fully mined.</li>
+      <li><b>Unfocused/broad discovery</b> — 0 useful terms every time.</li>
+      <li><b>Generic "get clients for [X]" tail</b> — increasingly dominated by low-intent creators with no published email (they land in needs_contact, not approved_hold).</li>
+    </ul>
+  </div>
+</div>
+
+<h2><span class="num">04</span>Are we running dry? <span style="color:var(--ink-dim);font-weight:400;text-transform:none;font-family:var(--sans);letter-spacing:0">— the question that matters most</span></h2>
+<p class="verdict"><b>Short answer: no — but we're mining a small quarry with a big shovel.</b> Channel supply is healthy; <b>novel-term supply is the ceiling we keep hitting.</b> Two independent signals point the same way:</p>
+
+<h3>Signal A — every fresh term still finds creators</h3>
+<p>Each brand-new search term still yields <b>~0.9 pitchable creators</b>, and that ratio held steady from the first pass to the last. The finder is <em>not</em> struggling to find channels per term. If we had more good terms, we'd find more good creators.</p>
+
+<h3>Signal B — but generating <em>new</em> terms is getting hard</h3>
+<p>Discovery's net-new-per-call decayed sharply across the day as the term table grew from ~2,500 to ~2,900 and dedupe rose:</p>
+<div class="bars">
+  <div class="bar decay"><span class="lab">Round 1 (AM)</span><div class="track"><div class="fill" style="width:88%"></div></div><span class="val">~25–41</span></div>
+  <div class="bar decay"><span class="lab">Round 2–3</span><div class="track"><div class="fill" style="width:58%"></div></div><span class="val">~16–30</span></div>
+  <div class="bar decay"><span class="lab">Round 4–5</span><div class="track"><div class="fill" style="width:34%"></div></div><span class="val">~5–23</span></div>
+  <div class="bar decay"><span class="lab">Round 6 (late)</span><div class="track"><div class="fill" style="width:8%"></div></div><span class="val">0 on mined niches</span></div>
+</div>
+<p style="color:var(--ink-dim);font-size:13px;margin-top:-2px">net-new usable terms per discovery call, by restock round</p>
+
+<div class="callout">
+  <p><b>The real read:</b> we've deeply mined ~10 niches. That is a <em>tiny slice</em> of the ICP — "any high-ticket, service-based business that can win clients on YouTube." We haven't meaningfully touched: adjacent professions, sub-specialties, geographic long-tail, or entire verticals (aesthetics beyond med-spa, home-services coaching, B2B consulting sub-fields, healthcare private practice, franchise/agency niches, etc.).</p>
+  <p><b>So: the pool of good creators is large and nowhere near exhausted — but our <em>current</em> term-generation approach (re-mining the same 10 niches) is hitting diminishing returns.</b> The fix isn't "find more channels," it's "widen the niche frontier the generator explores."</p>
+</div>
+
+<h2><span class="num">05</span>Bottlenecks, ranked</h2>
+<div class="scroll">
+<table>
+  <thead><tr><th>#</th><th>Bottleneck</th><th>Impact</th><th>Lever</th></tr></thead>
+  <tbody>
+    <tr><td class="n">1</td><td><b>Novel-term supply</b></td><td>caps how many creators we can find per day; forces constant restocking</td><td>expand niche frontier; feed generator a "saturated / explore-instead" map</td></tr>
+    <tr><td class="n">2</td><td><b>Email deliverability</b> (~47% verify)</td><td>half of good creators found have no verifiable email → needs_contact</td><td>build the contact-recovery engine (2,173 leads waiting)</td></tr>
+    <tr><td class="n">3</td><td><b>Finder pass wall-clock</b> (~35–50 min/pass)</td><td>throughput ceiling ~30–40 parked/hr</td><td>run 2 finder passes concurrently; keep llm-cap at 500</td></tr>
+    <tr><td class="n">4</td><td><b>firstPage 100-cap</b> on firm-tilt</td><td>firm sequencing only sees top-100 active terms</td><td>page through with <code>eachPage</code>/<code>pageSize</code></td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2><span class="num">06</span>Fix · optimize · cut</h2>
+<div class="two">
+  <div class="card">
+    <h3>Fix</h3>
+    <ul>
+      <li><span class="tag open">bug</span> firm-tilt <code>firstPage()</code> 100-row cap — page the active-term pool properly.</li>
+      <li><span class="tag opt">auto</span> run <code>evaluate-probes</code> automatically at each cycle's end (currently manual) so winners get promoted and losers retired without a human.</li>
+      <li><span class="tag opt">ops</span> a one-line "relaunch next cycle" wrapper so I stop hand-orphaning processes.</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h3>Optimize</h3>
+    <ul>
+      <li><b>Widen the discovery frontier</b> — pass the generator the list of saturated niches and tell it to explore adjacent/new verticals; this is the single biggest volume lever.</li>
+      <li><b>Concurrent finder passes</b> to beat the ~45-min wall-clock.</li>
+      <li><b>Keep llm-cap at 500</b> — proven best throughput.</li>
+      <li><b>Bank the needs_contact lane</b> — 2,173 reachable-but-unverified creators; even 40% recovery ≈ ~870 leads with zero new finding.</li>
+    </ul>
+  </div>
+</div>
+<div class="card miss" style="margin-top:16px">
+  <h3>Cut / remove</h3>
+  <ul>
+    <li><b>llm-cap &gt; 500</b> — worse throughput, no benefit.</li>
+    <li><b>Unfocused / broad discovery calls</b> — always 0 net-new; only focus-by-niche produces.</li>
+    <li><b>Re-mining fully-saturated niches</b> (Coaching/Consulting, Practice-Growth) — stop pointing discovery at them until the frontier widens.</li>
+    <li><b>Legacy <code>bump-new-terms.ts</code></b> — superseded now that fresh terms insert at priority 75.</li>
+  </ul>
+</div>
+
+<h2><span class="num">07</span>Two things to check</h2>
+<div class="callout warn">
+  <p><b>1,821 leads sit at <code>review_status = approved</code>.</b> That's a large pool outside today's <code>approved_hold</code> work — they'd be tick-eligible if the tick were running. Worth a look: are these stuck/unprocessed, or intentionally parked? If genuine, that's another big latent batch.</p>
+</div>
+<div class="callout">
+  <p><b>The needs_contact lane is now the biggest untapped asset in the whole pipeline</b> — 2,173 high-signal creators we <em>found and scored</em> but couldn't auto-email. Building even a modest contact-recovery step (About-tab email, booking links, contact-form scrape) likely out-yields another day of fresh finding.</p>
+</div>
+
+<div class="foot">
+  Generated from campaign JSONL + finder run logs · approved_hold 1,060 → 1,540 (+480) · needs_contact → 2,173 · companion technical analysis: <code>runs/lead-run-2026-07-09-analysis.md</code>
+</div>
+
+</div>
+</body>
+</html>

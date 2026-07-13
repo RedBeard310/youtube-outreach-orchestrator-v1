@@ -1,0 +1,448 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lead Run Debrief — 2026-07-08</title>
+<style>
+  *{margin:0;padding:0;}
+  :root{
+    --bg:#EEF1F4; --surface:#FFFFFF; --surface-2:#F5F7F9; --ink:#161B22; --ink-2:#3D4753;
+    --muted:#6B7684; --line:#DDE3E9; --accent:#0E8C82; --accent-2:#0A6E66; --accent-soft:#D9ECEA;
+    --good:#2E9E6B; --warn:#B9822A; --crit:#C24B3A;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --mono:ui-monospace,"SF Mono",Menlo,Consolas,"Roboto Mono",monospace;
+    --maxw:1080px;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --bg:#0F1317; --surface:#171C21; --surface-2:#1D242A; --ink:#E8EDF1; --ink-2:#B6C0CA;
+      --muted:#8592A0; --line:#29313A; --accent:#33B7A9; --accent-2:#4FC9BC; --accent-soft:#123734;
+      --good:#48B681; --warn:#D6A24C; --crit:#D96552;
+    }
+  }
+  :root[data-theme="light"]{
+    --bg:#EEF1F4; --surface:#FFFFFF; --surface-2:#F5F7F9; --ink:#161B22; --ink-2:#3D4753;
+    --muted:#6B7684; --line:#DDE3E9; --accent:#0E8C82; --accent-2:#0A6E66; --accent-soft:#D9ECEA;
+    --good:#2E9E6B; --warn:#B9822A; --crit:#C24B3A;
+  }
+  :root[data-theme="dark"]{
+    --bg:#0F1317; --surface:#171C21; --surface-2:#1D242A; --ink:#E8EDF1; --ink-2:#B6C0CA;
+    --muted:#8592A0; --line:#29313A; --accent:#33B7A9; --accent-2:#4FC9BC; --accent-soft:#123734;
+    --good:#48B681; --warn:#D6A24C; --crit:#D96552;
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto;}}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
+    line-height:1.6;-webkit-font-smoothing:antialiased;font-size:16px;}
+  .wrap{max-width:var(--maxw);margin:0 auto;padding:0 24px;}
+
+  /* top bar */
+  header.bar{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--bg) 88%,transparent);
+    backdrop-filter:blur(10px);border-bottom:1px solid var(--line);}
+  .bar-in{max-width:var(--maxw);margin:0 auto;padding:12px 24px;display:flex;align-items:center;gap:18px;flex-wrap:wrap;}
+  .brand{display:flex;align-items:center;gap:10px;font-weight:700;letter-spacing:-.01em;}
+  .brand .dot{width:10px;height:10px;border-radius:2px;background:var(--accent);box-shadow:0 0 0 4px var(--accent-soft);}
+  nav.jump{margin-left:auto;display:flex;gap:4px;flex-wrap:wrap;}
+  nav.jump a{font:600 12.5px/1 var(--sans);color:var(--muted);text-decoration:none;padding:7px 10px;border-radius:7px;}
+  nav.jump a:hover{color:var(--ink);background:var(--surface-2);}
+  nav.jump a:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+
+  /* hero */
+  .hero{padding:64px 0 40px;}
+  .eyebrow{font:700 12px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--accent);}
+  h1{font-size:clamp(30px,5vw,48px);line-height:1.05;letter-spacing:-.028em;margin:16px 0 14px;text-wrap:balance;font-weight:800;}
+  .lede{font-size:19px;color:var(--ink-2);max-width:62ch;margin:0;}
+  .result-band{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1px;
+    background:var(--line);border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-top:34px;}
+  .rb-cell{background:var(--surface);padding:20px 22px;}
+  .rb-cell .k{font:700 11px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);}
+  .rb-cell .v{font:800 30px/1 var(--sans);letter-spacing:-.02em;margin-top:12px;font-variant-numeric:tabular-nums;}
+  .rb-cell .v small{font-size:15px;font-weight:600;color:var(--muted);letter-spacing:0;}
+  .rb-cell.hi{background:linear-gradient(180deg,var(--accent-soft),var(--surface));}
+  .rb-cell.hi .v{color:var(--accent-2);}
+
+  /* sections */
+  section{padding:44px 0;border-top:1px solid var(--line);}
+  .sec-head{display:flex;align-items:baseline;gap:14px;margin-bottom:8px;}
+  .sec-num{font:700 13px/1 var(--mono);color:var(--accent);letter-spacing:.05em;}
+  h2{font-size:26px;letter-spacing:-.02em;margin:0;font-weight:750;text-wrap:balance;}
+  h2{font-weight:700;}
+  .sec-sub{color:var(--muted);margin:6px 0 26px;max-width:64ch;}
+  h3{font-size:16px;margin:28px 0 12px;letter-spacing:-.01em;}
+
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:24px;}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;}
+  @media (max-width:760px){.grid2,.grid3{grid-template-columns:1fr;}}
+
+  /* callout */
+  .callout{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--accent);
+    border-radius:12px;padding:22px 24px;margin:24px 0;}
+  .callout .tag{font:700 11px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--accent);}
+  .callout p{margin:10px 0 0;color:var(--ink-2);}
+  .callout strong{color:var(--ink);}
+
+  /* funnel */
+  .funnel{display:flex;flex-direction:column;gap:10px;margin-top:6px;}
+  .fstep{display:grid;grid-template-columns:190px 1fr;gap:16px;align-items:center;}
+  @media (max-width:620px){.fstep{grid-template-columns:1fr;gap:4px;}}
+  .fstep .lab{font-size:13.5px;color:var(--ink-2);}
+  .fstep .lab b{display:block;color:var(--ink);font-size:14px;}
+  .fbar-track{background:var(--surface-2);border-radius:8px;height:40px;position:relative;overflow:hidden;border:1px solid var(--line);}
+  .fbar{height:100%;display:flex;align-items:center;padding-left:14px;border-radius:7px 0 0 7px;
+    font:700 14px/1 var(--mono);color:#fff;font-variant-numeric:tabular-nums;white-space:nowrap;}
+  .fbar.b1{background:linear-gradient(90deg,var(--accent-2),var(--accent));}
+  .fbar.b2{background:linear-gradient(90deg,var(--accent),#2AA093);}
+  .fbar.b3{background:linear-gradient(90deg,#2AA093,#38A58C);}
+  .fbar .pct{margin-left:10px;font-weight:600;opacity:.85;font-size:12px;}
+  @media (prefers-color-scheme:dark){.fbar{color:#08110F;}}
+  :root[data-theme="dark"] .fbar{color:#08110F;}
+  :root[data-theme="light"] .fbar{color:#fff;}
+
+  /* tables */
+  .tbl-scroll{overflow-x:auto;border:1px solid var(--line);border-radius:12px;}
+  table{border-collapse:collapse;width:100%;font-size:13.5px;min-width:560px;}
+  thead th{background:var(--surface-2);text-align:right;padding:11px 14px;font:700 11px/1.2 var(--mono);
+    letter-spacing:.04em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--line);white-space:nowrap;}
+  thead th:first-child,tbody td:first-child{text-align:left;}
+  tbody td{padding:10px 14px;text-align:right;border-bottom:1px solid var(--line);
+    font-variant-numeric:tabular-nums;color:var(--ink-2);}
+  tbody tr:last-child td{border-bottom:none;}
+  tbody td b{color:var(--ink);}
+  tbody tr:hover td{background:var(--surface-2);}
+  .phase-a td:first-child::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--good);margin-right:8px;vertical-align:middle;}
+  .phase-b td:first-child::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--warn);margin-right:8px;vertical-align:middle;}
+  .rowmark td:first-child{font-weight:600;color:var(--ink);}
+  .miniabort{color:var(--crit);font-weight:600;}
+
+  /* bar chart (per-run + niche) */
+  .bars{display:flex;flex-direction:column;gap:9px;margin-top:8px;}
+  .brow{display:grid;grid-template-columns:130px 1fr 48px;gap:12px;align-items:center;}
+  @media (max-width:560px){.brow{grid-template-columns:96px 1fr 40px;gap:8px;}}
+  .brow .bl{font-size:12.5px;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .btrack{background:var(--surface-2);border-radius:6px;height:22px;overflow:hidden;}
+  .bfill{height:100%;border-radius:6px;background:var(--accent);}
+  .bfill.warnc{background:var(--warn);}
+  .bfill.gray{background:color-mix(in srgb,var(--muted) 55%,transparent);}
+  .brow .bv{font:600 12.5px/1 var(--mono);text-align:right;color:var(--ink);font-variant-numeric:tabular-nums;}
+
+  /* verify decline strip */
+  .vbatch{display:grid;grid-template-columns:78px 1fr 54px;gap:12px;align-items:center;}
+  .vseg{display:flex;height:26px;border-radius:6px;overflow:hidden;border:1px solid var(--line);}
+  .vseg span{display:block;height:100%;}
+  .vseg .ok{background:var(--good);}
+  .vseg .noem{background:color-mix(in srgb,var(--muted) 45%,transparent);}
+  .vseg .inv{background:var(--crit);}
+  .vpct{font:600 12.5px/1 var(--mono);text-align:right;font-variant-numeric:tabular-nums;}
+
+  /* lists / pills */
+  ul.clean{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:12px;}
+  ul.clean li{padding-left:26px;position:relative;color:var(--ink-2);}
+  ul.clean li::before{content:"";position:absolute;left:4px;top:9px;width:8px;height:8px;border-radius:2px;background:var(--accent);}
+  ul.clean li b,ul.clean li strong{color:var(--ink);}
+  .pill{display:inline-block;font:700 11px/1 var(--mono);padding:5px 9px;border-radius:6px;letter-spacing:.03em;}
+  .pill.good{background:color-mix(in srgb,var(--good) 16%,transparent);color:var(--good);}
+  .pill.warn{background:color-mix(in srgb,var(--warn) 18%,transparent);color:var(--warn);}
+  .pill.crit{background:color-mix(in srgb,var(--crit) 16%,transparent);color:var(--crit);}
+
+  .prob{border:1px solid var(--line);border-radius:12px;padding:20px;background:var(--surface);}
+  .prob h4{margin:0 0 6px;font-size:15px;display:flex;align-items:center;gap:9px;}
+  .prob p{margin:0;color:var(--ink-2);font-size:14px;}
+  .prob .sev{width:9px;height:9px;border-radius:50%;flex:none;}
+  .sev.hi{background:var(--crit);} .sev.md{background:var(--warn);} .sev.lo{background:var(--muted);}
+
+  /* recommendations */
+  ol.recs{list-style:none;counter-reset:r;padding:0;margin:0;display:flex;flex-direction:column;gap:14px;}
+  ol.recs li{counter-increment:r;display:grid;grid-template-columns:44px 1fr;gap:16px;align-items:start;
+    background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px 20px;}
+  ol.recs li::before{content:counter(r,decimal-leading-zero);font:800 16px/1 var(--mono);color:var(--accent);
+    background:var(--accent-soft);border-radius:8px;padding:11px 0;text-align:center;}
+  ol.recs h4{margin:0 0 4px;font-size:15.5px;}
+  ol.recs p{margin:0;color:var(--ink-2);font-size:14px;}
+
+  footer{padding:40px 0 60px;color:var(--muted);font-size:13px;border-top:1px solid var(--line);}
+  .kbd{font:600 12px/1 var(--mono);background:var(--surface-2);border:1px solid var(--line);border-radius:5px;padding:2px 6px;color:var(--ink-2);}
+  .legend{display:flex;gap:18px;flex-wrap:wrap;font-size:12.5px;color:var(--muted);margin-top:14px;}
+  .legend span{display:inline-flex;align-items:center;gap:7px;}
+  .swatch{width:11px;height:11px;border-radius:3px;display:inline-block;}
+</style>
+</head>
+<body>
+
+<header class="bar">
+  <div class="bar-in">
+    <div class="brand"><span class="dot"></span> Lead Run Debrief</div>
+    <nav class="jump">
+      <a href="#funnel">Funnel</a>
+      <a href="#phases">Two Phases</a>
+      <a href="#runs">Runs</a>
+      <a href="#verify">Verify</a>
+      <a href="#niche">Niches</a>
+      <a href="#terms">Terms</a>
+      <a href="#worked">Worked</a>
+      <a href="#problems">Problems</a>
+      <a href="#next">Next Run</a>
+    </nav>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <div class="hero">
+    <div class="eyebrow">Prospecting Pipeline · 2026-07-08 daytime run</div>
+    <h1>497 qualified creators parked in one session — and a clear map of what to do differently next time.</h1>
+    <p class="lede">Twelve finder passes and nine verify batches drove <b>2,394 scanned leads</b> down to <b>497 verified, high-signal creators</b> in <code>approved_hold</code>, hitting the ~500 target. The efficiency was not uniform: the first four runs converted twice as well as the last eight. That split is the most useful thing we learned.</p>
+
+    <div class="result-band">
+      <div class="rb-cell hi"><div class="k">New → approved_hold</div><div class="v">497 <small>/ ~500 goal</small></div></div>
+      <div class="rb-cell"><div class="k">Base total now</div><div class="v">1,060 <small>from 563</small></div></div>
+      <div class="rb-cell"><div class="k">Leads scanned</div><div class="v">2,394</div></div>
+      <div class="rb-cell"><div class="k">Scored ≥6</div><div class="v">993 <small>41%</small></div></div>
+      <div class="rb-cell"><div class="k">Scanned → parked</div><div class="v">20.8%</div></div>
+    </div>
+  </div>
+
+  <!-- FUNNEL -->
+  <section id="funnel">
+    <div class="sec-head"><span class="sec-num">01</span><h2>The funnel, end to end</h2></div>
+    <p class="sec-sub">Every lead passes four gates: the scorer (≥6 to be pitchable), the demo-niche filter, email-find, and email-verify. Two gates do the heavy cutting — scoring and email-verify.</p>
+
+    <div class="card">
+      <div class="funnel">
+        <div class="fstep">
+          <div class="lab"><b>Scanned</b> raw channels found</div>
+          <div class="fbar-track"><div class="fbar b1" style="width:100%">2,394</div></div>
+        </div>
+        <div class="fstep">
+          <div class="lab"><b>Scored ≥6</b> signal threshold</div>
+          <div class="fbar-track"><div class="fbar b1" style="width:41.5%">993 <span class="pct">41% of scanned</span></div></div>
+        </div>
+        <div class="fstep">
+          <div class="lab"><b>Pitchable</b> ≥6 &amp; not demo-excluded</div>
+          <div class="fbar-track"><div class="fbar b2" style="width:38.3%">916 <span class="pct">92% of ≥6</span></div></div>
+        </div>
+        <div class="fstep">
+          <div class="lab"><b>Email verified</b> deliverable address</div>
+          <div class="fbar-track"><div class="fbar b3" style="width:20.8%">497 <span class="pct">54% of pitchable</span></div></div>
+        </div>
+        <div class="fstep">
+          <div class="lab"><b>Parked</b> in approved_hold</div>
+          <div class="fbar-track"><div class="fbar b3" style="width:20.8%">497 <span class="pct">100% of verified</span></div></div>
+        </div>
+      </div>
+      <div class="legend">
+        <span><span class="swatch" style="background:var(--muted)"></span>235 leads demo-niche-excluded (SaaS / AI / creative — never pitchable)</span>
+        <span><span class="swatch" style="background:var(--crit)"></span>419 pitchable leads lost at email-find/verify (276 no email, 143 invalid)</span>
+      </div>
+    </div>
+
+    <div class="callout">
+      <span class="tag">The binding constraint</span>
+      <p><strong>Email-verify — not scoring — is now the tightest gate.</strong> Only 54% of pitchable ≥6 leads had a findable, deliverable email. That single 46% loss (276 with no email on the channel, 143 with an invalid address) cost us more leads than the entire below-6 pile. To lift daily output, raising the <strong>verify rate</strong> matters as much as finding more ≥6 leads.</p>
+    </div>
+  </section>
+
+  <!-- TWO PHASES -->
+  <section id="phases">
+    <div class="sec-head"><span class="sec-num">02</span><h2>The headline finding: a two-speed day</h2></div>
+    <p class="sec-sub">Splitting the day at run 5 reveals a sharp efficiency cliff. Phase 1 ran fresh, high-ticket professional terms with no overlap. Phase 2 pushed into lower-ticket trades and re-ran depleted terms. Same effort, half the yield.</p>
+
+    <div class="grid2">
+      <div class="card" style="border-top:3px solid var(--good);">
+        <div class="pill good">PHASE 1 · RUNS 1–4</div>
+        <h3 style="margin-top:14px;">Fresh professional veins</h3>
+        <div class="bars">
+          <div class="brow"><span class="bl">Scanned</span><div class="btrack"><div class="bfill gray" style="width:50%"></div></div><span class="bv">802</span></div>
+          <div class="brow"><span class="bl">→ Parked</span><div class="btrack"><div class="bfill" style="width:32.3%"></div></div><span class="bv">259</span></div>
+        </div>
+        <div style="display:flex;gap:26px;margin-top:18px;">
+          <div><div style="font:800 28px/1 var(--sans);color:var(--good);font-variant-numeric:tabular-nums;">32%</div><div style="font-size:12px;color:var(--muted);margin-top:4px;">scanned → parked</div></div>
+          <div><div style="font:800 28px/1 var(--sans);color:var(--good);font-variant-numeric:tabular-nums;">66%</div><div style="font-size:12px;color:var(--muted);margin-top:4px;">email-verify rate</div></div>
+        </div>
+      </div>
+      <div class="card" style="border-top:3px solid var(--warn);">
+        <div class="pill warn">PHASE 2 · RUNS 5–12</div>
+        <h3 style="margin-top:14px;">Trades + overlap re-runs</h3>
+        <div class="bars">
+          <div class="brow"><span class="bl">Scanned</span><div class="btrack"><div class="bfill gray" style="width:100%"></div></div><span class="bv">1,592</span></div>
+          <div class="brow"><span class="bl">→ Parked</span><div class="btrack"><div class="bfill warnc" style="width:15%"></div></div><span class="bv">238</span></div>
+        </div>
+        <div style="display:flex;gap:26px;margin-top:18px;">
+          <div><div style="font:800 28px/1 var(--sans);color:var(--warn);font-variant-numeric:tabular-nums;">15%</div><div style="font-size:12px;color:var(--muted);margin-top:4px;">scanned → parked</div></div>
+          <div><div style="font:800 28px/1 var(--sans);color:var(--warn);font-variant-numeric:tabular-nums;">45%</div><div style="font-size:12px;color:var(--muted);margin-top:4px;">email-verify rate</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="callout">
+      <span class="tag">Why it matters</span>
+      <p>Phase 2 needed <strong>2× the scanning to produce fewer parked leads.</strong> Two causes stacked: (1) the round-4 expansion into low-ticket <em>trades</em> (junk removal, towing, locksmith) drew creators with weaker booking intent and fewer published emails; (2) after ~5 runs the fresh-term reservoir was exhausted, so runs re-hit overlapping terms (<code>new=0</code> on many). <strong>If the whole day had run at Phase 1 efficiency, ~500 parked would have taken ~1,550 scanned instead of 2,394.</strong></p>
+    </div>
+  </section>
+
+  <!-- RUNS -->
+  <section id="runs">
+    <div class="sec-head"><span class="sec-num">03</span><h2>Run by run</h2></div>
+    <p class="sec-sub">Twelve finder passes. Green dot = Phase 1 (fresh professional). Amber = Phase 2. Hit rate is score-≥6 as a share of new leads; it falls with the higher <span class="kbd">top-n</span> and trade terms in run 5, then stabilizes once professional terms are re-seeded.</p>
+
+    <div class="tbl-scroll">
+      <table>
+        <thead><tr><th>Run · time</th><th>top-n</th><th>New</th><th>Score ≥6</th><th>Demo-excl</th><th>Hit %</th><th>Note</th></tr></thead>
+        <tbody>
+          <tr class="phase-a rowmark"><td>R1 · 17:14</td><td>100</td><td>257</td><td><b>157</b></td><td>20</td><td>61%</td><td>seed + prune landed</td></tr>
+          <tr class="phase-a rowmark"><td>R2 · 18:30</td><td>100</td><td>~168</td><td>~66</td><td>54</td><td>—</td><td><span class="miniabort">aborted</span> (Airtable), writes kept</td></tr>
+          <tr class="phase-a rowmark"><td>R3 · 19:33</td><td>100</td><td>184</td><td><b>96</b></td><td>3</td><td>52%</td><td>proven queue, very clean</td></tr>
+          <tr class="phase-a rowmark"><td>R4 · 20:39</td><td>100</td><td>193</td><td><b>98</b></td><td>10</td><td>51%</td><td>steady</td></tr>
+          <tr class="phase-b rowmark"><td>R5 · 22:00</td><td>130</td><td>317</td><td>127</td><td>38</td><td>40%</td><td>trade terms dilute</td></tr>
+          <tr class="phase-b rowmark"><td>R6</td><td>110</td><td>242</td><td>54</td><td>27</td><td>~22%</td><td>overlap on repeaters</td></tr>
+          <tr class="phase-b rowmark"><td>R7</td><td>130</td><td>209</td><td>66</td><td>10</td><td>~32%</td><td>fresh pro terms restore</td></tr>
+          <tr class="phase-b rowmark"><td>R8</td><td>140</td><td>202</td><td><b>81</b></td><td>16</td><td>~40%</td><td>best of Phase 2</td></tr>
+          <tr class="phase-b rowmark"><td>R9</td><td>140</td><td>224</td><td>79</td><td>14</td><td>~35%</td><td>holding</td></tr>
+          <tr class="phase-b rowmark"><td>R10</td><td>140</td><td>166</td><td>57</td><td>22</td><td>~34%</td><td>reservoir thinning</td></tr>
+          <tr class="phase-b rowmark"><td>R11</td><td>130</td><td>129</td><td>38</td><td>13</td><td>~29%</td><td>heavy overlap</td></tr>
+          <tr class="phase-b rowmark"><td>R12</td><td>130</td><td>103</td><td>39</td><td>8</td><td>~38%</td><td>final top-up</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="font-size:12.5px;color:var(--muted);margin-top:12px;">Score-≥6 for R1–R5 is from the orchestrator log (includes a few demo-excluded); R6–R12 use the exact pitchable-≥6 count sent to verify. The orchestrator JSONL only logged R1–R5 — a logging gap worth fixing.</p>
+  </section>
+
+  <!-- VERIFY -->
+  <section id="verify">
+    <div class="sec-head"><span class="sec-num">04</span><h2>Email-verify: the rate that decayed</h2></div>
+    <p class="sec-sub">Each batch = the ≥6 leads from a run (or run-group) pushed through email-find + ZeroBounce. <span style="color:var(--good);font-weight:600;">Verified</span> · <span style="color:var(--muted);font-weight:600;">no email found</span> · <span style="color:var(--crit);font-weight:600;">invalid email</span>. The rate slid from 66% to the low-40s as batches moved down-market.</p>
+
+    <div class="card">
+      <div class="bars">
+        <div class="vbatch"><span class="bl">A · R1–4</span><div class="vseg"><span class="ok" style="width:66.2%"></span><span class="noem" style="width:17.1%"></span><span class="inv" style="width:16.6%"></span></div><span class="vpct" style="color:var(--good)">66%</span></div>
+        <div class="vbatch"><span class="bl">B · R5</span><div class="vseg"><span class="ok" style="width:49.5%"></span><span class="noem" style="width:40.5%"></span><span class="inv" style="width:9.9%"></span></div><span class="vpct">50%</span></div>
+        <div class="vbatch"><span class="bl">C · R6</span><div class="vseg"><span class="ok" style="width:42.6%"></span><span class="noem" style="width:33.3%"></span><span class="inv" style="width:24.1%"></span></div><span class="vpct">43%</span></div>
+        <div class="vbatch"><span class="bl">D · R7</span><div class="vseg"><span class="ok" style="width:47%"></span><span class="noem" style="width:36.4%"></span><span class="inv" style="width:16.7%"></span></div><span class="vpct">47%</span></div>
+        <div class="vbatch"><span class="bl">E · R8</span><div class="vseg"><span class="ok" style="width:54.3%"></span><span class="noem" style="width:37%"></span><span class="inv" style="width:8.6%"></span></div><span class="vpct" style="color:var(--good)">54%</span></div>
+        <div class="vbatch"><span class="bl">F · R9</span><div class="vseg"><span class="ok" style="width:40.5%"></span><span class="noem" style="width:35.4%"></span><span class="inv" style="width:24.1%"></span></div><span class="vpct">41%</span></div>
+        <div class="vbatch"><span class="bl">G · R10</span><div class="vseg"><span class="ok" style="width:43.9%"></span><span class="noem" style="width:47.4%"></span><span class="inv" style="width:8.8%"></span></div><span class="vpct">44%</span></div>
+        <div class="vbatch"><span class="bl">H · R11</span><div class="vseg"><span class="ok" style="width:34.2%"></span><span class="noem" style="width:52.6%"></span><span class="inv" style="width:13.2%"></span></div><span class="vpct" style="color:var(--crit)">34%</span></div>
+        <div class="vbatch"><span class="bl">I · R12</span><div class="vseg"><span class="ok" style="width:38.5%"></span><span class="noem" style="width:43.6%"></span><span class="inv" style="width:17.9%"></span></div><span class="vpct">38%</span></div>
+      </div>
+      <div class="legend">
+        <span><span class="swatch" style="background:var(--good)"></span>497 verified &amp; parked</span>
+        <span><span class="swatch" style="background:var(--muted)"></span>276 no email on channel (60% of losses)</span>
+        <span><span class="swatch" style="background:var(--crit)"></span>143 invalid / undeliverable</span>
+      </div>
+    </div>
+    <div class="callout">
+      <span class="tag">Read this</span>
+      <p><strong>“No email found” — not “invalid” — is the dominant failure (276 vs 143).</strong> That points at <em>who</em> we found, not at bad scraping: personal-brand coaches and small trade channels frequently publish no contact email, while real firms (law, financial advisory, brokerages) almost always do. The verify rate is essentially a proxy for how <em>firm-like</em> the batch is — which is why Phase 1's professional mix cleared 66% and the trade-heavy tail fell to 34%.</p>
+    </div>
+  </section>
+
+  <!-- NICHE -->
+  <section id="niche">
+    <div class="sec-head"><span class="sec-num">05</span><h2>What actually got parked, by niche</h2></div>
+    <p class="sec-sub">The 497 parked creators, average signal score ≈ 8.0. Real Estate was the surprise runaway leader; the professional-service veins (Legal, Financial, Sales) delivered both volume and the highest verify rates.</p>
+
+    <div class="card">
+      <div class="bars">
+        <div class="brow"><span class="bl">Real Estate</span><div class="btrack"><div class="bfill" style="width:100%"></div></div><span class="bv">112</span></div>
+        <div class="brow"><span class="bl">Legal Services</span><div class="btrack"><div class="bfill" style="width:84%"></div></div><span class="bv">94</span></div>
+        <div class="brow"><span class="bl">Coaching/Consult</span><div class="btrack"><div class="bfill" style="width:53%"></div></div><span class="bv">59</span></div>
+        <div class="brow"><span class="bl">Sales Training</span><div class="btrack"><div class="bfill" style="width:46%"></div></div><span class="bv">51</span></div>
+        <div class="brow"><span class="bl">Financial Plan.</span><div class="btrack"><div class="bfill" style="width:46%"></div></div><span class="bv">51</span></div>
+        <div class="brow"><span class="bl">Business Growth</span><div class="btrack"><div class="bfill" style="width:29%"></div></div><span class="bv">32</span></div>
+        <div class="brow"><span class="bl">Health &amp; Wellness</span><div class="btrack"><div class="bfill gray" style="width:22%"></div></div><span class="bv">25</span></div>
+        <div class="brow"><span class="bl">Marketing Agency</span><div class="btrack"><div class="bfill gray" style="width:19%"></div></div><span class="bv">21</span></div>
+        <div class="brow"><span class="bl">Tax &amp; Accounting</span><div class="btrack"><div class="bfill" style="width:10%"></div></div><span class="bv">11</span></div>
+        <div class="brow"><span class="bl">Practice Growth</span><div class="btrack"><div class="bfill" style="width:10%"></div></div><span class="bv">11</span></div>
+        <div class="brow"><span class="bl">Other / misc</span><div class="btrack"><div class="bfill gray" style="width:13%"></div></div><span class="bv">15</span></div>
+      </div>
+    </div>
+
+    <div class="grid3" style="margin-top:16px;">
+      <div class="card"><h3 style="margin-top:0;">Winning term shapes</h3><ul class="clean" style="font-size:13.5px;">
+        <li><b>“how to get clients for [service]”</b> — 48% qualified on the best variants; surfaces the coach who teaches that trade.</li>
+        <li><b>“financial advisor for [profession]”</b> — retirees, physicians, pilots, FERS (14–18%).</li>
+        <li><b>Legal specialties</b> — immigration, PI, workers-comp, mass tort (16–18%, high email-find).</li>
+      </ul></div>
+      <div class="card"><h3 style="margin-top:0;">Best verify rates</h3><ul class="clean" style="font-size:13.5px;">
+        <li><b>Legal &amp; Financial</b> — real firms almost always publish an email.</li>
+        <li><b>RE brokerages</b> — strong contact info.</li>
+        <li><span class="pill warn">weak</span> personal-brand coaches &amp; small trades — frequently no email.</li>
+      </ul></div>
+      <div class="card"><h3 style="margin-top:0;">Dead weight cut</h3><ul class="clean" style="font-size:13.5px;">
+        <li><b>Demo niches</b> (SaaS/AI/creative) — auto-excluded, 0 parked.</li>
+        <li><b>Low-ticket trades</b> — 40% hit, 50% verify.</li>
+        <li><b>Consumer &amp; “Other”</b> — 5% hit; biggest scan waste when unfiltered.</li>
+      </ul></div>
+    </div>
+  </section>
+
+  <!-- TERMS -->
+  <section id="terms">
+    <div class="sec-head"><span class="sec-num">06</span><h2>Term engineering that made the difference</h2></div>
+    <p class="sec-sub">The search-term table was actively curated all day. This is what moved the hit rate from yesterday's 39% blend to Phase 1's 52–61%.</p>
+    <div class="grid3">
+      <div class="card"><div style="font:800 34px/1 var(--sans);color:var(--accent-2);font-variant-numeric:tabular-nums;">−621</div><h3 style="margin:8px 0 4px;">terms paused</h3><p style="font-size:13.5px;color:var(--ink-2);margin:0;">351 proven dead-vein (0% qualified despite 40–150 channels), 234 unrun weak-Marketing, 36 creative/tech drift.</p></div>
+      <div class="card"><div style="font:800 34px/1 var(--sans);color:var(--accent-2);font-variant-numeric:tabular-nums;">+315</div><h3 style="margin:8px 0 4px;">fresh terms added</h3><p style="font-size:13.5px;color:var(--ink-2);margin:0;">Across 8 batches, concentrated in the proven professional veins, hand-authored + autocomplete-mined.</p></div>
+      <div class="card"><div style="font:800 34px/1 var(--sans);color:var(--accent-2);font-variant-numeric:tabular-nums;">75</div><h3 style="margin:8px 0 4px;">priority for new terms</h3><p style="font-size:13.5px;color:var(--ink-2);margin:0;">Bumped above the default 50 so fresh terms <em>lead</em> each run — without this they sat buried under stale ones.</p></div>
+    </div>
+    <div class="callout">
+      <span class="tag">Autocomplete mining verdict</span>
+      <p>Zero-quota YouTube-autocomplete mining (7,000+ suggestions across two rounds) was <strong>only useful for the “how to get clients for [business]” shape</strong>. Profession-descriptor seeds (“immigration attorney…”, “how to close…”) returned near-pure noise — pop-culture, geo, and exam-prep results (<em>ace attorney, how to close a bag of chips</em>). For legal/financial, <strong>hand-authored specialty lists beat mining decisively.</strong></p>
+    </div>
+  </section>
+
+  <!-- WORKED -->
+  <section id="worked">
+    <div class="sec-head"><span class="sec-num">07</span><h2>What worked well</h2></div>
+    <ul class="clean">
+      <li><b>Seed-then-prune before running.</b> Pausing 585 weak terms and seeding proven veins lifted run-1 hit rate to 61% (vs 39% yesterday) and dropped demo-exclusion to 8%.</li>
+      <li><b>Host-finding is no longer a bottleneck.</b> ~100% host-identified across every run — the fixed 5-step cascade held up under volume.</li>
+      <li><b>Measuring the verify rate mid-run instead of assuming it.</b> The first verify batch confirmed 66%, which calibrated exactly how many more runs were needed rather than guessing.</li>
+      <li><b>Running verify concurrently with the finder.</b> After Airtable stabilized, overlapping the two processes (different repos, different rows) saved substantial wall-clock without conflicts.</li>
+      <li><b>Real Estate over-delivered.</b> An under-weighted vein going in, it became the #1 source of parked leads (112) — worth a bigger deliberate allocation next time.</li>
+    </ul>
+  </section>
+
+  <!-- PROBLEMS -->
+  <section id="problems">
+    <div class="sec-head"><span class="sec-num">08</span><h2>Problems &amp; hiccups</h2></div>
+    <div class="grid2">
+      <div class="prob"><h4><span class="sev md"></span>Airtable transient “Try again” errors</h4><p>Aborted run 2 mid-pass and briefly blocked report queries. Writes are durable so no leads were lost, but it cost ~half a run. Airtable-side degradation, not our code — retry logic absorbed most of it.</p></div>
+      <div class="prob"><h4><span class="sev hi"></span>Overlap collapse after ~5 runs</h4><p>The fresh-term reservoir drained, so later runs re-hit the same terms (<code>new=0</code> everywhere). Yield/run fell from 157 → ~38 score-≥6. Each late run needed mid-flight term authoring to stay alive.</p></div>
+      <div class="prob"><h4><span class="sev md"></span>Priority-ordering trap</h4><p>New terms default to priority 50 — the same as ~100 stale Coaching terms — so they sat un-pulled until manually bumped. Fresh terms must outrank the backlog or they never run.</p></div>
+      <div class="prob"><h4><span class="sev md"></span>Trade-term dilution (round 4)</h4><p>Expanding into low-ticket trades (junk removal, towing, locksmith) dropped hit rate to 40% and verify to 50%. These creators book less and publish fewer emails than professional-service coaches.</p></div>
+      <div class="prob"><h4><span class="sev lo"></span>Verify-rate decay to 34%</h4><p>As batches moved down-market and into overlap, deliverable-email rate slid from 66% to 34% — the clearest signal that we were scraping the bottom of the current term set.</p></div>
+      <div class="prob"><h4><span class="sev lo"></span>Orchestrator JSONL logging gap</h4><p>Only runs 1–5 wrote a yield line; runs 6–12 are missing from <code>orchestrator-2026-07-08.jsonl</code>. Reconstructable from finder logs, but worth fixing for clean run accounting.</p></div>
+    </div>
+  </section>
+
+  <!-- NEXT -->
+  <section id="next">
+    <div class="sec-head"><span class="sec-num">09</span><h2>How to run the next batch better</h2></div>
+    <p class="sec-sub">Ranked by expected impact on qualified-leads-per-hour. The theme: spend more of the day in the Phase-1 regime.</p>
+    <ol class="recs">
+      <li><div><h4>Pre-build a 6–8 run reservoir of fresh professional terms <em>before</em> starting</h4><p>The single biggest lever. Have ~400–500 un-run terms queued in Legal specialties, “financial advisor for [profession]”, “how to get clients for [professional service]”, and RE-investor niches so the whole day runs at 30%+ efficiency and never falls into overlap re-runs. No mid-flight authoring.</p></div></li>
+      <li><div><h4>Weight toward firm-heavy niches to raise the verify rate</h4><p>Verify rate ≈ how firm-like the batch is. Legal, Financial-advisory, Tax, and RE-brokerages publish emails; personal-brand coaches and trades often don't. Shifting the mix toward firms could lift verify from 54% → 65%+, which is worth ~100 extra parked leads per day at the same scan volume.</p></div></li>
+      <li><div><h4>Cap or skip low-ticket trades</h4><p>“how to get clients for [junk removal / towing / locksmith]” diluted both hit and verify. Keep the shape for <em>professional</em> services (law, accounting, financial, medical practices, agencies); drop the sub-$X trades unless volume is desperate.</p></div></li>
+      <li><div><h4>Set new-term priority above the default automatically</h4><p>Bake the “bump fresh terms to 75” step into the add-terms flow so new terms always lead the queue. Manual bumping worked but is easy to forget and cost a run of buried terms.</p></div></li>
+      <li><div><h4>Budget by the real funnel constants</h4><p>Plan with <b>~1.8 pitchable ≥6 per desired parked lead</b> (55% verify) and <b>~2.4 scanned per ≥6</b> (41% hit). For 500 parked: ~900 pitchable ≥6, ~2,200 scanned — achievable in ~5–6 runs <em>if</em> quality stays in the Phase-1 band.</p></div></li>
+      <li><div><h4>Stop autocomplete-mining legal/financial; keep it only for “get clients for [X]”</h4><p>Mining returned 95% noise for profession seeds. Maintain a curated, hand-authored master list of legal specialties and advisor-for-profession terms instead — it's higher yield per minute of effort.</p></div></li>
+      <li><div><h4>Overlap verify with the finder from the start</h4><p>It's safe (separate repos/rows) and saved real wall-clock once adopted. Kick off verify on each run's ≥6 batch as soon as the run lands, rather than pooling to the end.</p></div></li>
+      <li><div><h4>Investigate the 276 “no email found”</h4><p>60% of all losses. Worth a small spike: are we missing emails that exist (scraper coverage) vs. genuinely absent (channel has none)? If even 20% are recoverable with a deeper find pass, that's ~55 more parked leads/day for free.</p></div></li>
+    </ol>
+  </section>
+
+  <footer>
+    <div class="wrap" style="padding:0;">
+      Session 2026-07-08 · 12 finder runs · 9 verify batches · 497 new → <code>approved_hold</code> (base 563 → 1,060).
+      Everything parked, nothing sent — <code>approved_hold</code> holds until the new email process is ready.
+      Source: orchestrator + finder run logs, <code>search_terms</code> performance table, live lead base.
+    </div>
+  </footer>
+
+</div>
+
+</body>
+</html>

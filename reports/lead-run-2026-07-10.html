@@ -1,0 +1,183 @@
+<title>Lead Run Debrief — 2026-07-10</title>
+<style>
+  :root {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+      --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+      --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+    --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+    --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 40px 22px 80px; }
+  .eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); font-weight: 600; }
+  h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.12; margin: 10px 0 6px; text-wrap: balance; letter-spacing: -.02em; }
+  h2 { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); margin: 44px 0 16px; font-weight: 700; }
+  h3 { font-size: 18px; margin: 0 0 6px; letter-spacing: -.01em; }
+  p { margin: 0 0 14px; }
+  .lede { font-size: 18px; color: var(--ink-soft); max-width: 68ch; }
+  .tag { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--amber-soft); color: var(--amber); letter-spacing: .02em; }
+  .grid { display: grid; gap: 14px; }
+  .stats { grid-template-columns: repeat(4, 1fr); margin-top: 26px; }
+  @media (max-width: 720px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; box-shadow: var(--shadow); }
+  .stat .n { font-size: 30px; font-weight: 750; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .stat .l { font-size: 12.5px; color: var(--ink-soft); margin-top: 3px; }
+  .stat .s { font-size: 12px; margin-top: 8px; font-weight: 600; }
+  .up { color: var(--good); } .down { color: var(--red); } .warn { color: var(--amber); }
+  .accent-red { border-left: 3px solid var(--red); }
+  .accent-teal { border-left: 3px solid var(--teal); }
+  .accent-amber { border-left: 3px solid var(--amber); }
+
+  /* shape-of-day bar strip */
+  .strip { display: flex; align-items: flex-end; gap: 2px; height: 120px; padding: 14px 14px 10px; overflow-x: auto; }
+  .bar { flex: 1 0 6px; min-width: 5px; border-radius: 2px 2px 0 0; background: var(--teal); opacity: .9; }
+  .bar.zero { background: var(--red); height: 4px !important; opacity: .9; }
+  .bar.low { background: var(--amber); }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-soft); padding: 0 14px 14px; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+
+  .q { border-radius: 14px; padding: 20px 22px; margin-bottom: 14px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); }
+  .q .ask { font-size: 17px; font-weight: 700; color: var(--ink); margin-bottom: 10px; display: flex; gap: 10px; align-items: baseline; }
+  .q .ask .qn { color: var(--red); font-weight: 800; flex: 0 0 auto; }
+  .q p { color: var(--ink-soft); }
+  .q b { color: var(--ink); }
+  .pill { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink); background: var(--panel-2); padding: 1px 7px; border-radius: 6px; border: 1px solid var(--line); white-space: nowrap; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+  th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); }
+  td .num { font-variant-numeric: tabular-nums; font-weight: 650; }
+  .fix td:first-child { color: var(--good); font-weight: 650; }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); box-shadow: var(--shadow); }
+  ol.recs { padding-left: 0; list-style: none; counter-reset: r; margin: 0; }
+  ol.recs li { counter-increment: r; position: relative; padding: 14px 16px 14px 52px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 10px; box-shadow: var(--shadow); }
+  ol.recs li::before { content: counter(r); position: absolute; left: 14px; top: 14px; width: 26px; height: 26px; border-radius: 8px; background: var(--teal-soft); color: var(--teal); font-weight: 800; font-size: 14px; display: grid; place-items: center; }
+  ol.recs b { color: var(--ink); }
+  .foot { margin-top: 46px; padding: 16px 18px; border-radius: 12px; background: var(--amber-soft); border: 1px solid var(--line); font-size: 14px; color: var(--ink-soft); }
+  .foot b { color: var(--ink); }
+  .muted { color: var(--ink-soft); font-size: 13.5px; }
+</style>
+
+<div class="wrap">
+
+  <div class="eyebrow">Lead Run Debrief · YouTube outreach</div>
+  <h1>2026-07-10 — a rough day, fully diagnosed</h1>
+  <p class="lede">The finder spent the afternoon re-mining ground it had already stripped: <b>full API cost per term, almost no new leads.</b> One bug (term-starvation) drove both the low yield <em>and</em> the quota blowout. The morning ran fine — the middle of the day fell off a cliff.</p>
+  <div style="margin-top:14px"><span class="tag">CUT EARLY TO PRESERVE YOUTUBE QUOTA</span></div>
+
+  <div class="grid stats">
+    <div class="card stat accent-teal">
+      <div class="n">+124</div>
+      <div class="l">parked → <code>approved_hold</code></div>
+      <div class="s down">≈26% of a normal day</div>
+    </div>
+    <div class="card stat">
+      <div class="n">+480</div>
+      <div class="l">yesterday, for reference</div>
+      <div class="s muted">07-09 full day</div>
+    </div>
+    <div class="card stat accent-red">
+      <div class="n">86,993</div>
+      <div class="l">channels fetched (API cost)</div>
+      <div class="s down">→ 2,662 new (3.1%)</div>
+    </div>
+    <div class="card stat accent-amber">
+      <div class="n">99.9%</div>
+      <div class="l">of daily RapidAPI request cap</div>
+      <div class="s warn">+ 268 direct-key rotations</div>
+    </div>
+  </div>
+
+  <h2>The shape of the day</h2>
+  <div class="card" style="padding:0">
+    <div class="strip" id="strip"></div>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--teal)"></span>healthy pass (≥12 fresh pitchable)</span>
+      <span><span class="dot" style="background:var(--amber)"></span>weak (1–11)</span>
+      <span><span class="dot" style="background:var(--red)"></span>dead pass (0) — <b>17 in a row mid-day</b></span>
+    </div>
+  </div>
+  <p class="muted">Each bar = one finder pass (87 total, 00:56→23:31), height = fresh pitchable found. The red block is the term-starvation stall; the small final cluster is the post-fix recovery after terms were reactivated.</p>
+
+  <h2>The three questions</h2>
+
+  <div class="q accent-red">
+    <div class="ask"><span class="qn">Q1</span><span>Why did today suck so much?</span></div>
+    <p><b>One dominant cause: term-starvation.</b> The finder only mines <em>active</em> search terms by priority. By mid-day the <b>entire active pool had decayed to negative priority</b> — every mineable term was already exhausted — while the good supply (274 never-run terms + all fresh discovery probes) sat <b>paused and invisible</b> to the finder. Result: <span class="pill">17 consecutive passes at 0 fresh leads</span>. That dead stretch is most of the gap to a normal day.</p>
+    <p>Aggravators: (2) supply started thinner — yesterday's +480 drained the fresh proven terms; (3) frontier niches verify at ~38% vs 47%, so more leads went to <code>needs_contact</code> (<b>+180</b>) than <code>approved_hold</code> (<b>+124</b>); (4) a mid-day network blip (<code>ENOTFOUND</code>) <b>hard-crashed the run</b> because the driver wasn't resilient to DNS errors; (5) 10 restarts added pre-flight overhead.</p>
+  </div>
+
+  <div class="q accent-red">
+    <div class="ask"><span class="qn">Q2</span><span>Why did it burn way more YouTube API than usual?</span></div>
+    <p><b>Same root cause, seen from the cost side.</b> A saturated term isn't cheap to discover it's saturated — the finder still pays the <b>full</b> quota for it (a search call + channel-detail fetches for ~50 candidates) and only <em>then</em> finds every candidate is a dupe or hard-filtered. A representative pass: <span class="pill">seen 400 · filtered 318 · dup 81 · new 1</span>.</p>
+    <p>Across the day that's <b>86,993 channels fetched → 2,662 new (3.1%)</b> — ~97% of the API spend bought nothing, ~<b>700 fetches per parked lead</b>. Amplifiers stacked on top: <code>--concurrent 2</code> doubled the burn rate, <b>43 discovery cycles</b> each ran extra validation searches, and <b>10 restarts</b> re-ran the pre-flight each time. The safety-net RapidAPI tier hit <b>99.9%</b> of its daily request cap unattended.</p>
+  </div>
+
+  <div class="q accent-red">
+    <div class="ask"><span class="qn">Q3</span><span>Why did it find way fewer leads than usual?</span></div>
+    <p>Because <b>the fresh-lead engine was starved of minable terms</b> — not because the channel universe ran out. Two proofs it was starvation, not true exhaustion:</p>
+    <p>① <b>The instant it was unblocked, yield returned.</b> Manually reactivating the 274 never-run paused terms produced <span class="pill">26 fresh pitchable on the very next pass</span> (then 8, 18, 5, 12) — straight back to healthy levels. ② <b>The finder kept seeing 322–400 channels every pass</b> — they were just already-known for the exhausted terms it was forced to mine. Fresh terms existed but were administratively locked out of the active pool (probes auto-pause; winners only promote at run-end; the 274 sat paused).</p>
+  </div>
+
+  <h2>What broke → what's fixed</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Issue</th><th>Mechanism</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr><td>Term-starvation stall</td><td>Active pool all-negative; good terms paused &amp; unreachable</td><td class="up">Unblocked live (274 terms reactivated); permanent guard recommended</td></tr>
+        <tr><td>Network crash (<code>ENOTFOUND</code>)</td><td>DNS error not in retry regex + unhandled floating promise → hard exit</td><td class="up">Fixed: DNS errors retryable; <code>.catch</code> + global rejection guard</td></tr>
+        <tr><td>Verify couldn't keep up</td><td>1 lane @ concurrency 4 vs 2 finders</td><td class="up">Fixed: verify @ concurrency 8 — pool now drains fast</td></tr>
+        <tr><td>API-burn-for-nothing</td><td>Full fetch cost on saturated terms before overlap detected</td><td class="warn">Open — needs early saturation bail (recommended #2)</td></tr>
+        <tr><td>Unattended quota blowout</td><td>No per-session YouTube budget governor</td><td class="warn">Open — recommended #4</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Recommended next — ranked</h2>
+  <ol class="recs">
+    <li><b>Anti-starvation guard in the finder (highest leverage, cheap).</b> When the top active priority drops to ≤0, auto-reactivate the best never-run paused terms (or promote paused probe winners) <em>before</em> selecting a pass. This alone would have prevented today's 17 dead passes.</li>
+    <li><b>Cheap saturation detection.</b> Spot <code>overlap_warning</code> from the search result set <em>before</em> paying for 50 channel-detail fetches — bail a term early once its candidates are mostly known IDs. Cuts the API-burn-for-nothing directly.</li>
+    <li><b>Promote probe winners mid-run</b>, not just at campaign end — run <code>evaluate-probes</code> every few fades so converting veins re-enter the active pool the same session.</li>
+    <li><b>Per-session YouTube-quota governor</b> in the campaign — stop launching concurrent passes once RapidAPI search crosses ~80%, so a long run can't drain the day's quota unattended (today hit 99.9%).</li>
+    <li><b>The <code>needs_contact</code> recovery engine (biggest volume lever, deferred).</b> 2,353 found-and-scored creators with no verified email. Recovering ~30% (~700) dwarfs a day of fresh finding and sidesteps the whole term-supply ceiling. Awaiting greenlight.</li>
+  </ol>
+
+  <div class="foot">
+    <b>Status caveat:</b> everything is <b>parked</b>, nothing sent. <code>approved_hold</code> is a deliberate holding lane — leads sit there until the intended email process is ready. Today's +124 joins a base of 1,540 → <b>1,664 parked</b>. Campaign stopped cleanly, process tree killed, lockfile cleared, YouTube quota preserved for other tasks. Resilience fixes are staged in the orchestrator repo (uncommitted, per commit-when-asked).
+  </div>
+
+</div>
+
+<script>
+  // fresh_pitchable per pass, chronological (from logs/campaign-2026-07-10.jsonl)
+  var seq = [64,46,73,46,54,59,59,59,50,42,36,17,26,30,52,19,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,6,6,13,6,6,4,5,5,7,7,5,2,8,6,6,3,15,5,11,22,8,11,4,22,22,6,13,8,10,10,10,4,2,3,0,29,24,11,16,2,45,6,14,2,4,0,0,0,26,8,18,5,12,12];
+  var max = Math.max.apply(null, seq);
+  var strip = document.getElementById('strip');
+  seq.forEach(function (v) {
+    var b = document.createElement('div');
+    b.className = 'bar' + (v === 0 ? ' zero' : v < 12 ? ' low' : '');
+    b.style.height = Math.max(4, Math.round((v / max) * 100)) + '%';
+    b.title = v + ' fresh pitchable';
+    strip.appendChild(b);
+  });
+</script>
