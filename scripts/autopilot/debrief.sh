@@ -79,5 +79,11 @@ if [ -s "$OUT" ]; then
     --note "daily debrief+improve $DATE" || true
 fi
 
+# Mirror the debrief into the repo's reports/ folder (canonical home stays the brain;
+# Casey wants all reports gathered under reports/ too — 2026-07-13).
+mkdir -p "$REPO/reports"
+cp "$BRAIN/brain/lead-gen/runs/lead-run-$DATE.html" "$REPO/reports/" 2>/dev/null || true
+cp "$BRAIN/brain/lead-gen/runs/lead-run-$DATE-analysis.md" "$REPO/reports/" 2>/dev/null || true
+
 echo "[debrief.sh] debrief agent finished (rc=$agent_rc); cost recorded from $OUT"
 exit 0

@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Creator Supply Expansion — Research Report · 2026-07-13</title>
+<style>
+  :root {
+    --surface: #fcfcfb; --plane: #f9f9f7;
+    --ink: #0b0b0b; --ink-2: #52514e; --muted: #898781;
+    --hairline: #e1e0d9; --border: rgba(11,11,11,0.10);
+    --accent: #2a78d6; --accent-wash: rgba(42,120,214,0.08);
+    --good: #0ca30c; --warning: #fab219; --serious: #ec835a; --critical: #d03b3b;
+    --good-text: #006300;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --surface: #1a1a19; --plane: #0d0d0d;
+      --ink: #ffffff; --ink-2: #c3c2b7; --muted: #898781;
+      --hairline: #2c2c2a; --border: rgba(255,255,255,0.10);
+      --accent: #3987e5; --accent-wash: rgba(57,135,229,0.12);
+      --good-text: #0ca30c;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--plane); color: var(--ink);
+    font: 16px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif;
+    -webkit-text-size-adjust: 100%;
+  }
+  .page { max-width: 980px; margin: 0 auto; padding: 48px 24px 96px; }
+  .kicker { font-size: 12px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
+  h1 { font-size: 34px; line-height: 1.15; margin: 8px 0 6px; letter-spacing: -0.02em; }
+  .meta { color: var(--muted); font-size: 14px; margin-bottom: 8px; }
+  h2 { font-size: 22px; margin: 56px 0 4px; letter-spacing: -0.01em; }
+  h2 .no { color: var(--muted); font-weight: 600; margin-right: 8px; }
+  h3 { font-size: 16px; margin: 28px 0 8px; }
+  .sub { color: var(--ink-2); margin: 0 0 20px; }
+  p { color: var(--ink-2); }
+  strong { color: var(--ink); }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin: 28px 0 8px; }
+  .tile { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px 18px; }
+  .tile .label { font-size: 13px; color: var(--muted); }
+  .tile .value { font-size: 30px; font-weight: 600; margin-top: 2px; letter-spacing: -0.01em; }
+  .tile .note { font-size: 12.5px; color: var(--ink-2); margin-top: 4px; }
+
+  .toc { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; margin-top: 24px; font-size: 14.5px; }
+  .toc b { font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+  .toc ol { margin: 8px 0 0; padding-left: 20px; }
+  .toc li { margin: 3px 0; }
+
+  .callout { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 8px; padding: 14px 18px; margin: 20px 0; }
+  .callout.warn { border-left-color: var(--serious); }
+  .callout p { margin: 6px 0; }
+
+  .tablewrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; margin: 18px 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  th { text-align: left; font-weight: 600; color: var(--muted); font-size: 12.5px; letter-spacing: .04em; text-transform: uppercase; padding: 12px 14px; border-bottom: 1px solid var(--hairline); white-space: nowrap; }
+  td { padding: 11px 14px; border-bottom: 1px solid var(--hairline); vertical-align: top; color: var(--ink-2); }
+  tr:last-child td { border-bottom: none; }
+  td b, td strong { color: var(--ink); }
+  td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .seed { font-size: 13px; color: var(--muted); }
+
+  .chip { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; padding: 2px 9px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); white-space: nowrap; }
+  .chip .dot { width: 8px; height: 8px; border-radius: 50%; }
+  .chip.good .dot { background: var(--good); } .chip.good { color: var(--good-text); }
+  .chip.warn .dot { background: var(--warning); } .chip.warn { color: var(--ink); }
+  .chip.serious .dot { background: var(--serious); } .chip.serious { color: var(--ink); }
+  .chip.crit .dot { background: var(--critical); } .chip.crit { color: var(--critical); }
+  .chip.mut .dot { background: var(--muted); } .chip.mut { color: var(--muted); }
+
+  .rank { display: flex; gap: 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px 18px; margin: 12px 0; }
+  .rank .n { font-size: 22px; font-weight: 700; color: var(--accent); min-width: 30px; line-height: 1.2; }
+  .rank h4 { margin: 0 0 4px; font-size: 15.5px; color: var(--ink); }
+  .rank p { margin: 0; font-size: 14px; }
+  .rank .tag { font-size: 12px; color: var(--muted); margin-top: 6px; }
+
+  .pending { border: 1px dashed var(--hairline); border-radius: 10px; padding: 16px 18px; color: var(--muted); background: transparent; }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.88em; background: var(--accent-wash); border-radius: 4px; padding: 1px 5px; color: var(--ink); }
+  ul { color: var(--ink-2); } li { margin: 4px 0; }
+  .footer { margin-top: 64px; padding-top: 16px; border-top: 1px solid var(--hairline); color: var(--muted); font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="kicker">Research report</div>
+  <h1>Creator Supply Expansion</h1>
+  <div class="meta">2026-07-13 · youtube-outreach-orchestrator-v1 · multi-agent research (2 standalone deep-dives + a 5-phase probe workflow)</div>
+  <p class="sub"><strong>The question:</strong> the keyword-term engine that feeds the lead finder is saturating (~3,856 terms run; the discovery LLM reconverges on the same phrasings). How do we <em>consistently</em> keep finding net-new YouTube creators who fit the ICP — educational-video creators selling a high-ticket service — at signal score ≥ 6?</p>
+
+  <div class="tiles">
+    <div class="tile"><div class="label">Net-new verticals identified</div><div class="value">12</div><div class="note">+ 4 near-misses, each with seed terms</div></div>
+    <div class="tile"><div class="label">Candidate terms per keyword harvest</div><div class="value">1.5–6K</div><div class="note">after dedupe + ICP prefilter; repeatable monthly</div></div>
+    <div class="tile"><div class="label">Cost of an industrial harvest</div><div class="value">$1–5</div><div class="note">DataForSEO today; $0 via Google Ads API once approved</div></div>
+    <div class="tile"><div class="label">Build effort for keyword layer v1</div><div class="value">2–3 days</div><div class="note">plugs into the existing probe → promote/retire loop unchanged</div></div>
+  </div>
+
+  <div class="toc">
+    <b>Contents</b>
+    <ol>
+      <li><a href="#framing">The real bottleneck (and the two constraints)</a></li>
+      <li><a href="#keywords">Track 1 — Industrialize keyword generation</a></li>
+      <li><a href="#verticals">Track 2 — Expand the vertical universe</a></li>
+      <li><a href="#mechanism">The repeatable vertical-discovery engine</a></li>
+      <li><a href="#probes">Track 3 — Live-probed mechanisms (workflow)</a></li>
+      <li><a href="#actions">Recommended actions, ranked</a></li>
+    </ol>
+  </div>
+
+  <h2 id="framing"><span class="no">01</span>The real bottleneck</h2>
+  <p>"We ran out of keywords" is only partly true. Three facts reframe it:</p>
+  <ul>
+    <li><strong>Creators are not exhausted — easy <em>query supply</em> is.</strong> Each genuinely fresh term still yields ~0.9 pitchable creators. The drought is in net-new term <em>ideas</em>, because a freeform LLM brainstorm collapses back into its own priors.</li>
+    <li><strong>The second constraint is email verification.</strong> Only ~40–54% of pitchable creators have an auto-verifiable email; ~2,600 score-≥6 creators already sit unreachable in <code>needs_contact</code>. Mechanisms that surface creators with <em>findable business emails</em> are worth extra.</li>
+    <li><strong>Once generation is industrialized, the bottleneck moves.</strong> Every candidate term still costs a 100-unit YouTube search to validate — so after Track 1 ships, probe-testing throughput and verify-rate become the frontier again. That is what Track 3's graph/playlist mechanisms attack (1–2 API units for <em>many</em> channels instead of 100 per search).</li>
+  </ul>
+
+  <h2 id="keywords"><span class="no">02</span>Track 1 — Industrialize keyword generation</h2>
+  <p class="sub">Stop asking an LLM to imagine phrasings; mine them from data at scale.</p>
+
+  <h3>Google Keyword Planner (Google Ads API) — worth applying, not worth waiting for</h3>
+  <ul>
+    <li><strong>Access changed Oct 2025:</strong> new developer tokens land in an "Explorer" tier that <em>blocks keyword planning</em>; test accounts return dummy data. Real <code>GenerateKeywordIdeas</code> requires <strong>Basic Access</strong> — free, "keyword research" is now an accepted use case, but there is an acknowledged application backlog (Feb 2026): realistically <strong>1–4+ weeks</strong>.</li>
+    <li><strong>Capacity once approved:</strong> seeds of 20 keywords/request, URL seeding, whole-site seeding (up to 250K ideas/domain), 10K ideas per page, free. Seeding with ~50 proven winner terms + 20 winner business sites ≈ <strong>20K–60K raw strings → ~1,500–6,000 net-new ICP-relevant probe terms</strong> per harvest, repeatable monthly.</li>
+    <li><strong>Caveat:</strong> volumes are Google-search, not YouTube — acceptable, because we need idea <em>breadth</em>; the probe → promote/retire loop already measures actual YouTube yield.</li>
+  </ul>
+
+  <h3>Alternatives compared</h3>
+  <div class="tablewrap"><table>
+    <tr><th>Source</th><th>Friction</th><th>Cost</th><th>YouTube-specific</th><th>Verdict</th></tr>
+    <tr><td><b>YouTube autocomplete</b> (<code>ds=yt</code>)</td><td>Zero — no key; partial miner already exists (<code>scripts/mine-autocomplete.ts</code>)</td><td>Free</td><td><b>Yes — literally YouTube search behavior</b></td><td><span class="chip good"><span class="dot"></span>Start here</span> — a–z + 2nd-level recursion ≈ 3–10K strings/day</td></tr>
+    <tr><td><b>Google autocomplete</b> (same endpoint, no <code>ds=yt</code>)</td><td>Zero</td><td>Free</td><td>No</td><td><span class="chip good"><span class="dot"></span>Free adjunct</span> — one param, client-demand phrasings</td></tr>
+    <tr><td><b>DataForSEO</b> (Keywords Data + Labs)</td><td>Sign-up + $50 deposit; usable in ~1h</td><td>~$0.06/task; <b>entire 50-winner harvest ≈ $1–5</b></td><td>No (resells Google Ads data)</td><td><span class="chip good"><span class="dot"></span>Best paid</span> — Keyword Planner data <em>without</em> the approval queue</td></tr>
+    <tr><td><b>Google Ads API</b> (Keyword Planner)</td><td>Basic Access application; 1–4+ wks backlog</td><td>Free</td><td>No</td><td><span class="chip warn"><span class="dot"></span>Apply now, integrate later</span> — replaces DataForSEO at $0 when it clears</td></tr>
+    <tr><td>Google Trends API / pytrends</td><td>Alpha-gated / archived Apr 2025</td><td>—</td><td>No</td><td><span class="chip crit"><span class="dot"></span>Skip</span></td></tr>
+    <tr><td>KeywordTool.io / Ahrefs / Semrush</td><td>Subscriptions</td><td>$1.2K–18K/yr floors</td><td>Partial</td><td><span class="chip crit"><span class="dot"></span>Skip</span> — dominated by free/cheap tiers above</td></tr>
+    <tr><td>vidIQ / TubeBuddy</td><td>No public API</td><td>—</td><td>UI only</td><td><span class="chip crit"><span class="dot"></span>Not an option</span></td></tr>
+  </table></div>
+
+  <h3>Integration (sketch, ~2–3 days)</h3>
+  <p>The probe plumbing is already source-agnostic: <code>evaluate-probes.ts</code> promotes/retires anything with a <code>probe:</code> prefix, unmodified. New module <code>src/discovery/external/</code> + one CLI: source adapters (autocomplete → DataForSEO → Ads API later) → normalize + dedupe against all 3,856 existing terms → cheap Haiku ICP-prefilter (~300 candidates/call, keeps consumer-generic sludge out) → reservoir file → <strong>drip 100–200 probes/day</strong> into the terms table as <code>probe:kw:&lt;date&gt;</code>. Drip-capping matters because each probe test costs a 100-unit search — 5K candidates is months of testing throughput.</p>
+
+  <h2 id="verticals"><span class="no">03</span>Track 2 — Expand the vertical universe</h2>
+  <p class="sub">Not new phrasings within known niches — new <em>universes</em> of educational-video creators selling high-ticket services. The agent first read the full existing coverage (ICP file + both seed CSVs, 923 terms — much wider than the code suggests) so these are net-new.</p>
+
+  <div class="callout">
+    <p><strong>The single biggest supply injection: Commonwealth geo-clones.</strong> The entire proven US core — solicitors, IFAs, chartered accountants, buyer's agents, SMSF/pension specialists — exists in the UK/AU/CA/NZ with less YouTube saturation and <em>higher</em> email findability (firm-heavy professions publish contact pages). One vocabulary map (attorney→solicitor, 401k→pension/superannuation, realtor→estate agent) multiplies everything already proven. Cheap to probe; check US-tuned host-finder/email-pattern assumptions and whether non-US clients are wanted before scaling.</p>
+  </div>
+
+  <div class="tablewrap"><table>
+    <tr><th>#</th><th>Vertical</th><th>Why it fits</th><th>Example seed terms</th><th>Density / examples</th><th>Email est.</th></tr>
+    <tr><td class="num">1</td><td><b>Commonwealth geo-clones</b> (UK/AU/CA/NZ of the proven core)</td><td>Proven by direct analogy; identical high-ticket economics; less-saturated local YT</td><td class="seed">"uk property tax accountant" · "inheritance tax planning uk" · "buyers agent australia" · "smsf property investing" · "canada us cross border tax"</td><td><span class="chip good"><span class="dot"></span>High</span> Property Hub (UK); PK Gupta (AU)</td><td class="num">50–60%</td></tr>
+    <tr><td class="num">2</td><td><b>Residential architects &amp; luxury design-build</b> (practitioner-facing)</td><td>Proven practitioner YT niche; $50K–$500K+ commissions; content-mature firms</td><td class="seed">"cost to build a custom home 2026" · "working with an architect process" · "inground pool cost breakdown" · "design build vs general contractor"</td><td><span class="chip good"><span class="dot"></span>High</span> 30X40 Design Workshop; California Pools</td><td class="num">55–65%</td></tr>
+    <tr><td class="num">3</td><td><b>Flight training &amp; aviation academies</b></td><td>Big instructional niche; $15K PPL → $90K+ career programs; schools compete on content</td><td class="seed">"how to become an airline pilot" · "private pilot license cost" · "accelerated flight training program" · "part 141 vs part 61"</td><td><span class="chip good"><span class="dot"></span>High</span> MzeroA; Fly8MA; Angle of Attack</td><td class="num">55–65%</td></tr>
+    <tr><td class="num">4</td><td><b>Cash-pay elective &amp; regenerative medicine</b> (beyond current frontier)</td><td>Doctor-educator channels proven; $5K–$30K cash procedures; clinics already invest in video</td><td class="seed">"stem cell therapy for knees explained" · "is lasik worth it 2026" · "bariatric surgery requirements" · "sleep apnea treatment without cpap"</td><td><span class="chip warn"><span class="dot"></span>Med-high</span> Regenexx; Pound of Cure</td><td class="num">50–60%</td></tr>
+    <tr><td class="num">5</td><td><b>Product development &amp; manufacturing for hardware founders</b></td><td>$20K–$250K engagements; B2B firms with budgets</td><td class="seed">"how to get a product manufactured" · "prototype to production process" · "injection molding cost explained"</td><td><span class="chip warn"><span class="dot"></span>Med</span> MAKO Design; Titans of CNC</td><td class="num">55–65%</td></tr>
+    <tr><td class="num">6</td><td><b>Practice-transition brokers &amp; healthcare M&amp;A</b></td><td>$50K+ success fees; every lead is gold → strong scripting-ROI story</td><td class="seed">"how to sell a dental practice" · "dental practice valuation" · "selling to a dso pros and cons"</td><td><span class="chip warn"><span class="dot"></span>Med</span> Shared Practices</td><td class="num">55–65%</td></tr>
+    <tr><td class="num">7</td><td><b>Public adjusters &amp; claim advocacy</b></td><td>Contingency % of six-figure claims; referral-dependent, hungry for inbound</td><td class="seed">"what does a public adjuster do" · "insurance denied my roof claim" · "commercial property insurance claim"</td><td><span class="chip warn"><span class="dot"></span>Med</span> (names uncertain — probe)</td><td class="num">45–55%</td></tr>
+    <tr><td class="num">8</td><td><b>Church &amp; ministry growth services</b></td><td>$2K–$20K engagements + retainers; content-native leaders</td><td class="seed">"how to grow a small church" · "church marketing strategy" · "increase church giving"</td><td><span class="chip good"><span class="dot"></span>Med-high</span> Pro Church Tools</td><td class="num">45–55%</td></tr>
+    <tr><td class="num">9</td><td><b>Customs brokerage &amp; tariff compliance</b></td><td>2025–26 tariff chaos = demand shock; $5K–$50K engagements</td><td class="seed">"how do tariffs work for importers" · "hts code classification" · "import from china tariffs 2026"</td><td><span class="chip serious"><span class="dot"></span>Low-med</span> creator density thin — probe first</td><td class="num">50–60%</td></tr>
+    <tr><td class="num">10</td><td><b>Litigation support &amp; forensic experts</b></td><td>$300–$800/hr, five-figure engagements; referral-bound → love inbound</td><td class="seed">"forensic accountant divorce" · "how to become an expert witness" · "lost profits damages calculation"</td><td><span class="chip serious"><span class="dot"></span>Low-med</span> dozens not hundreds</td><td class="num">50–60%</td></tr>
+    <tr><td class="num">11</td><td><b>Residential treatment &amp; behavioral-health facilities</b></td><td>$30K–$100K+/mo programs; heavy existing marketing spend</td><td class="seed">"how to choose a rehab facility" · "residential treatment for teens" · "intervention for family member"</td><td><span class="chip warn"><span class="dot"></span>Med</span> (verify examples)</td><td class="num">50–60%*</td></tr>
+    <tr><td class="num">12</td><td><b>Yacht &amp; aircraft brokers</b> + fractional/charter</td><td>$30K–$500K commissions; abundant channels</td><td class="seed">"yacht buying guide first time" · "buying your first airplane" · "aircraft ownership costs explained"</td><td><span class="chip warn"><span class="dot"></span>Med-high count</span> but media-leaning</td><td class="num">55–60%</td></tr>
+  </table></div>
+  <p class="seed">* #11 emails often resolve to generic admissions@ inboxes — verify rate may look fine while reply-ability is poor. Near-misses worth probing: franchise-buyer brokers (Franchise City is exactly the model), FDA/regulatory consulting, farm-succession + ranch/land brokerage, executive-protection training.</p>
+
+  <h3>Honest dud-risk ranking</h3>
+  <div class="tablewrap"><table>
+    <tr><th>Vertical</th><th>Risk</th><th>Why</th></tr>
+    <tr><td>#9 Customs/tariff compliance</td><td><span class="chip crit"><span class="dot"></span>Highest</span></td><td>Demand shock is real but creator supply is thin — mostly corporate webinars, not owner-operators. Probe 3 terms before believing.</td></tr>
+    <tr><td>#10 Forensics/litigation support</td><td><span class="chip serious"><span class="dot"></span>High</span></td><td>Live on attorney referrals; creators number in the dozens. Slow trickle, not a vein.</td></tr>
+    <tr><td>#12 Yacht/aircraft brokers</td><td><span class="chip serious"><span class="dot"></span>High</span></td><td>Fails "would pay for scripting" most often — their content is inventory walkthroughs; biggest channels are media companies.</td></tr>
+    <tr><td>#11 Treatment centers</td><td><span class="chip warn"><span class="dot"></span>Medium</span></td><td>Generic admissions@ inboxes; channel face rarely the buying decision-maker; compliance-cautious marketing.</td></tr>
+    <tr><td>#8 Church growth</td><td><span class="chip warn"><span class="dot"></span>Medium</span></td><td>Real creators but budget-sensitive — and the pipeline's NOISE regex currently filters <code>ministry|god|jesus</code>, which would silently kill validation. Needs an exemption.</td></tr>
+  </table></div>
+
+  <div class="callout warn">
+    <p><strong>Code touches required before new verticals score correctly:</strong> the term generator forces every term into the <code>VALID_NICHE_CATEGORIES</code> enum — aviation, marine, manufacturing, church, and customs have no natural home and would land in "Other," where the scorer's category prior under-scores genuinely in-ICP creators. Adopting new verticals = one-line additions to <code>src/scoring/categories.ts</code> first, plus the NOISE-regex exemption for the church vertical.</p>
+  </div>
+
+  <h2 id="mechanism"><span class="no">04</span>The repeatable vertical-discovery engine</h2>
+  <p class="sub">So verticals never become another static list that exhausts in three weeks. Mirrors the term-level promote/retire loop the system already trusts — one level up.</p>
+  <div class="tablewrap"><table>
+    <tr><th>Piece</th><th>What it does</th></tr>
+    <tr><td><b>1 · Verticals become data, not code</b></td><td>Move <code>FRONTIER_VERTICALS</code> into an Airtable <code>verticals</code> table with lifecycle state (candidate → probing → proven → saturated → retired), source, and rollup stats. Saturation becomes a measured fact, not a vibe.</td></tr>
+    <tr><td><b>2 · Taxonomy-walker generator</b></td><td>The anti-exhaustion trick: instead of freeform LLM brainstorming (which reconverges on its priors — the root cause of today's drought), walk an <em>external, exhaustive, checked-in taxonomy</em> — ~1,000 six-digit NAICS service leaves + licensed-professions lists — with a stored cursor, one branch per fade event, scoring each candidate 1–5 on the four ICP criteria. Years of supply at fade-rate.</td></tr>
+    <tr><td><b>3 · Free demand validation</b></td><td>Before a candidate vertical costs a 100-unit search, template "how to get clients for X" / "how to grow a X" into the free autocomplete endpoint. Hits = humans search it = creators serve it → spawn 3–5 probe terms. Zero hits → retire with reason, one API-free call.</td></tr>
+    <tr><td><b>4 · Geography as a multiplier axis</b></td><td>Registry is vertical × geo. A one-time vocabulary map lets every proven US vertical spawn UK/AU/CA/NZ clones as candidates automatically — the largest single supply injection available.</td></tr>
+    <tr><td><b>5 · Close the loop</b></td><td><code>evaluate-probes.ts</code> already promotes/retires terms; add a vertical rollup: first N probes all die → vertical retired; any probe hits qr≥10% → vertical proven, unlocking full term generation. All decisions log to <code>discovery-decisions.jsonl</code>.</td></tr>
+  </table></div>
+
+  <h2 id="probes"><span class="no">05</span>Track 3 — Live-probed mechanisms</h2>
+  <div class="pending">
+    <p><strong>In flight at publication time.</strong> A 5-phase workflow (Ground → 6 ideation lenses → Shortlist → live read-only API probes → adversarial red-team) is testing the non-keyword mechanisms right now: graph traversal from our ~6K known-ICP channels (featured-channel shelves, collabs), playlist harvesting (many channels per 1–2 API units vs 100/search), business-first directory resolution (which also attacks the email-verify constraint), autocomplete probes, data-asset lookalikes, and contrarian re-frames (incl. time-based re-mining of proven terms with <code>publishedAfter</code>, and the honest case that the 2,600-lead <code>needs_contact</code> recovery beats all of it). Results + probe evidence will be appended to this report when the workflow completes.</p>
+  </div>
+
+  <h2 id="actions"><span class="no">06</span>Recommended actions, ranked</h2>
+  <div class="rank"><div class="n">1</div><div><h4>File the Google Ads API Basic Access application (Casey, ~30 min, $0)</h4><p>Free manager account + API Center form; select "keyword research" as the use case; company site must be live. Costs nothing; clears in 1–4+ weeks; eventually replaces DataForSEO at $0 with full site-seeding (250K ideas/domain).</p><div class="tag">Owner: Casey · Effort: 30 min · Unblocks: $0 industrial keyword supply</div></div></div>
+  <div class="rank"><div class="n">2</div><div><h4>Build the external-keyword miner v1: autocomplete recursion + DataForSEO (~2–3 days)</h4><p>YouTube-native, free base layer (80% of the code exists) + $1–5 industrial harvests. Feeds the existing probe → promote/retire loop unmodified; drip-capped at 100–200 probes/day.</p><div class="tag">Effort: 2–3 days · Yield: 1.5–6K candidate terms/harvest — generation stops being the bottleneck</div></div></div>
+  <div class="rank"><div class="n">3</div><div><h4>Probe the top-5 verticals + geo-clones this week (cheap, uses existing pipeline)</h4><p>Add the needed <code>categories.ts</code> entries, then drop 3–5 seed terms each for Commonwealth clones, architects/design-build, flight training, cash-pay medicine, and practice-transition brokers as probes. The existing evaluate-probes loop measures real yield within days.</p><div class="tag">Effort: &lt;1 day · Validates the two highest-upside supply expansions with data</div></div></div>
+  <div class="rank"><div class="n">4</div><div><h4>Build the vertical lifecycle engine (taxonomy-walker + verticals table)</h4><p>The structural fix that makes "we ran out of niches" impossible for years: a governed walk over ~1,000 NAICS leaves × geo, validated free via autocomplete, promoted by measured yield.</p><div class="tag">Effort: ~2–3 days · The permanent answer to vertical exhaustion</div></div></div>
+  <div class="rank"><div class="n">5</div><div><h4>Await Track 3 probe results before committing to graph/playlist builds</h4><p>The live probes will show which non-keyword mechanisms actually surface net-new ICP channels per API unit — and the red team will have attacked overlap and fragility. Decide with evidence.</p><div class="tag">Also pending: the needs_contact recovery engine (2,600 warm leads) remains the single biggest deferred lever — separate build, awaiting greenlight</div></div></div>
+
+  <div class="footer">
+    Generated 2026-07-13 by the orchestrator's research session · Sources: 2 standalone research agents (verticals; keyword APIs) + 5-phase live-probe workflow (in flight) · Grounded in: <code>src/discovery/icp.ts</code>, <code>scripts/discover-veins.ts</code>, <code>scripts/evaluate-probes.ts</code>, <code>scripts/mine-autocomplete.ts</code>, seed CSVs (923 terms), term-performance table (~3,856 terms), lead base <code>appenY7r5jlZMRpJ0</code>.
+  </div>
+</div>
+</body>
+</html>
