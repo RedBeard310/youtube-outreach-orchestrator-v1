@@ -84,12 +84,27 @@ last_stop_reason() {
 }
 
 rapid_fails=0
+# mtime of THIS script at process start — used for self-reload (see loop top).
+SELF_MTIME="$(stat -c %Y "$0" 2>/dev/null || echo 0)"
 log "starting (max-minutes=$MAX_MINUTES, quota-wait=${QUOTA_WAIT}s, hard-pct=$HARD_PCT)"
 
 while true; do
   if [ -f "$HALT_FLAG" ]; then
     log "HALT flag present ($HALT_FLAG) — stopping loop"
     exit 0
+  fi
+
+  # Self-reload. A committed fix to THIS script does nothing until the long-running loop
+  # process restarts — bash doesn't re-read an edited script mid-run. That's why the
+  # 2026-07-13 back-off fix sat DORMANT for ~9h of continued thrash until an incidental
+  # 16:03Z restart happened to load it (2026-07-14 debrief). Re-exec when the file changes
+  # on disk (and still parses) so autopilot-improve commits self-deploy within one iteration
+  # instead of waiting for a manual `systemctl restart`. exec keeps the same PID, so systemd
+  # sees no restart. (autopilot-improve 2026-07-14)
+  now_mtime="$(stat -c %Y "$0" 2>/dev/null || echo 0)"
+  if [ "$now_mtime" != "$SELF_MTIME" ] && bash -n "$0" 2>/dev/null; then
+    log "campaign-loop.sh updated on disk (mtime $SELF_MTIME → $now_mtime) — re-exec'ing to load it"
+    exec "$0" "$@"
   fi
 
   # Anthropic hard ceiling — belt-and-suspenders (the check-in is the primary guard).
