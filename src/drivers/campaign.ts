@@ -165,6 +165,57 @@ async function discover(opts: CampaignOpts, focus?: string): Promise<void> {
   log({ event: 'discover', frontier: opts.frontier, focus: focus ?? null, exit: r.exit_code });
 }
 
+// Industrialised Keyword Layer (2026-07-14). Mine REAL search strings from YouTube +
+// Google autocomplete and write the ICP-prefiltered survivors as probes, via the
+// finder's scripts/keyword-harvest.ts. This is the durable answer to term-drought:
+// unlike discover() — one LLM call that reconverges on its own priors (the root
+// cause of the drought) — the harvest pulls demand-verified autocomplete tails the
+// generator would never imagine. The module + CLI already existed and were proven by
+// hand on 07-13 (933 net-new terms / 260 probes → the +166 recovery day); this just
+// wires it into the autonomous loop so it self-refills instead of needing a human.
+//
+// It is HEAVIER than an LLM call (hundreds of free autocomplete requests + a Haiku
+// prefilter), so it is CADENCE-GATED: at most once per KEYWORD_HARVEST_INTERVAL_HOURS
+// (default 4). Between harvests the reservoir gate falls through to the fast discover()
+// below. The expensive part is not the harvest (autocomplete is free, prefilter a few
+// cents) but TESTING the probes it writes (100 units/search) — that is already bounded
+// by the quota governor, so a generous cap is safe. State lives in the campaign's cwd.
+function harvestStatePath(): string {
+  return join('logs', 'keyword-harvest-state.json');
+}
+function hoursSinceLastHarvest(): number {
+  try {
+    const s = JSON.parse(readFileSync(harvestStatePath(), 'utf8')) as { last?: string };
+    const t = s.last ? Date.parse(s.last) : NaN;
+    return Number.isFinite(t) ? (Date.now() - t) / 3_600_000 : Infinity;
+  } catch {
+    return Infinity; // no state yet → due
+  }
+}
+async function harvestKeywords(opts: CampaignOpts): Promise<boolean> {
+  const intervalH = Number(process.env.KEYWORD_HARVEST_INTERVAL_HOURS ?? 4);
+  const cap = process.env.KEYWORD_HARVEST_CAP ?? '200';
+  const sinceH = hoursSinceLastHarvest();
+  if (opts.dryRun) {
+    console.log(`[campaign] DRY RUN — would harvest keywords: npx tsx scripts/keyword-harvest.ts --apply --cap ${cap} (gate: every ${intervalH}h; last ${sinceH === Infinity ? 'never' : sinceH.toFixed(1) + 'h'} ago)`);
+    return false;
+  }
+  if (sinceH < intervalH) {
+    console.log(`[campaign] keyword harvest skipped — last run ${sinceH.toFixed(1)}h ago (< ${intervalH}h gate).`);
+    log({ event: 'keyword_harvest', skipped: true, since_hours: Number(sinceH.toFixed(2)) });
+    return false;
+  }
+  console.log(`[campaign] harvesting real autocomplete terms → probes (cap ${cap})…`);
+  const r = await runChild('npx', ['tsx', 'scripts/keyword-harvest.ts', '--apply', '--cap', String(cap)], finderRepo());
+  // Record the ATTEMPT regardless of exit code so a persistently-failing harvest can't
+  // re-block the session every pass; a transient failure simply retries next interval.
+  mkdirSync('logs', { recursive: true });
+  writeFileSync(harvestStatePath(), JSON.stringify({ last: new Date().toISOString(), exit: r.exit_code, cap }) + '\n');
+  log({ event: 'keyword_harvest', skipped: false, exit: r.exit_code, cap });
+  if (r.exit_code !== 0) console.error(`[campaign] keyword harvest exited ${r.exit_code} (non-fatal; falling back to LLM discovery).`);
+  return r.exit_code === 0;
+}
+
 // At the end of a run, promote the probe winners (qr>=threshold) to the fresh tier
 // and retire the losers — so discovered veins that converted come back with the
 // good terms and duds stop wasting quota. Was manual on 2026-07-09; now automatic.
@@ -213,7 +264,8 @@ export async function driveCampaign(opts: CampaignOpts): Promise<void> {
     log({ event: 'reservoir', verdict });
     if (verdict === 'STOCK-UP' && opts.discovery) {
       console.log(`[campaign] reservoir short — stocking up before the run.`);
-      await discover(opts);
+      await harvestKeywords(opts); // real autocomplete terms first (cadence-gated Keyword Layer)
+      await discover(opts);        // LLM veins as the fast complement / between-harvest fallback
     }
   }
 
