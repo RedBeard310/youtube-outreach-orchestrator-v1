@@ -1,0 +1,184 @@
+<title>Lead Run Debrief — 2026-07-14</title>
+<style>
+  :root {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+      --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+      --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+    --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+    --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 40px 22px 80px; }
+  .eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); font-weight: 600; }
+  h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.12; margin: 10px 0 6px; text-wrap: balance; letter-spacing: -.02em; }
+  h2 { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); margin: 44px 0 16px; font-weight: 700; }
+  h3 { font-size: 18px; margin: 0 0 6px; letter-spacing: -.01em; }
+  p { margin: 0 0 14px; }
+  .lede { font-size: 18px; color: var(--ink-soft); max-width: 68ch; }
+  .tag { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--teal-soft); color: var(--teal); letter-spacing: .02em; }
+  .grid { display: grid; gap: 14px; }
+  .stats { grid-template-columns: repeat(4, 1fr); margin-top: 26px; }
+  @media (max-width: 720px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; box-shadow: var(--shadow); }
+  .stat .n { font-size: 30px; font-weight: 750; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .stat .l { font-size: 12.5px; color: var(--ink-soft); margin-top: 3px; }
+  .stat .s { font-size: 12px; margin-top: 8px; font-weight: 600; }
+  .up { color: var(--good); } .down { color: var(--red); } .warn { color: var(--amber); }
+  .accent-red { border-left: 3px solid var(--red); }
+  .accent-teal { border-left: 3px solid var(--teal); }
+  .accent-amber { border-left: 3px solid var(--amber); }
+  code { background: var(--panel-2); padding: 1px 5px; border-radius: 5px; font-size: .88em; border: 1px solid var(--line); }
+
+  /* shape-of-day bar strip */
+  .strip { display: flex; align-items: flex-end; gap: 1px; height: 120px; padding: 14px 14px 10px; overflow-x: auto; position: relative; }
+  .bar { flex: 1 0 3px; min-width: 3px; border-radius: 2px 2px 0 0; background: var(--teal); opacity: .9; position: relative; }
+  .bar.zero { background: var(--red); height: 4px !important; opacity: .8; }
+  .bar.low { background: var(--amber); }
+  .bar.restart { box-shadow: -2px 0 0 0 var(--ink-soft); }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-soft); padding: 0 14px 14px; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+
+  .q { border-radius: 14px; padding: 20px 22px; margin-bottom: 14px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); }
+  .q .ask { font-size: 17px; font-weight: 700; color: var(--ink); margin-bottom: 10px; display: flex; gap: 10px; align-items: baseline; }
+  .q .ask .qn { color: var(--teal); font-weight: 800; flex: 0 0 auto; }
+  .q p { color: var(--ink-soft); }
+  .q b { color: var(--ink); }
+  .pill { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink); background: var(--panel-2); padding: 1px 7px; border-radius: 6px; border: 1px solid var(--line); white-space: nowrap; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+  th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); }
+  td .num { font-variant-numeric: tabular-nums; font-weight: 650; }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); box-shadow: var(--shadow); }
+  ol.recs { padding-left: 0; list-style: none; counter-reset: r; margin: 0; }
+  ol.recs li { counter-increment: r; position: relative; padding: 14px 16px 14px 52px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 10px; box-shadow: var(--shadow); }
+  ol.recs li::before { content: counter(r); position: absolute; left: 14px; top: 14px; width: 26px; height: 26px; border-radius: 8px; background: var(--teal-soft); color: var(--teal); font-weight: 800; font-size: 14px; display: grid; place-items: center; }
+  ol.recs b { color: var(--ink); }
+  .foot { margin-top: 46px; padding: 16px 18px; border-radius: 12px; background: var(--teal-soft); border: 1px solid var(--line); font-size: 14px; color: var(--ink-soft); }
+  .foot b { color: var(--ink); }
+  .muted { color: var(--ink-soft); font-size: 13.5px; }
+</style>
+
+<div class="wrap">
+
+  <div class="eyebrow">Lead Run Debrief · YouTube outreach</div>
+  <h1>2026-07-14 — a recovery day carried entirely by its second half</h1>
+  <p class="lede">Yield more than doubled off 07-13's dry wall — <b>+166 parked</b> vs +115 — but <b>91% of it (333 of 367 pitchable) came after a 16:03Z service restart.</b> The first nine hours were near-barren: the 07-13 back-off fix was <em>committed but not deployed</em>, so the old loop kept thrashing exhausted terms. The restart loaded the fix and coincided with fresh term supply. Both are now self-healing.</p>
+  <div style="margin-top:14px"><span class="tag">RAN CLEAN · $0 CLAUDE SPEND · 0 FATAL SIGNATURES</span></div>
+
+  <div class="grid stats">
+    <div class="card stat accent-teal">
+      <div class="n">+166</div>
+      <div class="l">parked → <code>approved_hold</code></div>
+      <div class="s up">1,941 → 2,107 · vs +115 on 07-13</div>
+    </div>
+    <div class="card stat">
+      <div class="n">367</div>
+      <div class="l">pitchable (score ≥6 + host)</div>
+      <div class="s warn">1.69/pass · 333 (91%) post-restart</div>
+    </div>
+    <div class="card stat accent-red">
+      <div class="n">79%</div>
+      <div class="l">discovery generations wrote nothing</div>
+      <div class="s down">168/212 sonnet calls → 0 net-new</div>
+    </div>
+    <div class="card stat accent-amber">
+      <div class="n">~9 h</div>
+      <div class="l">the 07-13 fix sat dormant</div>
+      <div class="s warn">committed 07:28Z, live only at 16:03Z</div>
+    </div>
+  </div>
+
+  <h2>The shape of the day</h2>
+  <div class="card" style="padding:0">
+    <div class="strip" id="strip"></div>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--teal)"></span>healthy pass (≥7 fresh pitchable)</span>
+      <span><span class="dot" style="background:var(--amber)"></span>weak (1–6)</span>
+      <span><span class="dot" style="background:var(--red)"></span>dead pass (0)</span>
+      <span><span class="dot" style="background:var(--ink-soft)"></span>16:03Z service restart</span>
+    </div>
+  </div>
+  <p class="muted">Each bar = one finder pass (217 total, chronological), height = fresh pitchable found. The long red-and-flat left block is the pre-restart thrash grinding exhausted terms (<b>130 passes, 34 pitchable total</b>). The marker is the 16:03Z restart; everything to its right is the healthy second half (<b>87 passes, 333 pitchable</b>) — the back-off fix live <em>and</em> fresh terms in the pool.</p>
+
+  <h2>The three questions</h2>
+
+  <div class="q accent-teal">
+    <div class="ask"><span class="qn">Q1</span><span>Why did yield bounce back to +166 after 07-13's dry wall?</span></div>
+    <p><b>Fresh term supply re-entered the pool — and almost all of it landed in the second half.</b> The search-term table grew <span class="pill">4,453 → 5,086 (+633)</span> over the cycle, mostly from probe promotion and Casey's in-flight <em>Keyword Layer v1</em> expansion (new verticals + autocomplete-sourced terms), <em>not</em> from frontier discovery. The new ground concentrated in two niches: <b>Real Estate (117) and Health &amp; Wellness Clinics (115)</b> were 63% of all pitchable. Verify held at <span class="pill">45% (166/367)</span>. The takeaway is unchanged from 07-09: <b>we are term-supply-limited, not channel-supply-limited</b> — feed the pool and it converts.</p>
+  </div>
+
+  <div class="q accent-red">
+    <div class="ask"><span class="qn">Q2</span><span>Why were the first nine hours near-barren (34 pitchable / 130 passes)?</span></div>
+    <p><b>Because "committed" isn't "deployed."</b> The 07-13 debrief shipped a fix to <code>campaign-loop.sh</code> so hard-walls rest 30 min instead of relaunching in 20s. It was committed at <b>07:28Z</b> — but a long-running bash loop <b>does not re-read its own script mid-run</b>, so the process that started earlier kept executing the <em>old, dead-back-off</em> code. Result: the exact 168×-style thrash the fix was meant to kill <b>continued</b> — <span class="pill">84 sessions, median 2.6-min relaunch</span> — grinding an exhausted term pool for the whole morning.</p>
+    <p>At <b>16:03Z</b> the service happened to restart (loading the fix). The contrast is the proof: after the restart, <span class="pill">14 sessions, median 82.5-min gap</span>, zero fast relaunches — hard-walls now rest and let discovery/probe promotion re-fuel between sessions. <b>Fixed durably this cycle:</b> the loop now re-<code>exec</code>s itself when its script changes on disk, so future <code>autopilot-improve</code> commits self-deploy within one iteration instead of waiting for a manual restart.</p>
+  </div>
+
+  <div class="q accent-red">
+    <div class="ask"><span class="qn">Q3</span><span>Where did the wasted spend go, if the burn-ledger says $0?</span></div>
+    <p><b>Into the finder's Anthropic key — invisible to the autopilot ledger.</b> The campaign fires a full <code>claude-sonnet-5</code> discovery generation on every fade. This cycle, <span class="pill">168 of 212 (79%)</span> of those generated 40 candidates that <b>all deduped to zero</b> against a term table that hadn't grown since the last dry pass — the same prompt over the same table re-proposing the same known terms. The 44 productive passes added only ~109 terms; the other ~524 of the +633 came from probes and Keyword Layer, not from these calls.</p>
+    <p><b>Fixed durably this cycle:</b> a per-mode "discovery-dry" guard records the table size at which a mode last went dry and <b>skips the sonnet call until the table actually grows</b>. It's behaviourally identical downstream (a skipped-dry pass writes 0 terms, exactly like the generate-then-"nothing to write" path) and self-re-arms the instant new terms enter.</p>
+  </div>
+
+  <h2>What broke → what's fixed</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Issue</th><th>Mechanism</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr><td>07-13 back-off fix dormant ~9h</td><td>Long-running bash loop never re-read its edited script → old dead-back-off code kept thrashing (84 sessions @ 2.6 min)</td><td class="up">Fixed: <code>campaign-loop.sh</code> self-re-execs on disk change (orchestrator)</td></tr>
+        <tr><td>79% of discovery calls wrote nothing</td><td>Full <code>claude-sonnet-5</code> generation every fade even when the term table hadn't grown → dedupe to 0</td><td class="up">Fixed: discovery-dry guard skips the call until the table grows (finder)</td></tr>
+        <tr><td>Back-off fix itself (07-13)</td><td>Verified live post-restart: hard-walls rest 30 min</td><td class="up">Confirmed working (median gap 2.6m → 82.5m)</td></tr>
+        <tr><td>Term-supply wall (07-13's headline)</td><td>Relieved this cycle by Keyword Layer v1 + probe promotion (+633 terms; RE + clinics resurged)</td><td class="warn">Structural — operator-driven; keep the ICP widening</td></tr>
+        <tr><td>Term-exhaustion invisible to health signal</td><td><code>checkin.ts</code> watches fatal signatures + flat <code>approved_hold</code>; a clean "No active terms" abort trips neither</td><td class="warn">Open — 07-13 rec #4 (finder-failure-rate flag)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Recommended next — ranked</h2>
+  <ol class="recs">
+    <li><b>Keep feeding the term pool — it's the whole game.</b> Today's bounce was <em>entirely</em> a supply story: +633 terms → +166 parked, while frontier discovery contributed almost none. Land Casey's <em>Keyword Layer v1</em> expansion and keep widening the ICP (new professions, geos, phrasings). Without new ground every cycle drifts back toward the wall.</li>
+    <li><b>Build the <code>needs_contact</code> recovery engine (biggest unbuilt lever).</b> <span class="pill">2,897</span> found-and-scored creators sit parked with no verifiable email (+197 this cycle). Recovering even a third out-yields a week of fresh finding and sidesteps the term-supply ceiling entirely. Deferred pending greenlight.</li>
+    <li><b>Watch the two shipped fixes hold next cycle.</b> Confirm (a) the self-reload actually deploys the next loop-driver commit without a manual restart, and (b) <code>discovery-dry-state.json</code> is suppressing the dry sonnet calls (expect the "skip … no new ground" log line to dominate fades on a flat table).</li>
+    <li><b>Surface term-exhaustion in the health signal (07-13 rec #4, still open).</b> Flag a cycle where finder passes exit nonzero above a threshold, so a supply wall shows up in <code>checkin.ts</code> instead of hiding behind a rising <code>approved_hold</code>.</li>
+  </ol>
+
+  <div class="foot">
+    <b>Status caveat:</b> everything is <b>parked</b>, nothing sent — <code>approved_hold</code> is a deliberate holding lane until the email process is ready. Today's +166 brings the pool to <b>2,107</b>; <code>needs_contact</code> is at <b>2,897</b>. The loop ran unattended all cycle at <b>$0 Claude spend, 0 fatal signatures</b>, and is <b>left running</b> for the next cycle. Two durable self-healing fixes shipped (finder: <code>31c208b</code> via auto-sync; orchestrator: <code>401d62b</code>). The self-reload bootstraps on the next natural service restart, then is permanent.
+  </div>
+
+</div>
+
+<script>
+  // fresh_pitchable per finder pass, chronological (from logs/campaign-2026-07-13.jsonl + -14.jsonl, cycle window).
+  var seq = [0,0,0,0,0,0,0,0,0,0,0,3,0,0,1,0,9,0,0,0,0,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,1,0,0,1,0,0,0,1,0,1,0,0,2,0,0,0,0,0,0,0,1,0,4,0,3,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,7,2,4,2,3,7,8,7,10,4,10,1,7,3,2,10,13,20,3,4,5,3,1,3,0,3,3,6,4,1,1,9,18,7,12,1,6,5,10,0,3,2,4,5,8,6,6,2,8,7,5,3,3,4,5,5,8,3,4,1,1,3,1,1,0,2,1,0,1,0,1,0,1,0,0,0,0,0,0,1,0,0,0,3,0,0];
+  var restartIdx = 130; // first pass after the 16:03Z service restart
+  var max = Math.max.apply(null, seq);
+  var strip = document.getElementById('strip');
+  seq.forEach(function (v, i) {
+    var b = document.createElement('div');
+    b.className = 'bar' + (v === 0 ? ' zero' : v < 7 ? ' low' : '') + (i === restartIdx ? ' restart' : '');
+    b.style.height = Math.max(4, Math.round((v / max) * 100)) + '%';
+    b.title = (i < restartIdx ? 'pre-restart · ' : 'post-restart · ') + v + ' fresh pitchable';
+    strip.appendChild(b);
+  });
+</script>
