@@ -25,11 +25,18 @@ const REPO = '/home/casey/repos/youtube-outreach-orchestrator-v1';
 const LOGS = join(REPO, 'logs');
 const HALT_FLAG = join(LOGS, 'autopilot-halt.flag');
 const ATTENTION = join(LOGS, 'autopilot-attention.jsonl');
+const OBSERVATIONS = join(LOGS, 'autopilot-observations.jsonl');
 const PARKED_HIST = join(LOGS, 'autopilot-parked-history.jsonl');
 
 // How long approved_hold may stay flat (while the finder is working) before we treat it
 // as a broken verify/park path. In minutes.
 const FLAT_PARK_MINUTES = Number(process.env.AUTOPILOT_FLAT_PARK_MINUTES ?? 100);
+
+// Term-supply-wall detection window (see the starvation heartbeat below). How many of the
+// most-recent finder passes to inspect, and the max total fresh-pitchable across them that
+// still counts as "near-dry". Observability only — never triggers the paid fix-agent.
+const STARVATION_WINDOW = Number(process.env.AUTOPILOT_STARVATION_WINDOW ?? 6);
+const STARVATION_MAX_PITCHABLE = Number(process.env.AUTOPILOT_STARVATION_MAX_PITCHABLE ?? 1);
 
 // Fatal signatures — the exact classes of migration/config break we've seen take the
 // pipeline down. Any in a recent session log means a crash a fix-agent should investigate.
@@ -64,6 +71,25 @@ function recentFinderOkCount(): { ok: number; total: number } {
   if (!jf) return { ok: 0, total: 0 };
   const runs = readEvents(jf).filter((e) => e.event === 'finder_run').slice(-6);
   return { ok: runs.filter((e) => e.exit === 0).length, total: runs.length };
+}
+
+// Fresh-pitchable / failure profile of the last N finder passes — the raw signal for the
+// term-supply-wall heartbeat. A dry wall shows up as the finder either exiting nonzero
+// (aborting on "No active terms") or exiting 0 with ~0 fresh pitchable across a run of
+// passes, while approved_hold stays legitimately flat (nothing to park).
+function recentFinderStats(n: number): { total: number; failed: number; zeroYield: number; pitchable: number } {
+  const jf = newestCampaignJsonl();
+  if (!jf) return { total: 0, failed: 0, zeroYield: 0, pitchable: 0 };
+  const runs = readEvents(jf).filter((e) => e.event === 'finder_run').slice(-n);
+  let failed = 0, zeroYield = 0, pitchable = 0;
+  for (const r of runs) {
+    const exit = r.exit;
+    const fp = typeof r.fresh_pitchable === 'number' ? r.fresh_pitchable : 0;
+    if (exit !== 0 && exit !== null && exit !== undefined) failed++;
+    else if (fp === 0) zeroYield++;
+    pitchable += fp;
+  }
+  return { total: runs.length, failed, zeroYield, pitchable };
 }
 
 // The 1-2 most-recent session logs the campaign-loop wrote (fallback: console logs).
@@ -145,6 +171,24 @@ async function main(): Promise<void> {
   } catch (e) {
     // Airtable blip — do NOT treat as an anomaly (transient); just note it.
     console.log(`[checkin ${day}] note: approved_hold count unavailable (${e instanceof Error ? e.message : String(e)})`);
+  }
+
+  // 5) Term-supply-wall HEARTBEAT (observability only — NEVER exit 7). A dry term pool is
+  //    the recurring failure mode (07-13, 07-15) yet slips past the detectors above: the
+  //    finder isn't crashing and approved_hold is flat for a legitimate reason (nothing to
+  //    park), not a broken verify path. It is also NOT fix-agent-fixable — the remedy is an
+  //    ICP/term-supply decision (keyword harvest / wider ICP / the needs_contact engine), so
+  //    spending a `claude -p` agent on it would burn money it can't recover. Instead we log a
+  //    once-hourly heartbeat to a SEPARATE observations file (kept out of the attention file
+  //    so the fix-agent's evidence channel stays pure) so the daily debrief and operator can
+  //    SEE the wall same-hour instead of only at the next debrief (07-13 rec #4 / 07-14 lever #4).
+  const fstats = recentFinderStats(STARVATION_WINDOW);
+  const starving = fstats.total >= STARVATION_WINDOW &&
+    (fstats.pitchable <= STARVATION_MAX_PITCHABLE || fstats.failed >= fstats.total - 1);
+  if (starving) {
+    const detail = `finder near-dry: last ${fstats.total} passes → ${fstats.pitchable} fresh pitchable, ${fstats.failed} failed, ${fstats.zeroYield} zero-yield. Term-supply wall (not a code bug) — feed the term pool (keyword harvest / wider ICP) or advance the needs_contact engine.`;
+    appendFileSync(OBSERVATIONS, JSON.stringify({ ts: new Date().toISOString(), kind: 'term_starvation', detail, parked }) + '\n');
+    console.log(`[checkin ${day}] OBSERVATION term_starvation — ${detail}`);
   }
 
   const softNote = burn.over_soft ? ` [OVER SOFT $${burn.soft_usd}]` : '';
