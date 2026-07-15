@@ -38,6 +38,13 @@ const FLAT_PARK_MINUTES = Number(process.env.AUTOPILOT_FLAT_PARK_MINUTES ?? 100)
 const STARVATION_WINDOW = Number(process.env.AUTOPILOT_STARVATION_WINDOW ?? 6);
 const STARVATION_MAX_PITCHABLE = Number(process.env.AUTOPILOT_STARVATION_MAX_PITCHABLE ?? 1);
 
+// Minimum fresh-pitchable supply across the same recent window before a flat approved_hold
+// count is treated as a broken verify/park path (find_no_park below). Below this, a flat
+// count is fully explained by low supply (drought/vein-fading) — nothing to park yet, not a
+// bug — and must not fire the alarm. Matches campaign.ts's own fadeThreshold (12): that's
+// already the codebase's definition of "not enough fresh leads to expect real conversion".
+const MIN_SUPPLY_FOR_PARK_ALARM = Number(process.env.AUTOPILOT_MIN_SUPPLY_FOR_PARK_ALARM ?? 12);
+
 // Fatal signatures — the exact classes of migration/config break we've seen take the
 // pipeline down. Any in a recent session log means a crash a fix-agent should investigate.
 const FATAL_PATTERNS = [
@@ -151,8 +158,14 @@ async function main(): Promise<void> {
   }
 
   // 4) Finding-but-not-parking: approved_hold flat for FLAT_PARK_MINUTES while the finder
-  //    keeps exiting 0 — the exact shape of the skill-missing bug we hit this migration.
-  //    Uses the live Airtable count vs a rolling history file (robust across long sessions).
+  //    keeps exiting 0 AND is surfacing real supply (>= MIN_SUPPLY_FOR_PARK_ALARM fresh
+  //    pitchable across the window) — the exact shape of the skill-missing bug we hit this
+  //    migration. The supply gate is required: without it, a low-yield drought (terms
+  //    intermittently exhausting, "No active terms to process") also satisfies "finder exits
+  //    0 while parked is flat" and false-positives as a broken verify/park path when nothing
+  //    is actually broken (2026-07-15) — that legitimate case is the term_starvation heartbeat
+  //    below, not this alarm. Uses the live Airtable count vs a rolling history file (robust
+  //    across long sessions).
   let parked: number | null = null;
   try {
     parked = await countByReviewStatus('approved_hold');
@@ -162,10 +175,11 @@ async function main(): Promise<void> {
     const older = hist.filter((p) => Date.parse(p.ts) <= cutoff);
     const baseline = older.length ? older[older.length - 1] : null; // most recent point older than the window
     const finder = recentFinderOkCount();
-    if (baseline && parked <= baseline.parked && finder.ok >= 3) {
+    const supply = recentFinderStats(STARVATION_WINDOW);
+    if (baseline && parked <= baseline.parked && finder.ok >= 3 && supply.pitchable >= MIN_SUPPLY_FOR_PARK_ALARM) {
       anomalies.push({
         kind: 'find_no_park',
-        detail: `approved_hold flat at ${parked} for ≥${FLAT_PARK_MINUTES}min (was ${baseline.parked} at ${baseline.ts}) while ${finder.ok}/${finder.total} recent finder passes exited 0 — pipeline finds but doesn't verify/park`,
+        detail: `approved_hold flat at ${parked} for ≥${FLAT_PARK_MINUTES}min (was ${baseline.parked} at ${baseline.ts}) while ${finder.ok}/${finder.total} recent finder passes exited 0 and surfaced ${supply.pitchable} fresh pitchable — pipeline finds but doesn't verify/park`,
       });
     }
   } catch (e) {
