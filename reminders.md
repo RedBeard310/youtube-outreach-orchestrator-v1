@@ -69,3 +69,59 @@ best-first:
 3. **Tighten `pure_course_seller` disqualifier** — whales monetize via courses/community.
 NOTE: Casey has real clients ~250k subs, so any cap/penalty must stay well above that
 (800k cap was chosen for headroom). NOT implemented — revisit with the finder scoring.
+
+---
+
+## [2026-07-16] Buy "similar channels" from a third party instead of scraping for it
+
+**Idea (Casey):** Tools like the **vidIQ** Chrome extension show a "similar channels"
+list when you open a channel page. Casey's read: *vidIQ's own suggestions are awful* —
+but the **category of product** is right. If some vendor maintains a genuinely good
+channel-similarity graph, we buy an API call instead of scraping YouTube for it.
+
+**Why this matters more than it looks.** Our home-grown answer to "who else is like this
+guy?" is structurally fragile, and we proved it the same day:
+- YouTube **killed the `relatedToVideoId` API in Aug 2023**. There is no official
+  "similar channels" endpoint. There never was a channel-level one.
+- So `watchNextEdge` scrapes the watch page for the recommendation rail — free, ToS-gray,
+  and on 2026-07-16 it started returning **HTTP 429 after only ~80 fetches** from this VPS.
+  A 2,024-seed sweep needs 2,024 fetches.
+- The one *legitimate* edge (`sectionsEdge` → `channelSections.list`) came back **empty on
+  16 of 17 modal seeds** — small practising firms never configure a featured-channels shelf.
+
+A paid similarity API would replace a brittle scrape with a supported call, and sidestep
+the rate limit entirely. That's the whole appeal — not better data, just data we're
+allowed to fetch at volume.
+
+**Current state (context for whoever picks this up):**
+The graph walker is built and measured. `youtube-lead-finder-v1/src/discovery/graph/`
+(`edges.ts`, `candidates.ts`), `scripts/graph-probe.ts` (kill gate), `scripts/graph-sweep.ts`
+(the one-time backlog sweep — written, **never completed a run**, blocked by the 429).
+Measured on 20 modal seeds: **83.8% net-new** vs all 3,856 search terms (the real asset),
+but only **10.0% ICP precision** — the modal-seed hypothesis failed. ~0.6 leads/seed.
+Casey's call: wait out the 429 rather than buy rotating IPs. *Days instead of hours is
+fine.* IP rotation stays on the table as the other way to solve the same problem.
+
+**GOTCHAS when evaluating a vendor — these are what will actually decide it:**
+1. **"Similar" for competitor research ≠ similar for us.** These tools are built for
+   creators sizing up rivals, so they optimise for audience overlap and surface *big*
+   channels. We want 5k-sub practising attorneys. That is precisely the failure mode our
+   first probe found: walking from 19M-sub LegalEagle returned Kurzgesagt / CGP Grey.
+   A vendor tuned for overlap will reproduce it. Casey's "vidIQ is awful" is probably
+   this exact mismatch, not a quality bug.
+2. **Do not pay before probing.** `graph-probe.ts` is already the right harness — swap the
+   edge for the vendor's API, keep everything else, and read the same two numbers on a
+   free trial: **net-new rate** (must stay ~80%+ — a vendor whose graph mirrors YouTube
+   search is worthless to us, since we've mined 3,856 terms) and **ICP precision** (the
+   10% baseline is the bar to beat; below it the vendor buys us nothing but legitimacy).
+3. **Precision must beat 10% by a lot to justify money.** The current mechanism is free.
+   A vendor has to earn its cost with either much better precision *or* the ability to run
+   at 2,024-seed volume without a 429 — the second is likely the real value.
+4. **Check the ToS for lead-gen use**, not just scraping. Some creator-analytics vendors
+   forbid using their data to build prospect lists.
+5. Candidates to look at (all unverified — none confirmed to expose this via API):
+   vidIQ, Social Blade, ChannelCrawler, Tubular Labs, NoxInfluencer, Modash, HypeAuditor.
+   Influencer-marketing platforms are the more promising shelf than creator-SEO tools,
+   because lookalike-discovery *is* their product.
+
+**Status:** NOT implemented, not researched. Parked pending the 429 wait-out.
