@@ -1,0 +1,203 @@
+<title>Lead Run Debrief — 2026-07-16</title>
+<style>
+  :root {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+      --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+      --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+    --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+    --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 40px 22px 80px; }
+  .eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); font-weight: 600; }
+  h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.12; margin: 10px 0 6px; text-wrap: balance; letter-spacing: -.02em; }
+  h2 { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); margin: 44px 0 16px; font-weight: 700; }
+  h3 { font-size: 18px; margin: 0 0 6px; letter-spacing: -.01em; }
+  p { margin: 0 0 14px; }
+  .lede { font-size: 18px; color: var(--ink-soft); max-width: 68ch; }
+  .tag { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--amber-soft); color: var(--amber); letter-spacing: .02em; }
+  .tag.good { background: var(--teal-soft); color: var(--teal); }
+  .grid { display: grid; gap: 14px; }
+  .stats { grid-template-columns: repeat(4, 1fr); margin-top: 26px; }
+  @media (max-width: 720px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; box-shadow: var(--shadow); }
+  .stat .n { font-size: 30px; font-weight: 750; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .stat .l { font-size: 12.5px; color: var(--ink-soft); margin-top: 3px; }
+  .stat .s { font-size: 12px; margin-top: 8px; font-weight: 600; }
+  .up { color: var(--good); } .down { color: var(--red); } .warn { color: var(--amber); }
+  .accent-red { border-left: 3px solid var(--red); }
+  .accent-teal { border-left: 3px solid var(--teal); }
+  .accent-amber { border-left: 3px solid var(--amber); }
+
+  /* shape-of-day bar strip */
+  .strip { display: flex; align-items: flex-end; gap: 2px; height: 120px; padding: 14px 14px 10px; overflow-x: auto; }
+  .bar { flex: 1 0 6px; min-width: 5px; border-radius: 2px 2px 0 0; background: var(--teal); opacity: .9; }
+  .bar.zero { background: var(--red); height: 4px !important; opacity: .9; }
+  .bar.low { background: var(--amber); }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-soft); padding: 0 14px 14px; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+
+  .q { border-radius: 14px; padding: 20px 22px; margin-bottom: 14px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); }
+  .q .ask { font-size: 17px; font-weight: 700; color: var(--ink); margin-bottom: 10px; display: flex; gap: 10px; align-items: baseline; }
+  .q .ask .qn { color: var(--teal); font-weight: 800; flex: 0 0 auto; }
+  .q p { color: var(--ink-soft); }
+  .q b { color: var(--ink); }
+  .pill { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink); background: var(--panel-2); padding: 1px 7px; border-radius: 6px; border: 1px solid var(--line); white-space: nowrap; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+  th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); }
+  td .num { font-variant-numeric: tabular-nums; font-weight: 650; }
+  .fix td:first-child { color: var(--good); font-weight: 650; }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); box-shadow: var(--shadow); }
+  ol.recs { padding-left: 0; list-style: none; counter-reset: r; margin: 0; }
+  ol.recs li { counter-increment: r; position: relative; padding: 14px 16px 14px 52px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 10px; box-shadow: var(--shadow); }
+  ol.recs li::before { content: counter(r); position: absolute; left: 14px; top: 14px; width: 26px; height: 26px; border-radius: 8px; background: var(--teal-soft); color: var(--teal); font-weight: 800; font-size: 14px; display: grid; place-items: center; }
+  ol.recs b { color: var(--ink); }
+  .foot { margin-top: 46px; padding: 16px 18px; border-radius: 12px; background: var(--amber-soft); border: 1px solid var(--line); font-size: 14px; color: var(--ink-soft); }
+  .foot b { color: var(--ink); }
+  .muted { color: var(--ink-soft); font-size: 13.5px; }
+  .niche { display:flex; flex-wrap:wrap; gap:8px; margin-top:4px; }
+  .chip { font-size:12.5px; padding:4px 10px; border-radius:999px; background:var(--panel-2); border:1px solid var(--line); font-variant-numeric:tabular-nums; }
+  .chip b { color:var(--teal); }
+</style>
+
+<div class="wrap">
+
+  <div class="eyebrow">Lead Run Debrief · YouTube outreach</div>
+  <h1>2026-07-16 — a healthy first half, a dry second half</h1>
+  <p class="lede">The mirror image of yesterday. Supply was <b>freshly harvested early</b>, so the PT morning ran strong — then the pool drained through the evening and the <b>4-hour harvest cadence couldn't refuel fast enough</b>. The loop did everything right: it rested instead of grinding, spent <b>$0</b>, threw <b>0 errors</b>, and its per-pass yield was the <b>best in a week</b>. It just ran out of terms after lunch.</p>
+  <div style="margin-top:14px"><span class="tag good">CLEAN CYCLE · $0 · 0 FATAL · 0 QUOTA STOPS</span></div>
+
+  <div class="grid stats">
+    <div class="card stat accent-teal">
+      <div class="n">+82</div>
+      <div class="l">parked → <code>approved_hold</code></div>
+      <div class="s muted">pool 2,185 → 2,267</div>
+    </div>
+    <div class="card stat">
+      <div class="n">1.74</div>
+      <div class="l">pitchable / finder pass</div>
+      <div class="s up">best in a week (195 / 112)</div>
+    </div>
+    <div class="card stat accent-teal">
+      <div class="n">$0 · 0 · 0</div>
+      <div class="l">Claude spend · fatal sigs · quota stops</div>
+      <div class="s up">every self-healing fix held</div>
+    </div>
+    <div class="card stat accent-amber">
+      <div class="n">5 / 20</div>
+      <div class="l">harvest fires vs. <code>STOCK-UP</code> sessions</div>
+      <div class="s warn">supply drained faster than the 4h cadence refilled</div>
+    </div>
+  </div>
+
+  <h2>The shape of the day</h2>
+  <div class="card" style="padding:0">
+    <div class="strip" id="strip"></div>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--teal)"></span>healthy pass (≥12 fresh pitchable)</span>
+      <span><span class="dot" style="background:var(--amber)"></span>weak (1–11)</span>
+      <span><span class="dot" style="background:var(--red)"></span>dead pass (0) — <b>clustered in the back half</b></span>
+    </div>
+  </div>
+  <p class="muted">Each bar = one finder pass (112 total, 07-15 07:00Z → 07-16 07:00Z), height = fresh pitchable found. The strong left third is the PT morning/midday on freshly-harvested terms; the long weak-and-dead right two-thirds is the pool draining with no refuel — 56 of 112 passes came back zero, most of them after PT lunch. The lone tall spike is a late 14-pitchable pass at ~18:00 PT.</p>
+
+  <h2>The three questions</h2>
+
+  <div class="q accent-teal">
+    <div class="ask"><span class="qn">Q1</span><span>Why only +82 — a modest day?</span></div>
+    <p><b>A tale of two halves, and this time the good half came first.</b> The PT morning/midday ran on freshly-harvested terms and produced most of the yield — roughly <span class="pill">~100 of 195 pitchable in 5 hours</span> (peaks of 23, 21, 16). Then the pool drained and the evening went quiet: the PT evening and overnight were <b>near-dead</b> (16:00 PT onward mostly zeros; 20:00–23:00 PT completely dead).</p>
+    <p>The binding limiter was <b>throughput, not efficiency</b>. Per-pass yield was actually the <b>best in a week</b> (<span class="pill">1.74 pitchable/pass</span> vs 1.32 on 07-15, 1.69 on 07-14, 0.71 on 07-13) — the finder is excellent <em>when it has terms</em>. But it ran the <b>fewest passes</b> (112 vs 127 / 217 / 375) because it kept hitting the term wall and <b>correctly resting</b>: <span class="pill">20 of 24 sessions hard-stopped</span> and backed off rather than grinding dead terms. The reservoir came back <code>STOCK-UP</code> on <b>20 of 24</b> pre-flights, but the harvest is cadence-gated to 4h, so it fired only <b>5 times</b> (16 skipped) — every fade in between fell through to the LLM <code>discover()</code>, which yields ≈0 net-new against the saturated term table.</p>
+  </div>
+
+  <div class="q accent-teal">
+    <div class="ask"><span class="qn">Q2</span><span>Did it waste money, quota, or thrash?</span></div>
+    <p><b>No — this was the cleanest cycle yet.</b> <span class="pill">$0 Claude spend</span>, <span class="pill">0 fatal signatures</span>, <span class="pill">0 quota stops</span>, YouTube quota never a factor. Every prior self-healing fix held: the discovery-dry guard suppressed wasted generations, and the hard-wall back-off + self-reload kept the run to <b>24 sessions with proper resting gaps</b> — no 2.6-minute relaunch thrash. The hourly check-in fired <b>no paid fix-agent</b> all cycle.</p>
+    <p>And the fix shipped <em>last</em> cycle earned its keep: the new <code>term_starvation</code> heartbeat <b>fired 7 times</b> (18:42Z → 06:42Z) — precisely across the dead evening/overnight tail — and stayed <b>$0 and out of the fix-agent path</b>, exactly as designed. A dry finder is now visible same-hour instead of only at this debrief. The loss today was <b>supply, not code</b>: the machine behaved perfectly around a well it had emptied.</p>
+  </div>
+
+  <div class="q accent-teal">
+    <div class="ask"><span class="qn">Q3</span><span>What's the constraint — and what did we do about it?</span></div>
+    <p>The same governing input as every day since 07-09: <b>term supply.</b> This cycle isolated a <em>specific</em> failure mode — the <b>between-harvest drain</b>. The keyword harvest (our only refuel that produces real net-new terms) could previously fire <b>only at a session's pre-flight</b>. So once the early refill drained mid-window, every subsequent fade hit the dead <code>discover()</code> and the pool just bled out until the next session's pre-flight happened to align with the 4h gate. That's the dead evening tail, mechanically.</p>
+    <p><b>Fixed this cycle.</b> The harvest now also fires <b>on fade</b> — the moment the active vein drains mid-session — at a shorter cadence floor (<code>KEYWORD_HARVEST_MIN_INTERVAL_HOURS</code>, default 2h vs the pre-flight 4h), because a fade is direct, measured evidence we're draining. It's additive and cadence-gated, so it can't over-fire or touch quota. Beyond that, the biggest lever is unchanged and unbuilt: the <b><code>needs_contact</code> recovery engine</b> (now <span class="pill">3,079</span> parked creators, +98 this cycle) sidesteps the term-supply wall entirely. Deferred pending greenlight.</p>
+  </div>
+
+  <h2>Where the leads came from</h2>
+  <div class="card">
+    <div class="niche">
+      <span class="chip"><b>Real Estate</b> 95</span>
+      <span class="chip"><b>Legal</b> 32</span>
+      <span class="chip"><b>Financial Planning</b> 26</span>
+      <span class="chip">Tax &amp; Accounting 9</span>
+      <span class="chip">Coaching 8</span>
+      <span class="chip">Relocation 8</span>
+      <span class="chip">Health Clinics 6</span>
+      <span class="chip">SaaS 5</span>
+      <span class="chip">AI Automation 2</span>
+      <span class="chip">Wealth 1 · Biz-Growth 1 · Other 2</span>
+    </div>
+    <p class="muted" style="margin-top:14px;margin-bottom:0">Real Estate + Legal + Financial Planning = <b>153 / 195 pitchable (78%)</b>; RE alone is <b>49%</b>. Notable shift vs 07-15: <b>Legal jumped to #2</b> (32 vs 12) — the harvest surfaced a fresh batch of legal-services tails this cycle. Same three verticals keep carrying the day.</p>
+  </div>
+
+  <h2>What broke → what's fixed</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Issue</th><th>Mechanism</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr class="fix"><td>Between-harvest supply drain</td><td>Harvest could fire only at session pre-flight; cadence-gated 4h → pool bled out mid-window, fades hit the ≈0-net-new LLM discover()</td><td class="up">Fixed: harvest now fires on fade at a 2h floor (mid-session refill with real terms)</td></tr>
+        <tr class="fix"><td><code>term_starvation</code> heartbeat (07-15 fix)</td><td>Was a dry finder invisible until the daily debrief?</td><td class="up">Validated: fired 7× across the dead tail, $0, out of the fix-agent path</td></tr>
+        <tr><td>Discovery-dry guard (07-14)</td><td>Suppress the sonnet <code>discover()</code> call when the term table hasn't grown</td><td class="up">Held — no wasted generations, $0 spend</td></tr>
+        <tr><td>Hard-wall back-off + self-reload (07-13/07-14)</td><td>Classify by stop cause; loop re-execs on disk change</td><td class="up">Held — 24 sessions, proper resting gaps, no thrash</td></tr>
+        <tr><td>Term-supply ceiling (structural)</td><td>Fresh terms are the governing input; harvest + wider ICP feed it, discover() ≈ 0 net-new</td><td class="warn">Open — needs the <code>needs_contact</code> engine (biggest lever, deferred)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Recommended next — ranked</h2>
+  <ol class="recs">
+    <li><b>Watch the fade-triggered harvest next cycle (shipped today).</b> Confirm it lifts the PT-evening/overnight yield that died today, and that it stays quota-safe (0 quota stops with big headroom this cycle, so the risk is low). If it isn't enough, the next dial is lowering the base <code>KEYWORD_HARVEST_INTERVAL_HOURS</code> or raising the cap — but only on this cycle's evidence, not blindly.</li>
+    <li><b>Build the <code>needs_contact</code> recovery engine</b> (<code>youtube-email-outreach-v1</code>) — <b>3,079</b> found-and-scored creators with no verifiable email, +98/cycle. Recovering even a third out-yields a week of fresh finding and fully sidesteps the term-supply wall. Biggest lever, still deferred pending greenlight.</li>
+    <li><b>Keep widening the ICP / frontier.</b> Three verticals (RE + Legal + Financial Planning) are 78% of yield. The harvest refuels those tails, but net-new <em>verticals</em> — new professions and sub-niches — are what break the supply ceiling durably rather than refilling the same wells.</li>
+    <li><b>Nothing else needs touching.</b> The loop is healthy, self-healing, and cheap; resist adding machinery it doesn't need.</li>
+  </ol>
+
+  <div class="foot">
+    <b>Status caveat:</b> everything is <b>parked</b>, nothing sent. <code>approved_hold</code> is a deliberate holding lane — leads sit there until the intended email process is ready. Today's +82 joins the base → <b>2,267 parked</b>; another ~97 swept into <code>needs_contact</code> → <b>3,079</b>. Campaign ran unattended all cycle: 24 sessions, 112 finder passes, $0 Claude spend, 0 fatal signatures, 0 quota stops. One self-healing fix shipped this cycle (fade-triggered keyword harvest, orchestrator repo) — typechecked, loads clean, committed.
+  </div>
+
+</div>
+
+<script>
+  // fresh_pitchable per finder pass, chronological (from logs/campaign-2026-07-15.jsonl + 07-16.jsonl, cycle window 07-15T07:00Z → 07-16T07:00Z)
+  var seq = [1,1,0,0,1,4,3,1,2,1,9,3,1,3,1,0,6,0,0,0,0,4,2,1,2,0,2,0,5,3,0,2,1,0,1,4,1,0,1,0,0,4,7,7,2,0,0,0,1,0,2,0,3,0,0,2,2,0,2,3,1,0,0,0,0,0,0,1,1,0,0,0,2,1,3,0,0,14,0,0,1,2,1,0,4,1,2,0,0,0,0,0,1,2,0,0,1,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0];
+  var max = Math.max.apply(null, seq);
+  var strip = document.getElementById('strip');
+  seq.forEach(function (v) {
+    var b = document.createElement('div');
+    b.className = 'bar' + (v === 0 ? ' zero' : v < 12 ? ' low' : '');
+    b.style.height = Math.max(4, Math.round((v / max) * 100)) + '%';
+    b.title = v + ' fresh pitchable';
+    strip.appendChild(b);
+  });
+</script>
