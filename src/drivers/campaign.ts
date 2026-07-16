@@ -192,8 +192,11 @@ function hoursSinceLastHarvest(): number {
     return Infinity; // no state yet → due
   }
 }
-async function harvestKeywords(opts: CampaignOpts): Promise<boolean> {
-  const intervalH = Number(process.env.KEYWORD_HARVEST_INTERVAL_HOURS ?? 4);
+async function harvestKeywords(opts: CampaignOpts, intervalOverrideH?: number): Promise<boolean> {
+  // Default cadence is the pre-flight 4h gate. Callers with a stronger, MEASURED
+  // supply-pressure signal (a mid-session fade — the active vein just drained) may pass
+  // a shorter floor so the pool refills faster precisely when it's draining.
+  const intervalH = intervalOverrideH ?? Number(process.env.KEYWORD_HARVEST_INTERVAL_HOURS ?? 4);
   const cap = process.env.KEYWORD_HARVEST_CAP ?? '200';
   const sinceH = hoursSinceLastHarvest();
   if (opts.dryRun) {
@@ -342,6 +345,16 @@ export async function driveCampaign(opts: CampaignOpts): Promise<void> {
     if (!opts.dryRun && finder.exit_code === 0 && freshPitchable < opts.fadeThreshold && opts.discovery) {
       console.log(`[campaign] only ${freshPitchable} fresh pitchable this pass (< ${opts.fadeThreshold}) — vein fading, pivoting to discovery.`);
       log({ event: 'fade_detected', run, fresh_pitchable: freshPitchable });
+      // A fade is direct evidence the active vein just drained MID-SESSION — a stronger
+      // supply-pressure signal than a pre-flight reservoir verdict. Refill with REAL
+      // autocomplete terms first, at a shorter cadence floor (KEYWORD_HARVEST_MIN_INTERVAL_HOURS,
+      // default 2h vs the pre-flight 4h), then still run the LLM discover() as a complement.
+      // Additive + cadence-gated: no-ops when not due, so quota stays bounded (the harvest
+      // itself is ~free autocomplete; only probe-TESTING costs quota, already governed).
+      // Closes the between-harvest supply sag (07-15 rec #3): pre-flight was previously the
+      // ONLY place the harvest could fire, so a session that drained mid-window had to wait
+      // for the next session's pre-flight to refill while every fade hit the ~0-net-new discover().
+      await harvestKeywords(opts, Number(process.env.KEYWORD_HARVEST_MIN_INTERVAL_HOURS ?? 2));
       await discover(opts);
       // Promote probe winners MID-RUN (#3), not just at the end: every N fades,
       // run evaluate-probes so veins the day's discovery already validated re-enter
