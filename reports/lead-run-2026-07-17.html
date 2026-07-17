@@ -1,0 +1,182 @@
+<title>Lead Run Debrief — 2026-07-17</title>
+<style>
+  :root {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+      --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+      --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+    --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+    --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 40px 22px 80px; }
+  .eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); font-weight: 600; }
+  h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.12; margin: 10px 0 6px; text-wrap: balance; letter-spacing: -.02em; }
+  h2 { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); margin: 44px 0 16px; font-weight: 700; }
+  h3 { font-size: 18px; margin: 0 0 6px; letter-spacing: -.01em; }
+  p { margin: 0 0 14px; }
+  .lede { font-size: 18px; color: var(--ink-soft); max-width: 68ch; }
+  .tag { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--red-soft); color: var(--red); letter-spacing: .02em; }
+  .grid { display: grid; gap: 14px; }
+  .stats { grid-template-columns: repeat(4, 1fr); margin-top: 26px; }
+  @media (max-width: 720px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; box-shadow: var(--shadow); }
+  .stat .n { font-size: 30px; font-weight: 750; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .stat .l { font-size: 12.5px; color: var(--ink-soft); margin-top: 3px; }
+  .stat .s { font-size: 12px; margin-top: 8px; font-weight: 600; }
+  .up { color: var(--good); } .down { color: var(--red); } .warn { color: var(--amber); }
+  .accent-red { border-left: 3px solid var(--red); }
+  .accent-teal { border-left: 3px solid var(--teal); }
+  .accent-amber { border-left: 3px solid var(--amber); }
+
+  /* shape-of-day bar strip */
+  .strip { display: flex; align-items: flex-end; gap: 2px; height: 120px; padding: 14px 14px 10px; overflow-x: auto; }
+  .bar { flex: 1 0 6px; min-width: 5px; border-radius: 2px 2px 0 0; background: var(--teal); opacity: .9; }
+  .bar.zero { background: var(--red); height: 4px !important; opacity: .9; }
+  .bar.low { background: var(--amber); }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-soft); padding: 0 14px 14px; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+
+  .q { border-radius: 14px; padding: 20px 22px; margin-bottom: 14px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); }
+  .q .ask { font-size: 17px; font-weight: 700; color: var(--ink); margin-bottom: 10px; display: flex; gap: 10px; align-items: baseline; }
+  .q .ask .qn { color: var(--red); font-weight: 800; flex: 0 0 auto; }
+  .q p { color: var(--ink-soft); }
+  .q b { color: var(--ink); }
+  .pill { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink); background: var(--panel-2); padding: 1px 7px; border-radius: 6px; border: 1px solid var(--line); white-space: nowrap; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+  th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); }
+  td .num { font-variant-numeric: tabular-nums; font-weight: 650; }
+  .fix td:first-child { color: var(--good); font-weight: 650; }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); box-shadow: var(--shadow); }
+  ol.recs { padding-left: 0; list-style: none; counter-reset: r; margin: 0; }
+  ol.recs li { counter-increment: r; position: relative; padding: 14px 16px 14px 52px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 10px; box-shadow: var(--shadow); }
+  ol.recs li::before { content: counter(r); position: absolute; left: 14px; top: 14px; width: 26px; height: 26px; border-radius: 8px; background: var(--teal-soft); color: var(--teal); font-weight: 800; font-size: 14px; display: grid; place-items: center; }
+  ol.recs b { color: var(--ink); }
+  .foot { margin-top: 46px; padding: 16px 18px; border-radius: 12px; background: var(--amber-soft); border: 1px solid var(--line); font-size: 14px; color: var(--ink-soft); }
+  .foot b { color: var(--ink); }
+  .muted { color: var(--ink-soft); font-size: 13.5px; }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .9em; background: var(--panel-2); padding: 1px 5px; border-radius: 5px; border: 1px solid var(--line); }
+</style>
+
+<div class="wrap">
+
+  <div class="eyebrow">Lead Run Debrief · YouTube outreach</div>
+  <h1>2026-07-17 — the term engine got IP-blocked</h1>
+  <p class="lede">The lowest-volume day of the run, and for once it wasn't the finder, the scorer, or the verifier. <b>Google's public autocomplete endpoint — the finder's only working term-refuel — IP-blocked us and returned <span class="pill">22,105</span> HTTP 403s.</b> The keyword harvest fired but stocked nothing, the reservoir read <code>STOCK-UP</code> every session, and the term pool bled dry. Everything downstream was healthy: verify held ~47%, $0 spend, 0 crashes.</p>
+  <div style="margin-top:14px"><span class="tag">TERM SUPPLY BLOCKED AT THE NETWORK LAYER — NOT EXHAUSTION</span></div>
+
+  <div class="grid stats">
+    <div class="card stat accent-teal">
+      <div class="n">+75</div>
+      <div class="l">parked → <code>approved_hold</code></div>
+      <div class="s warn">pool 2,271 → 2,346</div>
+    </div>
+    <div class="card stat accent-red">
+      <div class="n">71</div>
+      <div class="l">fresh pitchable / 65 passes</div>
+      <div class="s down">1.09/pass — lowest raw total of the run</div>
+    </div>
+    <div class="card stat accent-red">
+      <div class="n">22,105</div>
+      <div class="l">HTTP 403 on autocomplete</div>
+      <div class="s down">harvest IP-blocked all cycle</div>
+    </div>
+    <div class="card stat accent-teal">
+      <div class="n">$0.00</div>
+      <div class="l">Claude spend · 0 fatal signatures</div>
+      <div class="s up">loop ran clean & safe</div>
+    </div>
+  </div>
+
+  <h2>The shape of the day</h2>
+  <div class="card" style="padding:0">
+    <div class="strip" id="strip"></div>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--teal)"></span>healthy pass (≥12 fresh pitchable) — <b>0 all cycle</b></span>
+      <span><span class="dot" style="background:var(--amber)"></span>weak (1–11) — 24 passes</span>
+      <span><span class="dot" style="background:var(--red)"></span>dead pass (0) — <b>41 of 65</b></span>
+    </div>
+  </div>
+  <p class="muted">Each bar = one finder pass (65 total, 07:24Z→06:49Z), height = fresh pitchable found. The tallest bar all day was <b>9</b>. No pass cleared the "healthy" bar even once — the term pool never had enough to give, because the thing that refills it was blocked.</p>
+
+  <h2>The three questions</h2>
+
+  <div class="q accent-red">
+    <div class="ask"><span class="qn">Q1</span><span>Why was this the lowest-volume day of the run?</span></div>
+    <p><b>The term pool was starved — but this time by a network block, not by exhaustion.</b> The finder mines active search terms; when the pool runs thin, the <b>keyword harvest</b> is the only thing that refills it (free autocomplete tails → ICP-prefiltered → probes). This cycle the harvest was <b>wholesale IP-blocked</b>: Google's suggest endpoint returned <span class="pill">HTTP 403</span> to <b>both</b> the <code>youtube</code> and <code>google</code> autocomplete engines, <span class="pill">22,105 times</span>. So the harvest fired but produced ~nothing, the reservoir gate read <span class="pill">STOCK-UP on all 29 sessions</span>, and <span class="pill">27 of 28 sessions hard-stopped</span> on the term wall. Result: <b>71 fresh pitchable across 65 passes (1.09/pass)</b> — the fewest passes and the lowest raw total of the whole run.</p>
+    <p>The tell that this is <em>upstream of everything that works</em>: <b>verify held at ~47%</b> (75 verified of 159 pitchable), right on trend. Nothing downstream broke. The loss was entirely in <b>finding</b>, and finding was choked at its supply valve.</p>
+  </div>
+
+  <div class="q accent-red">
+    <div class="ask"><span class="qn">Q2</span><span>We shipped the harvest to fix exactly this — why didn't it save the day?</span></div>
+    <p>Two reasons stacked. <b>(1) It was blocked at the source.</b> The 07-14/07-16 work wired the harvest into the loop and added fade-firing — but a harvest can only refuel if the endpoint answers, and this cycle it answered <code>403</code>. <b>(2) It was cadence-gated too tight.</b> Of <span class="pill">66 harvest attempts, only 6 fired</span> — 60 were skipped by the interval gate. A mid-cycle fix (the <code>STOCK-UP</code>-triggered 1h force-harvest, <code>0df4923</code>) landed at <b>01:50Z</b> and was only live for the final ~5h. But note: even the 6 that <em>did</em> fire hit the 403 wall — so cadence was the <em>lesser</em> problem today. The block was the wall.</p>
+    <p>A subtle aggravator we also fixed: the check-in's starvation backstop <em>kicks a keyword harvest</em> to break a dry spell — which, into a blocked endpoint, just <b>hammers the block harder</b> and deepens it.</p>
+  </div>
+
+  <div class="q accent-red">
+    <div class="ask"><span class="qn">Q3</span><span>Is the term well finally dry, or is this a block?</span></div>
+    <p><b>A block — categorically, not exhaustion.</b> Three proofs: ① The failures are <span class="pill">HTTP 403</span> (access denied), not empty responses — the endpoint is refusing us, not out of suggestions. The harvest even has a separate "0 net-new = throttling" guard for the exhaustion case; that's not what fired. ② <b>Both</b> the YouTube and Google suggest corpora 403 in lockstep — that's an IP-reputation block on the shared <code>suggestqueries.google.com</code> host, not two independent term veins drying up on the same day. ③ Everything that <em>doesn't</em> depend on that endpoint stayed healthy — 883 channels discovered, 159 pitchable, verify ~47%, 0 quota stops. When the block lifts (or we change egress IP), the refill resumes with zero code changes.</p>
+  </div>
+
+  <h2>What broke → what's fixed</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Issue</th><th>Mechanism</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr><td>Autocomplete IP-block (22,105 × 403)</td><td>Harvest grinds full ~287 req/seed getting 403 on each, stocks nothing, deepens the block, buries the cause under 22k identical log lines</td><td class="up">Fixed: circuit breaker bails after 8 consecutive failures + emits one greppable <code>AUTOCOMPLETE_ENDPOINT_BLOCKED</code> marker (finder <code>68f1896</code>)</td></tr>
+        <tr><td>Check-in kicked a harvest into the block</td><td>Starvation backstop fires <code>keyword-harvest --apply</code> on a dry finder — futile &amp; counterproductive when the endpoint is blocked</td><td class="up">Fixed: check-in now detects the block, skips the kick, logs an <code>autocomplete_blocked</code> observation same-hour (orchestrator <code>8d53f3f</code>)</td></tr>
+        <tr><td>Harvest cadence skipped 60/66 attempts</td><td>Interval gate too tight vs. a chronically <code>STOCK-UP</code> reservoir</td><td class="warn">Partial: <code>STOCK-UP</code> 1h force-harvest landed 01:50Z (<code>0df4923</code>), only live ~5h — watch next full cycle</td></tr>
+        <tr><td>The block itself</td><td>IP-reputation block on <code>suggestqueries.google.com</code> from the VPS egress IP</td><td class="down">Open — infra remedy (rotate egress IP / proxy / alternate term source). Not code-fixable.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Recommended next — ranked</h2>
+  <ol class="recs">
+    <li><b>Unblock the term engine (the binding constraint — infra, needs Casey).</b> Rotate the VPS egress IP or route the harvest's autocomplete calls through a proxy. Until <code>suggestqueries.google.com</code> answers 200 again, the reservoir cannot refill and every low day repeats. The circuit breaker shipped today stops the waste and makes the block visible; it does not lift it.</li>
+    <li><b>Watch the two fixes land next cycle.</b> The breaker should collapse the 22k wasted requests to a few dozen and print <code>AUTOCOMPLETE_ENDPOINT_BLOCKED</code>; the check-in should log <code>autocomplete_blocked</code> hourly (free, out of the fix-agent path) instead of hammering. If the block has lifted, expect yield to snap back to ~1.7/pass as on 07-16.</li>
+    <li><b>Build a second, independent term source.</b> The whole engine currently rides one free endpoint that can be blocked wholesale. The adapter already name-checks DataForSEO / Google Ads API as future layers — a paid keyword source removes the single point of failure the block exposed.</li>
+    <li><b>The <code>needs_contact</code> recovery engine (biggest volume lever, deferred).</b> <span class="pill">3,156</span> found-and-scored creators with no verified email sit parked there. Recovering ~30% (~950) dwarfs a day of fresh finding <em>and</em> sidesteps the term-supply block entirely — no autocomplete endpoint required. Still awaiting greenlight.</li>
+  </ol>
+
+  <div class="foot">
+    <b>Status caveat:</b> everything is <b>parked</b>, nothing sent. <code>approved_hold</code> is a deliberate holding lane — leads sit there until the intended email process is ready. Today's <b>+75</b> takes the pool to <b>2,346</b>; <code>needs_contact</code> is now <b>3,156</b> (+77). The campaign loop ran clean and unattended all cycle — <b>$0 Claude spend, 0 fatal signatures, 0 quota stops</b> — it simply had a starved supply valve. Two durable self-healing fixes shipped (finder circuit breaker + check-in block detection); the actual unblock is an infra call.
+  </div>
+
+</div>
+
+<script>
+  // fresh_pitchable per finder pass, chronological across the cycle window
+  // (07-16 07:00Z → 07-17 07:00Z, from logs/campaign-2026-07-16.jsonl + campaign-2026-07-17.jsonl)
+  var seq = [0,0,0,0,0,0,2,1,1,1,1,7,1,7,1,2,1,0,0,0,0,0,0,8,9,0,4,0,0,0,0,0,0,0,0,0,0,2,2,0,5,0,3,0,0,0,0,0,0,0,0,0,3,0,4,1,0,0,1,2,2,0,0,0,0];
+  var max = Math.max.apply(null, seq);
+  var strip = document.getElementById('strip');
+  seq.forEach(function (v) {
+    var b = document.createElement('div');
+    b.className = 'bar' + (v === 0 ? ' zero' : v < 12 ? ' low' : '');
+    b.style.height = Math.max(4, Math.round((v / max) * 100)) + '%';
+    b.title = v + ' fresh pitchable';
+    strip.appendChild(b);
+  });
+</script>
