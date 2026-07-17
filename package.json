@@ -10,6 +10,8 @@
     "finder:dry": "tsx src/cli/run-finder.ts --dry-run",
     "campaign": "tsx src/cli/run-campaign.ts",
     "campaign:dry": "tsx src/cli/run-campaign.ts --dry-run",
+    "send": "tsx src/cli/run-send.ts",
+    "send:dry": "tsx src/cli/run-send.ts --dry-run",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

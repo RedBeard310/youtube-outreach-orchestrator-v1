@@ -22,7 +22,7 @@ Lead-finder (interval-driven, runs LAST in the tick), plus two lead-driven branc
 
 Branched on `review_status` (case-sensitive — Airtable values are `approved` lowercase, `D100` uppercase):
 
-- `approved` → shell out to `youtube-email-outreach-v1` for find → verify → enrich (Quick research) → compose → push to SmartLead (paused). Terminal: `outreach_status = "sent_to_smartlead"`.
+- `approved` → **the tick preps only.** Shell out to `youtube-email-outreach-v1` for find → verify → enrich (Quick research) with `--stop-after enrich`, then **park the lead at `outreach_status = "enriched"`**. Writing and sending the email are **deliberately decoupled from the tick** (since 2026-07-17) — see [Writing/sending is decoupled from the tick](#writingsending-is-decoupled-from-the-tick-since-2026-07-17). Fire the parked leads on demand with **`npm run send`** (compose → push to SmartLead, paused). Tick-terminal: `enriched`. Overall-terminal: `outreach_status = "sent_to_smartlead"`.
 - `D100` → step A: `youtube-email-outreach-v1 --stop-after verify`; step B: per-lead invocation of `youtube-deep-research-v1`'s `scripts/run-channel.ts` (with auto-bootstrap via `scripts/setup-airtable.ts` if the slug is new to `clients.json`). Each d100 lead gets its own Airtable base. **No compose, no SmartLead in v1.** Terminal: `outreach_status = "deep_research_complete"`.
 
 All other `review_status` values (`unreviewed`, `rejected`, `sent`, `below_threshold`, `scoring_failed`, `demo_niche_excluded`, `approved_hold`, `needs_contact`) are ignored.
@@ -45,6 +45,15 @@ Persisted on the singleSelect:
 `stopped_early` is **not** persisted — it's only an in-process return value from `youtube-email-outreach-v1`'s `--stop-after`. After `--stop-after verify` on a verified lead, the persisted status is `email_verified`.
 
 `deep_research_in_progress` is the only mid-pipeline status that is terminal — once set, the orchestrator does not auto-restart mid-flight runs. Manual intervention required for stuck-in-progress leads. `failed` and `deep_research_failed` are explicitly NOT terminal (see "Core rules").
+
+## Writing/sending is decoupled from the tick (since 2026-07-17)
+
+**The act of writing/sending an email is disconnected from everything else.** The tick preps leads and parks them; a separate, manually-triggered command writes and sends. Nothing about writing an email finds contacts, cleans a database, or blocks any other work.
+
+- **Prep (on the tick, `npm run tick`):** `approved` leads go find → verify → enrich (`--stop-after enrich` inside `youtube-email-outreach-v1`) and **park at `outreach_status = "enriched"`**. The tick **never composes or pushes**. Every approved lead ends the tick "lying in wait, ready to write." Prep is idempotent — a lead already at `enriched`/`email_drafted`/`sent_to_smartlead` is skipped by the prep query (`APPROVED_PREP_DONE` in `src/airtable.ts`), so re-ticking never re-drives a parked lead.
+- **Send (on demand, `npm run send`):** drives the parked leads (`enriched`, or `email_drafted` from a partial prior send — `APPROVED_FIRE_READY`) through compose → push to SmartLead. This is the **only** path that sends, and it runs exactly when you trigger it. `npm run send:dry` previews the shell-out and sends nothing; `--lead-ids a,b` fires a subset; `--limit N` caps the batch. It acquires the same `logs/.tick-lock` as the tick, so a send and a tick can't overlap. Driver: `driveApprovedSend` in `src/drivers/approved.ts`; the inbox-health gate still fires here (at send time), not during prep.
+
+**Why: the enrichment-DB cleanup can never strand a ready-to-write lead.** The cleanup (`youtube-email-outreach-v1/scripts/airtable-cleanup.ts`) is a **separate manual script** — nothing in the tick, campaign, or autopilot auto-runs it. Its `--auto` mode only targets leads already at `sent_to_smartlead` (i.e. it follows a *send*, and never touches an `enriched` parked lead), and it is non-destructive to what compose needs: it always exports a re-importable JSON and keeps the on-disk research bundle (`enrichment-bundles/<recId>/`), and compose reads its input from that **on-disk bundle**, not from the Airtable enrichment base. So even a fully-cleaned lead can still be (re)composed. Composing an email cannot arm the cleanup; only a send can, and the send is now yours to trigger.
 
 ## What the orchestrator does each tick
 
@@ -119,7 +128,7 @@ Estimated ~200–300 lines TS across `src/cli/orchestrate.ts` + a lead-query hel
 
 ## Ticks are manual-only (since 2026-06-01)
 
-**The 4-hour `launchd` cron is DISABLED** — agent unloaded, plist renamed `com.caseybrown.youtube-outreach-orchestrator.plist.disabled`. Reason: the Mac is usually asleep or the repo closed at scheduled tick times, so scheduled ticks silently no-fired (a stale `ENRICHMENT_REPO_PATH` had also been killing them — now fixed). **Run ticks by hand: `npm run tick`. Do NOT re-enable the cron unless Casey explicitly says so.** The nightly enrichment-cleanup cron (`com.caseybrown.airtable-cleanup`) is likewise disabled — run `airtable-cleanup.ts --auto` manually after each send batch, then `rollup-archived-runs.ts`. The durable fix for both is an always-on host (VPS / trigger.dev); until then, everything is manual.
+**The 4-hour `launchd` cron is DISABLED** — agent unloaded, plist renamed `com.caseybrown.youtube-outreach-orchestrator.plist.disabled`. Reason: the Mac is usually asleep or the repo closed at scheduled tick times, so scheduled ticks silently no-fired (a stale `ENRICHMENT_REPO_PATH` had also been killing them — now fixed). **Run ticks by hand: `npm run tick`. Do NOT re-enable the cron unless Casey explicitly says so.** Note the tick now only **preps** leads to `enriched` — writing/sending is the separate `npm run send` step (see [Writing/sending is decoupled from the tick](#writingsending-is-decoupled-from-the-tick-since-2026-07-17)). The nightly enrichment-cleanup cron (`com.caseybrown.airtable-cleanup`) is likewise disabled — run `airtable-cleanup.ts --auto` manually after each send batch, then `rollup-archived-runs.ts`. The durable fix for both is an always-on host (VPS / trigger.dev); until then, everything is manual.
 
 Former cron (for reference if ever re-enabled): `17 */4 * * *` (every 4h, off-zero minute).
 

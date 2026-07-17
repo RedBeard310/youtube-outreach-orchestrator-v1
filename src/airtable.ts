@@ -48,11 +48,25 @@ export interface Lead {
 //
 // `deep_research_in_progress` IS terminal — once set, the orchestrator does not
 // auto-restart mid-flight runs. Manual intervention required for stuck leads.
-const APPROVED_TERMINAL = new Set<OutreachStatus>([
+// Statuses at which the tick's *prep* branch stops re-driving an approved lead.
+// Since 2026-07-17 the tick only preps (find -> verify -> enrich) and parks the
+// lead at `enriched`; writing + sending the email is a separate on-demand step
+// (`npm run send`). So a lead that has reached `enriched` (or `email_drafted` /
+// `sent_to_smartlead`, or dead-ended at no_email/invalid) is "done" as far as
+// the tick is concerned — it lies in wait for the send command and the tick
+// never touches it again. See APPROVED_FIRE_READY for the ready-to-send states.
+const APPROVED_PREP_DONE = new Set<OutreachStatus>([
+  'enriched',
+  'email_drafted',
   'sent_to_smartlead',
   'no_email_found',
   'email_invalid',
 ]);
+
+// The states a prepped, ready-to-send approved lead sits at. `npm run send`
+// resumes these through compose -> push. `email_drafted` = a prior send composed
+// the draft but didn't push (e.g. a SmartLead blip); re-firing resumes at push.
+const APPROVED_FIRE_READY: readonly OutreachStatus[] = ['enriched', 'email_drafted'];
 
 const D100_TERMINAL = new Set<OutreachStatus>([
   'deep_research_complete',
@@ -130,10 +144,38 @@ export async function getLeadsForOrchestration(): Promise<Lead[]> {
 
   return leads.filter(l => {
     const status = l.outreach_status;
-    if (l.review_status === 'approved') return !status || !APPROVED_TERMINAL.has(status);
+    if (l.review_status === 'approved') return !status || !APPROVED_PREP_DONE.has(status);
     if (l.review_status === 'D100') return !status || !D100_TERMINAL.has(status);
     return false;
   });
+}
+
+// On-demand send queue: approved leads that prep has parked in a ready-to-fire
+// state (`enriched`, or `email_drafted` from a partial prior send). `npm run
+// send` drives these through compose -> push. Deliberately separate from the
+// tick's prep query so writing/sending an email never rides along with — or is
+// blocked by — the find/verify/enrich work, the enrichment-DB cleanup, or
+// anything else. Everything lies in wait; this is the only thing that sends.
+export async function getApprovedFireLeads(): Promise<Lead[]> {
+  const base = getBase();
+  const readyClauses = APPROVED_FIRE_READY.map(s => `{outreach_status}='${s}'`).join(', ');
+  const formula = `AND({review_status}='approved', OR(${readyClauses}))`;
+  const records = await withRetry(
+    () => base(tableName()).select({ filterByFormula: formula }).all(),
+    'getApprovedFireLeads',
+  );
+  return records.map(recordToLead);
+}
+
+// Whether a specific lead is parked and ready for `npm run send` to fire it.
+// Used to filter an explicit `--lead-ids` list so a stray id (unapproved, still
+// mid-prep, or already sent) is skipped rather than re-driven.
+export function isApprovedFireReady(lead: Lead): boolean {
+  return (
+    lead.review_status === 'approved' &&
+    lead.outreach_status != null &&
+    APPROVED_FIRE_READY.includes(lead.outreach_status)
+  );
 }
 
 export async function getLeadsByIds(ids: string[]): Promise<Lead[]> {

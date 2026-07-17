@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import { getLeadsForOrchestration } from '../airtable.ts';
-import { driveApproved } from '../drivers/approved.ts';
+import { driveApprovedPrep } from '../drivers/approved.ts';
 import { driveD100 } from '../drivers/d100.ts';
 import { driveLeadFinder } from '../drivers/lead-finder.ts';
 import { acquireLock, releaseLock } from '../lock.ts';
@@ -21,10 +21,12 @@ async function main() {
     const d100 = leads.filter(l => l.review_status === 'D100');
 
     console.log(
-      `[orchestrator] tick start ts=${startedAt} approved=${approved.length} d100=${d100.length} dry_run=${dryRun}`
+      `[orchestrator] tick start ts=${startedAt} approved_to_prep=${approved.length} d100=${d100.length} dry_run=${dryRun} (approved leads are prepped to 'enriched'; send with 'npm run send')`
     );
 
-    const approvedResult = await driveApproved(approved, { dryRun });
+    // Prep only: find -> verify -> enrich, park at `enriched`. Writing + sending
+    // is the separate on-demand `npm run send` step (decoupled 2026-07-17).
+    const approvedResult = await driveApprovedPrep(approved, { dryRun });
     const d100Result = await driveD100(d100, { dryRun });
     // Lead-finder runs last so a long discovery run can't delay per-lead work.
     // It only fires if `LEAD_FINDER_INTERVAL_HOURS` has elapsed since its last
