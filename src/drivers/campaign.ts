@@ -267,7 +267,16 @@ export async function driveCampaign(opts: CampaignOpts): Promise<void> {
     log({ event: 'reservoir', verdict });
     if (verdict === 'STOCK-UP' && opts.discovery) {
       console.log(`[campaign] reservoir short — stocking up before the run.`);
-      await harvestKeywords(opts); // real autocomplete terms first (cadence-gated Keyword Layer)
+      // STOCK-UP means the fresh-term pool literally cannot cover this run — the term
+      // engine is DRY, which is precisely when a harvest is mandatory. The normal 4h
+      // cadence is the wrong gate here: skipping because we happened to harvest a few
+      // hours ago leaves the finder with zero terms, it aborts on "No active terms",
+      // two aborts trip the hard-wall, and the whole session parks 0 leads for hours
+      // (the 2026-07-17 term-starvation stall — reservoir was STOCK-UP but harvest was
+      // skipped at 3.6h < 4h gate). When we're genuinely short we harvest regardless of
+      // cadence; the env floor lets an operator re-introduce minimum spacing if the
+      // relentless-refill ever churns (default 0 = always refill while dry).
+      await harvestKeywords(opts, Number(process.env.KEYWORD_HARVEST_STARVED_INTERVAL_HOURS ?? 0));
       await discover(opts);        // LLM veins as the fast complement / between-harvest fallback
     }
   }
