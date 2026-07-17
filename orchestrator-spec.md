@@ -80,12 +80,14 @@ The orchestrator owns almost no business logic. Each repo/skill already runs end
 
 ---
 
+> **Updated 2026-07-17 — the approved path is now split.** The tick only *preps*: find → verify → enrich, then parks at `outreach_status = "ready_data_scraped"` (via `--stop-after enrich`). It **no longer composes or pushes.** The "Compose email" and "Push to SmartLead" boxes above are now a separate, on-demand step — **`npm run send`** — that you trigger whenever ("everything lying in wait, ready to write"). `ready_no_data` is a reserved sibling status (ready to email, no enrichment data) that nothing produces or sends yet. Full detail: orchestrator `CLAUDE.md` → "Writing/sending is decoupled from the tick."
+
 ## Repos and skills the orchestrator calls
 
 | Component | Type | Role | Owned state |
 |---|---|---|---|
 | `youtube-lead-finder-v1` | Agent (repo) | Discovers YouTube channels matching ICP, writes to lead Airtable base with `review_status="unreviewed"`. **No orchestrator involvement** — runs on its own schedule, possibly Casey-triggered. | Lead candidates table |
-| `youtube-email-outreach-v1` | Agent (repo) | The current repo. Find email → verify → enrich (calls Quick research) → compose → push. Handles its own state machine via `outreach_status`. Already supports `--lead-id`, `--variant`, `--concurrency` flags. | Outreach status fields + email vars |
+| `youtube-email-outreach-v1` | Agent (repo) | The current repo. Find email → verify → enrich (calls Quick research) → compose → push — **but the tick stops after enrich (parks at `ready_data_scraped`); compose + push are the decoupled on-demand `npm run send`.** Handles its own state machine via `outreach_status`. Already supports `--lead-id`, `--variant`, `--concurrency` flags. | Outreach status fields + email vars |
 | `quick-youtube-channel-research-v1` | Agent (repo, locked) | Quick enrichment. Called by email-outreach-v1 today; will continue to be called the same way. Writes to scratch Airtable base, exports local markdown bundle. | Scratch Airtable base (cleaned by `airtable-cleanup.ts`) |
 | **Deep-research agent (TBN)** | Agent (future repo) | For `d100` leads only. Likely a rename/fork of `quick-youtube-channel-research-v1` with deeper extraction passes. Writes to a separate, permanent Airtable base. Casey will name this. | Dedicated permanent Airtable base |
 | `5-ideas-email` | Skill (`~/.claude/skills/5-ideas-email/`) | Email writer variant A. Read by `youtube-email-outreach-v1` at compose time. | — |
@@ -135,7 +137,7 @@ Existing fields on `lead_candidates` (lead Airtable base) that drive orchestrati
 | Field | Values | Read by orchestrator? |
 |---|---|---|
 | `review_status` | `unreviewed`, `approved`, `d100`, `rejected`, `sent`, `below threshold`, `scoring failed`, `demo`, `niche excluded` | YES — branches on `approved` and `d100`; ignores the rest |
-| `outreach_status` | `pending`, `email_found`, `email_verified`, `enriched`, `email_drafted`, `sent_to_smartlead`, `no_email_found`, `email_invalid`, `failed` | YES — to determine which stage to advance |
+| `outreach_status` | `pending`, `email_found`, `email_verified`, `ready_data_scraped` (parked/enriched, ready for `npm run send`), `ready_no_data` (reserved — ready to email, no enrichment data; unused for now), `enriched` (legacy alias for `ready_data_scraped`), `email_drafted`, `sent_to_smartlead`, `no_email_found`, `email_invalid`, `failed` | YES — to determine which stage to advance |
 | `email_address`, `email_verification_result`, `enrichment_bundle_path`, etc. | (various) | NO directly — but the orchestrator may use them to decide "this lead is ready for stage X" |
 
 New field (proposed):

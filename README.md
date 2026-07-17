@@ -12,12 +12,30 @@ cp .env.example .env
 # Fill in AIRTABLE_API_KEY, EMAIL_OUTREACH_REPO_PATH, DEEP_RESEARCH_REPO_PATH
 ```
 
-## Run a tick
+## Run a tick (prep)
+
+The tick **preps** approved leads — find → verify → enrich — and parks each at
+`outreach_status = "ready_data_scraped"`. It never composes or sends.
 
 ```bash
 npm run tick:dry      # log what it would do, don't shell out
 npm run tick          # real run
 ```
+
+## Send (write + push) — on demand
+
+Writing and sending email is decoupled from the tick (2026-07-17). Fire the parked
+`ready_data_scraped` leads through compose → push to SmartLead (paused) whenever you want:
+
+```bash
+npm run send:dry                 # preview the shell-out, send nothing
+npm run send                     # fire all ready leads
+npm run send -- --lead-ids a,b   # fire only these (must be ready)
+npm run send -- --limit 25       # cap the batch
+```
+
+`send` acquires the same `logs/.tick-lock` as the tick, so the two can't overlap. See
+[CLAUDE.md](CLAUDE.md) → "Writing/sending is decoupled from the tick."
 
 ## Cron
 
@@ -47,3 +65,5 @@ Before running for real, add these singleSelect options to the `outreach_status`
 - `deep_research_failed`
 
 Without them, Airtable will reject the orchestrator's status writes and d100 leads will stay stuck at `email_verified`.
+
+The approved-path parked statuses `ready_data_scraped` / `ready_no_data` do **not** need manual pre-creation — they're written by `youtube-email-outreach-v1` with `typecast: true`, so Airtable auto-creates the options on first write.
