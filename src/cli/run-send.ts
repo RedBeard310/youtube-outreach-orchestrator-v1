@@ -1,12 +1,12 @@
 // On-demand "fire" step: write + send emails for approved leads that the tick
-// has already prepped and parked at `enriched`. Fully decoupled from the tick —
+// has already prepped and parked at `ready_data_scraped`. Fully decoupled from the tick —
 // sending here touches nothing else. It does NOT find/verify, does NOT enrich,
 // and does NOT clean the enrichment DB (that stays a separate manual step and
 // only ever removes data for already-sent leads). "Everything lies in wait;
 // shoot off emails whenever."
 //
 // Usage:
-//   npm run send                       # fire every ready (enriched) approved lead
+//   npm run send                       # fire every ready (ready_data_scraped) approved lead
 //   npm run send:dry                   # preview the exact shell-out, send nothing
 //   npm run send -- --lead-ids a,b     # fire only these ids (must be ready)
 //   npm run send -- --limit 25         # cap this batch

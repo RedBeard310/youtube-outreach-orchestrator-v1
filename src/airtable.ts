@@ -15,7 +15,9 @@ export type OutreachStatus =
   | 'pending'
   | 'email_found'
   | 'email_verified'
-  | 'enriched'
+  | 'enriched' // legacy alias for ready_data_scraped; still recognised on read
+  | 'ready_data_scraped' // parked, enriched, ready for the on-demand send (was `enriched`)
+  | 'ready_no_data' // reserved: ready to email but no enrichment data; not produced/sent yet
   | 'email_drafted'
   | 'sent_to_smartlead'
   | 'no_email_found'
@@ -50,13 +52,18 @@ export interface Lead {
 // auto-restart mid-flight runs. Manual intervention required for stuck leads.
 // Statuses at which the tick's *prep* branch stops re-driving an approved lead.
 // Since 2026-07-17 the tick only preps (find -> verify -> enrich) and parks the
-// lead at `enriched`; writing + sending the email is a separate on-demand step
-// (`npm run send`). So a lead that has reached `enriched` (or `email_drafted` /
-// `sent_to_smartlead`, or dead-ended at no_email/invalid) is "done" as far as
-// the tick is concerned — it lies in wait for the send command and the tick
-// never touches it again. See APPROVED_FIRE_READY for the ready-to-send states.
+// lead at `ready_data_scraped`; writing + sending the email is a separate
+// on-demand step (`npm run send`). So a lead that has reached `ready_data_scraped`
+// (or `email_drafted` / `sent_to_smartlead`, or dead-ended at no_email/invalid) is
+// "done" as far as the tick is concerned — it lies in wait for the send command
+// and the tick never touches it again. `ready_no_data` is also parked-and-ignored
+// by the tick, but it is deliberately NOT in APPROVED_FIRE_READY yet: nothing
+// produces it and its no-bundle send path isn't built, so it's a manual holding
+// label for now. `enriched` stays here as a legacy alias for any in-flight lead.
 const APPROVED_PREP_DONE = new Set<OutreachStatus>([
-  'enriched',
+  'ready_data_scraped',
+  'ready_no_data',
+  'enriched', // legacy
   'email_drafted',
   'sent_to_smartlead',
   'no_email_found',
@@ -66,7 +73,9 @@ const APPROVED_PREP_DONE = new Set<OutreachStatus>([
 // The states a prepped, ready-to-send approved lead sits at. `npm run send`
 // resumes these through compose -> push. `email_drafted` = a prior send composed
 // the draft but didn't push (e.g. a SmartLead blip); re-firing resumes at push.
-const APPROVED_FIRE_READY: readonly OutreachStatus[] = ['enriched', 'email_drafted'];
+// `enriched` is a legacy alias for `ready_data_scraped`. `ready_no_data` is
+// intentionally excluded — its send path isn't built yet (see APPROVED_PREP_DONE).
+const APPROVED_FIRE_READY: readonly OutreachStatus[] = ['ready_data_scraped', 'enriched', 'email_drafted'];
 
 const D100_TERMINAL = new Set<OutreachStatus>([
   'deep_research_complete',
@@ -151,7 +160,7 @@ export async function getLeadsForOrchestration(): Promise<Lead[]> {
 }
 
 // On-demand send queue: approved leads that prep has parked in a ready-to-fire
-// state (`enriched`, or `email_drafted` from a partial prior send). `npm run
+// state (`ready_data_scraped`, or `email_drafted` from a partial prior send). `npm run
 // send` drives these through compose -> push. Deliberately separate from the
 // tick's prep query so writing/sending an email never rides along with — or is
 // blocked by — the find/verify/enrich work, the enrichment-DB cleanup, or

@@ -21,10 +21,10 @@ async function main() {
     const d100 = leads.filter(l => l.review_status === 'D100');
 
     console.log(
-      `[orchestrator] tick start ts=${startedAt} approved_to_prep=${approved.length} d100=${d100.length} dry_run=${dryRun} (approved leads are prepped to 'enriched'; send with 'npm run send')`
+      `[orchestrator] tick start ts=${startedAt} approved_to_prep=${approved.length} d100=${d100.length} dry_run=${dryRun} (approved leads are prepped to 'ready_data_scraped'; send with 'npm run send')`
     );
 
-    // Prep only: find -> verify -> enrich, park at `enriched`. Writing + sending
+    // Prep only: find -> verify -> enrich, park at `ready_data_scraped`. Writing + sending
     // is the separate on-demand `npm run send` step (decoupled 2026-07-17).
     const approvedResult = await driveApprovedPrep(approved, { dryRun });
     const d100Result = await driveD100(d100, { dryRun });

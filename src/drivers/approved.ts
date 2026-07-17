@@ -43,7 +43,7 @@ async function runOutreach(
 }
 
 // PREP (runs on the tick): find -> verify -> enrich, then park each lead at
-// `outreach_status = enriched` via `--stop-after enrich`. Compose and the
+// `outreach_status = ready_data_scraped` via `--stop-after enrich`. Compose and the
 // SmartLead push never fire here — those are the on-demand `npm run send` step.
 // This is the decoupling (2026-07-17): every approved lead ends the tick "lying
 // in wait, ready to write," and the tick never sends. Because the tick never
@@ -54,13 +54,13 @@ export async function driveApprovedPrep(leads: Lead[], opts: DriverOpts = {}): P
     leads,
     ['--stop-after', 'enrich'],
     'approved-prep',
-    'prepping (find -> verify -> enrich, parking at enriched)',
+    'prepping (find -> verify -> enrich, parking at ready_data_scraped)',
     opts,
   );
 }
 
 // SEND (on-demand, `npm run send`): resume parked leads through compose -> push.
-// Leads enter at `enriched` (or `email_drafted` from a partial prior send); the
+// Leads enter at `ready_data_scraped` (or `email_drafted` from a partial prior send); the
 // email repo's gates skip find/verify/enrich and only write + push to SmartLead.
 // This is the only path that sends, and it runs exactly when you trigger it —
 // writing/sending an email is now fully disconnected from everything else.
