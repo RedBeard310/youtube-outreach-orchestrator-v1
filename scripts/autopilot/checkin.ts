@@ -16,8 +16,9 @@
 // across consecutive check-ins while the finder keeps exiting cleanly).
 
 import 'dotenv/config';
-import { appendFileSync, existsSync, readdirSync, readFileSync, writeFileSync, statSync } from 'node:fs';
+import { appendFileSync, existsSync, openSync, readdirSync, readFileSync, writeFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import { spawn } from 'node:child_process';
 import { summarizeToday, pacificDate } from './burn-ledger.js';
 import { countByReviewStatus } from '../../src/airtable.ts';
 
@@ -44,6 +45,16 @@ const STARVATION_MAX_PITCHABLE = Number(process.env.AUTOPILOT_STARVATION_MAX_PIT
 // bug — and must not fire the alarm. Matches campaign.ts's own fadeThreshold (12): that's
 // already the codebase's definition of "not enough fresh leads to expect real conversion".
 const MIN_SUPPLY_FOR_PARK_ALARM = Number(process.env.AUTOPILOT_MIN_SUPPLY_FOR_PARK_ALARM ?? 12);
+
+// Backstop keyword-harvest kick (2026-07-17). Casey's standing rule: a multi-hour
+// zero-new-leads stretch must ALWAYS kick the keyword engine. The campaign's own STOCK-UP
+// path (campaign.ts) is the primary, ~30-min trigger; this hourly check-in is the
+// independent belt-and-suspenders that fires even if the campaign's gate is somehow
+// bypassed or the campaign is between sessions. Cooldown-gated across BOTH harvest state
+// files so a genuine autocomplete saturation can't churn a harvest every single hour.
+const FINDER_REPO = process.env.LEAD_FINDER_REPO_PATH ?? '/home/casey/repos/youtube-lead-finder-v1';
+const HARVEST_KICK_STATE = join(LOGS, 'autopilot-harvest-kick-state.json');
+const HARVEST_KICK_INTERVAL_H = Number(process.env.AUTOPILOT_HARVEST_KICK_INTERVAL_HOURS ?? 2);
 
 // Fatal signatures — the exact classes of migration/config break we've seen take the
 // pipeline down. Any in a recent session log means a crash a fix-agent should investigate.
@@ -128,6 +139,42 @@ function readParkedHistory(): ParkedPoint[] {
   return out;
 }
 
+// Hours since the LAST keyword harvest by EITHER trigger — the check-in's own backstop kick
+// or the campaign's STOCK-UP harvest. Reading both prevents the two mechanisms from piling
+// redundant harvests on the same drought.
+function hoursSinceAnyHarvest(): number {
+  let min = Infinity;
+  for (const f of [HARVEST_KICK_STATE, join(LOGS, 'keyword-harvest-state.json')]) {
+    try {
+      const s = JSON.parse(readFileSync(f, 'utf8')) as { last?: string };
+      const t = s.last ? Date.parse(s.last) : NaN;
+      if (Number.isFinite(t)) min = Math.min(min, (Date.now() - t) / 3_600_000);
+    } catch { /* no state / unreadable → treat as long ago */ }
+  }
+  return min;
+}
+
+// Fire scripts/keyword-harvest.ts in the finder repo, detached, if we haven't harvested
+// within the cooldown. Fire-and-forget: the harvest writes fresh probe terms to Airtable
+// that the next campaign pass consumes; the check-in must stay fast and free, so it does not
+// wait on the result. Returns true if a harvest was launched.
+function kickKeywordHarvest(reason: string): boolean {
+  if (hoursSinceAnyHarvest() < HARVEST_KICK_INTERVAL_H) return false;
+  const cap = process.env.KEYWORD_HARVEST_CAP ?? '200';
+  const logFile = join(LOGS, `harvest-kick-${new Date().toISOString().replace(/[:.]/g, '-')}.log`);
+  try {
+    const out = openSync(logFile, 'a');
+    const child = spawn('npx', ['tsx', 'scripts/keyword-harvest.ts', '--apply', '--cap', cap], {
+      cwd: FINDER_REPO, detached: true, stdio: ['ignore', out, out],
+    });
+    child.unref();
+    writeFileSync(HARVEST_KICK_STATE, JSON.stringify({ last: new Date().toISOString(), reason, pid: child.pid ?? null, log: logFile }) + '\n');
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function main(): Promise<void> {
   const burn = summarizeToday();
   const day = pacificDate();
@@ -192,8 +239,9 @@ async function main(): Promise<void> {
   //    finder isn't crashing and approved_hold is flat for a legitimate reason (nothing to
   //    park), not a broken verify path. It is also NOT fix-agent-fixable — the remedy is an
   //    ICP/term-supply decision (keyword harvest / wider ICP / the needs_contact engine), so
-  //    spending a `claude -p` agent on it would burn money it can't recover. Instead we log a
-  //    once-hourly heartbeat to a SEPARATE observations file (kept out of the attention file
+  //    spending a `claude -p` agent on it would burn money it can't recover. Instead we (a)
+  //    fire a cheap code-only keyword harvest (kickKeywordHarvest) to refill the term pool,
+  //    and (b) log a once-hourly heartbeat to a SEPARATE observations file (kept out of the attention file
   //    so the fix-agent's evidence channel stays pure) so the daily debrief and operator can
   //    SEE the wall same-hour instead of only at the next debrief (07-13 rec #4 / 07-14 lever #4).
   const fstats = recentFinderStats(STARVATION_WINDOW);
@@ -203,6 +251,15 @@ async function main(): Promise<void> {
     const detail = `finder near-dry: last ${fstats.total} passes → ${fstats.pitchable} fresh pitchable, ${fstats.failed} failed, ${fstats.zeroYield} zero-yield. Term-supply wall (not a code bug) — feed the term pool (keyword harvest / wider ICP) or advance the needs_contact engine.`;
     appendFileSync(OBSERVATIONS, JSON.stringify({ ts: new Date().toISOString(), kind: 'term_starvation', detail, parked }) + '\n');
     console.log(`[checkin ${day}] OBSERVATION term_starvation — ${detail}`);
+    // ACTION (2026-07-17): break the wall, don't just log it. A keyword harvest is a cheap,
+    // code-only refill (free autocomplete + a few-cent prefilter) — no `claude -p` agent, so
+    // it respects the "not fix-agent-fixable" reasoning above while still honoring Casey's
+    // standing rule to ALWAYS kick the engine on a multi-hour zero-lead stretch. Cooldown-
+    // gated and coordinated with the campaign's own harvest so the two don't double-fire.
+    if (kickKeywordHarvest('term_starvation_heartbeat')) {
+      console.log(`[checkin ${day}] → fired keyword harvest to break the term-supply wall (backstop kick)`);
+      appendFileSync(OBSERVATIONS, JSON.stringify({ ts: new Date().toISOString(), kind: 'harvest_kick', detail: 'checkin backstop fired keyword-harvest --apply', parked }) + '\n');
+    }
   }
 
   const softNote = burn.over_soft ? ` [OVER SOFT $${burn.soft_usd}]` : '';
