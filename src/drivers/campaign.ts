@@ -273,10 +273,15 @@ export async function driveCampaign(opts: CampaignOpts): Promise<void> {
       // hours ago leaves the finder with zero terms, it aborts on "No active terms",
       // two aborts trip the hard-wall, and the whole session parks 0 leads for hours
       // (the 2026-07-17 term-starvation stall — reservoir was STOCK-UP but harvest was
-      // skipped at 3.6h < 4h gate). When we're genuinely short we harvest regardless of
-      // cadence; the env floor lets an operator re-introduce minimum spacing if the
-      // relentless-refill ever churns (default 0 = always refill while dry).
-      await harvestKeywords(opts, Number(process.env.KEYWORD_HARVEST_STARVED_INTERVAL_HOURS ?? 0));
+      // skipped at 3.6h < 4h gate). When we're genuinely short we harvest far more
+      // eagerly than the normal 4h cadence — but NOT every cycle: the harvest hits
+      // Google/YouTube autocomplete, which on this datacenter IP can hard-403 the whole
+      // batch (observed 2026-07-17: 586/586 requests 403, ~0 net-new terms — same IP-
+      // reputation family as the graph-sweep watch-page 429s). Force-harvesting every
+      // ~30-min session would just storm a blocked endpoint and risk deepening the block,
+      // so we floor the starved cadence at 1h: eager enough to catch the moment the block
+      // clears and refill, gentle enough not to grind a forbidden endpoint. Env-tunable.
+      await harvestKeywords(opts, Number(process.env.KEYWORD_HARVEST_STARVED_INTERVAL_HOURS ?? 1));
       await discover(opts);        // LLM veins as the fast complement / between-harvest fallback
     }
   }
