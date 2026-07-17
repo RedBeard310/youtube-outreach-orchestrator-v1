@@ -123,6 +123,24 @@ function recentSessionLogs(n = 2): string[] {
   return cands.sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs).slice(0, n);
 }
 
+// Is the public autocomplete endpoint currently IP-blocking us? Two signals in the recent
+// session logs: (a) the harvest's explicit AUTOCOMPLETE_ENDPOINT_BLOCKED marker (finder
+// circuit-breaker, 2026-07-17), or (b) a dense run of autocomplete "failed: HTTP 403" lines
+// (belt-and-suspenders for logs written before the breaker deploys — the 2026-07-17 drought
+// buried 22k of them). When blocked, a keyword-harvest kick is futile AND counterproductive
+// (it just hammers the blocked endpoint, deepening the block), so the starvation backstop
+// must NOT fire one — it's an infra remedy (rotate egress IP / proxy / wait), not a code fix.
+function autocompleteBlocked(): boolean {
+  for (const f of recentSessionLogs(2)) {
+    let body = '';
+    try { body = readFileSync(f, 'utf8'); } catch { continue; }
+    if (body.includes('AUTOCOMPLETE_ENDPOINT_BLOCKED')) return true;
+    const m = body.match(/failed: HTTP 403/g);
+    if (m && m.length >= 50) return true;
+  }
+  return false;
+}
+
 interface Attention { ts: string; kind: string; detail: string; evidence?: string }
 function raiseAttention(a: Omit<Attention, 'ts'>): void {
   appendFileSync(ATTENTION, JSON.stringify({ ts: new Date().toISOString(), ...a }) + '\n');
@@ -256,7 +274,16 @@ async function main(): Promise<void> {
     // it respects the "not fix-agent-fixable" reasoning above while still honoring Casey's
     // standing rule to ALWAYS kick the engine on a multi-hour zero-lead stretch. Cooldown-
     // gated and coordinated with the campaign's own harvest so the two don't double-fire.
-    if (kickKeywordHarvest('term_starvation_heartbeat')) {
+    //
+    // EXCEPT when the autocomplete endpoint is IP-blocked (sustained 403 — the 2026-07-17
+    // root cause): the harvest CANNOT refill the pool and every request just deepens the
+    // block, so kicking it is worse than doing nothing. Log a distinct observation so the
+    // operator can rotate egress IP / proxy same-hour, and skip the kick.
+    if (autocompleteBlocked()) {
+      const bdetail = `autocomplete endpoint IP-blocked (sustained HTTP 403) — the keyword harvest cannot refill the term pool until the block lifts. Skipping the harvest kick (hammering it deepens the block). Remedy is infra: rotate egress IP / proxy, or wait it out.`;
+      appendFileSync(OBSERVATIONS, JSON.stringify({ ts: new Date().toISOString(), kind: 'autocomplete_blocked', detail: bdetail, parked }) + '\n');
+      console.log(`[checkin ${day}] OBSERVATION autocomplete_blocked — ${bdetail}`);
+    } else if (kickKeywordHarvest('term_starvation_heartbeat')) {
       console.log(`[checkin ${day}] → fired keyword harvest to break the term-supply wall (backstop kick)`);
       appendFileSync(OBSERVATIONS, JSON.stringify({ ts: new Date().toISOString(), kind: 'harvest_kick', detail: 'checkin backstop fired keyword-harvest --apply', parked }) + '\n');
     }
