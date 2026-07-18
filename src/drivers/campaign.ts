@@ -18,7 +18,7 @@
 // row — quota/keys exhausted, Airtable down). Every decision is logged to
 // logs/campaign-<date>.jsonl.
 
-import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { driveLeadFinder } from './lead-finder.ts';
 import { runChild, runChildCapture } from '../run.ts';
@@ -183,6 +183,30 @@ async function discover(opts: CampaignOpts, focus?: string): Promise<void> {
 function harvestStatePath(): string {
   return join('logs', 'keyword-harvest-state.json');
 }
+// Is the public autocomplete endpoint currently IP-blocking the harvest? Same signal the
+// hourly check-in uses (scripts/autopilot/checkin.ts → autocompleteBlocked): the finder's
+// AUTOCOMPLETE_ENDPOINT_BLOCKED circuit-breaker marker, or a dense run of "failed: HTTP 403"
+// lines, in the 1–2 newest session logs. 403 = access denied (a block), NOT empty responses
+// (true term exhaustion). Reading only the newest logs makes it self-clearing: the first
+// clean session after the block lifts reads as unblocked and harvesting resumes on its own.
+function autocompleteBlocked(): boolean {
+  const cands: string[] = [];
+  for (const d of [join('logs', 'autopilot-sessions'), 'logs']) {
+    if (!existsSync(d)) continue;
+    for (const f of readdirSync(d)) {
+      if (/session-.*\.log$/.test(f) || /campaign-console-.*\.log$/.test(f)) cands.push(join(d, f));
+    }
+  }
+  const newest = cands.sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs).slice(0, 2);
+  for (const f of newest) {
+    let body = '';
+    try { body = readFileSync(f, 'utf8'); } catch { continue; }
+    if (body.includes('AUTOCOMPLETE_ENDPOINT_BLOCKED')) return true;
+    const m = body.match(/failed: HTTP 403/g);
+    if (m && m.length >= 50) return true;
+  }
+  return false;
+}
 function hoursSinceLastHarvest(): number {
   try {
     const s = JSON.parse(readFileSync(harvestStatePath(), 'utf8')) as { last?: string };
@@ -201,6 +225,19 @@ async function harvestKeywords(opts: CampaignOpts, intervalOverrideH?: number): 
   const sinceH = hoursSinceLastHarvest();
   if (opts.dryRun) {
     console.log(`[campaign] DRY RUN — would harvest keywords: npx tsx scripts/keyword-harvest.ts --apply --cap ${cap} (gate: every ${intervalH}h; last ${sinceH === Infinity ? 'never' : sinceH.toFixed(1) + 'h'} ago)`);
+    return false;
+  }
+  // Autocomplete IP-block guard (2026-07-18). When the public suggest endpoint is IP-blocking
+  // us (sustained HTTP 403 — the 2026-07-17 root cause), a harvest CANNOT refill the term pool
+  // and every request only deepens the block. The hourly check-in already skips its backstop
+  // kick on this signal; the always-on campaign loop must too — otherwise it storms the blocked
+  // endpoint on every STOCK-UP pre-flight (it fired the harvest 14× on 2026-07-18 while the
+  // block was live). This is the precise, self-clearing replacement for the old blunt "floor the
+  // starved cadence at 1h" mitigation: skip while a live block marker is present, resume the
+  // first clean session after it lifts. The remedy is infra (rotate egress IP / proxy), not code.
+  if (autocompleteBlocked()) {
+    console.log('[campaign] keyword harvest skipped — autocomplete endpoint IP-blocked (sustained HTTP 403); harvesting would only deepen the block. Remedy is infra: rotate egress IP / proxy.');
+    log({ event: 'keyword_harvest', skipped: true, reason: 'autocomplete_blocked' });
     return false;
   }
   if (sinceH < intervalH) {
