@@ -58,12 +58,13 @@ const HARVEST_KICK_INTERVAL_H = Number(process.env.AUTOPILOT_HARVEST_KICK_INTERV
 
 // Fatal signatures — the exact classes of migration/config break we've seen take the
 // pipeline down. Any in a recent session log means a crash a fix-agent should investigate.
+const CONSECUTIVE_FINDER_FAILURES = /two consecutive finder failures/;
 const FATAL_PATTERNS = [
   /ERR_MODULE_NOT_FOUND/,
   /Cannot find package/,
   /ENOENT[^\n]*\.claude\/skills/,
   /must be "rapidapi" or "direct"/,
-  /two consecutive finder failures/,
+  CONSECUTIVE_FINDER_FAILURES,
   /FAILED: ENOENT/,
 ];
 
@@ -218,7 +219,24 @@ async function main(): Promise<void> {
     try { tail = readFileSync(f, 'utf8').slice(-40000); } catch { continue; }
     for (const p of FATAL_PATTERNS) {
       const m = tail.match(p);
-      if (m) { anomalies.push({ kind: 'fatal_signature', detail: `pattern ${p} in ${f}`, evidence: m[0] }); break; }
+      if (!m) continue;
+      // "two consecutive finder failures" is campaign.ts's own intentional hard-wall stop,
+      // not a crash — and it fires routinely on plain term-supply exhaustion ("No active
+      // terms to process"), which campaign-loop.sh already backs off/retries on its own and
+      // which section 5 below explicitly treats as NOT fix-agent-fixable. Escalating this
+      // benign, self-healing shape to the paid fix-agent every hour it persists (2026-07-19:
+      // it had already self-healed by the time the agent ran) burns money for nothing —
+      // only escalate when the log does NOT show that benign cause.
+      if (p === CONSECUTIVE_FINDER_FAILURES && /No active terms to process/.test(tail)) {
+        appendFileSync(OBSERVATIONS, JSON.stringify({
+          ts: new Date().toISOString(),
+          kind: 'finder_hard_wall_benign',
+          detail: `"two consecutive finder failures" in ${f} explained by term-supply exhaustion ("No active terms to process") — not a code bug, skipping fix-agent`,
+        }) + '\n');
+        continue;
+      }
+      anomalies.push({ kind: 'fatal_signature', detail: `pattern ${p} in ${f}`, evidence: m[0] });
+      break;
     }
   }
 
