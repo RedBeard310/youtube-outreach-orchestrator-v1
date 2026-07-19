@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lead Run Debrief — 2026-07-19</title>
+<style>
+  :root {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+      --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+      --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+    --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+    --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 40px 22px 80px; }
+  .eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); font-weight: 600; }
+  h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.12; margin: 10px 0 6px; text-wrap: balance; letter-spacing: -.02em; }
+  h2 { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); margin: 44px 0 16px; font-weight: 700; }
+  h3 { font-size: 18px; margin: 0 0 6px; letter-spacing: -.01em; }
+  p { margin: 0 0 14px; }
+  .lede { font-size: 18px; color: var(--ink-soft); max-width: 68ch; }
+  .tag { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--teal-soft); color: var(--teal); letter-spacing: .02em; }
+  .grid { display: grid; gap: 14px; }
+  .stats { grid-template-columns: repeat(4, 1fr); margin-top: 26px; }
+  @media (max-width: 720px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; box-shadow: var(--shadow); }
+  .stat .n { font-size: 30px; font-weight: 750; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .stat .l { font-size: 12.5px; color: var(--ink-soft); margin-top: 3px; }
+  .stat .s { font-size: 12px; margin-top: 8px; font-weight: 600; }
+  .up { color: var(--good); } .down { color: var(--red); } .warn { color: var(--amber); }
+  .accent-red { border-left: 3px solid var(--red); }
+  .accent-teal { border-left: 3px solid var(--teal); }
+  .accent-amber { border-left: 3px solid var(--amber); }
+  .accent-good { border-left: 3px solid var(--good); }
+
+  .strip { display: flex; align-items: flex-end; gap: 3px; height: 120px; padding: 14px 14px 10px; overflow-x: auto; }
+  .bar { flex: 1 0 8px; min-width: 7px; border-radius: 2px 2px 0 0; background: var(--teal); opacity: .9; }
+  .bar.zero { background: var(--red); height: 4px !important; opacity: .9; }
+  .bar.low { background: var(--amber); }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-soft); padding: 0 14px 14px; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+
+  .q { border-radius: 14px; padding: 20px 22px; margin-bottom: 14px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); }
+  .q .ask { font-size: 17px; font-weight: 700; color: var(--ink); margin-bottom: 10px; display: flex; gap: 10px; align-items: baseline; }
+  .q .ask .qn { color: var(--teal); font-weight: 800; flex: 0 0 auto; }
+  .q p { color: var(--ink-soft); }
+  .q b { color: var(--ink); }
+  .pill { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink); background: var(--panel-2); padding: 1px 7px; border-radius: 6px; border: 1px solid var(--line); white-space: nowrap; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+  th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); }
+  td .num { font-variant-numeric: tabular-nums; font-weight: 650; }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); box-shadow: var(--shadow); }
+  .barrow { display: flex; align-items: center; gap: 10px; margin: 7px 0; }
+  .barrow .lab { flex: 0 0 210px; font-size: 13.5px; color: var(--ink-soft); }
+  .barrow .track { flex: 1; height: 16px; background: var(--panel-2); border-radius: 5px; overflow: hidden; border: 1px solid var(--line); }
+  .barrow .fill { height: 100%; background: var(--teal); }
+  .barrow .v { flex: 0 0 44px; text-align: right; font-variant-numeric: tabular-nums; font-weight: 650; font-size: 13.5px; }
+  ol.recs { padding-left: 0; list-style: none; counter-reset: r; margin: 0; }
+  ol.recs li { counter-increment: r; position: relative; padding: 14px 16px 14px 52px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 10px; box-shadow: var(--shadow); }
+  ol.recs li::before { content: counter(r); position: absolute; left: 14px; top: 14px; width: 26px; height: 26px; border-radius: 8px; background: var(--teal-soft); color: var(--teal); font-weight: 800; font-size: 14px; display: grid; place-items: center; }
+  ol.recs b { color: var(--ink); }
+  .foot { margin-top: 46px; padding: 16px 18px; border-radius: 12px; background: var(--teal-soft); border: 1px solid var(--line); font-size: 14px; color: var(--ink-soft); }
+  .foot b { color: var(--ink); }
+  .muted { color: var(--ink-soft); font-size: 13.5px; }
+  code { background: var(--panel-2); padding: 1px 5px; border-radius: 5px; font-size: 13px; border: 1px solid var(--line); }
+</style>
+
+<div class="wrap">
+
+  <div class="eyebrow">Lead Run Debrief · YouTube outreach · autopilot cycle</div>
+  <h1>2026-07-19 — the pipeline routed around a 3-day block</h1>
+  <p class="lede">Day 3 of the autocomplete IP-block, and the term-refuel harvest was still dead — yet parked volume <b>more than doubled off yesterday</b>. The recovery came entirely through the <b>second discovery lane</b>: LLM-invented frontier probes the finder mined the same session, pivoting hard into Real&nbsp;Estate and health clinics. The block is now a <em>degrade</em>, not a <em>halt</em>.</p>
+  <div style="margin-top:14px"><span class="tag">RECOVERY DAY — $0 SPEND, 0 CRASHES, BLOCK SURVIVED</span></div>
+
+  <div class="grid stats">
+    <div class="card stat accent-good">
+      <div class="n">+129</div>
+      <div class="l">parked → <code>approved_hold</code></div>
+      <div class="s up">2.5× yesterday (+51)</div>
+    </div>
+    <div class="card stat accent-teal">
+      <div class="n">2,526</div>
+      <div class="l"><code>approved_hold</code> pool</div>
+      <div class="s muted">2,397 → 2,526</div>
+    </div>
+    <div class="card stat">
+      <div class="n">252</div>
+      <div class="l">pitchable found (score ≥6)</div>
+      <div class="s up">of 951 discovered · verify ~51%</div>
+    </div>
+    <div class="card stat accent-amber">
+      <div class="n">Day 3</div>
+      <div class="l">autocomplete IP-block</div>
+      <div class="s warn">still up · 57 × 403 (was 22,105)</div>
+    </div>
+  </div>
+
+  <h2>The shape of the day</h2>
+  <div class="card" style="padding:0">
+    <div class="strip" id="strip"></div>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--teal)"></span>strong session (≥8 parked)</span>
+      <span><span class="dot" style="background:var(--amber)"></span>weak (1–7)</span>
+      <span><span class="dot" style="background:var(--red)"></span>dead session (0 parked)</span>
+    </div>
+  </div>
+  <p class="muted">Each bar = one campaign session's net parked gain (33 sessions, 00:00→24:00 PT), not the finder's per-pass tally. The productive middle block (12·6·9·17·1·15·12) is the frontier-discovery recovery; the tail softened but never fully died. <b>Why parked-gain, not fresh-pitchable?</b> The finder's per-pass <code>fresh_pitchable</code> counter read only 45 all cycle while the DB recorded 252 pitchable — a ~5.6× undercount that would paint a false "dead day" (see Q3).</p>
+
+  <h2>Where the volume came from</h2>
+  <div class="card">
+    <div class="barrow"><div class="lab">Real Estate &amp; Property</div><div class="track"><div class="fill" style="width:100%"></div></div><div class="v">149</div></div>
+    <div class="barrow"><div class="lab">Health &amp; Wellness Clinics</div><div class="track"><div class="fill" style="width:36%"></div></div><div class="v">54</div></div>
+    <div class="barrow"><div class="lab">Coaching &amp; Consulting</div><div class="track"><div class="fill" style="width:15%"></div></div><div class="v">23</div></div>
+    <div class="barrow"><div class="lab">Financial Planning</div><div class="track"><div class="fill" style="width:5%"></div></div><div class="v">7</div></div>
+    <div class="barrow"><div class="lab">Relocation &amp; Lifestyle</div><div class="track"><div class="fill" style="width:3%"></div></div><div class="v">5</div></div>
+    <div class="barrow"><div class="lab">Tax · Legal · Sales · Marketing · SaaS · other</div><div class="track"><div class="fill" style="width:9%"></div></div><div class="v">14</div></div>
+  </div>
+  <p class="muted"><b>Real Estate + Health clinics = 203 of 252 pitchable (80%).</b> A near-total pivot from yesterday's Financial-Planning-heavy mix — the discovery engine relocating to richer veins is the whole story of the recovery.</p>
+
+  <h2>The three questions</h2>
+
+  <div class="q accent-good">
+    <div class="ask"><span class="qn">Q1</span><span>How did we recover to +129 with the term engine still blocked?</span></div>
+    <p><b>The block only kills one of two refuel lanes.</b> The autocomplete harvest (Google's public suggest endpoint) stayed IP-blocked and skipped <span class="pill">47 of 66 attempts</span> — but the finder's <em>other</em> refuel, the LLM <b>frontier-discovery</b> path (<code>discover-veins.ts</code>), is completely independent of that endpoint. It fired <span class="pill">66×</span> this cycle, writing fresh probe terms each session that the finder mined <b>in the same session</b>. Those probes happened to land in Real&nbsp;Estate and health-clinic veins that converted, and that carried <b>+129 parked</b> — 2.5× yesterday's +51 and the best day since 07-16. This is the "relentless by pivoting" design doing exactly its job: a multi-day infra block became a <em>degrade</em>, not a <em>halt</em>.</p>
+  </div>
+
+  <div class="q accent-amber">
+    <div class="ask"><span class="qn">Q2</span><span>If discovery carried the day, why did <code>evaluate-probes</code> promote 0 winners — again?</span></div>
+    <p>Because <b>a probe yields leads the instant it's mined, but almost never clears the bar to be <em>kept</em>.</b> Frontier probes pay off in-session (that's the +129), yet nearly all convert below the <span class="pill">3.5% qualified-rate</span> promote threshold, so <b>0 survived to the persistent "fresh tier"</b> — the whole book of <b>3,706 probes</b> sits paused, none promoted. The finder is therefore <b>100% dependent on re-inventing fresh probes every night</b> instead of accumulating proven veins that compound. The 07-15 recalibration (10% → 3.5%) was meant to fix this; the bar is <em>still</em> above what a single-run probe reaches. This is the day's real structural weakness — flagged as lever #3, not fixed here (it's a business-logic tuning call for Casey).</p>
+  </div>
+
+  <div class="q accent-teal">
+    <div class="ask"><span class="qn">Q3</span><span>Why does the finder look "dead" (54/68 zero passes, 0 healthy) on a productive day?</span></div>
+    <p>Because the finder's per-pass <code>fresh_pitchable</code> counter <b>badly undercounts the truth</b>. It logged <span class="pill">45 fresh pitchable all cycle</span> while Airtable recorded <span class="pill">252 pitchable discovered</span> — a <b>~5.6× gap</b> (yesterday it was 22 vs 108, ~5×; the ratio is stable). Read literally, the pass telemetry says "dead day"; the ledger says "productive." The gap also drives the fade signal: because <code>&lt;12 fresh_pitchable</code> trips a fade→discover, the miscalibrated counter fires a discover on <b>essentially every pass</b> (66 of 68). Ironically, that over-discovery is <em>what produced the recovery</em> — so it isn't urgent to change — but the number the debrief and the fade logic run on is disconnected from reality.</p>
+  </div>
+
+  <h2>What broke → what's fixed</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Issue</th><th>Mechanism</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr><td>Redundant loser re-pausing</td><td><code>evaluate-probes</code> re-wrote <code>status='paused'</code> on all 3,706 already-paused probes every run (10+×/cycle) — a retired loser keeps its probe tag + sub-threshold qr, so it re-matches the filter forever</td><td class="up">Fixed today — skip already-paused losers; verified <b>pause 0</b> vs the old 3,706 against the live book (finder <code>7116731</code>)</td></tr>
+        <tr><td>Autocomplete IP-block (day 3)</td><td>Google suggest endpoint still 403-blocking the VPS egress; the finder's only <em>harvest</em>-based refuel</td><td class="warn">Infra, not code-fixable — but self-healing skip held (47 harvest-skips, breaker capped 403s at 57 vs 22,105 on 07-17)</td></tr>
+        <tr><td>Discovery doesn't compound</td><td>0 probes clear the 3.5% promote bar → nothing reaches fresh tier → finder re-invents probes nightly</td><td class="warn">Open — lever #3 (promote-threshold / cumulative-run tuning; Casey's call)</td></tr>
+        <tr><td>Finder <code>fresh_pitchable</code> undercount</td><td>Per-pass counter reads ~5.6× below DB yield; drives both the shape-strip and the fade→discover trigger</td><td class="muted">Open — reporting-only, low urgency (the over-discovery it causes is currently helping)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Recommended next — ranked</h2>
+  <ol class="recs">
+    <li><b>Rotate the VPS egress IP / proxy the autocomplete calls (operator, infra).</b> The only action that lifts the block — #1 lever three days running. <em>But</em> today re-frames its urgency: the pipeline <b>survives the block</b> via LLM discovery (+129 proves it), so this is now "restore full supply," not "unblock a halt."</li>
+    <li><b>Second independent term source</b> (DataForSEO / Google Ads API). Removes the single point of failure so the harvest lane degrades gracefully instead of relying on the LLM lane to carry the whole load through a multi-day block.</li>
+    <li><b>Make discovery compound (biggest structural fix inside the finder).</b> 0 probes promoted for a third straight cycle means proven veins (RE, clinics) are thrown away and re-invented every night. Lower the promote bar again, evaluate on <em>cumulative</em> runs rather than one, or promote by niche-relative rate — so a Real-Estate vein that just delivered 149 leads persists to the fresh tier instead of being paused.</li>
+    <li><b>The <code>needs_contact</code> recovery engine (biggest volume lever, deferred).</b> Now <span class="pill">3,332</span> found-and-scored creators with no verified email — fully immune to the term block and larger than three good finding days combined. Awaiting greenlight.</li>
+    <li><b>Reconcile the finder's <code>fresh_pitchable</code> telemetry with DB yield</b> so the fade logic and future debriefs run on the real number, not a ~5.6× undercount.</li>
+  </ol>
+
+  <div class="foot">
+    <b>Status caveat:</b> everything is <b>parked</b>, nothing sent. <code>approved_hold</code> is a deliberate holding lane — leads sit there until the intended email process is ready. Today's +129 lifts the pool to <b>2,526 parked</b>; <code>needs_contact</code> rose to <b>3,332</b> (+124). The cycle ran fully unattended: <b>$0 Claude spend, 0 fatal signatures, 0 quota stops, 0 crashes</b>. One durable fix shipped and verified in the finder repo (auto-sync will push it); the loop is left running for the next cycle.
+  </div>
+
+</div>
+
+<script>
+  // Net parked gain per campaign session, chronological (logs/campaign-2026-07-{18,19}.jsonl, cycle window)
+  var seq = [0,0,1,0,0,0,4,12,6,9,17,1,15,12,0,2,0,6,0,4,0,9,6,2,2,0,2,1,4,0,14,0,0];
+  var max = Math.max.apply(null, seq);
+  var strip = document.getElementById('strip');
+  seq.forEach(function (v) {
+    var b = document.createElement('div');
+    b.className = 'bar' + (v === 0 ? ' zero' : v < 8 ? ' low' : '');
+    b.style.height = Math.max(4, Math.round((v / max) * 100)) + '%';
+    b.title = v + ' parked this session';
+    strip.appendChild(b);
+  });
+</script>
+</html>
