@@ -1,0 +1,421 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lead Gen Status — 24h Intake &amp; 72h Operations</title>
+<style>
+  :root {
+    color-scheme: light;
+    --surface-1: #fcfcfb;
+    --plane: #f9f9f7;
+    --text-primary: #0b0b0b;
+    --text-secondary: #52514e;
+    --muted: #898781;
+    --grid: #e1e0d9;
+    --baseline: #c3c2b7;
+    --border: rgba(11,11,11,0.10);
+    --series-1: #2a78d6;
+    --series-2: #008300;
+    --seq-250: #86b6ef;
+    --seq-350: #5598e7;
+    --seq-450: #2a78d6;
+    --seq-550: #1c5cab;
+    --seq-650: #104281;
+    --good: #0ca30c;
+    --warning: #fab219;
+    --serious: #ec835a;
+    --critical: #d03b3b;
+    --success-text: #006300;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark;
+      --surface-1: #1a1a19;
+      --plane: #0d0d0d;
+      --text-primary: #ffffff;
+      --text-secondary: #c3c2b7;
+      --muted: #898781;
+      --grid: #2c2c2a;
+      --baseline: #383835;
+      --border: rgba(255,255,255,0.10);
+      --series-1: #3987e5;
+      --series-2: #008300;
+      --seq-250: #184f95;
+      --seq-350: #1c5cab;
+      --seq-450: #256abf;
+      --seq-550: #3987e5;
+      --seq-650: #5598e7;
+      --success-text: #0ca30c;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --surface-1: #1a1a19;
+    --plane: #0d0d0d;
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --muted: #898781;
+    --grid: #2c2c2a;
+    --baseline: #383835;
+    --border: rgba(255,255,255,0.10);
+    --series-1: #3987e5;
+    --series-2: #008300;
+    --seq-250: #184f95;
+    --seq-350: #1c5cab;
+    --seq-450: #256abf;
+    --seq-550: #3987e5;
+    --seq-650: #5598e7;
+    --success-text: #0ca30c;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--plane);
+    color: var(--text-primary);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 32px 20px 80px; }
+
+  header.page {
+    border-bottom: 2px solid var(--baseline);
+    padding-bottom: 20px;
+    margin-bottom: 8px;
+  }
+  header.page h1 { font-size: 30px; line-height: 1.2; margin: 0 0 8px; letter-spacing: -0.02em; }
+  .stamp { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+
+  .report-tag {
+    display: inline-block; font-size: 12px; font-weight: 700; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--series-1);
+    border: 1px solid var(--border); border-radius: 999px;
+    padding: 4px 12px; margin-bottom: 12px; background: var(--surface-1);
+  }
+  h2.section {
+    font-size: 25px; letter-spacing: -0.015em; margin: 0 0 6px;
+  }
+  .section-sub { color: var(--text-secondary); margin: 0 0 24px; font-size: 15px; }
+  section.report { margin-top: 56px; }
+
+  h3 { font-size: 17px; margin: 32px 0 12px; letter-spacing: -0.01em; }
+  p { margin: 0 0 14px; }
+  .lede { font-size: 17px; color: var(--text-secondary); }
+
+  .card {
+    background: var(--surface-1); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px 22px; margin: 18px 0;
+  }
+
+  /* ---- stat tiles ---- */
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(158px, 1fr)); gap: 12px; margin: 20px 0 8px; }
+  .tile {
+    background: var(--surface-1); border: 1px solid var(--border);
+    border-radius: 12px; padding: 16px 18px;
+  }
+  .tile .n { font-size: 30px; font-weight: 700; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; line-height: 1.1; }
+  .tile .k { font-size: 12.5px; color: var(--text-secondary); margin-top: 5px; line-height: 1.35; }
+  .tile .note { font-size: 12px; color: var(--muted); margin-top: 3px; }
+
+  /* ---- bar chart ---- */
+  .chart { margin: 6px 0 4px; }
+  .bar-row { display: grid; grid-template-columns: minmax(96px, 190px) 1fr auto; align-items: center; gap: 12px; padding: 3px 0; }
+  .bar-label { font-size: 13.5px; color: var(--text-secondary); text-align: right; overflow-wrap: anywhere; }
+  .bar-track { background: var(--grid); border-radius: 4px; height: 17px; position: relative; }
+  .bar-fill { height: 100%; border-radius: 4px; background: var(--series-1); min-width: 2px; }
+  .bar-val { font-size: 13px; font-variant-numeric: tabular-nums; color: var(--text-primary); font-weight: 600; min-width: 46px; }
+  .bar-pct { color: var(--muted); font-weight: 400; font-size: 12px; }
+
+  /* ---- funnel ---- */
+  .funnel-row { display: grid; grid-template-columns: minmax(112px, 190px) 1fr auto; align-items: center; gap: 12px; padding: 3px 0; }
+
+  /* ---- split bar (2 series) ---- */
+  .split { display: flex; height: 30px; border-radius: 5px; overflow: hidden; gap: 2px; margin: 10px 0 8px; }
+  .split > span { display: block; height: 100%; }
+  .legend { display: flex; flex-wrap: wrap; gap: 18px; margin: 10px 0 2px; font-size: 13.5px; color: var(--text-secondary); }
+  .legend i { display: inline-block; width: 11px; height: 11px; border-radius: 3px; margin-right: 7px; vertical-align: baseline; }
+
+  /* ---- tables ---- */
+  .scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 12px 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; min-width: 520px; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--grid); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); font-weight: 600; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  tbody tr:last-child td { border-bottom: none; }
+
+  /* ---- status pills ---- */
+  .pill { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600;
+          padding: 3px 10px; border-radius: 999px; border: 1px solid var(--border); white-space: nowrap; }
+  .pill.fixed { color: var(--success-text); }
+  .pill.open  { color: var(--critical); }
+  .pill.auto  { color: var(--series-1); }
+
+  .callout {
+    border-left: 3px solid var(--series-1); background: var(--surface-1);
+    border-radius: 0 10px 10px 0; padding: 16px 20px; margin: 20px 0;
+  }
+  .callout.warn { border-left-color: var(--critical); }
+  .callout.win  { border-left-color: var(--good); }
+  .callout h4 { margin: 0 0 7px; font-size: 15px; }
+  .callout p:last-child { margin-bottom: 0; }
+
+  details { margin: 10px 0; }
+  summary { cursor: pointer; font-size: 13.5px; color: var(--text-secondary); padding: 5px 0; }
+
+  ul.tight { margin: 0 0 14px; padding-left: 20px; }
+  ul.tight li { margin-bottom: 7px; }
+  .kicker { color: var(--muted); font-size: 12.5px; margin-top: 6px; }
+  strong.hl { font-weight: 700; }
+  hr.soft { border: none; border-top: 1px solid var(--grid); margin: 34px 0; }
+</style>
+
+<div class="wrap">
+
+<header class="page">
+  <h1>Lead Gen Status Report</h1>
+  <div class="stamp">Generated 2026-07-20 15:11 UTC &nbsp;·&nbsp; Report 1 covers the last 24 hours &nbsp;·&nbsp; Report 2 covers the last 72 hours</div>
+</header>
+
+<!-- ============================ REPORT 1 ============================ -->
+<section class="report" id="report-1">
+  <div class="report-tag">Report 1</div>
+  <h2 class="section">What we scraped in the last 24 hours</h2>
+  <p class="section-sub">Every channel that entered the database between 2026-07-19 15:11 and 2026-07-20 15:11 UTC, pulled straight from Airtable.</p>
+
+  <div class="tiles">
+    <div class="tile"><div class="n">1,044</div><div class="k">channels scraped</div><div class="note">new to the database</div></div>
+    <div class="tile"><div class="n">309</div><div class="k">good leads (score&nbsp;≥&nbsp;6)</div><div class="note">29.6% of everything scraped</div></div>
+    <div class="tile"><div class="n">267</div><div class="k">good leads with a named host</div><div class="note">86% of the good ones</div></div>
+    <div class="tile"><div class="n">140</div><div class="k">parked with a verified email</div><div class="note">ready to write to</div></div>
+    <div class="tile"><div class="n">137</div><div class="k">good, but no email yet</div><div class="note">held for recovery</div></div>
+  </div>
+
+  <div class="callout win">
+    <h4>The headline: one method is now doing essentially all the work</h4>
+    <p>Of the 1,044 channels scraped, <strong class="hl">1,031 came from the channel-graph method and 13 came from keyword search.</strong> That's 98.8% versus 1.2%. The keyword engine has effectively stopped producing — the reason is in Report 2.</p>
+  </div>
+
+  <h3>Where the leads came from</h3>
+  <div class="legend">
+    <span><i style="background:var(--series-1)"></i>Channel graph — 1,031</span>
+    <span><i style="background:var(--series-2)"></i>Keyword search — 13</span>
+  </div>
+  <div class="split" role="img" aria-label="Source split: channel graph 1,031 channels (98.8%), keyword search 13 channels (1.2%)">
+    <span style="width:98.8%;background:var(--series-1)"></span>
+    <span style="width:1.2%;background:var(--series-2)"></span>
+  </div>
+  <p class="kicker">Same story among the <em>good</em> leads only: 308 from the graph, 1 from keyword search.</p>
+
+  <h3>How good were they?</h3>
+  <p>Leads are scored 0–9. We treat <strong class="hl">6 and above</strong> as worth pitching. The distribution is genuinely bimodal — the scorer is decisive rather than hedging into the middle.</p>
+  <div class="chart">
+    <div class="bar-row"><div class="bar-label">Score 9</div><div class="bar-track"><div class="bar-fill" style="width:73.1%"></div></div><div class="bar-val">152</div></div>
+    <div class="bar-row"><div class="bar-label">Score 8</div><div class="bar-track"><div class="bar-fill" style="width:7.2%"></div></div><div class="bar-val">15</div></div>
+    <div class="bar-row"><div class="bar-label">Score 7</div><div class="bar-track"><div class="bar-fill" style="width:43.8%"></div></div><div class="bar-val">91</div></div>
+    <div class="bar-row"><div class="bar-label">Score 6</div><div class="bar-track"><div class="bar-fill" style="width:24.5%"></div></div><div class="bar-val">51</div></div>
+    <div class="bar-row"><div class="bar-label" style="color:var(--muted)">Score 5</div><div class="bar-track"><div class="bar-fill" style="width:5.3%;background:var(--baseline)"></div></div><div class="bar-val" style="color:var(--muted)">11</div></div>
+    <div class="bar-row"><div class="bar-label" style="color:var(--muted)">Score 4</div><div class="bar-track"><div class="bar-fill" style="width:81.3%;background:var(--baseline)"></div></div><div class="bar-val" style="color:var(--muted)">169</div></div>
+    <div class="bar-row"><div class="bar-label" style="color:var(--muted)">Score 3</div><div class="bar-track"><div class="bar-fill" style="width:68.8%;background:var(--baseline)"></div></div><div class="bar-val" style="color:var(--muted)">143</div></div>
+    <div class="bar-row"><div class="bar-label" style="color:var(--muted)">Score 2</div><div class="bar-track"><div class="bar-fill" style="width:100%;background:var(--baseline)"></div></div><div class="bar-val" style="color:var(--muted)">208</div></div>
+    <div class="bar-row"><div class="bar-label" style="color:var(--muted)">Score 1</div><div class="bar-track"><div class="bar-fill" style="width:31.7%;background:var(--baseline)"></div></div><div class="bar-val" style="color:var(--muted)">66</div></div>
+    <div class="bar-row"><div class="bar-label" style="color:var(--muted)">Score 0</div><div class="bar-track"><div class="bar-fill" style="width:66.3%;background:var(--baseline)"></div></div><div class="bar-val" style="color:var(--muted)">138</div></div>
+  </div>
+  <p class="kicker">Blue = keepers (309). Grey = below the bar (735).</p>
+
+  <h3>Which niches are producing — good leads only</h3>
+  <p>This is the "what's working" answer. <strong class="hl">Real estate is dominant</strong>, taking 46% of every good lead we found in 24 hours. Health &amp; wellness clinics are a clear second.</p>
+  <div class="chart">
+    <div class="bar-row"><div class="bar-label">Real Estate &amp; Property</div><div class="bar-track"><div class="bar-fill" style="width:100%"></div></div><div class="bar-val">143 <span class="bar-pct">46%</span></div></div>
+    <div class="bar-row"><div class="bar-label">Health &amp; Wellness Clinics</div><div class="bar-track"><div class="bar-fill" style="width:39.9%"></div></div><div class="bar-val">57 <span class="bar-pct">18%</span></div></div>
+    <div class="bar-row"><div class="bar-label">Coaching &amp; Consulting</div><div class="bar-track"><div class="bar-fill" style="width:23.1%"></div></div><div class="bar-val">33 <span class="bar-pct">11%</span></div></div>
+    <div class="bar-row"><div class="bar-label">Financial Planning</div><div class="bar-track"><div class="bar-fill" style="width:11.9%"></div></div><div class="bar-val">17 <span class="bar-pct">6%</span></div></div>
+    <div class="bar-row"><div class="bar-label">Business Growth Coaching</div><div class="bar-track"><div class="bar-fill" style="width:10.5%"></div></div><div class="bar-val">15 <span class="bar-pct">5%</span></div></div>
+    <div class="bar-row"><div class="bar-label">Relocation &amp; Lifestyle</div><div class="bar-track"><div class="bar-fill" style="width:10.5%"></div></div><div class="bar-val">15 <span class="bar-pct">5%</span></div></div>
+    <div class="bar-row"><div class="bar-label">AI Automation &amp; Agents</div><div class="bar-track"><div class="bar-fill" style="width:5.6%"></div></div><div class="bar-val">8</div></div>
+    <div class="bar-row"><div class="bar-label">Legal Services</div><div class="bar-track"><div class="bar-fill" style="width:4.2%"></div></div><div class="bar-val">6</div></div>
+    <div class="bar-row"><div class="bar-label">Marketing Agencies</div><div class="bar-track"><div class="bar-fill" style="width:3.5%"></div></div><div class="bar-val">5</div></div>
+    <div class="bar-row"><div class="bar-label">SaaS &amp; Software Demos</div><div class="bar-track"><div class="bar-fill" style="width:2.1%"></div></div><div class="bar-val">3</div></div>
+    <div class="bar-row"><div class="bar-label">Everything else</div><div class="bar-track"><div class="bar-fill" style="width:4.9%"></div></div><div class="bar-val">7</div></div>
+  </div>
+
+  <h3>What size are the good leads?</h3>
+  <p>Half of every good lead is <strong class="hl">under 5,000 subscribers</strong>. That's the intended target — these are working firms with a camera, not media brands. Nothing above 500k made the cut, which is the size filter doing its job.</p>
+  <div class="chart">
+    <div class="bar-row"><div class="bar-label">Under 1k subs</div><div class="bar-track"><div class="bar-fill" style="width:71.4%"></div></div><div class="bar-val">65</div></div>
+    <div class="bar-row"><div class="bar-label">1k – 5k</div><div class="bar-track"><div class="bar-fill" style="width:100%"></div></div><div class="bar-val">91</div></div>
+    <div class="bar-row"><div class="bar-label">5k – 25k</div><div class="bar-track"><div class="bar-fill" style="width:67.0%"></div></div><div class="bar-val">61</div></div>
+    <div class="bar-row"><div class="bar-label">25k – 100k</div><div class="bar-track"><div class="bar-fill" style="width:52.7%"></div></div><div class="bar-val">48</div></div>
+    <div class="bar-row"><div class="bar-label">100k – 500k</div><div class="bar-track"><div class="bar-fill" style="width:48.4%"></div></div><div class="bar-val">44</div></div>
+  </div>
+
+  <h3>What happened to all 1,044</h3>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Outcome</th><th class="num">Count</th><th>What it means</th></tr></thead>
+      <tbody>
+        <tr><td>Below threshold</td><td class="num">531</td><td>Scored under 6. Discarded from the pitch pool.</td></tr>
+        <tr><td>Unreviewed</td><td class="num">180</td><td>Scraped but not yet triaged — the queue is still catching up.</td></tr>
+        <tr><td><strong>Parked, email verified</strong></td><td class="num">140</td><td>Good lead, working email found. Ready to write to.</td></tr>
+        <tr><td><strong>Needs contact</strong></td><td class="num">137</td><td>Good lead, no verifiable email yet. Held, not discarded.</td></tr>
+        <tr><td>Excluded niche</td><td class="num">56</td><td>Outside the target market by rule.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="kicker">Of the 277 good leads that got triaged, 51% had a findable email and 49% didn't — consistent with the standing view that a missing email is a recovery job, not a failed lead.</p>
+
+  <div class="callout">
+    <h4>Read on quality</h4>
+    <p>The 29.6% hit rate is the number to watch, and it <strong class="hl">matches the 30% that was predicted</strong> when the seed band was measured. The method is performing exactly as the measurement said it would — which matters, because an earlier estimate of this same method (10%) turned out to be wrong. 86% of good leads also came back with a real first name attached, so most are personally addressable.</p>
+  </div>
+</section>
+
+<hr class="soft">
+
+<!-- ============================ REPORT 2 ============================ -->
+<section class="report" id="report-2">
+  <div class="report-tag">Report 2</div>
+  <h2 class="section">What we've been doing — the last 72 hours</h2>
+  <p class="section-sub">Plain language: the two ways we find channels, what each one did, what broke, and what got fixed.</p>
+
+  <h3>The two methods, in one paragraph each</h3>
+
+  <div class="card">
+    <p><strong class="hl">Method 1 — Keyword search (the original).</strong> We keep a big list of phrases real people type into YouTube — "timeshare exit attorney", "pension planning uk", "buyers agent australia". The system searches each phrase, looks at who comes up, and scores them. The catch: a phrase burns out once you've seen everyone it can show you. So this method only keeps working if we constantly feed it <em>new</em> phrases. We get those by "harvesting" YouTube's and Google's autocomplete suggestions — the dropdown that appears as you type.</p>
+    <p style="margin-bottom:0"><strong class="hl">Method 2 — The channel graph (new, built 4 days ago).</strong> Take a creator we already know is good. Look at what YouTube recommends next to their videos — the "up next" panel on the right. Collect those channels, score them, repeat. It's the digital version of "who else is like this guy?" <em>It needs no search phrases at all</em>, which is exactly why it's still running while Method 1 is stuck.</p>
+  </div>
+
+  <h3>Scoreboard for the 72 hours</h3>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>&nbsp;</th><th class="num">Channels found</th><th class="num">Good leads</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><strong>Channel graph</strong></td>
+          <td class="num">2,509</td><td class="num">714</td>
+          <td><span class="pill fixed">● Running well</span></td>
+        </tr>
+        <tr>
+          <td><strong>Keyword search</strong></td>
+          <td class="num">223</td><td class="num">27</td>
+          <td><span class="pill open">● Stalled — blocked</span></td>
+        </tr>
+        <tr>
+          <td colspan="4" style="color:var(--muted);font-size:13px">Totals: 2,732 channels scraped, 741 good leads (27.1%), 645 with a named host.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>The channel graph: where it stands</h3>
+  <p>It's working through a fixed list of 4,494 known-good creators, one at a time, collecting the channels YouTube recommends alongside each. It is <strong class="hl">56% of the way through</strong> and will finish on its own.</p>
+
+  <div class="tiles">
+    <div class="tile"><div class="n">2,509</div><div class="k">of 4,494 creators walked</div><div class="note">55.8% complete</div></div>
+    <div class="tile"><div class="n">20,530</div><div class="k">channels we'd never seen</div><div class="note">before filtering</div></div>
+    <div class="tile"><div class="n">1,376</div><div class="k">good leads produced</div><div class="note">score ≥ 6</div></div>
+    <div class="tile"><div class="n">$15.69</div><div class="k">total spent so far</div><div class="note">≈ 1.1¢ per good lead</div></div>
+  </div>
+
+  <h3>How 34,180 candidates became 1,376 leads</h3>
+  <div class="chart">
+    <div class="funnel-row"><div class="bar-label">Channels suggested</div><div class="bar-track"><div class="bar-fill" style="width:100%;background:var(--seq-250)"></div></div><div class="bar-val">34,180</div></div>
+    <div class="funnel-row"><div class="bar-label">Never seen before</div><div class="bar-track"><div class="bar-fill" style="width:60.1%;background:var(--seq-350)"></div></div><div class="bar-val">20,530</div></div>
+    <div class="funnel-row"><div class="bar-label">Passed size/junk filter</div><div class="bar-track"><div class="bar-fill" style="width:34.0%;background:var(--seq-450)"></div></div><div class="bar-val">11,638</div></div>
+    <div class="funnel-row"><div class="bar-label">Actually scored</div><div class="bar-track"><div class="bar-fill" style="width:10.2%;background:var(--seq-550)"></div></div><div class="bar-val">3,471</div></div>
+    <div class="funnel-row"><div class="bar-label">Good leads</div><div class="bar-track"><div class="bar-fill" style="width:4.0%;background:var(--seq-650)"></div></div><div class="bar-val">1,376</div></div>
+  </div>
+  <p class="kicker">60% of what the graph suggests is genuinely new to us — that was the key bet, and it held.</p>
+
+  <h3>Which neighbourhoods pay best</h3>
+  <p>Good leads came out of <strong class="hl">453 different creators' neighbourhoods</strong> — this is broad, not a handful of lucky ones. The best single one produced 18.</p>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Creator we walked from</th><th class="num">Good leads found nearby</th></tr></thead>
+      <tbody>
+        <tr><td>Passive Prospecting | YouTube For Real Estate</td><td class="num">18</td></tr>
+        <tr><td>Robert Rutkowski | Texas Luxury Homes</td><td class="num">7</td></tr>
+        <tr><td>Living in Myrtle Beach SC | The Hereda Team</td><td class="num">6</td></tr>
+        <tr><td>North Atlanta Homes For Sale</td><td class="num">6</td></tr>
+        <tr><td>365 Hawaii Real Estate Minute</td><td class="num">6</td></tr>
+        <tr><td>Real Estate Wisdom with Veronica Woods</td><td class="num">5</td></tr>
+        <tr><td>Raleigh Luxury Listings</td><td class="num">5</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="kicker">Notice they're nearly all real estate. Real estate creators cluster tightly — one good agent's "up next" panel is full of other agents.</p>
+
+  <h3>The keyword engine: why it stopped</h3>
+  <div class="callout warn">
+    <h4>Two problems stacked on top of each other</h4>
+    <p><strong>1. Every phrase is used up.</strong> All 6,565 search phrases have been mined out — each one has been run until it stopped showing anyone new.</p>
+    <p style="margin-bottom:0"><strong>2. We can't get new phrases.</strong> The autocomplete harvest — how we top up the phrase list — is being <strong class="hl">blocked by Google at the network level</strong>. Every single request comes back "403 Forbidden". I tested it again just now, three days after first seeing it: <strong class="hl">still blocked.</strong></p>
+  </div>
+  <p>The practical effect: the campaign wakes up every 30 minutes, finds it has no phrases to search, gives up, and sleeps. Over 72 hours that's <strong class="hl">170 attempts, 91 of which failed outright</strong>, producing 27 good leads total. The graph produced 714 in the same window.</p>
+
+  <p>Why is Google blocking us? The server this runs on is a datacenter machine, and Google treats datacenter addresses as suspicious. Worth noting the two methods are affected very differently:</p>
+  <ul class="tight">
+    <li><strong>The graph method gets "slow down" (429)</strong> — a temporary speed limit that clears in about two minutes. We've hit it 416 times since the sweep started and it self-recovered every time by waiting and retrying. Harmless.</li>
+    <li><strong>The keyword harvest gets "forbidden" (403)</strong> — a hard refusal that does not clear. It's been three days.</li>
+  </ul>
+
+  <h3>What broke, and what I did about it</h3>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>What happened</th><th>Resolution</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><strong>I set the creator size filter wrong.</strong> I guessed that bigger creators would be safer seeds and set the floor at 5,000 subscribers — without testing it. That excluded the single best band.</td>
+          <td>Measured each band properly. 1,000–5,000 subscribers is the sweet spot (30% hit rate vs 10% for bigger). Floor moved to 1,000, which roughly tripled the sweep's expected output.</td>
+          <td><span class="pill fixed">● Fixed</span></td>
+        </tr>
+        <tr>
+          <td><strong>I reported a false finding as fact.</strong> I ran two measurements at the same time, which triggered the rate limit, and read the resulting empty results as "small creators don't work" — the exact opposite of the truth. I gave you a table of numbers that were wrong.</td>
+          <td>Retracted it to you, re-measured one at a time, and got the real answer. Both the correct numbers and a warning never to run these measurements in parallel are now written into the code so it can't be repeated.</td>
+          <td><span class="pill fixed">● Fixed</span></td>
+        </tr>
+        <tr>
+          <td><strong>The sweep was throwing away rate-limited creators.</strong> When YouTube said "slow down", the sweep marked that creator as done anyway — so it would have been skipped forever on the next run.</td>
+          <td>Only creators actually visited get checked off. Rate-limited ones go back in the queue.</td>
+          <td><span class="pill fixed">● Fixed</span></td>
+        </tr>
+        <tr>
+          <td><strong>The campaign was starving itself on a technicality.</strong> Its phrase supply was empty, but the top-up step was skipped because of a "only refill every 4 hours" rule and it had refilled 3.6 hours ago. So it ran with zero phrases and parked zero leads.</td>
+          <td>An empty phrase supply now always triggers a refill, ignoring the timer. Capped at once an hour so it can't hammer a blocked endpoint.</td>
+          <td><span class="pill auto">● Auto-fixed</span></td>
+        </tr>
+        <tr>
+          <td><strong>The hourly health check spotted this and did nothing.</strong> It had detected the dry phrase supply for days, but only wrote a note recommending a human go fix it.</td>
+          <td>It now performs the refill itself instead of writing advice.</td>
+          <td><span class="pill auto">● Auto-fixed</span></td>
+        </tr>
+        <tr>
+          <td><strong>My first cost estimate was too high, then my second was too optimistic.</strong> I estimated $100–150 for the sweep, then after 20 creators revised to ~1 lead each.</td>
+          <td>With 2,509 creators of real data: the full sweep will cost about <strong>$28</strong> and yield about <strong>2,465 good leads</strong> — 0.55 leads per creator, not 1.0. Cheaper than feared, fewer leads than the small sample suggested.</td>
+          <td><span class="pill fixed">● Measured</span></td>
+        </tr>
+        <tr>
+          <td><strong>Google is blocking the phrase harvest (403).</strong></td>
+          <td>Not fixable from this server. Needs either residential IP addresses (~$1–5/month for this traffic volume) or routing the harvest through a data provider's API.</td>
+          <td><span class="pill open">● Open — needs your call</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>What we learned</h3>
+  <ul class="tight">
+    <li><strong>Bigger creators are not better seeds.</strong> The relationship is a hump, not a slope — 1,000–5,000 subscribers is the peak. Too small and they're hobbyists; too big and YouTube recommends entertainment channels instead of peers.</li>
+    <li><strong>We were limited by search phrases, not by available channels.</strong> There was never a shortage of creators to find — only a shortage of ways to ask for them. The graph method sidesteps that entirely, which is why it's still going.</li>
+    <li><strong>Finding leads is cheap; the email is the hard part.</strong> A good lead costs about a penny to find. Roughly half of them have no verifiable email — that's now the real bottleneck, not discovery.</li>
+    <li><strong>Real estate is the richest vein by a wide margin</strong> — about half of all good leads, because those creators cluster tightly and recommend each other.</li>
+    <li><strong>Don't trust a small sample.</strong> Twice this week a number from a tiny sample pointed the wrong way. Both times the fix was to measure more before acting.</li>
+  </ul>
+
+  <div class="callout">
+    <h4>What needs a decision from you</h4>
+    <p>Only one thing: <strong class="hl">the keyword engine stays dead until it can reach autocomplete again.</strong> That means residential IP addresses (roughly $1–5/month at this traffic volume, since the requests are tiny) or using a data provider's API instead. Everything else is running unattended and needs nothing.</p>
+    <p style="margin-bottom:0">Worth weighing honestly: the graph method is currently producing <strong class="hl">26× more good leads</strong> than keyword search ever did in the same window, and it has 1,985 creators left to walk. Unblocking keyword search is worth doing, but it is not urgent.</p>
+  </div>
+</section>
+
+<p class="kicker" style="margin-top:44px">All figures pulled live from Airtable and the run logs at generation time. Channel counts are net-new records only; leads already in the database aren't recounted.</p>
+
+</div>
