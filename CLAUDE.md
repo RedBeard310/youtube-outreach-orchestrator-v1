@@ -284,3 +284,21 @@ cleanup exports and purges it like every other table.
 - **YouTube backend is `auto` (direct-keys-first), merged to `main`.** No active branch landmine. Each downstream repo configures its own backend; enrichment repo is separate.
 - **`last_contacted_at` is polluted** (historical backfill from `outreach_processed_at`); the pipeline never reads it, so it doesn't affect sending, but don't trust it as a "contacted" signal.
 - **New email volume comes from a fresh `npm run finder` run**, not re-running outreach — the approved pipeline is essentially drained. (The 268 "unreviewed" leads are NOT untapped volume: all score 4–5, below the ≥6 bar; everything ≥6 is already triaged. Reject or ignore them.)
+
+## How to write replies to me
+
+Keep your replies short and sweet. Don't cut any necessary information or important details, but aim for brevity when explaining them.
+
+Lead with what changed and what it means for me — not what you did step by step.
+Plain language, no unnecessary technical jargon. Explain a term only if I need it
+to make a decision.
+
+Keep it short and spaced out: brief paragraphs, bold labels, a table when
+comparing two or more things. No walls of text, no filler openers.
+
+Include, briefly, anything that changes my picture of the work:
+- what you actually verified vs. assumed
+- anything surprising you found along the way
+- decisions I still need to make, as a short list at the end
+
+Cut everything else.
