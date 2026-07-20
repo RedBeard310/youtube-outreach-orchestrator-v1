@@ -183,12 +183,41 @@ async function discover(opts: CampaignOpts, focus?: string): Promise<void> {
 function harvestStatePath(): string {
   return join('logs', 'keyword-harvest-state.json');
 }
+function blockStatePath(): string {
+  return join('logs', 'autocomplete-block-state.json');
+}
+// Persist "we just observed a live 403 block" with a timestamp. Called whenever a block
+// marker is detected in a session log (see autocompleteBlocked below).
+function markAutocompleteBlocked(): void {
+  try {
+    mkdirSync('logs', { recursive: true });
+    writeFileSync(blockStatePath(), JSON.stringify({ last_seen: new Date().toISOString() }) + '\n');
+  } catch { /* best-effort; the log scan still catches the very next session */ }
+}
+// Have we seen a live block within the backoff window? The log-scan alone is SELF-ERASING:
+// a session that correctly SKIPS the harvest leaves a clean log (no 403 marker), so after two
+// consecutive skips the newest-logs window holds no block evidence and the next session
+// harvests again — re-storming the blocked endpoint (observed 2026-07-20: the harvest
+// oscillated skip→skip→harvest→403 and RAN 18× against a 4-day-old IP-block, each run firing
+// ~853 futile autocomplete requests + a wasted Haiku ICP-prefilter that kept 0). The persisted
+// stamp carries the block forward across clean-log skips for AUTOCOMPLETE_BLOCK_BACKOFF_HOURS
+// (default 6). Still self-clearing: after the window with no fresh marker it probes once; if
+// still blocked the probe re-stamps, if clear the harvest succeeds and normal cadence resumes.
+function blockedRecently(): boolean {
+  const backoffH = Number(process.env.AUTOCOMPLETE_BLOCK_BACKOFF_HOURS ?? 6);
+  if (backoffH <= 0) return false;
+  try {
+    const s = JSON.parse(readFileSync(blockStatePath(), 'utf8')) as { last_seen?: string };
+    const t = s.last_seen ? Date.parse(s.last_seen) : NaN;
+    return Number.isFinite(t) && (Date.now() - t) / 3_600_000 < backoffH;
+  } catch { return false; }
+}
 // Is the public autocomplete endpoint currently IP-blocking the harvest? Same signal the
 // hourly check-in uses (scripts/autopilot/checkin.ts → autocompleteBlocked): the finder's
 // AUTOCOMPLETE_ENDPOINT_BLOCKED circuit-breaker marker, or a dense run of "failed: HTTP 403"
 // lines, in the 1–2 newest session logs. 403 = access denied (a block), NOT empty responses
-// (true term exhaustion). Reading only the newest logs makes it self-clearing: the first
-// clean session after the block lifts reads as unblocked and harvesting resumes on its own.
+// (true term exhaustion). A fresh log marker refreshes the persisted backoff stamp; absent a
+// fresh marker we fall back to that stamp so a run of correct skips can't re-open the endpoint.
 function autocompleteBlocked(): boolean {
   const cands: string[] = [];
   for (const d of [join('logs', 'autopilot-sessions'), 'logs']) {
@@ -201,11 +230,12 @@ function autocompleteBlocked(): boolean {
   for (const f of newest) {
     let body = '';
     try { body = readFileSync(f, 'utf8'); } catch { continue; }
-    if (body.includes('AUTOCOMPLETE_ENDPOINT_BLOCKED')) return true;
+    if (body.includes('AUTOCOMPLETE_ENDPOINT_BLOCKED')) { markAutocompleteBlocked(); return true; }
     const m = body.match(/failed: HTTP 403/g);
-    if (m && m.length >= 50) return true;
+    if (m && m.length >= 50) { markAutocompleteBlocked(); return true; }
   }
-  return false;
+  // No fresh marker in the newest logs — trust the persisted backoff (fixes the oscillation).
+  return blockedRecently();
 }
 function hoursSinceLastHarvest(): number {
   try {
@@ -252,6 +282,10 @@ async function harvestKeywords(opts: CampaignOpts, intervalOverrideH?: number): 
   mkdirSync('logs', { recursive: true });
   writeFileSync(harvestStatePath(), JSON.stringify({ last: new Date().toISOString(), exit: r.exit_code, cap }) + '\n');
   log({ event: 'keyword_harvest', skipped: false, exit: r.exit_code, cap });
+  // If this run just slammed into the 403 wall, persist the block now (autocompleteBlocked()
+  // reads this session's fresh marker and stamps) so the NEXT session backs off immediately
+  // instead of oscillating back into another futile harvest.
+  if (autocompleteBlocked()) markAutocompleteBlocked();
   if (r.exit_code !== 0) console.error(`[campaign] keyword harvest exited ${r.exit_code} (non-fatal; falling back to LLM discovery).`);
   return r.exit_code === 0;
 }
