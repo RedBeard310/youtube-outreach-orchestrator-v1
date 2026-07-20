@@ -96,3 +96,21 @@ Estimated ~200–300 lines TS across `src/cli/orchestrate.ts` + a lead-query hel
 ## Default cron
 
 `17 */4 * * *` (every 4h, off-zero minute per skill-cron-best-practices). Subject to change — see open questions.
+
+## How to write replies to me
+
+Keep your replies short and sweet. Don't cut any necessary information or important details, but aim for brevity when explaining them.
+
+Lead with what changed and what it means for me — not what you did step by step.
+Plain language, no unnecessary technical jargon. Explain a term only if I need it
+to make a decision.
+
+Keep it short and spaced out: brief paragraphs, bold labels, a table when
+comparing two or more things. No walls of text, no filler openers.
+
+Include, briefly, anything that changes my picture of the work:
+- what you actually verified vs. assumed
+- anything surprising you found along the way
+- decisions I still need to make, as a short list at the end
+
+Cut everything else.
