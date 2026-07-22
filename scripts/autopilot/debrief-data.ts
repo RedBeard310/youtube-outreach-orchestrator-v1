@@ -80,6 +80,44 @@ function fatalSignaturesToday(sinceMs: number): string[] {
   return [...found];
 }
 
+// Supply-health from the hourly check-in observations log (autopilot-observations.jsonl).
+//
+// WHY THIS EXISTS (2026-07-22): the finder's fresh-finding engine has been dead for days
+// behind an autocomplete-endpoint IP-block (since 2026-07-17) that no code path can fix —
+// the remedy is infra (rotate egress IP / proxy). Yet the debrief JSON only surfaced
+// fatal_signatures, so the single most important fact about pipeline state — "fresh finding
+// is dead, and for HOW LONG" — was invisible in the authoritative feed. That's dangerous:
+// `discovered_today` is dominated by status CHURN (verify→promote + needs_contact sweeps of
+// the standing backlog), so a future debrief agent reading only the JSON could misread a
+// churn-inflated "619 discovered / 119 pitchable" as a healthy day while the finder produced
+// ~zero net-new. This block makes the outage and its true AGE machine-visible every cycle.
+interface Obs { ts: string; kind: string }
+function readObservations(): Obs[] {
+  const f = join(LOGS, 'autopilot-observations.jsonl');
+  if (!existsSync(f)) return [];
+  return (readJsonl(f) as Array<{ ts?: unknown; kind?: unknown }>)
+    .filter((o): o is Obs => typeof o.ts === 'string' && typeof o.kind === 'string')
+    .sort((a, b) => a.ts.localeCompare(b.ts));
+}
+
+// Start of the CURRENT unbroken run of `kind` observations, walking backward from the latest
+// through any gap ≤ maxGapH. The check-in logs these sparsely (only on a starving+blocked
+// hour), so tolerate day-level gaps; a genuine multi-day recovery (no observation for >2d)
+// correctly resets the episode. Returns null if the latest such observation predates the
+// cycle window (i.e. not active this cycle).
+function ongoingEpisodeStart(obs: Obs[], kind: string, sinceMs: number, maxGapH = 48): string | null {
+  const hits = obs.filter((o) => o.kind === kind);
+  if (!hits.length) return null;
+  const latest = hits[hits.length - 1];
+  if (Date.parse(latest.ts) < sinceMs) return null; // block did not recur this cycle
+  let start = latest.ts;
+  for (let i = hits.length - 2; i >= 0; i--) {
+    if (Date.parse(start) - Date.parse(hits[i].ts) <= maxGapH * 3_600_000) start = hits[i].ts;
+    else break;
+  }
+  return start;
+}
+
 async function main(): Promise<void> {
   const now = new Date();
   const date = pacificDate(now);
@@ -118,6 +156,24 @@ async function main(): Promise<void> {
   const parkedStart = parkedAtCycleStart(sinceISO);
   const burn = summarizeToday(date);
 
+  // Supply-health — surface the persistent term-supply outage the finder can't self-heal.
+  const obs = readObservations();
+  const blockStart = ongoingEpisodeStart(obs, 'autocomplete_blocked', sinceMs);
+  const freshPitchableSum = sum('finder_run', 'fresh_pitchable');
+  const nowMs = now.getTime();
+  const supplyHealth = {
+    // Fresh FINDING (net-new channels the finder actually surfaced), distinct from
+    // discovered_today (which is inflated by verify/promote + needs_contact status churn).
+    fresh_pitchable_sum: freshPitchableSum,
+    fresh_finding_dead: freshPitchableSum <= 1,
+    autocomplete_blocked: blockStart !== null,
+    autocomplete_blocked_since: blockStart,
+    autocomplete_blocked_days: blockStart === null ? 0
+      : Math.round(((nowMs - Date.parse(blockStart)) / 86_400_000) * 10) / 10,
+    autocomplete_block_obs_this_cycle: obs.filter((o) => o.kind === 'autocomplete_blocked' && o.ts >= sinceISO).length,
+    term_starvation_obs_this_cycle: obs.filter((o) => o.kind === 'term_starvation' && o.ts >= sinceISO).length,
+  };
+
   const snapshot = {
     date,
     cycle_start_iso: sinceISO,
@@ -141,7 +197,7 @@ async function main(): Promise<void> {
       sessions_started: count('start'),
       sessions_done: count('done'),
       finder_runs: count('finder_run'),
-      fresh_pitchable_sum: sum('finder_run', 'fresh_pitchable'),
+      fresh_pitchable_sum: freshPitchableSum,
       fades: count('fade_detected'),
       discovers: count('discover'),
       promotes: count('promote'),
@@ -150,6 +206,7 @@ async function main(): Promise<void> {
       time_budget_stops: count('time_budget_stop'),
     },
     burn_today: { total_usd: burn.total_usd, by_source: burn.by_source, soft: burn.soft_usd, hard: burn.hard_usd },
+    supply_health: supplyHealth,
     fatal_signatures_today: fatalSignaturesToday(sinceMs),
     references: {
       prior_debrief_html: '/home/casey/repos/casey-assistant/brain/lead-gen/runs/lead-run-2026-07-10.html',
