@@ -118,6 +118,41 @@ function ongoingEpisodeStart(obs: Obs[], kind: string, sinceMs: number, maxGapH 
   return start;
 }
 
+// Net-new channels the finder actually WROTE to Airtable this cycle — summed from the finder
+// RUN SUMMARY ("New channels written: N") across the session logs. This is the finder's OWN
+// authoritative count of fresh FINDING, and it exists because the two finding-ish figures
+// already in this snapshot both MISLEAD:
+//   • discovered_today is inflated by verify/promote + needs_contact status CHURN (07-23: 833
+//     "discovered" / 148 "pitchable" while the finder wrote just ~7 net-new channels all cycle);
+//   • the campaign's per-pass `fresh_pitchable` counter is known to UNDERCOUNT DB yield
+//     (07-19/07-20 debriefs: ~10 logged vs ~294 real), so keying `fresh_finding_dead` off it
+//     alone risks a false "dead" on a healthy day whose counter simply under-reported.
+// Grepping this line by hand was the recurring manual cross-check in every block-era debrief;
+// this makes it a grounded field. Mirrors fatalSignaturesToday's mtime-windowed log scan.
+function netNewChannelsWritten(sinceMs: number): { total: number; passes_with_writes: number } {
+  let total = 0;
+  let passesWithWrites = 0;
+  const dir = join(LOGS, 'autopilot-sessions');
+  if (existsSync(dir)) {
+    for (const f of readdirSync(dir)) {
+      if (!/^session-.*\.log$/.test(f)) continue;
+      const p = join(dir, f);
+      try {
+        if (statSync(p).mtimeMs < sinceMs) continue;
+        const txt = readFileSync(p, 'utf8');
+        const re = /New channels written:\s*(\d+)/g;
+        let m: RegExpExecArray | null;
+        while ((m = re.exec(txt)) !== null) {
+          const n = Number(m[1]);
+          total += n;
+          if (n > 0) passesWithWrites++;
+        }
+      } catch { /* skip */ }
+    }
+  }
+  return { total, passes_with_writes: passesWithWrites };
+}
+
 async function main(): Promise<void> {
   const now = new Date();
   const date = pacificDate(now);
@@ -160,12 +195,22 @@ async function main(): Promise<void> {
   const obs = readObservations();
   const blockStart = ongoingEpisodeStart(obs, 'autocomplete_blocked', sinceMs);
   const freshPitchableSum = sum('finder_run', 'fresh_pitchable');
+  const netNew = netNewChannelsWritten(sinceMs);
   const nowMs = now.getTime();
   const supplyHealth = {
-    // Fresh FINDING (net-new channels the finder actually surfaced), distinct from
-    // discovered_today (which is inflated by verify/promote + needs_contact status churn).
+    // Fresh FINDING — two independent lenses on the same question ("did the finder surface
+    // net-new channels this cycle?"), both distinct from discovered_today (inflated by
+    // verify/promote + needs_contact status churn):
+    //  • net_new_channels_written — the finder's OWN authoritative RUN-SUMMARY count (ground truth);
+    //  • fresh_pitchable_sum — the campaign's per-pass counter, kept for continuity but known to
+    //    UNDERCOUNT DB yield (07-19/07-20), so NOT trusted as the `dead` trigger.
+    net_new_channels_written: netNew.total,
+    net_new_passes_with_writes: netNew.passes_with_writes,
     fresh_pitchable_sum: freshPitchableSum,
-    fresh_finding_dead: freshPitchableSum <= 1,
+    // Dead when the finder wrote almost no net-new channels all cycle. A working finder writes
+    // hundreds+ (even the weakest post-block days cleared this easily); block-era dead days sit
+    // at ~7–19. Keyed off the hard count, not the flaky per-pass counter.
+    fresh_finding_dead: netNew.total < 30,
     autocomplete_blocked: blockStart !== null,
     autocomplete_blocked_since: blockStart,
     autocomplete_blocked_days: blockStart === null ? 0
