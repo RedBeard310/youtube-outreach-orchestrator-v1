@@ -1,0 +1,184 @@
+<title>Lead Run Debrief — 2026-07-23</title>
+<style>
+  :root {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+      --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+      --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+    --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+    --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 40px 22px 80px; }
+  .eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); font-weight: 600; }
+  h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.12; margin: 10px 0 6px; text-wrap: balance; letter-spacing: -.02em; }
+  h2 { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); margin: 44px 0 16px; font-weight: 700; }
+  h3 { font-size: 18px; margin: 0 0 6px; letter-spacing: -.01em; }
+  p { margin: 0 0 14px; }
+  .lede { font-size: 18px; color: var(--ink-soft); max-width: 68ch; }
+  .tag { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--amber-soft); color: var(--amber); letter-spacing: .02em; }
+  .tag.teal { background: var(--teal-soft); color: var(--teal); }
+  .grid { display: grid; gap: 14px; }
+  .stats { grid-template-columns: repeat(4, 1fr); margin-top: 26px; }
+  @media (max-width: 720px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; box-shadow: var(--shadow); }
+  .stat .n { font-size: 30px; font-weight: 750; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .stat .l { font-size: 12.5px; color: var(--ink-soft); margin-top: 3px; }
+  .stat .s { font-size: 12px; margin-top: 8px; font-weight: 600; }
+  .up { color: var(--good); } .down { color: var(--red); } .warn { color: var(--amber); }
+  .accent-red { border-left: 3px solid var(--red); }
+  .accent-teal { border-left: 3px solid var(--teal); }
+  .accent-amber { border-left: 3px solid var(--amber); }
+
+  /* shape-of-day bar strip */
+  .strip { display: flex; align-items: flex-end; gap: 2px; height: 120px; padding: 14px 14px 10px; overflow-x: auto; }
+  .bar { flex: 1 0 6px; min-width: 5px; border-radius: 2px 2px 0 0; background: var(--teal); opacity: .9; }
+  .bar.zero { background: var(--red); height: 4px !important; opacity: .9; }
+  .bar.low { background: var(--amber); }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-soft); padding: 0 14px 14px; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+
+  .q { border-radius: 14px; padding: 20px 22px; margin-bottom: 14px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); }
+  .q .ask { font-size: 17px; font-weight: 700; color: var(--ink); margin-bottom: 10px; display: flex; gap: 10px; align-items: baseline; }
+  .q .ask .qn { color: var(--red); font-weight: 800; flex: 0 0 auto; }
+  .q.accent-teal .ask .qn { color: var(--teal); }
+  .q p { color: var(--ink-soft); }
+  .q b { color: var(--ink); }
+  .pill { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink); background: var(--panel-2); padding: 1px 7px; border-radius: 6px; border: 1px solid var(--line); white-space: nowrap; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+  th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); }
+  td .num { font-variant-numeric: tabular-nums; font-weight: 650; }
+  .fix td:first-child { color: var(--good); font-weight: 650; }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); box-shadow: var(--shadow); }
+  ol.recs { padding-left: 0; list-style: none; counter-reset: r; margin: 0; }
+  ol.recs li { counter-increment: r; position: relative; padding: 14px 16px 14px 52px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 10px; box-shadow: var(--shadow); }
+  ol.recs li::before { content: counter(r); position: absolute; left: 14px; top: 14px; width: 26px; height: 26px; border-radius: 8px; background: var(--teal-soft); color: var(--teal); font-weight: 800; font-size: 14px; display: grid; place-items: center; }
+  ol.recs b { color: var(--ink); }
+  .foot { margin-top: 46px; padding: 16px 18px; border-radius: 12px; background: var(--amber-soft); border: 1px solid var(--line); font-size: 14px; color: var(--ink-soft); }
+  .foot b { color: var(--ink); }
+  .muted { color: var(--ink-soft); font-size: 13.5px; }
+</style>
+
+<div class="wrap">
+
+  <div class="eyebrow">Lead Run Debrief · YouTube outreach</div>
+  <h1>2026-07-23 — day 7 of the block; the backlog carried it</h1>
+  <p class="lede">Net-new <em>finding</em> is flat for a seventh straight day — the finder wrote <b>7 new channels across 122 passes</b>. The <b>+67 parked</b> came entirely from the verify lane draining the standing backlog. All three term-supply lanes are dead at once, and the cure is still infra, not code. The machine handled it exactly right: <b>$0, no thrash, no page, no crash — still running.</b></p>
+  <div style="margin-top:14px"><span class="tag">SUPPLY-STARVED, CLEANLY HELD</span> <span class="tag teal">$0 CLAUDE · 0 CRASHES · NO HALT</span></div>
+
+  <div class="grid stats">
+    <div class="card stat accent-teal">
+      <div class="n">+67</div>
+      <div class="l">parked → <code>approved_hold</code></div>
+      <div class="s up">pool 2,824 → 2,891 · +29% vs 07-22</div>
+    </div>
+    <div class="card stat accent-red">
+      <div class="n">7</div>
+      <div class="l">net-new channels written (whole cycle)</div>
+      <div class="s down">119 of 122 passes wrote 0 · finding flat</div>
+    </div>
+    <div class="card stat accent-amber">
+      <div class="n">Day 7</div>
+      <div class="l">autocomplete IP-block (since 07-17)</div>
+      <div class="s warn">infra fix, not code · 5.9 days</div>
+    </div>
+    <div class="card stat">
+      <div class="n">$0</div>
+      <div class="l">Claude spend · 0 crashes · 0 quota stops</div>
+      <div class="s muted">44 benign hard-walls, no page</div>
+    </div>
+  </div>
+
+  <h2>The shape of the day</h2>
+  <div class="card" style="padding:0">
+    <div class="strip" id="strip"></div>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--teal)"></span>productive verify session (≥8 parked)</span>
+      <span><span class="dot" style="background:var(--amber)"></span>trickle (1–7)</span>
+      <span><span class="dot" style="background:var(--red)"></span>0 parked</span>
+    </div>
+  </div>
+  <p class="muted">Each bar = one campaign session's <b>parked gain</b> (44 sessions, ~31 min apart, 00:07→06:59Z), height = leads promoted to <code>approved_hold</code>. This is the <b>backlog-drain</b> lane — the finder's own fresh-finding contribution was ~0 all cycle. The tall end cluster is the PT-morning verify sweep clearing the last easily-emailable pitchable leads.</p>
+
+  <h2>The three questions</h2>
+
+  <div class="q accent-red">
+    <div class="ask"><span class="qn">Q1</span><span>Why did finding produce almost nothing again?</span></div>
+    <p><b>All three term-supply lanes are dead simultaneously — day 7 of the same root cause.</b> (1) The <b>keyword harvest</b> (the finder's only refuel) rides Google's public autocomplete endpoint, <b>IP-blocked since 2026-07-17</b>; the campaign correctly <em>skips</em> it every session (<code>harvesting would only deepen the block</code>). (2) The <b>LLM frontier-discovery</b> lane is <b>dry-locked</b> — it went dry at <span class="pill">7,006 terms</span> and stayed there (a token +15 to 7,021 all cycle); the 07-21 <code>FRONTIER_VERTICALS +19</code> bet still hasn't converted. (3) The <b>anti-starvation reserve is spent</b> — every finder run logs <code>NO never-run paused terms remain</code>. With nothing to mine, <span class="pill">112 of 122 passes processed 0 terms</span> and the finder wrote just <b>7 net-new channels</b> all cycle.</p>
+  </div>
+
+  <div class="q accent-teal">
+    <div class="ask"><span class="qn">Q2</span><span>Then where did the +67 parked come from?</span></div>
+    <p><b>The verify lane, draining the standing backlog — not finding.</b> Each session runs an overlapped verify sweep over already-discovered pitchable leads; a representative one took <span class="pill">19 pitchable → 10 email-verified → promoted to approved_hold</span>. Summed over the cycle that's the +67. <b>Proof it's drain, not discovery:</b> the "authoritative" <code>discovered_today = 833 / 148 pitchable</code> is dominated by <em>status churn</em> (verify→promote + <code>needs_contact</code> sweeps of the standing pool) — the finder's own RUN SUMMARY wrote <b>0 new channels on 119 of 122 passes</b>. Email-verify held its usual <b>~47%</b> (70 of 148). That backlog is finite: <b>+151 → +86 → +52 → +67</b> across the last four days is the sputter of a reservoir, not a recovery.</p>
+  </div>
+
+  <div class="q accent-teal">
+    <div class="ask"><span class="qn">Q3</span><span>Is the machine coping, or quietly thrashing?</span></div>
+    <p><b>Coping — a textbook holding pattern.</b> Every self-healing fix from the past week fired as designed: <b>44 clean sessions ~31 min apart</b> (no relaunch storm), the block-aware guard <b>skipped the harvest</b> on all 13 pre-flights, the discovery dry-guard <b>suppressed every <code>claude-sonnet-5</code> call</b> (hence $0), and the check-in classified all <b>44 hard-walls benign</b> and <b>never paged the fix-agent</b>. Net: <span class="pill">$0 Claude · 0 quota stops · 0 crashes · no halt flag</span>. The one shadow: <b>RapidAPI sits at ~98% and there are 0 working direct YT keys</b> — so even if a term refuel arrived, there's barely capacity to mine it.</p>
+  </div>
+
+  <h2>What broke → what's fixed</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Issue</th><th>Mechanism</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr><td>Fresh-finding flatline (7 net-new / cycle)</td><td>Autocomplete endpoint IP-blocked → term pool can't refuel</td><td class="warn">Open — infra (rotate egress IP), 7 days running</td></tr>
+        <tr><td>LLM discovery saturated</td><td>Dry-locked at ~7,006 terms; +19 frontier verticals didn't convert</td><td class="warn">Open — needs new ICP ground or a 2nd term source</td></tr>
+        <tr><td>Anti-starvation reserve exhausted</td><td><code>NO never-run paused terms remain</code> — nothing left to reactivate</td><td class="warn">Open — downstream of the block, not fixable here</td></tr>
+        <tr><td>YouTube capacity thin</td><td>0 direct keys · RapidAPI ~98% of daily cap</td><td class="warn">Open — a refuel couldn't be mined even if it arrived</td></tr>
+        <tr class="fix"><td>Debrief JSON misread finding as healthy</td><td><code>discovered_today=833</code> is churn; <code>fresh_finding_dead</code> was keyed off the flaky per-pass counter</td><td class="up">Fixed today (<code>345a17f</code>) — grounded <code>net_new_channels_written</code> field + <code>dead</code> off the hard count</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Recommended next — ranked</h2>
+  <ol class="recs">
+    <li><b>Rotate the VPS egress IP / proxy — the only lever that reopens net-new finding.</b> The autocomplete block is 7 days old and no code path can lift it. Restoring the harvest refills the term pool, which restarts every downstream lane in one move. This has been rec #1 for a week; it is still the whole game.</li>
+    <li><b>Restore YouTube API capacity.</b> 0 working direct keys and RapidAPI at ~98% means that even the moment the term engine unblocks, there's almost no quota to mine the refuel with. Rotating/adding keys should land <em>alongside</em> the IP fix, not after.</li>
+    <li><b>Stand up a second independent term source (e.g. DataForSEO).</b> Today proved the single point of failure: one blockable free endpoint takes the whole finder down for a week. A paid, keyed autocomplete/keyword source decouples finding from that endpoint. (Needs credentials — operator-managed.)</li>
+    <li><b>The <code>needs_contact</code> recovery engine (now 3,666) — biggest unbuilt lever.</b> It sidesteps <em>both</em> ceilings (term-supply and YT quota): these are already-found, already-scored creators awaiting email recovery, not new finding. Recovering even a third dwarfs a week of blocked finding. Deferred by Casey; still the highest-value build.</li>
+    <li><b>(Shipped) Grounded finding-visibility in the debrief feed.</b> <code>net_new_channels_written</code> now lives in the authoritative JSON so a churn-inflated <code>discovered_today</code> can no longer read as a healthy day — the manual grep every block-era debrief did by hand is now a field.</li>
+  </ol>
+
+  <div class="foot">
+    <b>Status caveat:</b> everything is <b>parked</b>, nothing sent. <code>approved_hold</code> is a deliberate holding lane — leads sit there until the intended email process is ready. Today's +67 brings the pool to <b>2,891 parked</b> (and <code>needs_contact</code> to <b>3,666</b>). The loop was left running for the next cycle: guardrails all held, no halt flag warranted (the block is a supply degrade, not a money-path or auth failure). One durable fix shipped in the orchestrator (<code>345a17f</code>) — observability, not a cure. <b>The cure is infra.</b>
+  </div>
+
+</div>
+
+<script>
+  // Per-session parked_gain across the cycle [07-22T07:00Z, 07-23T07:00Z), from the campaign
+  // JSONL "done" events (44 sessions, sum 73 gross / +67 net pool). Finder fresh-finding was ~0
+  // every pass; this strip is the BACKLOG-DRAIN lane that actually produced the day's parks.
+  var seq = [3,3,1,0,0,3,0,0,5,0,0,0,0,5,3,0,0,2,0,2,2,0,0,0,0,0,0,2,0,1,4,0,0,0,0,0,4,2,8,9,10,4,0,0];
+  var max = Math.max.apply(null, seq);
+  var strip = document.getElementById('strip');
+  seq.forEach(function (v) {
+    var b = document.createElement('div');
+    b.className = 'bar' + (v === 0 ? ' zero' : v < 8 ? ' low' : '');
+    b.style.height = Math.max(4, Math.round((v / max) * 100)) + '%';
+    b.title = v + ' parked';
+    strip.appendChild(b);
+  });
+</script>
