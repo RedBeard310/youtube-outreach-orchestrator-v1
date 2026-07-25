@@ -73,7 +73,19 @@ function fatalSignaturesToday(sinceMs: number): string[] {
       try {
         if (statSync(p).mtimeMs < sinceMs) continue;
         const tail = readFileSync(p, 'utf8').slice(-60000);
-        for (const [name, re] of FATAL_PATTERNS) if (re.test(tail)) found.add(name);
+        for (const [name, re] of FATAL_PATTERNS) {
+          if (!re.test(tail)) continue;
+          // Mirror checkin.ts's 086affb guard (2026-07-19): campaign.ts's "two consecutive
+          // finder failures" hard-stop is BENIGN when the same session also shows "No active
+          // terms to process" — that's routine term-supply exhaustion (self-healing; the
+          // campaign-loop backs off 30min and retries), not a crash. On a drought day EVERY
+          // session logs it, so the un-guarded scan lit `finder_hard_wall` in the authoritative
+          // feed all 9 block-era days — crying wolf, and worse, MASKING a genuine hard wall (a
+          // real quota/keys/Airtable failure, which does NOT print "No active terms"): it would
+          // read identically to the benign drought it's buried in. Only escalate the un-benign case.
+          if (name === 'finder_hard_wall' && /No active terms to process/.test(tail)) continue;
+          found.add(name);
+        }
       } catch { /* skip */ }
     }
   }
