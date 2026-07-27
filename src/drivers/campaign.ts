@@ -149,43 +149,6 @@ async function promoteSeen(opts: CampaignOpts, seen: Set<string>): Promise<void>
   log({ event: 'promote', exit: r.exit_code, pool_size: seen.size });
 }
 
-// LLM discovery reconverges on its own priors when the term table is saturated: every
-// frontier batch dedupes to 0 novel candidates (the 2026-07 drought — 7054 terms, and the
-// autocomplete refuel that would surface genuinely-new phrasings has been IP-blocked since
-// 2026-07-17). Left ungated, discover() re-pays a claude-sonnet-5 generation on EVERY
-// ~30-min STOCK-UP pre-flight (and every fade) for zero net-new terms — observed all cycle
-// on 2026-07-27 (~44 futile generations). This persists a dry-streak and backs discovery
-// off once it is proven dry, self-clearing the instant it yields a novel term again (table
-// grew / block lifted / frontier opened). Same self-healing idiom as the autocomplete
-// block-state below. (autopilot-improve 2026-07-27)
-function discoverDryStatePath(): string {
-  return join('logs', 'discover-dry-state.json');
-}
-function discoverDry(): { streak: number; last: string | null } {
-  try {
-    const s = JSON.parse(readFileSync(discoverDryStatePath(), 'utf8')) as { streak?: number; last?: string };
-    return { streak: Number(s.streak) || 0, last: s.last ?? null };
-  } catch { return { streak: 0, last: null }; }
-}
-function recordDiscoverYield(novel: number): void {
-  try {
-    mkdirSync('logs', { recursive: true });
-    const streak = novel > 0 ? 0 : discoverDry().streak + 1;
-    writeFileSync(discoverDryStatePath(), JSON.stringify({ streak, last: new Date().toISOString(), last_novel: novel }) + '\n');
-  } catch { /* best-effort; a missing state file just means full cadence next pass */ }
-}
-// Skip the LLM discovery this pass? Only after a CLEAR dry streak AND within the backoff
-// window — the window self-clears so a saturated table is always re-probed eventually.
-function discoverBackedOff(): boolean {
-  const minStreak = Number(process.env.DISCOVER_DRY_MIN_STREAK ?? 3);
-  const backoffH = Number(process.env.DISCOVER_DRY_BACKOFF_HOURS ?? 6);
-  if (minStreak <= 0 || backoffH <= 0) return false;
-  const { streak, last } = discoverDry();
-  if (streak < minStreak) return false;
-  const t = last ? Date.parse(last) : NaN;
-  return Number.isFinite(t) && (Date.now() - t) / 3_600_000 < backoffH;
-}
-
 // Ask the finder to invent + write a batch of probe veins (adaptive discovery).
 // In frontier mode it explores un-mined verticals instead of re-mining the
 // saturated core (the 2026-07-09 lesson: re-mining yields ~0 net-new terms).
@@ -197,22 +160,9 @@ async function discover(opts: CampaignOpts, focus?: string): Promise<void> {
     console.log(`[campaign] DRY RUN — would discover veins: npx ${args.join(' ')}`);
     return;
   }
-  if (discoverBackedOff()) {
-    const { streak } = discoverDry();
-    const backoffH = Number(process.env.DISCOVER_DRY_BACKOFF_HOURS ?? 6);
-    console.log(`[campaign] LLM discovery skipped — ${streak} consecutive dry generations (0 novel terms); backing off ${backoffH}h. Self-clears when the term table grows or the autocomplete block lifts.`);
-    log({ event: 'discover', skipped: true, reason: 'dry_streak', streak });
-    return;
-  }
   console.log(`[campaign] restocking — inventing ${opts.discoveryCount} probe veins${opts.frontier ? ' [FRONTIER]' : focus ? ` (focus: ${focus})` : ''}…`);
-  const r = await runChildCapture('npx', args, finderRepo());
-  // Parse the finder's "[discover] N unique, in-ICP candidates" line = terms actually
-  // written. Unparseable (format drift) → treat as productive (novel=1) so we NEVER wrongly
-  // suppress discovery on a log-format change; only a measured 0 counts toward the streak.
-  const m = r.stdout.match(/\[discover\]\s+(\d+)\s+unique,\s*in-ICP candidates/);
-  const novel = m ? Number(m[1]) : 1;
-  recordDiscoverYield(novel);
-  log({ event: 'discover', frontier: opts.frontier, focus: focus ?? null, exit: r.exit_code, novel: m ? novel : null });
+  const r = await runChild('npx', args, finderRepo());
+  log({ event: 'discover', frontier: opts.frontier, focus: focus ?? null, exit: r.exit_code });
 }
 
 // Industrialised Keyword Layer (2026-07-14). Mine REAL search strings from YouTube +
