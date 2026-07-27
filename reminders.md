@@ -134,10 +134,23 @@ fine.* IP rotation stays on the table as the other way to solve the same problem
 perform, run the backfill on existing bundles, and assign the winners to all current
 and future scraping. Evaluate at two stages: **(a) data collection** — mining insights,
 enemies, and offers — and **(b) which model writes the email** using
-`cold-email-attack-enemies-propose-script-v1`. Use a frontier model (Opus 5 / Fable 5)
-as the brain. Surface the results through a **Variation Chooser** artifact: models doing
-a genuinely bad job never reach Casey; the decent ones get shown side by side and
-Casey + the LLM pick the best cost-to-performance point together.
+`cold-email-attack-enemies-propose-script-v1`. Surface the results through the
+`variation-chooser-v1` skill: models doing a genuinely bad job never reach Casey; the
+decent ones get shown side by side, and Casey + the LLM settle the cost-to-performance
+call together after hand-back.
+
+**Locked decisions (Casey, 2026-07-27):**
+1. **Two separate model choices, picked independently.** One model assembles the banks
+   (enemies, insights, signature concepts, coined phrases, offer); a *different* one writes
+   the emails. Bank building is per-bundle and high-volume → **cost dominates**. Email
+   writing is one call per lead and is the revenue event → **capability dominates**. Do not
+   assume one winner serves both.
+2. **@redbeardrants is a required test channel**, via a full quick-research run (not a
+   backfill). The other 5 are Casey's pick or random.
+3. **GPT-5.6 Luna joins the slate** alongside the Anthropic and OpenRouter candidates.
+4. **Wait for OpenRouter setup before starting.**
+
+Full phase-by-phase plan: `~/.claude/plans/let-s-say-this-in-structured-petal.md`.
 
 **Why:** The research repo is now fully model-agnostic (2026-07-27) — every LLM call
 resolves a *task* to a model string from env, and any string routes to Anthropic,
@@ -162,6 +175,21 @@ not politely sampled.
   have the four files. Measured: 15 transcripts ≈ 38k tokens ≈ $0.19 (Haiku) / $0.56
   (Sonnet 4.6) per bundle for all four steps.
 - **Nothing has been run.** No backfill, no sweep.
+- **Both skills EXIST on `claude-skills` `origin/main`** — `cold-email-attack-enemies-propose-script-v1`
+  and `variation-chooser-v1`. (An earlier draft of this entry said the propose-script skill was
+  missing; that was a stale local checkout, **15 commits behind origin**. Corrected 2026-07-27.)
+  Local has 3 modified files — commit or stash before pulling. Neither skill is installed in
+  `~/.claude/skills/` yet.
+
+**The Red Beard calibration set — the most valuable thing here.**
+`cold-email-attack-enemies-propose-script-v1/references/golden-examples.md` holds G001–G015, and
+**G001–G007 are ALL red-beard-rants — one approved email per emphasis-dial position**: G001
+outlier-recent, G002 outlier-alltime, G003 comment, G004 signature-concept, G005 framework, G006
+icp-pain, G007 enemy-double-down. (G008–G015 are Amanda Berrientez, the measured B2B register.)
+That makes Red Beard **labeled ground truth**: run a model at a given emphasis and compare its
+email to a Casey-approved golden for the same creator and same emphasis. Nothing else in the
+pipeline has that. It also confirms the contract — the skill explicitly reads `offer.md` and says
+to read "## Notes for video-idea selection" first, which is exactly what `offer-bank.ts` renders.
 
 ### The plan
 
@@ -187,28 +215,40 @@ so variants need separate dirs. **No code change needed.**
 at run time, they're needed for `LLM_PRICING_JSON` anyway):
 Haiku 4.5 (cheap baseline) · Sonnet 4.6 (control, current default) · Sonnet 5 ·
 `openrouter:google/gemini-2.5-flash` · `openrouter:qwen/...` · `openrouter:moonshotai/kimi-k2` ·
-`openrouter:deepseek/...`. Sweep only the 5 tasks that reach the email — insights, enemies,
-offer, examples, icp. (Stages 5/6/7/11 never run in quick mode; their model vars are moot.)
-Cost ≈ 6 bundles × 7 models × ~$0.35 ≈ **$15**.
+`openrouter:deepseek/...` · **GPT-5.6 Luna** (`openrouter:openai/...` or `openai-compat:` +
+`LLM_BASE_URL` — both routes already supported; verify the exact ID, it postdates the assistant's
+knowledge cutoff). Sweep only the 5 tasks that reach the email — insights, enemies, offer,
+examples, icp. (Stages 5/6/7/11 never run in quick mode; their model vars are moot.)
+8 models lands exactly in `variation-chooser-v1`'s default N of 8–12.
+Cost ≈ 6 bundles × 8 models × ~$0.35 ≈ **$17**.
 
 **Phase 3 — Grade, then gate, then judge.** Mechanical grader on all outputs → auto-reject
 below floor → frontier judge (Opus 5) on **survivors only**, blind and paired, scoring enemy
 centrality, quote fidelity, offer correctness, and usefulness-for-email. ≈$5–10.
 
-**Phase 4 — Variation Chooser artifact.** Self-contained HTML in the shape of
-`casey-assistant/deliverables/oleg-idea-card-layout-variations.html` (filter bar, chips, cards):
-one card per surviving model × bundle showing top-3 enemies, the offer block, groundedness
-numbers, and $/bundle. Auto-rejected models go in a collapsed section **with the reason**, so
-Casey can see why something was cut without reading it. Casey + LLM pick jointly.
+**Phase 4 — Chooser page.** Drive the `variation-chooser-v1` skill. **One chooser per bundle,
+cards = models** — start with Red Beard, 8 cards. Per card: top-3 enemies, the `offer.md` block,
+and chips carrying model · $/bundle · quote-fidelity %. Rejected models are simply absent (they
+failed factual checks upstream); note the rejects and reasons in chat, not as cards.
+**The skill forbids pre-ranking** — "Casey picks. You never pick for him. Don't pre-rank, don't
+mark a favorite." Chips surfacing cost/fidelity are explicitly allowed; recommending is not. The
+joint cost/performance decision happens in conversation **after hand-back**, not on the page.
 
-**Phase 5 — Arm (b), BLOCKED.** Deferred by Casey's call until the skill exists. Three unblocks
-required, in order: (1) `cold-email-attack-enemies-propose-script-v1` pushed from the Mac —
-it does not exist on the VPS, and the installed `cold-email-attack-enemies-v1` is **opener-only**;
-(2) installed into `~/.claude/skills/` (the repo `claude-skills/` is a superset — attack-enemies
-is not installed); (3) the email repo made model-agnostic — it hard-codes `claude-opus-4-7` at
-`youtube-email-outreach-v1/src/writer/compose.ts:11` and `compose-nick-saraev.ts:28`, plus Haiku
-at `host-name.ts:8` and `email/finder-llm.ts:19`. Port `models.ts` + `llm.ts` across. Then sweep
-writer models against the **winning bank from arm (a)** and judge against the golden corpus.
+**Phase 5 — Arm (b), the email writers. NOT blocked** (both skills exist — see Current state).
+Setup, in order: (1) `git pull` claude-skills after stashing the 3 modified files; (2) install
+both skills into `~/.claude/skills/`; (3) fix the skill's Mac-only bundle path — its Canon load
+points at `/Users/caseybrown/Claude/youtube-email-outreach-v1/enrichment-bundles/…`, the VPS path
+is `/home/casey/repos/youtube-email-outreach-v1/enrichment-bundles/…` (its Voice Firewall pointer
+already carries both paths; the bundle path does not); (4) make the email repo model-agnostic — it
+hard-codes `claude-opus-4-7` at `youtube-email-outreach-v1/src/writer/compose.ts:11` and
+`compose-nick-saraev.ts:28`, plus Haiku at `host-name.ts:8` and `email/finder-llm.ts:19`. Port
+`models.ts` + `llm.ts` + `pricing.ts` across.
+Then, against the **winning bank from arm (a)** on Red Beard: round 1 = each writer model runs
+once at `emphasis: signature-concept` (matches **G004**), take its own recommended email → 8
+cards compared against G004. Round 2 = pinned winners re-run at `enemy-double-down` (G007) and
+`comment` (G003) to confirm it wasn't a one-emphasis fluke. Writer slate skews capable: Opus 4.7
+(control) · Opus 5 · Sonnet 5 · GPT-5.6 Luna · Kimi K2 · DeepSeek · Haiku 4.5 (the cheap probe).
+≈$3/round.
 
 **Phase 6 — Roll out.** Canary first: set the winner in the research repo's `.env`, run ~5 new
 enrichments, re-run the grader, confirm numbers match the bakeoff. Record the previous `.env`
@@ -236,11 +276,20 @@ values so rollback is one edit. Only then backfill all 98 (`--i-know-the-cost`).
 6. **Autopilot picks this up unattended.** Once the winner is in the research repo's `.env`, the
    always-on campaign loop uses it on every new bundle with nobody watching. A bad choice degrades
    silently until a debrief catches it — hence the canary and the recorded rollback values.
+7. **Red Beard is `research_purpose: client_self` and the skill knows it** — "Never treat a
+   `client_self` repo (red-beard-rants) as a real prospect." That does not block calibration (we
+   are comparing against goldens, not prospecting), but a Red Beard email must never reach a send
+   path, and the skill may object if asked to treat it as a lead. Frame those runs as calibration
+   explicitly.
+8. **Verify the local checkout is current before concluding anything is missing.** This entry
+   originally claimed the propose-script skill did not exist; the truth was a checkout 15 commits
+   behind. `git ls-tree origin/main --name-only` answers it without pulling.
 7. **Cost accounting is only automatic on OpenRouter** (it reports true per-request spend). Gemini
    via Google's own endpoint, or any other gateway, needs prices in `LLM_PRICING_JSON` or every
    cost line reads $0.00.
 8. **`--estimate` is a heuristic** (~4 chars/token × per-step pass multipliers), fine for choosing
    between models, not a quote. The real number is the cost line each generator prints.
 
-**Status:** NOT started. Research repo is ready; grading harness and Variation Chooser are not
-built. Arm (b) blocked on the skill.
+**Status:** NOT started — waiting on Casey's OpenRouter setup (his call, 2026-07-27). Research repo
+is model-agnostic and ready. Still to build: the grading harness (`grade-bundle-banks.ts`). Nothing
+is blocked — both skills exist, they just need pulling and installing.
