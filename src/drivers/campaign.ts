@@ -188,10 +188,11 @@ function blockStatePath(): string {
 }
 // Persist "we just observed a live 403 block" with a timestamp. Called whenever a block
 // marker is detected in a session log (see autocompleteBlocked below).
-function markAutocompleteBlocked(): void {
+function markAutocompleteBlocked(atMs?: number): void {
   try {
     mkdirSync('logs', { recursive: true });
-    writeFileSync(blockStatePath(), JSON.stringify({ last_seen: new Date().toISOString() }) + '\n');
+    const ts = new Date(atMs ?? Date.now()).toISOString();
+    writeFileSync(blockStatePath(), JSON.stringify({ last_seen: ts }) + '\n');
   } catch { /* best-effort; the log scan still catches the very next session */ }
 }
 // Have we seen a live block within the backoff window? The log-scan alone is SELF-ERASING:
@@ -229,10 +230,19 @@ function autocompleteBlocked(): boolean {
   const newest = cands.sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs).slice(0, 2);
   for (const f of newest) {
     let body = '';
-    try { body = readFileSync(f, 'utf8'); } catch { continue; }
-    if (body.includes('AUTOCOMPLETE_ENDPOINT_BLOCKED')) { markAutocompleteBlocked(); return true; }
+    let mtimeMs = NaN;
+    try { body = readFileSync(f, 'utf8'); mtimeMs = statSync(f).mtimeMs; } catch { continue; }
+    // Stamp with the LOG FILE's mtime, not Date.now(): this function gets called on every
+    // preflight check across a session's lifetime, and a marker written once near the start
+    // of a long-running session (or in a prior session that's still one of the 2 newest)
+    // would otherwise get re-discovered and re-stamped to "now" on every subsequent call —
+    // perpetually resetting the AUTOCOMPLETE_BLOCK_BACKOFF_HOURS window and never letting the
+    // block state expire even after the real block has cleared (observed 2026-07-29: a single
+    // 403 burst at the start of an 85-minute session kept re-arming the 6h backoff well past
+    // when the endpoint had recovered, starving the finder of new terms for hours).
+    if (body.includes('AUTOCOMPLETE_ENDPOINT_BLOCKED')) { markAutocompleteBlocked(mtimeMs); return true; }
     const m = body.match(/failed: HTTP 403/g);
-    if (m && m.length >= 50) { markAutocompleteBlocked(); return true; }
+    if (m && m.length >= 50) { markAutocompleteBlocked(mtimeMs); return true; }
   }
   // No fresh marker in the newest logs — trust the persisted backoff (fixes the oscillation).
   return blockedRecently();
