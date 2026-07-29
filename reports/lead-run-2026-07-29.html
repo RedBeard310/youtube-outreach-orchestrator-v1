@@ -1,0 +1,192 @@
+<title>Lead Run Debrief — 2026-07-29</title>
+<style>
+  :root {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+      --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+      --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+    --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+    --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 40px 22px 80px; }
+  .eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); font-weight: 600; }
+  h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.12; margin: 10px 0 6px; text-wrap: balance; letter-spacing: -.02em; }
+  h2 { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); margin: 44px 0 16px; font-weight: 700; }
+  h3 { font-size: 18px; margin: 0 0 6px; letter-spacing: -.01em; }
+  p { margin: 0 0 14px; }
+  .lede { font-size: 18px; color: var(--ink-soft); max-width: 68ch; }
+  .tag { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--teal-soft); color: var(--teal); letter-spacing: .02em; }
+  .grid { display: grid; gap: 14px; }
+  .stats { grid-template-columns: repeat(4, 1fr); margin-top: 26px; }
+  @media (max-width: 720px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; box-shadow: var(--shadow); }
+  .stat .n { font-size: 30px; font-weight: 750; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .stat .l { font-size: 12.5px; color: var(--ink-soft); margin-top: 3px; }
+  .stat .s { font-size: 12px; margin-top: 8px; font-weight: 600; }
+  .up { color: var(--good); } .down { color: var(--red); } .warn { color: var(--amber); }
+  .accent-red { border-left: 3px solid var(--red); }
+  .accent-teal { border-left: 3px solid var(--teal); }
+  .accent-amber { border-left: 3px solid var(--amber); }
+  .accent-good { border-left: 3px solid var(--good); }
+
+  /* shape-of-day bar strip */
+  .strip { display: flex; align-items: flex-end; gap: 2px; height: 120px; padding: 14px 14px 10px; overflow-x: auto; }
+  .bar { flex: 1 0 6px; min-width: 5px; border-radius: 2px 2px 0 0; background: var(--teal); opacity: .9; }
+  .bar.zero { background: var(--red); height: 4px !important; opacity: .9; }
+  .bar.low { background: var(--amber); }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-soft); padding: 0 14px 14px; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+
+  .q { border-radius: 14px; padding: 20px 22px; margin-bottom: 14px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); }
+  .q .ask { font-size: 17px; font-weight: 700; color: var(--ink); margin-bottom: 10px; display: flex; gap: 10px; align-items: baseline; }
+  .q .ask .qn { color: var(--teal); font-weight: 800; flex: 0 0 auto; }
+  .q p { color: var(--ink-soft); }
+  .q b { color: var(--ink); }
+  .pill { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink); background: var(--panel-2); padding: 1px 7px; border-radius: 6px; border: 1px solid var(--line); white-space: nowrap; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+  th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); }
+  td .num { font-variant-numeric: tabular-nums; font-weight: 650; }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); box-shadow: var(--shadow); }
+  ol.recs { padding-left: 0; list-style: none; counter-reset: r; margin: 0; }
+  ol.recs li { counter-increment: r; position: relative; padding: 14px 16px 14px 52px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 10px; box-shadow: var(--shadow); }
+  ol.recs li::before { content: counter(r); position: absolute; left: 14px; top: 14px; width: 26px; height: 26px; border-radius: 8px; background: var(--teal-soft); color: var(--teal); font-weight: 800; font-size: 14px; display: grid; place-items: center; }
+  ol.recs b { color: var(--ink); }
+  .foot { margin-top: 46px; padding: 16px 18px; border-radius: 12px; background: var(--teal-soft); border: 1px solid var(--line); font-size: 14px; color: var(--ink-soft); }
+  .foot b { color: var(--ink); }
+  .muted { color: var(--ink-soft); font-size: 13.5px; }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .92em; background: var(--panel-2); padding: 1px 5px; border-radius: 5px; }
+</style>
+
+<div class="wrap">
+
+  <div class="eyebrow">Lead Run Debrief · YouTube outreach</div>
+  <h1>2026-07-29 — Day 13 of the block; a flat +0, and a real fix</h1>
+  <p class="lede">Same wall as the last week: both supply taps empty, so <b>parking held dead flat at 2,906</b>. But this cycle broke the five-day "no code" streak — I shipped a durable, self-healing harvest fix that stops the machine re-mining the <em>same eight seeds</em> every time it probes the blocked endpoint. The loop idled perfectly: <b>$0, 44 clean sessions, 0 crashes, no fatal signatures.</b></p>
+  <div style="margin-top:14px"><span class="tag">GRACEFUL IDLE · $0 · 0 CRASHES · 1 DURABLE FIX SHIPPED</span></div>
+
+  <div class="grid stats">
+    <div class="card stat accent-teal">
+      <div class="n">+0</div>
+      <div class="l">parked → <code>approved_hold</code></div>
+      <div class="s muted">pool flat at 2,906</div>
+    </div>
+    <div class="card stat accent-amber">
+      <div class="n">2 / 23</div>
+      <div class="l">pitchable ≥6 of discovered</div>
+      <div class="s warn">0 with a verifiable email → +0</div>
+    </div>
+    <div class="card stat accent-good">
+      <div class="n">$0</div>
+      <div class="l">Claude spend (soft 75 / hard 150)</div>
+      <div class="s up">0 crashes · fatal_sigs [ ]</div>
+    </div>
+    <div class="card stat accent-red">
+      <div class="n">Day 13</div>
+      <div class="l">autocomplete IP-block (since 07-17)</div>
+      <div class="s down">44/44 benign hard-stops</div>
+    </div>
+  </div>
+
+  <h2>The shape of the day</h2>
+  <div class="card" style="padding:0">
+    <div class="strip" id="strip"></div>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--teal)"></span>healthy pass (≥12 fresh pitchable)</span>
+      <span><span class="dot" style="background:var(--amber)"></span>weak (1–11)</span>
+      <span><span class="dot" style="background:var(--red)"></span>dead pass (0) — <b>50 of 52</b></span>
+    </div>
+  </div>
+  <p class="muted">Each bar = one finder pass (52 across the cycle, 07-28 00:00 → 07-29 07:00 PT). Peak was <b>1 fresh pitchable</b> — the two amber ticks are the only non-zero passes all cycle. This is a dead supply line, not a crash line: the finder aborts <code>No active terms</code> in ~0.8s and rests, spending zero YouTube searches.</p>
+
+  <h2>The three questions</h2>
+
+  <div class="q accent-teal">
+    <div class="ask"><span class="qn">Q1</span><span>Why +0 parked, again?</span></div>
+    <p><b>Both paths that can add a parked lead are empty at once.</b> A lead reaches <code>approved_hold</code> either by (1) <b>fresh finding</b> — a net-new creator scored ≥6 with a verifiable email — or (2) <b>backlog recovery</b> — the verify lane recovering an email for a creator already in the found-but-unverified pile. Path (2)'s backlog was <b>fully spent on 07-26</b>; path (1) has been ~dead since the <b>07-17 IP-block</b>.</p>
+    <p>The rate-limited endpoint still leaks a little, so this cycle the finder wrote <span class="pill">23 net-new channels</span> and <b>2 cleared the ≥6 bar</b> (1 Financial Planning, 1 Legal) — up from 07-28's 0 pitchable. But <b>neither had a verifiable email</b> (0 verified), so nothing parked. The other 21 scored below the bar (20 <code>below_threshold</code>, 3 <code>unreviewed</code>). Ground truth: <code>fresh_pitchable_sum = 2</code>, <code>fresh_finding_dead = true</code>.</p>
+  </div>
+
+  <div class="q accent-good">
+    <div class="ask"><span class="qn">Q2</span><span>Is anything actually broken?</span></div>
+    <p><b>No — this is a graceful idle, not a stall.</b> Every self-healing guard fired as designed: the harvest correctly skipped 15 of 16 pre-flights (block-backoff), discovery's dry-guard suppressed the sonnet call on frozen-table passes, <code>evaluate-probes</code> re-wrote 0 already-paused losers, and <b>44 of 44 sessions</b> hard-stopped <em>benignly</em> ("No active terms to process") ~31 min apart. Authoritative <code>fatal_signatures_today</code> came back <span class="pill">[ ] empty</span> — the 07-25 suppression fix (<code>b007173</code>) is holding for a 5th straight cycle, so the benign drought never masqueraded as a fatal wall and never paged the fix-agent.</p>
+    <p>Result: <b>$0 Claude spend, 0 quota stops, 0 crashes, 0 unhandled rejections, no halt flag.</b> A +0 day resembles a failure but is the opposite — the loop is resting against a wall it can't move from code, and doing so cleanly.</p>
+  </div>
+
+  <div class="q accent-amber">
+    <div class="ask"><span class="qn">Q3</span><span>The one harvest that <em>did</em> fire — what did it do?</span></div>
+    <p>At 05:13 the block-backoff window expired and the pre-flight harvest re-probed the endpoint. It served <span class="pill">840 net-new terms</span> — but from only <b>8 of 42 seeds</b> before the circuit breaker tripped on sustained 403s, and the ICP-prefilter kept <b>1 of 840</b>. Those 8 seeds are the <em>same</em> front seeds (UK tax, buyers-agent AU, pension/super) it has re-mined on <b>every</b> re-probe for 12 days — while the 34 verticals behind the block point (aviation, regenerative medicine, manufacturing, M&A, public adjusters, luxury assets) are <b>never reached</b>.</p>
+    <p><b>That is exactly the waste I fixed this cycle</b> (see below): re-storming the same saturated head only deepens the rate-limit and can't refill the pool. The seeds it never reaches are the least-mined ground we have — the one place an autonomous refill could still come from.</p>
+  </div>
+
+  <h2>What broke → what's fixed</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Issue</th><th>Mechanism</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr><td>Harvest re-mines the same 8 seeds every re-probe</td><td>Breaker trips at a fixed position in the seed list; the 34 verticals behind it are never reached under the block</td><td class="up">Fixed this cycle — seed-rotation offset walks the start point forward (finder <code>04b88fa</code>)</td></tr>
+        <tr><td>Benign drought hard-stop flagged as fatal</td><td>"two consecutive finder failures" matched a fatal pattern</td><td class="up">Fixed 07-25 (<code>b007173</code>) — <code>fatal_sigs</code> [ ] for a 5th cycle</td></tr>
+        <tr><td>Harvest re-storms a known-blocked endpoint</td><td>Newest-log detector self-erased after clean skips</td><td class="up">Fixed 07-20 (<code>1d5d1f9</code>) — 6h block-backoff stamp; skipped 15/16</td></tr>
+        <tr><td>Fresh finding produces sub-threshold noise only</td><td>LLM/leak veins re-mine ground the finder stripped weeks ago</td><td class="warn">Open — infra (rotate egress IP) or a 2nd term source</td></tr>
+        <tr><td>Both supply taps empty at once</td><td>Fresh finding dead + backlog verify-drain spent</td><td class="warn">Open — the <code>needs_contact</code> engine is the only untapped lever</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Self-improvement shipped this cycle</h2>
+  <div class="card accent-good">
+    <h3>Rotate the keyword-harvest seed offset so blocked re-probes mine fresh slices</h3>
+    <p class="muted" style="margin-bottom:10px">finder <code>04b88fa</code> · <code>scripts/keyword-harvest.ts</code> · verified: project typecheck clean + runtime simulation (6 blocked re-probes → 42/42 seeds covered, zero drift when unblocked)</p>
+    <p>Under the persistent block the circuit breaker aborts the harvest at the same seed every 6h, so the identical front seeds get re-mined while everything behind the block point sits untouched. The fix persists a start-offset (<code>logs/keyword-harvest/.seed-rotation.json</code>) and <b>walks it forward by the seeds actually harvested each run</b>, so consecutive block-truncated re-probes cover the <em>whole</em> list across a few runs instead of re-storming the same head. It's <b>a no-op when unblocked</b> (a full 42-seed harvest advances a full lap and wraps to the same start) and <b>best-effort</b> (a missing/corrupt state file just means offset 0 — never blocks the harvest). This is aligned with the 07-24 finding — <em>the leak extracts real terms; don't gate it, make it reach more ground</em> — and it's self-clearing: when the egress IP rotates, the normal full cadence resumes untouched.</p>
+    <p class="muted">Honest scope: the high-confidence win is efficiency + reach (stop re-mining 8 saturated seeds, spread the leak across all 42, ease pressure on the rate-limit). Whether the 34 unreached verticals still hold keepable ICP terms is uncertain — but they're the only untried ground an autonomous refill can come from, and this is what lets the machine try them.</p>
+  </div>
+
+  <h2>Recommended next — ranked</h2>
+  <ol class="recs">
+    <li><b>Rotate the VPS egress IP / proxy (infra, Day 13).</b> The single action that reopens fresh finding at volume — harvest, LLM discovery, and the anti-starvation floor all sit downstream of a term refuel this one free endpoint gates. The block has outlived every cheap code workaround; today's fix helps the machine <em>use</em> the leak better, but only an IP rotation removes the ceiling.</li>
+    <li><b>Build the <code>needs_contact</code> recovery engine (3,685 parked).</b> With fresh finding reduced to sub-threshold noise and the backlog spent, this is the <em>only</em> lever that can reliably add a parked lead, and it bypasses both the block and the API ceiling. Recovering ~30% (~1,100) dwarfs a month of fresh finding at current supply. Build in <code>youtube-email-outreach-v1</code> when greenlit.</li>
+    <li><b>A second independent term source (DataForSEO / Google Ads API).</b> Thirteen days have proven the single free endpoint is a single point of failure — a paid, keyed source can't be IP-blackholed the same way. This is the durable answer to the whole block class.</li>
+    <li><b>A non-halting escalation ping after N days of <code>fresh_finding_dead &amp;&amp; autocomplete_blocked</code>.</b> Thirteen days is a long time for a benign-but-total finding outage whose only signal is a human reading this debrief. The autopilot's sole escalation is the halt flag — too blunt for "still running, still $0, still finding nothing." Noted as the standing structural gap; not shipped unilaterally (the rules keep the loop notify-silent).</li>
+  </ol>
+
+  <div class="foot">
+    <b>Status caveat:</b> everything is <b>parked</b>, nothing sent. <code>approved_hold</code> holds at <b>2,906</b>, <code>needs_contact</code> at <b>3,685</b> (both flat). The loop is left running for the next cycle — no halt flag, nothing needs a human tonight except the one lever that's needed every night: <b>rotate the egress IP</b>. One durable fix shipped to the finder (auto-syncs within ~2 min).
+  </div>
+
+</div>
+
+<script>
+  // fresh_pitchable per finder pass, chronological across the cycle
+  // (from logs/campaign-2026-07-28.jsonl + campaign-2026-07-29.jsonl, cycle window 07-28T07:00Z → 07-29T07:00Z)
+  var seq = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0];
+  var max = Math.max.apply(null, seq) || 1;
+  var strip = document.getElementById('strip');
+  seq.forEach(function (v) {
+    var b = document.createElement('div');
+    b.className = 'bar' + (v === 0 ? ' zero' : v < 12 ? ' low' : '');
+    b.style.height = Math.max(4, Math.round((v / max) * 100)) + '%';
+    b.title = v + ' fresh pitchable';
+    strip.appendChild(b);
+  });
+</script>
