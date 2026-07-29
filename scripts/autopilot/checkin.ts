@@ -227,11 +227,25 @@ async function main(): Promise<void> {
       // benign, self-healing shape to the paid fix-agent every hour it persists (2026-07-19:
       // it had already self-healed by the time the agent ran) burns money for nothing —
       // only escalate when the log does NOT show that benign cause.
-      if (p === CONSECUTIVE_FINDER_FAILURES && /No active terms to process/.test(tail)) {
+      //
+      // Same reasoning applies to transient infra blips (Airtable/YouTube 503 SERVICE_UNAVAILABLE,
+      // network errors, etc — 2026-07-29): campaign.ts always runs its finalization sequence
+      // (final verify sweep → promote → auto-sweep → evaluate probes → "[campaign] DONE") after
+      // the hard-wall stop, whether the underlying cause was benign or not. A session log that
+      // reaches "[campaign] DONE" proves the session actually completed and campaign-loop.sh has
+      // already retried successfully — it is definitionally not stuck. A genuine hang/crash would
+      // NOT show DONE after the failure. Without this carve-out, a resolved transient blip keeps
+      // re-triggering the fix-agent every hour it stays in the "2 most recent session logs" window.
+      const benignNoActiveTerms = /No active terms to process/.test(tail);
+      const benignFinalized = /\[campaign\] DONE\b/.test(tail);
+      if (p === CONSECUTIVE_FINDER_FAILURES && (benignNoActiveTerms || benignFinalized)) {
+        const cause = benignNoActiveTerms
+          ? 'term-supply exhaustion ("No active terms to process")'
+          : 'a transient failure that already self-healed — the session still finalized ("[campaign] DONE") after the hard-wall stop';
         appendFileSync(OBSERVATIONS, JSON.stringify({
           ts: new Date().toISOString(),
           kind: 'finder_hard_wall_benign',
-          detail: `"two consecutive finder failures" in ${f} explained by term-supply exhaustion ("No active terms to process") — not a code bug, skipping fix-agent`,
+          detail: `"two consecutive finder failures" in ${f} explained by ${cause} — not a code bug, skipping fix-agent`,
         }) + '\n');
         continue;
       }
