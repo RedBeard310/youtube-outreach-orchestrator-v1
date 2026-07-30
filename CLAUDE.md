@@ -55,7 +55,7 @@ Persisted on the singleSelect:
 - **Prep (on the tick, `npm run tick`):** `approved` leads go find → verify → enrich (`--stop-after enrich` inside `youtube-email-outreach-v1`) and **park at `outreach_status = "ready_data_scraped"`**. The tick **never composes or pushes**. Every approved lead ends the tick "lying in wait, ready to write." Prep is idempotent — a lead already at `ready_data_scraped`/`email_drafted`/`sent_to_smartlead` is skipped by the prep query (`APPROVED_PREP_DONE` in `src/airtable.ts`), so re-ticking never re-drives a parked lead.
 - **Send (on demand, `npm run send`):** drives the parked leads (`ready_data_scraped`, or `email_drafted` from a partial prior send — `APPROVED_FIRE_READY`) through compose → push to SmartLead. This is the **only** path that sends, and it runs exactly when you trigger it. `npm run send:dry` previews the shell-out and sends nothing; `--lead-ids a,b` fires a subset; `--limit N` caps the batch. It acquires the same `logs/.tick-lock` as the tick, so a send and a tick can't overlap. Driver: `driveApprovedSend` in `src/drivers/approved.ts`; the inbox-health gate still fires here (at send time), not during prep.
 
-**Why: the enrichment-DB cleanup can never strand a ready-to-write lead.** The cleanup (`youtube-email-outreach-v1/scripts/airtable-cleanup.ts`) is a **separate manual script** — nothing in the tick, campaign, or autopilot auto-runs it. Its `--auto` mode only targets leads already at `sent_to_smartlead` (i.e. it follows a *send*, and never touches a `ready_data_scraped` parked lead), and it is non-destructive to what compose needs: it always exports a re-importable JSON and keeps the on-disk research bundle (`enrichment-bundles/<recId>/`), and compose reads its input from that **on-disk bundle**, not from the Airtable enrichment base. So even a fully-cleaned lead can still be (re)composed. Composing an email cannot arm the cleanup; only a send can, and the send is now yours to trigger.
+**Why: the enrichment-DB cleanup can never strand a ready-to-write lead.** The cleanup (`youtube-email-outreach-v1/scripts/airtable-cleanup.ts`) runs on its own systemd timer (see [Enrichment cleanup is automated](#enrichment-cleanup-is-automated-since-2026-07-30)) — nothing in the tick, campaign, or autopilot triggers it, and it is age-driven, never send-driven. Its `--auto` mode only targets leads already at `sent_to_smartlead` (i.e. it follows a *send*, and never touches a `ready_data_scraped` parked lead), and it is non-destructive to what compose needs: it always exports a re-importable JSON and keeps the on-disk research bundle (`enrichment-bundles/<recId>/`), and compose reads its input from that **on-disk bundle**, not from the Airtable enrichment base. So even a fully-cleaned lead can still be (re)composed. Composing an email cannot arm the cleanup; only a send can, and the send is now yours to trigger.
 
 ## What the orchestrator does each tick
 
@@ -130,7 +130,7 @@ Estimated ~200–300 lines TS across `src/cli/orchestrate.ts` + a lead-query hel
 
 ## Ticks are manual-only (since 2026-06-01)
 
-**The 4-hour `launchd` cron is DISABLED** — agent unloaded, plist renamed `com.caseybrown.youtube-outreach-orchestrator.plist.disabled`. Reason: the Mac is usually asleep or the repo closed at scheduled tick times, so scheduled ticks silently no-fired (a stale `ENRICHMENT_REPO_PATH` had also been killing them — now fixed). **Run ticks by hand: `npm run tick`. Do NOT re-enable the cron unless Casey explicitly says so.** Note the tick now only **preps** leads to `ready_data_scraped` — writing/sending is the separate `npm run send` step (see [Writing/sending is decoupled from the tick](#writingsending-is-decoupled-from-the-tick-since-2026-07-17)). The nightly enrichment-cleanup cron (`com.caseybrown.airtable-cleanup`) is likewise disabled — run `airtable-cleanup.ts --auto` manually after each send batch, then `rollup-archived-runs.ts`. The durable fix for both is an always-on host (VPS / trigger.dev); until then, everything is manual.
+**The 4-hour `launchd` cron is DISABLED** — agent unloaded, plist renamed `com.caseybrown.youtube-outreach-orchestrator.plist.disabled`. Reason: the Mac is usually asleep or the repo closed at scheduled tick times, so scheduled ticks silently no-fired (a stale `ENRICHMENT_REPO_PATH` had also been killing them — now fixed). **Run ticks by hand: `npm run tick`. Do NOT re-enable the cron unless Casey explicitly says so.** Note the tick now only **preps** leads to `ready_data_scraped` — writing/sending is the separate `npm run send` step (see [Writing/sending is decoupled from the tick](#writingsending-is-decoupled-from-the-tick-since-2026-07-17)). The enrichment-DB cleanup is **no longer manual** — see [Enrichment cleanup is automated](#enrichment-cleanup-is-automated-since-2026-07-30) below. The tick itself stays manual.
 
 Former cron (for reference if ever re-enabled): `17 */4 * * *` (every 4h, off-zero minute).
 
@@ -191,6 +191,62 @@ Escalation = write `logs/autopilot-halt.flag` and stop (no external notify). Sel
 agents may edit + commit any of the 5 repos but NEVER `.env`. Full detail:
 [scripts/autopilot/README.md](scripts/autopilot/README.md). This supersedes "manual-only"
 below for the campaign; `npm run campaign` by hand still works and shares the same lock.
+
+## Enrichment cleanup is automated (since 2026-07-30)
+
+The enrichment scratch base (`appTvzwOiTLmqC5Mw`) empties itself on the VPS. Nothing
+here needs running by hand, and the old "run it manually after each send batch"
+instruction was Mac-era text that stopped being true at the migration.
+
+`enrichment-db-cleanup.timer` fires **every 15 minutes** (`OnCalendar=*:0/15`) and runs
+`automator/scripts/enrichment-db-cleanup.py --live`, which:
+
+1. Sweeps runs older than `CLEANUP_ROUTINE_AGE_DAYS` (default **7d**) via
+   `airtable-cleanup.ts --older-than`. **Age-driven, not send-driven** — it does not
+   care whether a lead was ever emailed, so it can never be armed by composing.
+2. Opens a capacity valve if the base crosses 80% of the 125,000-record cap.
+3. Archives each purged run to `Exported Leads in JSON/`, then auto-rolls those
+   staging files into one dated `YYYY-MM-DD.json`. **Consolidation defaults ON**
+   (`runRollup` → `consolidate: true`) — without it, a 15-minute timer mints a new
+   same-day file every firing, which is exactly how 2026-07-24 ended up as 30 files.
+4. Syncs the archive folder to Google Drive (folder `1OjW2Qa29MxKb0E3qaX2WseSWhNFaedyl`,
+   set via `ENRICHMENT_DRIVE_FOLDER_ID` in the unit). **Run the sync only through the
+   service or with that env var set** — invoking `enrichment_drive_sync.py` bare makes
+   it create a *second* folder of the same name and rewrite the saved folder id.
+
+Bundles are **never** touched: the cleanup keeps `enrichment-bundles/<recId>/` on disk,
+which is where compose reads from, so a fully-cleaned lead is still composable.
+
+Manual equivalents, if you ever need them: `npx tsx scripts/airtable-cleanup.ts
+--older-than 7d --dry-run` to preview, `npx tsx scripts/rollup-archived-runs.ts
+--consolidate --dry-run` to preview a rollup.
+
+### The archive is now a complete record of a run
+
+Until 2026-07-30 the generated banks (enemies / insights / insights_analysis / offer /
+examples / bio) lived **only** as `researched/*.md` inside a bundle. Every other bundle
+file is a rendering of rows that already sit in the enrichment base, so it reached the
+JSON archive for free; the banks did not. "Is my research safe?" was a two-place question.
+
+Now the base has a **`banks` table** (`tblk9gbzjkiymX1fJ`) — an 11th table in the same
+base, not a new base. `export-run.ts` writes each bank into it after generation, and the
+cleanup exports and purges it like every other table.
+
+- **It is rows, not columns on `channels`.** Airtable caps a long-text cell at 100,000
+  chars and 224 banks in the 2026-07 corpus exceed it (examples-bank peaks at 1.23 MB),
+  so a field-per-bank layout silently truncates ~7% of the corpus. Long banks split
+  across rows via `chunk_index`/`chunk_count`; `bank-rows.ts` does the split and rebuild.
+- **No `bank_kind` select.** Airtable's field PATCH refuses to add a choice to a live
+  singleSelect (bare 422), so every new bank type would have needed hand-editing, and
+  writing an unlisted value fails outright. `source_filename` determines the kind.
+- The 16 pre-existing archives were backfilled with 10,133 bank rows by
+  `youtube-email-outreach-v1/scripts/inject_banks_into_archives.py` (streaming, so it
+  survives 315 MB files; write-verify-swap, so originals are never mutated in place).
+  Injected rows carry a `recbf` id prefix plus `backfilled_at`/`backfilled_from` so
+  reconstructed rows are distinguishable from exported ones.
+- **`_full-base-purge-*.json` are a different schema** (`{kind, baseId, rowCounts,
+  tables}` — a flat dump of the whole base, no `runs` array). The injector detects and
+  skips them; treating one as a per-run archive would rewrite it as an empty shell.
 
 ## Operational gotchas (verified 2026-06-01)
 
