@@ -75,15 +75,29 @@ function fatalSignaturesToday(sinceMs: number): string[] {
         const tail = readFileSync(p, 'utf8').slice(-60000);
         for (const [name, re] of FATAL_PATTERNS) {
           if (!re.test(tail)) continue;
-          // Mirror checkin.ts's 086affb guard (2026-07-19): campaign.ts's "two consecutive
-          // finder failures" hard-stop is BENIGN when the same session also shows "No active
-          // terms to process" — that's routine term-supply exhaustion (self-healing; the
-          // campaign-loop backs off 30min and retries), not a crash. On a drought day EVERY
-          // session logs it, so the un-guarded scan lit `finder_hard_wall` in the authoritative
-          // feed all 9 block-era days — crying wolf, and worse, MASKING a genuine hard wall (a
-          // real quota/keys/Airtable failure, which does NOT print "No active terms"): it would
-          // read identically to the benign drought it's buried in. Only escalate the un-benign case.
-          if (name === 'finder_hard_wall' && /No active terms to process/.test(tail)) continue;
+          // Mirror checkin.ts's benign carve-outs for campaign.ts's "two consecutive finder
+          // failures" hard-stop, so the authoritative feed classifies it the SAME way the hourly
+          // check-in (the paid-fix-agent gate) already does — otherwise the JSON cries
+          // `finder_hard_wall` on a stop the check-in already ruled benign & self-healing:
+          //  • 086affb (2026-07-19): benign on plain term-supply exhaustion ("No active terms to
+          //    process") — routine drought the campaign-loop backs off 30min and retries.
+          //  • benignFinalized (2026-07-29): benign on a transient infra blip (Airtable/YouTube
+          //    503 SERVICE_UNAVAILABLE, network error, etc.) that ALREADY self-healed — proven
+          //    when the SAME session still ran its finalization sequence to "[campaign] DONE"
+          //    AFTER the hard-wall stop. campaign.ts always finalizes (final verify → promote →
+          //    evaluate-probes → DONE) whether the cause was benign or not, so reaching DONE means
+          //    the session completed and campaign-loop.sh has already retried successfully — it is
+          //    definitionally not stuck. A genuine hang/crash (module error, OOM, unhandled
+          //    campaign exception) never reaches DONE, so it is still surfaced. Without this the
+          //    2026-07-30 cycle lit `finder_hard_wall` on a productive session (+18 parked, 118
+          //    channels) whose only failure was two consecutive Airtable 503s that rode out within
+          //    the same day — crying wolf against the check-in that had logged it benign. Genuine
+          //    supply/quota problems are surfaced by supply_health + the hard_stops/quota_stops
+          //    counts, not by this signature.
+          if (
+            name === 'finder_hard_wall' &&
+            (/No active terms to process/.test(tail) || /\[campaign\] DONE\b/.test(tail))
+          ) continue;
           found.add(name);
         }
       } catch { /* skip */ }
