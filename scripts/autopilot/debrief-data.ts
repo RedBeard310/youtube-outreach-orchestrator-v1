@@ -57,7 +57,7 @@ function parkedAtCycleStart(sinceISO: string): number | null {
 const FATAL_PATTERNS: Array<[string, RegExp]> = [
   ['module_not_found', /ERR_MODULE_NOT_FOUND|Cannot find package/],
   ['missing_skill', /ENOENT[^\n]*\.claude\/skills/],
-  ['bad_backend', /must be "rapidapi" or "direct"/],
+  ['bad_backend', /YOUTUBE_API_BACKEND must be/],
   ['finder_hard_wall', /two consecutive finder failures/],
   ['find_enoent', /FAILED: ENOENT/],
 ];

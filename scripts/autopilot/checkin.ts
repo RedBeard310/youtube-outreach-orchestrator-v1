@@ -63,7 +63,7 @@ const FATAL_PATTERNS = [
   /ERR_MODULE_NOT_FOUND/,
   /Cannot find package/,
   /ENOENT[^\n]*\.claude\/skills/,
-  /must be "rapidapi" or "direct"/,
+  /YOUTUBE_API_BACKEND must be/,
   CONSECUTIVE_FINDER_FAILURES,
   /FAILED: ENOENT/,
 ];
