@@ -14,6 +14,36 @@ Full spec: [orchestrator-spec.md](orchestrator-spec.md). Read it before making n
 - **Single-instance.** No concurrent ticks. Use a lockfile at `logs/.tick-lock`; if held, the new tick no-ops.
 - **Polling only.** No webhook server, queue, or event bus.
 
+## YouTube API keys: we ROTATE direct keys, and RapidAPI credits back them up
+
+This keeps getting forgotten, so it lives at the top: no repo in this pipeline runs on a single
+YouTube key, and "direct quota exhausted" is NOT a dead end.
+
+- **Every YouTube-calling repo rotates through a pool of direct keys** — `YOUTUBE_API_KEY` +
+  `YOUTUBE_API_KEY_1..N` from the shared env bank (`~/env-storage/.env`; `_1..7` as of 2026-07-31).
+  Rotation is automatic and failure-specific: 403 quota/blocked marks a key sticky-dead and moves
+  on; 429 rotates but keeps the key eligible; any other 403 (e.g. `commentsDisabled`) propagates
+  and never burns a key.
+- **When every direct key is dead, `auto` mode falls through to the RapidAPI YouTube mirror** —
+  a separate paid credit pool (`RAPIDAPI_KEY` + `RAPIDAPI_YOUTUBE_HOST`, host
+  `youtube-data-api-v33.p.rapidapi.com`) returning identical JSON. All repos default to
+  `YOUTUBE_API_BACKEND=auto` (the var is unset everywhere = auto). A run should degrade to
+  RapidAPI, not halt, when direct keys drain. Don't forget these credits exist when planning
+  or debugging quota problems.
+- **Canonical doc: `youtube-deep-research-v1/docs/youtube-api-key-rotation.md`** — the portable
+  spec for the whole scheme (env contract, rotation rules, reference implementation, quota
+  costs). Read it before touching or re-implementing any key handling anywhere.
+- **Check the pool, don't guess:** `npm run youtube-key-health` (email-outreach),
+  `npm run keys:health` (deep-research), `npx tsx scripts/test-youtube-keys.ts` (lead-finder,
+  quick-research). Re-run every ~2 days — appealed suspensions flip BLOCKED→WORKING.
+- **This repo makes no YouTube calls itself; it only governs usage.** The campaign driver reads
+  `youtube-lead-finder-v1/logs/quota-state.json` (RapidAPI headroom, written by the finder's
+  quota guard) and throttles at `YT_QUOTA_SOFT_PCT` (80) / hard-stops at `YT_QUOTA_HARD_PCT`
+  (95). Keep key handling downstream — it's business logic.
+- **Gotcha:** `quick-youtube-channel-research-v1` also falls back to RapidAPI but has NO quota
+  guard — it ignores `RAPIDAPI_MIN_REMAINING_PCT` and never writes `quota-state.json`, so
+  enrichment can spend RapidAPI credits invisibly to the campaign governor.
+
 ## Three branches per tick
 
 Lead-finder (interval-driven, runs LAST in the tick), plus two lead-driven branches:
