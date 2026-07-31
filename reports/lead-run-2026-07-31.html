@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lead Run Debrief — 2026-07-31</title>
+<style>
+  :root {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+      --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+      --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+    --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+    --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 40px 22px 80px; }
+  .eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); font-weight: 600; }
+  h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.12; margin: 10px 0 6px; text-wrap: balance; letter-spacing: -.02em; }
+  h2 { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); margin: 44px 0 16px; font-weight: 700; }
+  h3 { font-size: 18px; margin: 0 0 6px; letter-spacing: -.01em; }
+  p { margin: 0 0 14px; }
+  .lede { font-size: 18px; color: var(--ink-soft); max-width: 68ch; }
+  .tag { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--teal-soft); color: var(--teal); letter-spacing: .02em; }
+  .grid { display: grid; gap: 14px; }
+  .stats { grid-template-columns: repeat(4, 1fr); margin-top: 26px; }
+  @media (max-width: 720px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; box-shadow: var(--shadow); }
+  .stat .n { font-size: 30px; font-weight: 750; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .stat .l { font-size: 12.5px; color: var(--ink-soft); margin-top: 3px; }
+  .stat .s { font-size: 12px; margin-top: 8px; font-weight: 600; }
+  .up { color: var(--good); } .down { color: var(--red); } .warn { color: var(--amber); }
+  .accent-red { border-left: 3px solid var(--red); }
+  .accent-teal { border-left: 3px solid var(--teal); }
+  .accent-amber { border-left: 3px solid var(--amber); }
+  .accent-good { border-left: 3px solid var(--good); }
+
+  /* shape-of-day bar strip */
+  .strip { display: flex; align-items: flex-end; gap: 2px; height: 120px; padding: 14px 14px 10px; overflow-x: auto; }
+  .bar { flex: 1 0 6px; min-width: 5px; border-radius: 2px 2px 0 0; background: var(--teal); opacity: .9; }
+  .bar.zero { background: var(--red); height: 4px !important; opacity: .9; }
+  .bar.low { background: var(--amber); }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-soft); padding: 0 14px 14px; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+
+  .q { border-radius: 14px; padding: 20px 22px; margin-bottom: 14px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); }
+  .q .ask { font-size: 17px; font-weight: 700; color: var(--ink); margin-bottom: 10px; display: flex; gap: 10px; align-items: baseline; }
+  .q .ask .qn { color: var(--teal); font-weight: 800; flex: 0 0 auto; }
+  .q p { color: var(--ink-soft); }
+  .q b { color: var(--ink); }
+  .pill { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink); background: var(--panel-2); padding: 1px 7px; border-radius: 6px; border: 1px solid var(--line); white-space: nowrap; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+  th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); }
+  td .num { font-variant-numeric: tabular-nums; font-weight: 650; }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); box-shadow: var(--shadow); }
+  ol.recs { padding-left: 0; list-style: none; counter-reset: r; margin: 0; }
+  ol.recs li { counter-increment: r; position: relative; padding: 14px 16px 14px 52px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 10px; box-shadow: var(--shadow); }
+  ol.recs li::before { content: counter(r); position: absolute; left: 14px; top: 14px; width: 26px; height: 26px; border-radius: 8px; background: var(--teal-soft); color: var(--teal); font-weight: 800; font-size: 14px; display: grid; place-items: center; }
+  ol.recs b { color: var(--ink); }
+  .foot { margin-top: 46px; padding: 16px 18px; border-radius: 12px; background: var(--teal-soft); border: 1px solid var(--line); font-size: 14px; color: var(--ink-soft); }
+  .foot b { color: var(--ink); }
+  .muted { color: var(--ink-soft); font-size: 13.5px; }
+  .toggle { position: fixed; top: 14px; right: 14px; font-size: 12px; font-weight: 600; color: var(--ink-soft); background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 5px 12px; cursor: pointer; box-shadow: var(--shadow); }
+
+  /* niche mini-bars */
+  .niche { display: grid; grid-template-columns: 190px 1fr 44px; align-items: center; gap: 10px; font-size: 13.5px; padding: 5px 0; }
+  .niche .track { height: 10px; border-radius: 6px; background: var(--panel-2); overflow: hidden; }
+  .niche .fill { height: 100%; background: var(--teal); border-radius: 6px; }
+  .niche .v { text-align: right; font-variant-numeric: tabular-nums; font-weight: 650; color: var(--ink-soft); }
+</style>
+</head>
+<body>
+<button class="toggle" onclick="var r=document.documentElement,c=r.getAttribute('data-theme')==='dark'?'light':'dark';r.setAttribute('data-theme',c)">◐ theme</button>
+
+<div class="wrap">
+
+  <div class="eyebrow">Lead Run Debrief · YouTube outreach</div>
+  <h1>2026-07-31 — the block keeps leaking, and finding came all the way back</h1>
+  <p class="lede">Second straight rising day: <b>+72 parked</b>, the biggest single-cycle gain in ten days, carried entirely by <b>1,053 net-new channels written</b> — the strongest genuine finding of the whole 14-day IP-block. With the verify backlog spent since 07-25, this can only be real finding. The block is degrading from a hard wall toward rate-limiting, and each time the harvest punched through, a burst of leads followed.</p>
+  <div style="margin-top:14px"><span class="tag">GENUINE FINDING · BLOCK LEAKING, NOT LIFTED · $0 · CLEAN RUN</span></div>
+
+  <div class="grid stats">
+    <div class="card stat accent-good">
+      <div class="n">+72</div>
+      <div class="l">parked → <code>approved_hold</code></div>
+      <div class="s up">▲ off 07-30's +41 — best in 10 days</div>
+    </div>
+    <div class="card stat accent-teal">
+      <div class="n">1,053</div>
+      <div class="l">net-new channels written</div>
+      <div class="s up">most of the entire 14-day block</div>
+    </div>
+    <div class="card stat">
+      <div class="n">178 → 72</div>
+      <div class="l">pitchable (≥6) → verified &amp; parked</div>
+      <div class="s muted">~40% verify · 93 → <code>needs_contact</code></div>
+    </div>
+    <div class="card stat accent-teal">
+      <div class="n">$0</div>
+      <div class="l">Claude spend · 0 fatal signatures</div>
+      <div class="s up">0 crashes · 0 quota stops · no page</div>
+    </div>
+  </div>
+
+  <h2>The shape of the day</h2>
+  <div class="card" style="padding:0">
+    <div class="strip" id="strip"></div>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--teal)"></span>strong pass (≥8 fresh pitchable)</span>
+      <span><span class="dot" style="background:var(--amber)"></span>modest (1–7)</span>
+      <span><span class="dot" style="background:var(--red)"></span>dead pass (0)</span>
+    </div>
+  </div>
+  <p class="muted">Each bar = one finder pass (103 total, 00:21→23:59 PT), height = fresh pitchable found. <b>Three bursts, three droughts.</b> No single pass cleared the old ≥12 "healthy" bar (peak was 11) — the +72 came from <em>dense clusters</em>, not tall spikes. Each cluster fired right after a harvest <b>leaked through the block</b> (04:25, 12:26, 20:30 PT) and reservoir flipped <code>STOCK-UP → GO</code>: burst 1 → +28/+8 (early AM), burst 2 → +18/+10 (midday), burst 3 → +8 (evening). The two biggest sessions ended on the 90-min <b>time budget</b>, not a term wall — they had real work to do.</p>
+
+  <h2>The three questions</h2>
+
+  <div class="q accent-good">
+    <div class="ask"><span class="qn">Q1</span><span>Is the +72 real finding, or backlog churn again?</span></div>
+    <p><b>Real finding — no ambiguity this time.</b> The found-but-unverified verify backlog that carried parking through days 2–8 of the block was <b>fully spent on 07-25</b>. So there is nothing left for the verify lane to drain — every park now has to come from a freshly-written channel. And the grounded metric agrees: <span class="pill">net_new_channels_written = 1,053</span> across <b>65 writing passes</b>, <code>fresh_finding_dead = false</code>. The <b>72 verified emails exactly equal the +72 park gain</b>, and they came off new rows. This confirms — and amplifies — 07-30's tentative read that its +41 "was the block leaking, not lifting." Two rising days (+41 → +72) is a trend, not a blip.</p>
+  </div>
+
+  <div class="q accent-teal">
+    <div class="ask"><span class="qn">Q2</span><span>Why is finding recovering on <em>Day 14</em> of the IP-block?</span></div>
+    <p><b>Two independent supply lines came back at once.</b> ① The autocomplete endpoint keeps degrading from hard-block toward <b>rate-limiting</b> — today the harvest circuit-breaker <b>punched through on 3 sessions</b> (04:25 / 12:26 / 20:30 PT) instead of skipping, and reservoir went <code>GO</code> twice. Each leak seeded one of the day's three bursts. ② <b>Direct YouTube-key capacity is restored</b>: keys #1–#7 are back in live rotation (many per-minute 429-rotations, one full daily-quota exhaustion on key #5) — versus "0 working direct keys + RapidAPI ~100%" only a week ago. So the finder had both terms to mine <em>and</em> quota to mine them with. But <code>autocomplete_blocked</code> is <b>still true</b> (1 block observation this cycle) — this is the block <em>leaking wider</em>, not <em>lifted</em>. The durable fix is still infra: rotate the egress IP.</p>
+  </div>
+
+  <div class="q accent-amber">
+    <div class="ask"><span class="qn">Q3</span><span>Why only +72, and not more — what's the ceiling now?</span></div>
+    <p><b>Email-verifiability, same as always.</b> Of <span class="pill">178 pitchable (≥6)</span>, only <b>72 (~40%) had a verifiable email</b> → parked; <b>93 were swept to <code>needs_contact</code></b> (now <b>3,845</b>) — found, scored ≥6, host-identified, but no deliverable email yet. On a leak-day like today, <b>finding is no longer the binding constraint — email is.</b> More pitchable creators (106) fell out for lack of an email than were parked (72). The niche mix also <b>broadened</b> off the flat-week's Real-Estate/Health duopoly:</p>
+    <div style="margin-top:8px">
+      <div class="niche"><span>Health &amp; Wellness Clinics</span><span class="track"><span class="fill" style="width:100%"></span></span><span class="v">36</span></div>
+      <div class="niche"><span>Real Estate &amp; Property</span><span class="track"><span class="fill" style="width:78%"></span></span><span class="v">28</span></div>
+      <div class="niche"><span>Marketing Agencies</span><span class="track"><span class="fill" style="width:53%"></span></span><span class="v">19</span></div>
+      <div class="niche"><span>Coaching &amp; Consulting</span><span class="track"><span class="fill" style="width:44%"></span></span><span class="v">16</span></div>
+      <div class="niche"><span>Financial Planning &amp; Investing</span><span class="track"><span class="fill" style="width:42%"></span></span><span class="v">15</span></div>
+      <div class="niche"><span>Business Growth Coaching</span><span class="track"><span class="fill" style="width:28%"></span></span><span class="v">10</span></div>
+      <div class="niche"><span>+ 10 more niches (tail)</span><span class="track"><span class="fill" style="width:150%;max-width:100%"></span></span><span class="v">54</span></div>
+    </div>
+    <p class="muted" style="margin-top:10px">Health + Real Estate = 36% of pitchable (was ~70% during the flat week). Agencies, Coaching and Financial Planning all contributing again — a sign the leak is surfacing a wider slice of the ICP, not just re-hitting the two saturated flagship veins.</p>
+  </div>
+
+  <h2>What held → what's fixed</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Area</th><th>What happened</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr><td>Benign hard-wall carve-out</td><td>16 benign "two consecutive finder failures" drought-stops this cycle</td><td class="up">Held — <code>fatal_signatures_today = []</code> (07-25 <code>b007173</code> + 07-30 <code>eca0fa2</code> both holding)</td></tr>
+        <tr><td>Crash resilience</td><td>Full session-log grep clean: no <code>ENOTFOUND</code> / unhandled rejection / crash</td><td class="up">Held — 36 sessions, graceful idle every dead pass</td></tr>
+        <tr><td>Quota discipline</td><td>0 quota stops; harvest correctly skipped 100/103 on block-backoff, leaked 3×</td><td class="up">Held — block-backoff (<code>1d5d1f9</code>) self-clears on clean sessions</td></tr>
+        <tr><td>Cost governor</td><td>Discovery dry-guard suppressed the paid sonnet calls; fix-agent never fired</td><td class="up">Held — $0 Claude spend, burn ledger untouched</td></tr>
+        <tr><td>Dead-key re-probe (minor)</td><td>Per-process <code>deadKeys</code> Set → each pass re-probes quota-dead key #5 (16×/cycle)</td><td class="warn">Investigated &amp; <b>declined</b> — see below (no quota lost, persist-risk &gt; benefit)</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="muted"><b>Nothing broke.</b> The one real inefficiency I found — the finder re-probing a genuinely quota-exhausted direct key on each fresh pass — was left alone <em>deliberately</em>: a <code>quotaExceeded</code> request is <b>not billed</b> by YouTube (you can't exceed the cap you've already hit), so the only cost is ~16 wasted round-trips/day at <b>zero quota</b>. Persisting the dead-key state across processes would risk stranding a key whose daily quota <em>resets at PT-midnight</em> (a fresh process reading a stale "dead" flag would lose real capacity) — a net-negative regression on the money-path finder for no quota saving. The current per-process stickiness is the documented-intended design. <b>No code shipped this cycle.</b></p>
+
+  <h2>Recommended next — ranked</h2>
+  <ol class="recs">
+    <li><b>Rotate the VPS egress IP / proxy (infra, Day 14 — still #1).</b> Today's +72 is the block <em>leaking wider</em>, not lifting — finding rides three lucky harvest punch-throughs and a drought-burst-drought rhythm. Removing the block outright restores full, steady term supply and ends the dependence on one blockable free endpoint's mood.</li>
+    <li><b>Build the <code>needs_contact</code> recovery engine (3,845 — the biggest <em>unblocked</em> lever).</b> On leak-days like today it already out-caps finding: 106 of 178 pitchable creators fell out for lack of a verifiable email. These are found, scored ≥6, host-identified — recovering even a third dwarfs a day of fresh finding and sidesteps the whole term-supply ceiling. Deferred by Casey; the value gap widens every good day.</li>
+    <li><b>A 2nd independent term source (DataForSEO).</b> The durable structural answer to the block <em>class</em>: term supply should not hinge on whether one free Google endpoint decides to rate-limit us. This is what turns leak-days into every-day.</li>
+    <li><b>Make discovery compound.</b> <code>evaluate-probes</code> still promotes few winners and the term table barely grows between harvest leaks — the finder re-invents veins rather than banking them. A lower/cumulative promote bar would let a good leak-day's veins persist into the next.</li>
+  </ol>
+
+  <div class="foot">
+    <b>Status caveat:</b> everything is <b>parked</b>, nothing sent. <code>approved_hold</code> is a deliberate holding lane — leads sit there until the intended email process is ready. Today's +72 took the pool <b>2,947 → 3,019</b>; <code>needs_contact</code> rose <b>3,752 → 3,845</b> (+93). The loop ran clean all cycle — 36 sessions, $0 spend, 0 crashes, 0 quota stops, no fix-agent page, no halt flag — and is <b>still running</b> for the next cycle.
+  </div>
+
+</div>
+
+<script>
+  // fresh_pitchable per finder pass, chronological (from logs/campaign-2026-07-{30,31}.jsonl, cycle window 07-30T07:00Z→07-31T07:00Z)
+  var seq = [0,0,0,0,0,0,0,0,0,5,6,4,1,0,2,6,11,4,2,4,6,1,6,4,0,8,4,10,1,3,1,0,0,0,0,1,0,2,0,0,0,0,0,0,0,0,0,0,0,0,3,5,5,2,1,1,1,1,3,1,3,2,4,1,0,1,6,5,4,1,2,4,0,2,1,0,3,2,3,2,1,0,0,0,0,0,0,0,0,0,0,2,5,2,2,5,0,0,0,0,0,0,0];
+  var max = Math.max.apply(null, seq);
+  var strip = document.getElementById('strip');
+  seq.forEach(function (v) {
+    var b = document.createElement('div');
+    b.className = 'bar' + (v === 0 ? ' zero' : v < 8 ? ' low' : '');
+    b.style.height = Math.max(4, Math.round((v / max) * 100)) + '%';
+    b.title = v + ' fresh pitchable';
+    strip.appendChild(b);
+  });
+</script>
+</body>
+</html>
