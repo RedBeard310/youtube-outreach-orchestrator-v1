@@ -1,0 +1,187 @@
+<title>Lead Run Debrief — 2026-08-01</title>
+<style>
+  :root {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --good-soft: #1f8a5b1a; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+      --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+      --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --good-soft: #55c48c1c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --good-soft: #1f8a5b1a; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+    --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+    --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --good-soft: #55c48c1c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 40px 22px 80px; }
+  .eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); font-weight: 600; }
+  h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.12; margin: 10px 0 6px; text-wrap: balance; letter-spacing: -.02em; }
+  h2 { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); margin: 44px 0 16px; font-weight: 700; }
+  h3 { font-size: 18px; margin: 0 0 6px; letter-spacing: -.01em; }
+  p { margin: 0 0 14px; }
+  .lede { font-size: 18px; color: var(--ink-soft); max-width: 68ch; }
+  .tag { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--good-soft); color: var(--good); letter-spacing: .02em; }
+  .grid { display: grid; gap: 14px; }
+  .stats { grid-template-columns: repeat(4, 1fr); margin-top: 26px; }
+  @media (max-width: 720px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; box-shadow: var(--shadow); }
+  .stat .n { font-size: 30px; font-weight: 750; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .stat .l { font-size: 12.5px; color: var(--ink-soft); margin-top: 3px; }
+  .stat .s { font-size: 12px; margin-top: 8px; font-weight: 600; }
+  .up { color: var(--good); } .down { color: var(--red); } .warn { color: var(--amber); }
+  .accent-red { border-left: 3px solid var(--red); }
+  .accent-teal { border-left: 3px solid var(--teal); }
+  .accent-amber { border-left: 3px solid var(--amber); }
+  .accent-good { border-left: 3px solid var(--good); }
+
+  /* shape-of-day bar strip */
+  .strip { display: flex; align-items: flex-end; gap: 2px; height: 120px; padding: 14px 14px 10px; overflow-x: auto; }
+  .bar { flex: 1 0 6px; min-width: 4px; border-radius: 2px 2px 0 0; background: var(--teal); opacity: .9; }
+  .bar.zero { background: var(--red); height: 4px !important; opacity: .85; }
+  .bar.low { background: var(--amber); }
+  .bar.big { background: var(--good); }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-soft); padding: 0 14px 14px; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+
+  .q { border-radius: 14px; padding: 20px 22px; margin-bottom: 14px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); }
+  .q .ask { font-size: 17px; font-weight: 700; color: var(--ink); margin-bottom: 10px; display: flex; gap: 10px; align-items: baseline; }
+  .q .ask .qn { color: var(--teal); font-weight: 800; flex: 0 0 auto; }
+  .q p { color: var(--ink-soft); }
+  .q b { color: var(--ink); }
+  .pill { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink); background: var(--panel-2); padding: 1px 7px; border-radius: 6px; border: 1px solid var(--line); white-space: nowrap; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+  th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); }
+  td .num { font-variant-numeric: tabular-nums; font-weight: 650; }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); box-shadow: var(--shadow); }
+  ol.recs { padding-left: 0; list-style: none; counter-reset: r; margin: 0; }
+  ol.recs li { counter-increment: r; position: relative; padding: 14px 16px 14px 52px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 10px; box-shadow: var(--shadow); }
+  ol.recs li::before { content: counter(r); position: absolute; left: 14px; top: 14px; width: 26px; height: 26px; border-radius: 8px; background: var(--teal-soft); color: var(--teal); font-weight: 800; font-size: 14px; display: grid; place-items: center; }
+  ol.recs b { color: var(--ink); }
+  .foot { margin-top: 46px; padding: 16px 18px; border-radius: 12px; background: var(--good-soft); border: 1px solid var(--line); font-size: 14px; color: var(--ink-soft); }
+  .foot b { color: var(--ink); }
+  .muted { color: var(--ink-soft); font-size: 13.5px; }
+  .nichebar { display: flex; height: 26px; border-radius: 7px; overflow: hidden; border: 1px solid var(--line); margin: 4px 0 10px; }
+  .nichebar span { display: block; }
+</style>
+
+<div class="wrap">
+
+  <div class="eyebrow">Lead Run Debrief · YouTube outreach</div>
+  <h1>2026-08-01 — the block broke, and the day it broke was the biggest of the era</h1>
+  <p class="lede">The 15-day autocomplete IP-block that had been starving the term engine since 2026-07-17 <b>finally ended.</b> The proxy fix landed 07-31; keyword harvest ran clean again for the first time in two weeks; the term pool refilled and the finder went from <b>flat-lining all morning</b> to <b>climbing all night</b>. Result: <b>+404 parked</b> — 5.6× the prior day and by far the largest single-cycle gain of the whole block.</p>
+  <div style="margin-top:14px"><span class="tag">HARVEST RESTORED · +404 PARKED · $0 SPEND · NO HALT</span></div>
+
+  <div class="grid stats">
+    <div class="card stat accent-good">
+      <div class="n">+404</div>
+      <div class="l">parked → <code>approved_hold</code></div>
+      <div class="s up">3,019 → 3,423 · 5.6× the prior +72</div>
+    </div>
+    <div class="card stat accent-teal">
+      <div class="n">843</div>
+      <div class="l">pitchable (score ≥ 6) discovered</div>
+      <div class="s muted">of 3,619 new · 391 email-verified</div>
+    </div>
+    <div class="card stat accent-teal">
+      <div class="n">1,396</div>
+      <div class="l">net-new channels written</div>
+      <div class="s up">629 fresh-pitchable across 136 passes</div>
+    </div>
+    <div class="card stat accent-good">
+      <div class="n">$0</div>
+      <div class="l">Claude spend · 0 quota stops</div>
+      <div class="s up">no crash · no fix-agent · no halt flag</div>
+    </div>
+  </div>
+
+  <h2>The shape of the day</h2>
+  <div class="card" style="padding:0">
+    <div class="strip" id="strip"></div>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--good)"></span>strong pass (≥12 fresh pitchable)</span>
+      <span><span class="dot" style="background:var(--teal)"></span>healthy (5–11)</span>
+      <span><span class="dot" style="background:var(--amber)"></span>weak (1–4)</span>
+      <span><span class="dot" style="background:var(--red)"></span>dead pass (0) — <b>the morning outage tail</b></span>
+    </div>
+  </div>
+  <p class="muted">Each bar = one finder pass (136 total, 00:00→00:00 PT), height = fresh pitchable found. The left half is the dying tail of the term-starvation outage (48 zero-passes, 23 <code>hard_stop</code> back-offs); the right half is the post-harvest recovery, cresting at <b>27 fresh pitchable in a single pass</b> — the healthiest passes since the block began.</p>
+
+  <h2>The three questions</h2>
+
+  <div class="q accent-good">
+    <div class="ask"><span class="qn">Q1</span><span>Why was today the biggest day of the entire block era?</span></div>
+    <p><b>One dominant cause: keyword harvest came back.</b> The autocomplete endpoint had been IP-blocked with sustained HTTP&nbsp;403s since 2026-07-17 — the only mechanism that injects genuinely-new search terms into the table. Every refill path downstream (frontier discovery re-arms only when the table grows; the anti-starvation floor only reactivates never-run terms) was therefore choked at the source. The 07-31 fix — routing the harvest through a <b>US Webshare egress-proxy pool</b> — restored it: at <span class="pill">05:41Z the harvest ran exit-0, cap 200</span>, its first clean run in two weeks. New ground → discovery re-armed → the pool refilled → the finder had real veins to mine.</p>
+    <p>The yield landed <b>firm-heavy, exactly as designed</b>: of 843 pitchable, <b>Real&nbsp;Estate&nbsp;&amp;&nbsp;Property led with 327</b>, then Health&nbsp;clinics 153, Coaching 133, Legal 36, Relocation 35, Financial 32 — the frontier verticals seeded in prior cycles finally paying out once terms could flow.</p>
+  </div>
+
+  <div class="q accent-amber">
+    <div class="ask"><span class="qn">Q2</span><span>If the block broke, why did the morning still flat-line?</span></div>
+    <p>Because the fix landed <b>mid-cycle, not at the start.</b> For the first ~14 hours the term pool was still drained from the tail end of the outage: <span class="pill">48 of 136 passes returned 0</span> and the campaign logged <span class="pill">23 hard_stop back-offs</span>. Each was the same benign shape — the finder aborted on <em>"No active terms to process,"</em> two in a row tripped the two-strikes wall, the loop slept 30&nbsp;min, retried. <b>This is the system working as designed, not thrashing</b>: no quota burned (0 quota stops), no Claude spent, no crash. The 07-13-era 2.5-min thrash-loop is long fixed; the 30-min back-off held all morning.</p>
+    <p>The one blemish: those 23 stops all logged as an indistinguishable <em>"hard wall (quota/keys/Airtable)"</em> — when the real cause was an empty term pool. Correct behavior, misleading label. <b>Fixed this cycle</b> (see below).</p>
+  </div>
+
+  <div class="q accent-teal">
+    <div class="ask"><span class="qn">Q3</span><span>Is this real and durable — or another leak like 07-30 / 07-31?</span></div>
+    <p><b>This one is structurally different.</b> 07-30 (+41) and 07-31 (+72) were the block <em>leaking</em> — the harvest circuit-breaker punching through on a handful of sessions before slamming shut again. Today the harvest ran <b>clean and repeatably</b>, gated only by its normal staleness cadence (the post-05:41Z <code>skipped:true</code> lines are the 4h cooldown, <b>not</b> the 403 block). Two independent proofs it's the block lifting, not leaking: ① the recovery is a <b>sustained ramp</b> across the whole back half (crests of 23/24/26/27), not three isolated bursts; ② <span class="pill">only 1 block-observation all cycle</span> vs. the sustained 403 wall of the prior fortnight.</p>
+    <p>Caveat worth holding: durability rests on the <b>proxy pool staying healthy</b>. If those egress IPs get burned, the harvest 403s return and we're back to term-starvation. The egress pool is now the single point of failure for fresh supply.</p>
+  </div>
+
+  <h2>What broke → what's fixed</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Issue</th><th>Mechanism</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr><td>15-day term-refuel outage</td><td>Autocomplete endpoint IP-blocked (403) since 07-17 → no new terms → pool starves</td><td class="up">Fixed 07-31: harvest routed through US Webshare proxy pool; ran exit-0 05:41Z</td></tr>
+        <tr><td>Morning flat-line (48 dead passes)</td><td>Outage tail — pool still drained until the first clean harvest mid-cycle</td><td class="up">Self-resolved as harvest refilled the term table</td></tr>
+        <tr><td><code>hard_stop</code> mislabels supply-exhaustion as an infra wall</td><td>Finder exits 1 for both empty-pool and quota/keys/Airtable; campaign can't tell them apart</td><td class="up">Fixed this cycle: finder exits <b>3</b> on empty pool; campaign logs <code>reason: term_supply_exhausted</code> vs <code>hard_wall</code></td></tr>
+        <tr><td>Proxy pool is now a single point of failure</td><td>All fresh term supply flows through one egress-IP pool; if burned, 403s return</td><td class="warn">Open — monitor pool health; recommended #2</td></tr>
+        <tr><td>Email, not finding, is the ceiling</td><td>386 score-≥6 creators → <code>needs_contact</code> (no verifiable email) vs 404 → hold</td><td class="warn">Open — the deferred recovery engine (recommended #1)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Recommended next — ranked</h2>
+  <ol class="recs">
+    <li><b>The <code>needs_contact</code> recovery engine (biggest volume lever, still deferred).</b> The pool is now <span class="pill">4,231</span> found-and-scored creators with no verifiable email — it grew by 386 today alone, nearly matching the 404 that parked. With finding restored, this is unambiguously the ceiling: recovering even 30% (~1,270) dwarfs any single day of fresh finding. Awaiting greenlight.</li>
+    <li><b>Monitor the egress-proxy pool as first-class infra.</b> Fresh supply now depends entirely on the US Webshare pool staying un-blocked. Add a lightweight health signal (harvest exit-code / 403-rate) to the hourly check-in so a re-block is caught in an hour, not after another 15-day silent starve.</li>
+    <li><b>Let the debrief harness split <code>hard_stop</code> by the new <code>reason</code> field.</b> Now that supply-exhaustion stops self-label as <code>term_supply_exhausted</code>, the debrief metric should count them separately from real <code>hard_wall</code> stops — so "23 hard_stops" never again reads as an infra alarm when it's a benign morning back-off.</li>
+    <li><b>Ride the firm-heavy frontier while terms flow.</b> Real Estate (327), Health clinics (153) and Coaching (133) carried today. With harvest feeding discovery again, keep <code>--frontier</code> on and let the anti-starvation + probe-promotion loop compound — the term engine is finally the thing that's working, not the bottleneck.</li>
+  </ol>
+
+  <div class="foot">
+    <b>Status caveat:</b> everything is <b>parked</b>, nothing sent. <code>approved_hold</code> is a deliberate holding lane — leads sit there until the intended email process is ready. Today's +404 takes the pool to <b>3,423 parked</b> (<code>needs_contact</code> now 4,231). Campaign ran clean all cycle: <b>$0 Claude spend, 0 quota stops, 0 crashes, no fix-agent page, no halt flag</b> (<code>fatal_signatures</code> = empty). One small self-healing fix shipped to the finder + orchestrator (accurate <code>term_supply_exhausted</code> labeling); both typecheck clean. Loop left running for the next cycle.
+  </div>
+
+</div>
+
+<script>
+  // fresh_pitchable per finder pass, chronological across the cycle window
+  // (2026-07-31T07:00Z → 2026-08-01T07:00Z), from logs/campaign-2026-07-31.jsonl + -08-01.jsonl
+  var seq = [0,0,0,0,0,0,1,1,1,1,0,0,0,2,4,9,8,2,0,2,4,1,1,3,0,3,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3,1,3,0,2,5,2,2,2,0,1,3,0,1,1,0,3,4,2,2,4,6,3,4,2,0,4,2,0,0,0,0,0,0,0,7,9,4,8,6,13,8,14,16,23,6,9,16,18,21,24,10,26,15,22,23,18,12,27,20,24,11,10,9,8,6,10,10,7,0,0,7,4,3,0,4,2,3,5,0,5,2,2,2,3,4,3,3];
+  var max = Math.max.apply(null, seq);
+  var strip = document.getElementById('strip');
+  seq.forEach(function (v) {
+    var b = document.createElement('div');
+    b.className = 'bar' + (v === 0 ? ' zero' : v < 5 ? ' low' : v >= 12 ? ' big' : '');
+    b.style.height = Math.max(4, Math.round((v / max) * 100)) + '%';
+    b.title = v + ' fresh pitchable';
+    strip.appendChild(b);
+  });
+</script>
