@@ -317,6 +317,30 @@ Default cleverness = **level 2 (Dry)** unless the task names a level. The 1-5 le
 Fallback (ONLY if the canonical file is unreachable): zero em dashes; level-2 dry style (plain, direct, no ornament, no imagery); every line passes the read-aloud listener gate; and state in your output that the full firewall was not loaded.
 
 <!-- LLM-SPEND-GUARD v1 — managed block; keep identical in every repo -->
+## Zero-Anthropic pipeline (house law since 2026-08-01)
+
+**Nothing in this pipeline bills the Anthropic API.** Casey's standing order after the
+2026-08-01 ~$80/day incident: the Anthropic key is off-limits to every pipeline repo
+unless he explicitly says otherwise for a named task. What replaced it:
+
+- **Every LLM task runs a cheap OpenRouter model driven by a committed skill file**
+  (instructions + golden examples) with the model choice in that repo's `models.json`
+  (config-as-code — env is Mac-clobbered and can't be trusted for this).
+- **Finder** (`youtube-lead-finder-v1`): scoring (qwen3.7-flash, self-consistency
+  vote-of-3), host-ID, keyword prefilter, vein discovery (DeepSeek v3.2). Skills in
+  `skills/*.md`, eval harnesses in `scripts/skill-eval-*.ts`, frozen fixtures +
+  results in `logs/skill-eval/`. Validated at parity with the old Haiku scorer's own
+  self-consistency ceiling before the swap.
+- **Email repo**: compose, emailFinder, hostName — all OpenRouter via `models.json`.
+- **Quick + deep research repos**: all bank/stage tasks → DeepSeek v3.2 via `models.json`.
+- **Autopilot `claude -p` agents** (check-in fix, debrief) bill the **Max-subscription
+  OAuth login**, never the API key — the systemd units carry no key and the scripts
+  `unset ANTHROPIC_API_KEY` as a hard guard. Subscription usage is allowed (see LLM
+  Spend Guard below); API-key usage is not.
+- `anthropic:`-prefixed model strings still exist in the transports as an EXPLICIT
+  opt-in escape hatch. Never set one as a default or in a models.json without Casey's
+  word.
+
 ## LLM Spend Guard (house law — applies in every repo)
 
 **Subscription chat is fine.** Work billed to a subscription plan (Claude Code on the Max plan, Codex on a ChatGPT plan, whatever the tool) needs no disclosure — just do the task.

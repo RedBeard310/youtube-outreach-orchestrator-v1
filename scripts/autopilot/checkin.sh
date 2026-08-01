@@ -7,6 +7,12 @@
 
 set -uo pipefail
 
+
+# HARD GUARD (Casey, 2026-08-01): the Anthropic API key is off-limits to the
+# pipeline. Even if a future edit sources env-storage here, any `claude -p`
+# below must bill the Max-subscription OAuth login, never the API key.
+unset ANTHROPIC_API_KEY
+
 REPO="/home/casey/repos/youtube-outreach-orchestrator-v1"
 cd "$REPO" || exit 1
 
