@@ -423,10 +423,22 @@ export async function driveCampaign(opts: CampaignOpts): Promise<void> {
     // Hard-wall detection: finder exiting nonzero twice in a row => quota/keys/Airtable.
     if (!opts.dryRun && finder.exit_code !== 0 && finder.exit_code !== null) {
       consecutiveFinderFailures++;
+      // Finder exit 3 = benign term-supply exhaustion ("No active terms to process"),
+      // NOT an infra hard wall. Label the stop by its real cause so debriefs and the
+      // hourly check-in can tell a dry term pool (harvest/discovery couldn't refill —
+      // self-heals on the next harvest/back-off) apart from a genuine quota/keys/Airtable
+      // failure (needs a human). Prior to this, all 23 of the 2026-08-01 supply-exhaustion
+      // stops logged as an indistinguishable "hard wall (quota/keys/Airtable)".
+      const supplyExhausted = finder.exit_code === 3;
       console.error(`[campaign] finder exit ${finder.exit_code} — consecutive failures: ${consecutiveFinderFailures}`);
       if (consecutiveFinderFailures >= 2) {
-        console.error(`[campaign] two consecutive finder failures — likely a hard wall (quota/keys/Airtable). Stopping.`);
-        log({ event: 'hard_stop', run });
+        const reason = supplyExhausted ? 'term_supply_exhausted' : 'hard_wall';
+        console.error(
+          supplyExhausted
+            ? `[campaign] two consecutive term-supply-exhausted passes — the active term pool is dry (harvest/discovery could not refill it). Stopping; the loop back-off + next keyword harvest refill it.`
+            : `[campaign] two consecutive finder failures — likely a hard wall (quota/keys/Airtable). Stopping.`,
+        );
+        log({ event: 'hard_stop', run, reason });
         break;
       }
     } else {
