@@ -57,7 +57,7 @@ while true; do
   runlog=$DIR/$(basename "$file" -ids.txt)-run.log
   log "launching batch: count=$count pool=$pool excluded=$excluded file=$file"
   (cd "$EMAIL" && YOUTUBE_API_BACKEND=rapidapi npm run outreach -- \
-    --lead-ids-file "$file" --stop-after enrich --concurrency 8) \
+    --lead-ids-file "$file" --stop-after enrich --concurrency "${BACKFILL_CONCURRENCY:-12}") \
     >"$runlog" 2>&1
   rc=$?
   done_n=$(grep -c "enrich run done" "$runlog" 2>/dev/null || echo 0)
