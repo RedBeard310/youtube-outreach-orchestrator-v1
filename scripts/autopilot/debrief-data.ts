@@ -276,7 +276,17 @@ async function main(): Promise<void> {
       quota_stops: count('quota_stop'),
       time_budget_stops: count('time_budget_stop'),
     },
-    burn_today: { total_usd: burn.total_usd, by_source: burn.by_source, soft: burn.soft_usd, hard: burn.hard_usd },
+    // scope is Anthropic-only: since the 2026-08-01 zero-Anthropic migration the pipeline's
+    // LLM work runs on OpenRouter, which the burn ledger never meters — total_usd:0 == "$0
+    // Anthropic", NOT "$0 total LLM spend". Labeled so a reader can't mistake one for the other.
+    burn_today: {
+      scope: burn.scope,
+      note: 'Anthropic-only. Pipeline LLM (OpenRouter) is not metered here — total_usd:0 means $0 Anthropic, not $0 total LLM spend.',
+      total_usd: burn.total_usd,
+      by_source: burn.by_source,
+      soft: burn.soft_usd,
+      hard: burn.hard_usd,
+    },
     supply_health: supplyHealth,
     fatal_signatures_today: fatalSignaturesToday(sinceMs),
     references: {

@@ -48,6 +48,13 @@ export function recordBurn(rec: Omit<BurnRecord, 'ts'>): void {
 
 export interface BurnSummary {
   date: string;
+  // scope of what this ledger meters. It is Anthropic-only by construction: the ceilings
+  // are ANTHROPIC_SOFT/HARD_USD and the only thing recorded is the headless `claude -p`
+  // runs' total_cost_usd. Since the 2026-08-01 zero-Anthropic migration the pipeline's LLM
+  // work (scoring, host-ID, discovery, compose, verify, research banks) runs on OpenRouter,
+  // which this ledger NEVER sees — so total_usd == 0 means "$0 Anthropic", NOT "$0 LLM spend".
+  // Surface the scope so no reader (or spend-guard check) mistakes one for the other.
+  scope: 'anthropic';
   total_usd: number;
   by_source: Record<string, number>;
   soft_usd: number;
@@ -78,6 +85,7 @@ export function summarizeToday(date = pacificDate()): BurnSummary {
   total = Math.round(total * 10000) / 10000;
   return {
     date,
+    scope: 'anthropic',
     total_usd: total,
     by_source: bySource,
     soft_usd: soft,
