@@ -1,0 +1,180 @@
+<title>Lead Run Debrief — 2026-08-04</title>
+<style>
+  :root {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+      --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+      --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+    --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+    --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 40px 22px 80px; }
+  .eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); font-weight: 600; }
+  h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.12; margin: 10px 0 6px; text-wrap: balance; letter-spacing: -.02em; }
+  h2 { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); margin: 44px 0 16px; font-weight: 700; }
+  h3 { font-size: 18px; margin: 0 0 6px; letter-spacing: -.01em; }
+  p { margin: 0 0 14px; }
+  .lede { font-size: 18px; color: var(--ink-soft); max-width: 68ch; }
+  .tag { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--teal-soft); color: var(--teal); letter-spacing: .02em; }
+  .grid { display: grid; gap: 14px; }
+  .stats { grid-template-columns: repeat(4, 1fr); margin-top: 26px; }
+  @media (max-width: 720px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; box-shadow: var(--shadow); }
+  .stat .n { font-size: 30px; font-weight: 750; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .stat .l { font-size: 12.5px; color: var(--ink-soft); margin-top: 3px; }
+  .stat .s { font-size: 12px; margin-top: 8px; font-weight: 600; }
+  .up { color: var(--good); } .down { color: var(--red); } .warn { color: var(--amber); }
+  .accent-red { border-left: 3px solid var(--red); }
+  .accent-teal { border-left: 3px solid var(--teal); }
+  .accent-amber { border-left: 3px solid var(--amber); }
+
+  .strip { display: flex; align-items: flex-end; gap: 2px; height: 120px; padding: 14px 14px 10px; overflow-x: auto; }
+  .bar { flex: 1 0 6px; min-width: 5px; border-radius: 2px 2px 0 0; background: var(--teal); opacity: .9; }
+  .bar.zero { background: var(--red); height: 4px !important; opacity: .9; }
+  .bar.low { background: var(--amber); }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-soft); padding: 0 14px 14px; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+
+  .q { border-radius: 14px; padding: 20px 22px; margin-bottom: 14px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); }
+  .q .ask { font-size: 17px; font-weight: 700; color: var(--ink); margin-bottom: 10px; display: flex; gap: 10px; align-items: baseline; }
+  .q .ask .qn { color: var(--teal); font-weight: 800; flex: 0 0 auto; }
+  .q p { color: var(--ink-soft); }
+  .q b { color: var(--ink); }
+  .pill { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink); background: var(--panel-2); padding: 1px 7px; border-radius: 6px; border: 1px solid var(--line); white-space: nowrap; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+  th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); }
+  td .num { font-variant-numeric: tabular-nums; font-weight: 650; }
+  .fix td:first-child { color: var(--good); font-weight: 650; }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); box-shadow: var(--shadow); }
+  ol.recs { padding-left: 0; list-style: none; counter-reset: r; margin: 0; }
+  ol.recs li { counter-increment: r; position: relative; padding: 14px 16px 14px 52px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 10px; box-shadow: var(--shadow); }
+  ol.recs li::before { content: counter(r); position: absolute; left: 14px; top: 14px; width: 26px; height: 26px; border-radius: 8px; background: var(--teal-soft); color: var(--teal); font-weight: 800; font-size: 14px; display: grid; place-items: center; }
+  ol.recs b { color: var(--ink); }
+  .foot { margin-top: 46px; padding: 16px 18px; border-radius: 12px; background: var(--amber-soft); border: 1px solid var(--line); font-size: 14px; color: var(--ink-soft); }
+  .foot b { color: var(--ink); }
+  .muted { color: var(--ink-soft); font-size: 13.5px; }
+</style>
+
+<div class="wrap">
+
+  <div class="eyebrow">Lead Run Debrief · YouTube outreach</div>
+  <h1>2026-08-04 — the fifth clean day, and the gap keeps widening</h1>
+  <p class="lede">Nothing broke. The loop ran <b>16 sessions</b>, parked <b>+105</b>, spent <b>$0 on Anthropic</b>, and hit zero quota, crash or auth trouble — <code>fatal_signatures</code> empty for the fifth straight cycle. Finding is healthy but the frontier is still thin (~1.6 pitchable/pass) and the reservoir has no drain: <b>8,385 leads parked, 0 sent.</b></p>
+  <div style="margin-top:14px"><span class="tag">CLEAN · $0 · STILL RUNNING</span></div>
+
+  <div class="grid stats">
+    <div class="card stat accent-teal">
+      <div class="n">+105</div>
+      <div class="l">parked → <code>approved_hold</code></div>
+      <div class="s muted">3,781 → 3,886</div>
+    </div>
+    <div class="card stat">
+      <div class="n">184</div>
+      <div class="l">pitchable (score ≥6)</div>
+      <div class="s muted">of 817 net-new · 749 channels written</div>
+    </div>
+    <div class="card stat accent-amber">
+      <div class="n">35%</div>
+      <div class="l">email-verify rate</div>
+      <div class="s warn">65 verified — down from 58% / 64%</div>
+    </div>
+    <div class="card stat accent-red">
+      <div class="n">8,385</div>
+      <div class="l">total parked, <b>0 sent</b></div>
+      <div class="s down">approved_hold 3,886 + needs_contact 4,499</div>
+    </div>
+  </div>
+
+  <h2>The shape of the day</h2>
+  <div class="card" style="padding:0">
+    <div class="strip" id="strip"></div>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--teal)"></span>stronger pass (≥6 fresh pitchable)</span>
+      <span><span class="dot" style="background:var(--amber)"></span>trickle (1–5)</span>
+      <span><span class="dot" style="background:var(--red)"></span>dead pass (0) — <b>47 of 116, scattered</b></span>
+    </div>
+  </div>
+  <p class="muted">Each bar = one finder pass (116 total, 01:09→06:49 UTC window aggregated over the cycle), height = fresh pitchable found. <b>No dead-pass block</b> — the zeros are scattered noise, not a starvation stall. Peak pass was 9; the tallest cluster (bars ~86–90: 9·8·5·4·6) is a single vein briefly catching. This is the thin-frontier trickle, the same shape as 08-02/08-03.</p>
+
+  <h2>The three questions</h2>
+
+  <div class="q accent-teal">
+    <div class="ask"><span class="qn">Q1</span><span>Did anything break?</span></div>
+    <p><b>No.</b> 16 sessions started, 16 finished, all on the 90-minute time budget — <span class="pill">0 hard stops · 0 quota stops · 0 crashes</span>. No fix-agent page, no halt flag, <code>fatal_signatures</code> empty. Supply health is green: <b>749 net-new channels written</b> across 114 productive passes, <code>fresh_finding_dead=false</code>, the autocomplete endpoint is <b>not blocked</b>, and there were <b>zero</b> term-starvation observations. Anthropic spend <b>$0</b> (the pipeline runs entirely on OpenRouter since the 08-01 zero-Anthropic migration — unmetered in this ledger).</p>
+    <p>One small real finding, not a break: the OpenRouter keyword prefilter (<code>qwen3.7-flash</code>) hit a transient <b>HTTP 429</b> rate-limit <b>3×</b> and each time <b>silently dropped a 100-term batch</b> — ~300 candidate keywords discarded on a day where supply is the binding constraint. Fixed this cycle (see below).</p>
+  </div>
+
+  <div class="q accent-amber">
+    <div class="ask"><span class="qn">Q2</span><span>Why did the verify rate fall to 35%?</span></div>
+    <p><b>Niche mix, not a regression.</b> 65 of 184 pitchable carried a verifiable email (35%), down from 08-03's 58% and 08-02's 64% — but back in line with July's 38–47% range. Today's pitchable were <b>70% Real Estate + Health-clinic + Legal</b> (RE 53, Health 49, Legal 26), and the two biggest — solo realtors and clinic channels — verify weakest (personal Gmail / contact-form-only), while the firm-heavy verticals that lift the rate (Financial 11, Tax 5) were a smaller slice than on 08-03. The verify lane itself ran clean (ZeroBounce credits healthy, overlapped with the finder every pass). Day-to-day verify swings ±25pts purely on which veins the discovery loop happens to catch — this is variance, not a defect.</p>
+  </div>
+
+  <div class="q accent-red">
+    <div class="ask"><span class="qn">Q3</span><span>So what's the actual story?</span></div>
+    <p><b>The outlet gap — for the fifth day running.</b> Intake is fine; the problem is nothing leaves. <code>approved_hold</code> is now <span class="pill">3,886</span> and <code>needs_contact</code> <span class="pill">4,499</span> — <b>8,385 leads parked, 0 sent.</b> approved_hold has <b>more than doubled since 07-10</b> (1,664 → 3,886), and needs_contact nearly doubled (2,353 → 4,499). Every clean day adds ~+100–175 to a pool with no drain.</p>
+    <p>Parking is also <b>decelerating</b> off the 08-01 block-break spike: <span class="pill">+404 → +185 → +162 → +105</span>. That's not a fault — it's the frontier thinning back to its steady trickle (~1.6 pitchable/pass) now that the autocomplete unblock's backlog is worked through. The lever isn't "find harder"; it's <b>the two things that convert the existing 8,385</b>: an outlet for <code>approved_hold</code> and a recovery engine for <code>needs_contact</code>.</p>
+  </div>
+
+  <h2>What broke → what's fixed</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Issue</th><th>Mechanism</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr class="fix"><td>Prefilter drops supply on a 429</td><td>Transient OpenRouter rate-limit outlives the client's 4 retries → fail-closed handler discards the whole 100-term batch (~300 terms today)</td><td class="up">Fixed: batch retries once on the sanctioned fallback model (deepseek-v3.2) before dropping</td></tr>
+        <tr><td>Verify rate 35% (vs 58/64%)</td><td>Niche mix — RE + Health clinics dominated; those verify weakest</td><td class="warn">Not a defect — inherent ±25pt variance</td></tr>
+        <tr><td>Outlet gap (8,385 parked, 0 sent)</td><td>No send process for approved_hold; no recovery engine for needs_contact</td><td class="down">Open — the binding constraint, needs Casey's call</td></tr>
+        <tr><td>Thin frontier (~1.6 pitchable/pass)</td><td>Proven niches saturated; 70% of yield from 3 verticals</td><td class="warn">Open — broaden verticals / a 2nd term source</td></tr>
+        <tr><td>OpenRouter LLM spend unmetered</td><td>Burn ledger is Anthropic-only by design (labeled 08-03); OpenRouter cost is invisible here</td><td class="warn">Open — meter it as first-class cost</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Recommended next — ranked</h2>
+  <ol class="recs">
+    <li><b>Build the <code>needs_contact</code> recovery engine (biggest lever, deferred).</b> 4,499 scored-and-found creators with no verifiable email — recovering even 30% (~1,350) dwarfs a day of fresh finding and sidesteps the whole term-supply ceiling. It has out-capped finding for two weeks. Awaiting greenlight.</li>
+    <li><b>Decide the send outlet for <code>approved_hold</code>.</b> 3,886 prepped, validated leads sitting idle. Until a send process turns on, every clean day just deepens the reservoir. This is a decision, not a build.</li>
+    <li><b>Broaden the frontier against the 70% three-niche concentration.</b> RE + Health-clinic + Legal have carried pitchable all week; new verticals (or the parked comment-scraping source) would both raise volume and lift the verify rate off the weak-verify niches.</li>
+    <li><b>Meter OpenRouter spend as first-class cost.</b> The burn ledger is structurally Anthropic-only, so <code>total_usd:0</code> reads as "the pipeline is free." Today's 300-term 429 drop is a reminder the OpenRouter side has real behavior worth watching — including cost.</li>
+  </ol>
+
+  <div class="foot">
+    <b>Status caveat:</b> everything is <b>parked</b>, nothing sent. <code>approved_hold</code> is a deliberate holding lane — leads sit until the intended email process is ready. Today's +105 joins the base → <b>3,886 parked</b> (+ 4,499 in <code>needs_contact</code>). The loop cost <b>$0 Anthropic</b>, ran clean across 16 sessions, and is <b>still running</b> for the next cycle. One durable self-healing fix shipped to the finder (prefilter fallback-model retry) — typecheck clean, fallback resolution runtime-verified.
+  </div>
+
+</div>
+
+<script>
+  // fresh_pitchable per finder pass, chronological (from logs/campaign-2026-08-0{3,4}.jsonl, cycle window)
+  var seq = [1,2,0,0,2,0,1,0,1,1,0,1,4,1,2,0,1,2,0,0,6,0,0,0,2,0,3,3,2,0,2,1,0,1,1,1,2,1,0,1,7,0,0,0,3,0,0,7,3,3,2,7,3,0,7,1,1,5,0,0,3,1,0,1,2,1,2,0,2,1,3,3,3,4,4,0,0,0,0,3,0,0,0,2,4,9,8,5,4,6,2,1,0,0,2,0,1,0,0,0,3,1,0,0,0,0,1,0,1,0,0,0,2,0,2,1];
+  var max = Math.max.apply(null, seq);
+  var strip = document.getElementById('strip');
+  seq.forEach(function (v) {
+    var b = document.createElement('div');
+    b.className = 'bar' + (v === 0 ? ' zero' : v < 6 ? ' low' : '');
+    b.style.height = Math.max(4, Math.round((v / max) * 100)) + '%';
+    b.title = v + ' fresh pitchable';
+    strip.appendChild(b);
+  });
+</script>
