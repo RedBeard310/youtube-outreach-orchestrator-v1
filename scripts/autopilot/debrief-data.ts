@@ -208,6 +208,12 @@ async function main(): Promise<void> {
     byReview[k] = (byReview[k] ?? 0) + 1;
   }
   const emailVerified = discovered.filter((l) => l.outreach_status === 'email_verified').length;
+  // Scoring health as a FIRST-CLASS metric (2026-08-05, autopilot-improve). It was already
+  // present inside by_review_status, but buried there the 08-04 debrief walked straight past
+  // 128 scoring_failed rows (16% of the day's discovery) and reported a clean day; by 08-05 it
+  // was 580 rows (72%). Surfaced on its own so a scoring outage is impossible to miss in the
+  // daily report even if the hourly check-in's alarm is ever mis-tuned.
+  const scoringFailed = discovered.filter((l) => l.review_status === 'scoring_failed').length;
 
   const ev = cycleCampaignEvents(sinceISO, untilISO);
   const count = (name: string) => ev.filter((e) => e.event === name).length;
@@ -261,6 +267,10 @@ async function main(): Promise<void> {
       total: discovered.length,
       pitchable_score_ge6: pitchable.length,
       email_verified: emailVerified,
+      scoring_failed: scoringFailed,
+      scoring_failed_rate_pct: discovered.length > 0
+        ? Math.round((1000 * scoringFailed) / discovered.length) / 10
+        : 0,
       by_niche_pitchable: byNiche,
       by_review_status: byReview,
     },

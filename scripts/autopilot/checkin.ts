@@ -335,11 +335,24 @@ async function main(): Promise<void> {
   //    and (b) log a once-hourly heartbeat to a SEPARATE observations file (kept out of the attention file
   //    so the fix-agent's evidence channel stays pure) so the daily debrief and operator can
   //    SEE the wall same-hour instead of only at the next debrief (07-13 rec #4 / 07-14 lever #4).
+  // Computed BEFORE the heartbeat (2026-08-05, autopilot-improve) so section 5 can't
+  // MIS-ATTRIBUTE a broken scoring pipeline as a term-supply wall. On 08-04/05 this
+  // heartbeat fired 19× asserting "Term-supply wall (not a code bug)" while the actual
+  // cause was the reasoning-token truncation bug — channels were being found and written,
+  // they just all came back scoring_failed. That wrong label is a large part of why the
+  // incident survived 30 hours: every hourly observation said "supply problem, nothing to fix".
+  const yieldStats = recentFinderYield(SCORING_MIN_SAMPLE);
+  const scoringFailedRatePct = yieldStats.newLeads > 0 ? (100 * yieldStats.scoringFailed) / yieldStats.newLeads : 0;
+  const scoringFailedAlarm = yieldStats.newLeads >= SCORING_MIN_SAMPLE && scoringFailedRatePct >= SCORING_FAILED_RATE_PCT;
+
   const fstats = recentFinderStats(STARVATION_WINDOW);
   const starving = fstats.total >= STARVATION_WINDOW &&
     (fstats.pitchable <= STARVATION_MAX_PITCHABLE || fstats.failed >= fstats.total - 1);
   if (starving) {
-    const detail = `finder near-dry: last ${fstats.total} passes → ${fstats.pitchable} fresh pitchable, ${fstats.failed} failed, ${fstats.zeroYield} zero-yield. Term-supply wall (not a code bug) — feed the term pool (keyword harvest / wider ICP) or advance the needs_contact engine.`;
+    const cause = scoringFailedAlarm
+      ? `NOT a term-supply wall — ${scoringFailedRatePct.toFixed(0)}% of the last ${yieldStats.newLeads} new leads came back scoring_failed, so the finder IS finding and the scoring pipeline is dropping them (see the scoring_failure_rate anomaly).`
+      : `Term-supply wall (not a code bug) — feed the term pool (keyword harvest / wider ICP) or advance the needs_contact engine.`;
+    const detail = `finder near-dry: last ${fstats.total} passes → ${fstats.pitchable} fresh pitchable, ${fstats.failed} failed, ${fstats.zeroYield} zero-yield. ${cause}`;
     appendFileSync(OBSERVATIONS, JSON.stringify({ ts: new Date().toISOString(), kind: 'term_starvation', detail, parked }) + '\n');
     console.log(`[checkin ${day}] OBSERVATION term_starvation — ${detail}`);
     // ACTION (2026-07-17): break the wall, don't just log it. A keyword harvest is a cheap,
@@ -352,7 +365,12 @@ async function main(): Promise<void> {
     // root cause): the harvest CANNOT refill the pool and every request just deepens the
     // block, so kicking it is worse than doing nothing. Log a distinct observation so the
     // operator can rotate egress IP / proxy same-hour, and skip the kick.
-    if (autocompleteBlocked()) {
+    if (scoringFailedAlarm) {
+      // Same reasoning as the IP-block carve-out below: more terms cannot fix a scoring
+      // pipeline that drops everything it finds, and each kick spends a prefilter LLM call
+      // for nothing. 6a below is already paging the fix-agent with the real diagnosis.
+      console.log(`[checkin ${day}] → skipping harvest kick: scoring_failed rate ${scoringFailedRatePct.toFixed(0)}% explains the dry passes, more terms won't help`);
+    } else if (autocompleteBlocked()) {
       const bdetail = `autocomplete endpoint IP-blocked (sustained HTTP 403) — the keyword harvest cannot refill the term pool until the block lifts. Skipping the harvest kick (hammering it deepens the block). Remedy is infra: rotate egress IP / proxy, or wait it out.`;
       appendFileSync(OBSERVATIONS, JSON.stringify({ ts: new Date().toISOString(), kind: 'autocomplete_blocked', detail: bdetail, parked }) + '\n');
       console.log(`[checkin ${day}] OBSERVATION autocomplete_blocked — ${bdetail}`);
@@ -376,9 +394,7 @@ async function main(): Promise<void> {
   //       today's rate falls to less than half the trailing baseline AND 6a is NOT already
   //       explaining it — if scoring_failed is already elevated, 6a is the correct, more
   //       specific diagnosis and firing both would just be the same incident reported twice.
-  const yieldStats = recentFinderYield(SCORING_MIN_SAMPLE);
-  const scoringFailedRatePct = yieldStats.newLeads > 0 ? (100 * yieldStats.scoringFailed) / yieldStats.newLeads : 0;
-  const scoringFailedAlarm = yieldStats.newLeads >= SCORING_MIN_SAMPLE && scoringFailedRatePct >= SCORING_FAILED_RATE_PCT;
+  // (yieldStats / scoringFailedRatePct / scoringFailedAlarm are computed above section 5.)
   if (scoringFailedAlarm) {
     anomalies.push({
       kind: 'scoring_failure_rate',
