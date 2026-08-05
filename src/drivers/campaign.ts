@@ -318,7 +318,7 @@ async function evaluateProbes(opts: CampaignOpts): Promise<void> {
 // NOTE: concurrency>1 can create rare duplicate lead rows when the same channel
 // surfaces under terms in two different slices within the race window — run
 // scripts/dedupe-leads.ts after a concurrent session. Default 1 = sequential/safe.
-async function runFinderPasses(opts: CampaignOpts, concurrencyOverride?: number): Promise<{ exit_code: number | null; freshPitchable: number }> {
+async function runFinderPasses(opts: CampaignOpts, concurrencyOverride?: number): Promise<{ exit_code: number | null; freshPitchable: number; newLeads: number; scoringFailed: number; score6Plus: number }> {
   const n = Math.max(1, concurrencyOverride ?? opts.concurrentPasses);
   const runs = Array.from({ length: n }, (_, i) =>
     driveLeadFinder({ force: true, topN: opts.topN, llmCap: opts.llmCap, termOffset: i * opts.topN, dryRun: opts.dryRun }),
@@ -328,7 +328,10 @@ async function runFinderPasses(opts: CampaignOpts, concurrencyOverride?: number)
     ? (results.find(r => r.exit_code !== 0 && r.exit_code !== null)?.exit_code ?? 1)
     : 0;
   const freshPitchable = results.reduce((s, r) => s + (r.yield_breakdown?.score_6_plus_AND_host_identified ?? 0), 0);
-  return { exit_code, freshPitchable };
+  const newLeads = results.reduce((s, r) => s + (r.yield_breakdown?.new_leads ?? 0), 0);
+  const scoringFailed = results.reduce((s, r) => s + (r.yield_breakdown?.by_review_status?.scoring_failed ?? 0), 0);
+  const score6Plus = results.reduce((s, r) => s + (r.yield_breakdown?.score_6_plus ?? 0), 0);
+  return { exit_code, freshPitchable, newLeads, scoringFailed, score6Plus };
 }
 
 export async function driveCampaign(opts: CampaignOpts): Promise<void> {
@@ -446,7 +449,16 @@ export async function driveCampaign(opts: CampaignOpts): Promise<void> {
     }
 
     const freshPitchable = finder.freshPitchable;
-    log({ event: 'finder_run', run, exit: finder.exit_code, fresh_pitchable: freshPitchable, concurrent: opts.concurrentPasses });
+    log({
+      event: 'finder_run',
+      run,
+      exit: finder.exit_code,
+      fresh_pitchable: freshPitchable,
+      concurrent: opts.concurrentPasses,
+      new_leads: finder.newLeads,
+      scoring_failed: finder.scoringFailed,
+      score_6_plus: finder.score6Plus,
+    });
 
     // Fade → pivot to discovery instead of grinding (#3).
     if (!opts.dryRun && finder.exit_code === 0 && freshPitchable < opts.fadeThreshold && opts.discovery) {

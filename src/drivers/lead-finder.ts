@@ -174,7 +174,8 @@ export async function driveLeadFinder(opts: DriverOpts = {}): Promise<LeadFinder
         `[lead-finder] yield: ${breakdown.new_leads} new leads | ` +
           `score≥6: ${breakdown.score_6_plus} | ` +
           `host_identified: ${breakdown.host_identified} | ` +
-          `both: ${breakdown.score_6_plus_AND_host_identified}`
+          `both: ${breakdown.score_6_plus_AND_host_identified} | ` +
+          `scoring_failed: ${breakdown.by_review_status.scoring_failed ?? 0}`
       );
     } catch (e) {
       console.error('[lead-finder] failed to query post-run breakdown:', e);

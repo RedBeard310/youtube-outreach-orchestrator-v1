@@ -142,6 +142,47 @@ function autocompleteBlocked(): boolean {
   return false;
 }
 
+// Scoring-pipeline health thresholds (2026-08-05, the reasoning-token-truncation
+// incident — see youtube-lead-finder-v1/src/scoring/score.ts HOTFIX comment). The
+// checkin ran hourly through 20+ hours of a 76-86% scoring_failed rate and never
+// caught it: recentFinderStats only ever looked at fresh_pitchable, never at
+// scoring_failed or the raw score_6_plus rate. These two checks close that gap.
+const SCORING_FAILED_RATE_PCT = Number(process.env.AUTOPILOT_SCORING_FAILED_RATE_PCT ?? 20);
+const SCORING_MIN_SAMPLE = Number(process.env.AUTOPILOT_SCORING_MIN_SAMPLE ?? 20);
+const PITCHABLE_MIN_SAMPLE = Number(process.env.AUTOPILOT_PITCHABLE_MIN_SAMPLE ?? 40);
+const PITCHABLE_BASELINE_MIN_POINTS = Number(process.env.AUTOPILOT_PITCHABLE_BASELINE_MIN_POINTS ?? 8);
+const PITCHABLE_COLLAPSE_RATIO = Number(process.env.AUTOPILOT_PITCHABLE_COLLAPSE_RATIO ?? 0.5);
+const PITCHABLE_RATE_HIST = join(LOGS, 'autopilot-pitchable-rate-history.jsonl');
+
+// Walk recent finder_run events (newest campaign-*.jsonl first, falling back one day if the
+// window straddles midnight) accumulating new_leads/scoring_failed/score_6_plus until we hit
+// SCORING_MIN_SAMPLE new leads or run out of events, capped at 40 events so a stale/quiet day
+// can't pull in week-old data. This is "after a certain amount of leads" (Casey, 2026-08-05):
+// a rate over 5 new leads is noise; a rate over 40 is a real signal either way.
+function recentFinderYield(minSample: number): { newLeads: number; scoringFailed: number; score6Plus: number; events: number } {
+  const files = readdirSync(LOGS)
+    .filter((f) => /^campaign-\d{4}-\d{2}-\d{2}\.jsonl$/.test(f))
+    .map((f) => join(LOGS, f))
+    .sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs)
+    .slice(0, 2);
+  const runs: Array<Record<string, unknown>> = [];
+  for (const f of files) runs.push(...readEvents(f).filter((e) => e.event === 'finder_run'));
+  runs.sort((a, b) => Date.parse(String(b.ts ?? 0)) - Date.parse(String(a.ts ?? 0)));
+
+  let newLeads = 0, scoringFailed = 0, score6Plus = 0, events = 0;
+  for (const r of runs.slice(0, 40)) {
+    // Older log lines predate this instrumentation (2026-08-05) and won't carry these fields —
+    // skip them rather than silently treating "undefined" as 0 new leads.
+    if (typeof r.new_leads !== 'number') continue;
+    newLeads += r.new_leads;
+    scoringFailed += typeof r.scoring_failed === 'number' ? r.scoring_failed : 0;
+    score6Plus += typeof r.score_6_plus === 'number' ? r.score_6_plus : 0;
+    events += 1;
+    if (newLeads >= minSample) break;
+  }
+  return { newLeads, scoringFailed, score6Plus, events };
+}
+
 interface Attention { ts: string; kind: string; detail: string; evidence?: string }
 function raiseAttention(a: Omit<Attention, 'ts'>): void {
   appendFileSync(ATTENTION, JSON.stringify({ ts: new Date().toISOString(), ...a }) + '\n');
@@ -318,6 +359,51 @@ async function main(): Promise<void> {
     } else if (kickKeywordHarvest('term_starvation_heartbeat')) {
       console.log(`[checkin ${day}] → fired keyword harvest to break the term-supply wall (backstop kick)`);
       appendFileSync(OBSERVATIONS, JSON.stringify({ ts: new Date().toISOString(), kind: 'harvest_kick', detail: 'checkin backstop fired keyword-harvest --apply', parked }) + '\n');
+    }
+  }
+
+  // 6) Scoring-pipeline health (2026-08-05). Two checks over the same recent-yield window:
+  //
+  //   6a. scoring_failed rate — the DIRECT signal. In a healthy pipeline this sits near 0%
+  //       (a stray transient API error here and there); a sustained spike means the scoring
+  //       call itself is broken (bad token budget, bad model/JSON parsing, schema mismatch)
+  //       regardless of what niches are being mined that day. Low false-positive rate, so this
+  //       goes straight to the fix-agent like a fatal signature would.
+  //
+  //   6b. pitchable-rate collapse vs a rolling baseline — Casey's own suggested check ("what %
+  //       came back score>=6, is it below our ~20% average"). Noisier than 6a (term supply,
+  //       niche mix, and market conditions all move this legitimately), so it only fires when
+  //       today's rate falls to less than half the trailing baseline AND 6a is NOT already
+  //       explaining it — if scoring_failed is already elevated, 6a is the correct, more
+  //       specific diagnosis and firing both would just be the same incident reported twice.
+  const yieldStats = recentFinderYield(SCORING_MIN_SAMPLE);
+  const scoringFailedRatePct = yieldStats.newLeads > 0 ? (100 * yieldStats.scoringFailed) / yieldStats.newLeads : 0;
+  const scoringFailedAlarm = yieldStats.newLeads >= SCORING_MIN_SAMPLE && scoringFailedRatePct >= SCORING_FAILED_RATE_PCT;
+  if (scoringFailedAlarm) {
+    anomalies.push({
+      kind: 'scoring_failure_rate',
+      detail: `${yieldStats.scoringFailed}/${yieldStats.newLeads} newly-discovered leads (${scoringFailedRatePct.toFixed(0)}%) came back scoring_failed over the last ${yieldStats.events} finder pass(es) — threshold is ${SCORING_FAILED_RATE_PCT}%. Likely a scoring-pipeline bug (token budget, model config, JSON parsing), not a niche/term-supply issue. See youtube-lead-finder-v1 src/scoring/score.ts and logs for "no JSON object found" / finish_reason "length".`,
+    });
+  } else if (yieldStats.newLeads > 0) {
+    console.log(`[checkin ${day}] scoring_failed rate ${scoringFailedRatePct.toFixed(0)}% (${yieldStats.scoringFailed}/${yieldStats.newLeads}, n=${yieldStats.events} passes) — within normal range`);
+  }
+
+  const pitchableYieldWindow = recentFinderYield(PITCHABLE_MIN_SAMPLE);
+  if (pitchableYieldWindow.newLeads >= PITCHABLE_MIN_SAMPLE) {
+    const rate = pitchableYieldWindow.score6Plus / pitchableYieldWindow.newLeads;
+    appendFileSync(PITCHABLE_RATE_HIST, JSON.stringify({ ts: new Date().toISOString(), rate, sample: pitchableYieldWindow.newLeads }) + '\n');
+    const hist = existsSync(PITCHABLE_RATE_HIST)
+      ? readFileSync(PITCHABLE_RATE_HIST, 'utf8').split('\n').filter((l) => l.trim()).map((l) => { try { return JSON.parse(l) as { ts: string; rate: number; sample: number }; } catch { return null; } }).filter((x): x is { ts: string; rate: number; sample: number } => x !== null)
+      : [];
+    const prior = hist.slice(0, -1); // exclude the point we just appended
+    if (prior.length >= PITCHABLE_BASELINE_MIN_POINTS) {
+      const baseline = prior.reduce((s, p) => s + p.rate, 0) / prior.length;
+      if (baseline > 0 && rate < baseline * PITCHABLE_COLLAPSE_RATIO && !scoringFailedAlarm) {
+        anomalies.push({
+          kind: 'pitchable_rate_collapse',
+          detail: `score>=6 rate is ${(rate * 100).toFixed(1)}% over the last ${pitchableYieldWindow.newLeads} new leads, vs a ${(baseline * 100).toFixed(1)}% trailing baseline (${prior.length} prior check-ins) — less than half. scoring_failed rate is normal (${scoringFailedRatePct.toFixed(0)}%), so this isn't the token-budget bug; likely a scoring-rubric, prefilter, or term-mix regression worth a look.`,
+        });
+      }
     }
   }
 
