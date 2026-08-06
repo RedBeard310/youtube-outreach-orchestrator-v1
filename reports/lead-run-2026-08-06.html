@@ -1,0 +1,222 @@
+<title>Lead Run Debrief — 2026-08-06</title>
+<style>
+  :root {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+      --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+      --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+    --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+    --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 40px 22px 80px; }
+  .eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); font-weight: 600; }
+  h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.12; margin: 10px 0 6px; text-wrap: balance; letter-spacing: -.02em; }
+  h2 { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); margin: 44px 0 16px; font-weight: 700; }
+  h3 { font-size: 18px; margin: 0 0 6px; letter-spacing: -.01em; }
+  p { margin: 0 0 14px; }
+  .lede { font-size: 18px; color: var(--ink-soft); max-width: 68ch; }
+  .tag { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--red-soft); color: var(--red); letter-spacing: .02em; }
+  .tag.ok { background: var(--teal-soft); color: var(--teal); }
+  .tag.warn { background: var(--amber-soft); color: var(--amber); }
+  .grid { display: grid; gap: 14px; }
+  .stats { grid-template-columns: repeat(4, 1fr); margin-top: 26px; }
+  @media (max-width: 720px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; box-shadow: var(--shadow); }
+  .stat .n { font-size: 30px; font-weight: 750; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .stat .l { font-size: 12.5px; color: var(--ink-soft); margin-top: 3px; }
+  .stat .s { font-size: 12px; margin-top: 8px; font-weight: 600; }
+  .up { color: var(--good); } .down { color: var(--red); } .warn { color: var(--amber); }
+  .accent-red { border-left: 3px solid var(--red); }
+  .accent-teal { border-left: 3px solid var(--teal); }
+  .accent-amber { border-left: 3px solid var(--amber); }
+
+  .strip { display: flex; align-items: flex-end; gap: 3px; height: 150px; padding: 14px 14px 10px; overflow-x: auto; }
+  .strip.thin { height: 108px; gap: 2px; }
+  .bar { flex: 1 0 8px; min-width: 6px; border-radius: 2px 2px 0 0; background: var(--red); opacity: .92; position: relative; }
+  .bar.mid { background: var(--amber); }
+  .bar.ok { background: var(--good); }
+  .bar.zero { background: var(--red); height: 4px !important; }
+  .bar.teal { background: var(--teal); }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-soft); padding: 0 14px 14px; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+
+  .q { border-radius: 14px; padding: 20px 22px; margin-bottom: 14px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); }
+  .q .ask { font-size: 17px; font-weight: 700; color: var(--ink); margin-bottom: 10px; display: flex; gap: 10px; align-items: baseline; }
+  .q .ask .qn { color: var(--teal); font-weight: 800; flex: 0 0 auto; }
+  .q p { color: var(--ink-soft); }
+  .q b { color: var(--ink); }
+  .pill { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink); background: var(--panel-2); padding: 1px 7px; border-radius: 6px; border: 1px solid var(--line); white-space: nowrap; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+  th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); }
+  td .num { font-variant-numeric: tabular-nums; font-weight: 650; }
+  .fix td:first-child { color: var(--good); font-weight: 650; }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); box-shadow: var(--shadow); }
+  ol.recs { padding-left: 0; list-style: none; counter-reset: r; margin: 0; }
+  ol.recs li { counter-increment: r; position: relative; padding: 14px 16px 14px 52px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 10px; box-shadow: var(--shadow); }
+  ol.recs li::before { content: counter(r); position: absolute; left: 14px; top: 14px; width: 26px; height: 26px; border-radius: 8px; background: var(--teal-soft); color: var(--teal); font-weight: 800; font-size: 14px; display: grid; place-items: center; }
+  ol.recs b { color: var(--ink); }
+  .foot { margin-top: 46px; padding: 16px 18px; border-radius: 12px; background: var(--amber-soft); border: 1px solid var(--line); font-size: 14px; color: var(--ink-soft); }
+  .foot b { color: var(--ink); }
+  .muted { color: var(--ink-soft); font-size: 13.5px; }
+  code { background: var(--panel-2); border: 1px solid var(--line); border-radius: 5px; padding: 0 5px; font-size: 13px; }
+</style>
+
+<div class="wrap">
+
+  <div class="eyebrow">Lead Run Debrief · YouTube outreach</div>
+  <h1>2026-08-06: the rescue paid for itself, and the new alarm caught its first real bug</h1>
+  <p class="lede">Two things happened, and both of them were yesterday's work landing. The scoring fix held: <b>705 channels scored, 1 failure</b>, and that one was a provider hiccup, not the truncation bug. The rescue of the 733 stranded rows finished at 15:20Z having recovered every one of them, and <b>73% of today's parking landed in the five sessions it was feeding</b>. Parked went <b>3,896 to 4,069, up 173</b>. Then at 05:47Z the collapse alarm built yesterday fired for the first time, correctly, and the hourly fix agent shipped a root cause fix five minutes later.</p>
+  <div style="margin-top:14px"><span class="tag ok">733/733 RESCUED · 0 SCORING FAILURES</span> <span class="tag ok">$0 · STILL RUNNING</span> <span class="tag warn">MOST OF +173 IS RECOVERED, NOT FOUND</span></div>
+
+  <div class="grid stats">
+    <div class="card stat accent-teal">
+      <div class="n">+173</div>
+      <div class="l">parked into <code>approved_hold</code></div>
+      <div class="s up">3,896 → 4,069. Best day since 08-03</div>
+    </div>
+    <div class="card stat accent-teal">
+      <div class="n">0.14%</div>
+      <div class="l">scoring failure rate</div>
+      <div class="s up">1 of 706. Was 78% yesterday</div>
+    </div>
+    <div class="card stat accent-amber">
+      <div class="n">129</div>
+      <div class="l">of 176 parked, before 15:00Z</div>
+      <div class="s warn">The rescue window. After it: ~5 per session</div>
+    </div>
+    <div class="card stat accent-teal">
+      <div class="n">22h</div>
+      <div class="l">from alarm built to first real catch</div>
+      <div class="s up">Fired 05:47Z, fixed 05:52Z, no page</div>
+    </div>
+  </div>
+
+  <h2>The shape of the day</h2>
+  <div class="card" style="padding:0">
+    <div class="strip" id="strip"></div>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--teal)"></span>leads parked while the rescue was still feeding verify</span>
+      <span><span class="dot" style="background:var(--amber)"></span>after the rescue drained, 15:20Z onward</span>
+    </div>
+  </div>
+  <p class="muted">Each bar is one campaign session, in order, 08-05 08:09Z to 08-06 05:14Z. Height is leads parked that session. The first five sessions parked <b>35, 20, 23, 21 and 30</b>. The nine after them parked <b>8, 6, 4, 2, 7, 2, 7, 4, 7</b>. The rescue script ran 06:44Z to 15:20Z, so the drop lines up with it finishing, not with anything going wrong. This is the single most important shape in the report: today's big number is mostly inventory that was already paid for, and the underlying rate once it ran out is about <b>5 leads a session</b>.</p>
+
+  <div class="card" style="padding:0; margin-top:14px">
+    <div class="strip thin" id="strip2"></div>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--red)"></span>scoring failure rate 80% or worse</span>
+      <span><span class="dot" style="background:var(--amber)"></span>40 to 79%</span>
+      <span><span class="dot" style="background:var(--good)"></span>under 40%</span>
+    </div>
+  </div>
+  <p class="muted">The same view yesterday's debrief ended on, extended by a full cycle. 27 sessions, 08-04 08:14Z to 08-06 05:14Z. The wall of red on the left is the token budget bug. Everything from the 04:58Z fix onward is green and stays green: <b>705 scored, 1 failed</b> across today's 14 sessions. The one failure was an OpenRouter 429 on <code>qwen3.7-flash</code> that outlived all five retry attempts, so that channel was skipped rather than written as broken. It left no stranded row: the live <code>scoring_failed</code> backlog is <b>0</b>, verified directly against Airtable.</p>
+
+  <h2>The three questions</h2>
+
+  <div class="q accent-teal">
+    <div class="ask"><span class="qn">Q1</span><span>Did the rescue actually recover leads, or just move rows around?</span></div>
+    <p><b>It recovered leads, and they are the bulk of today's number.</b> All 733 stranded rows were rescored, none failed a second time, and the scores came back real: <span class="pill">188 sevens</span>, <span class="pill">99 nines</span>, <span class="pill">47 sixes</span> and 3 eights, so <b>337 of the 733 were pitchable creators the pipeline had already found and thrown away</b>.</p>
+    <p>Those 337 went straight into the verify lane, which is why the arithmetic of the day looks odd at first. The campaign resolved <b>412 pitchable leads</b> through verify this cycle (142 parked, 270 swept to <code>needs_contact</code>) while only finding <b>143 new ones</b>. The surplus is the rescued cohort clearing. Of today's own fresh discoveries, only <b>56</b> reached <code>approved_hold</code>.</p>
+    <p>One number worth holding onto: the rescued cohort verified at roughly <b>31%</b> against <b>42%</b> for leads found today. Older rows are a colder sample. Recovery is still worth doing, it is just not free money.</p>
+  </div>
+
+  <div class="q accent-amber">
+    <div class="ask"><span class="qn">Q2</span><span>Strip out the rescue. Is finding actually back to normal?</span></div>
+    <p><b>Back to where it was two days ago, yes. Back to where it was five days ago, no.</b> Per productive pass the finder wrote <b>7.1 net-new channels</b> today, against 3.1 on the broken day, 6.6 on 08-04 and 7.1 on 08-03. Fresh pitchable per pass was <b>1.37</b>, against 1.57 on 08-04 and 2.05 on 08-02. So the incident is fully behind us and nothing is limping.</p>
+    <p>The slower story underneath is a gentle slide. Pitchable per day across the four clean days reads <span class="pill">313</span>, <span class="pill">259</span>, <span class="pill">184</span>, <span class="pill">143</span>. That is about a fifth lost each day, on a term table that is still growing (14,609 to 15,067 terms across the cycle, so the harvest is working). Terms are being added faster than they are converting. Worth watching for two more cycles before treating it as a wall.</p>
+    <p>The mix stayed where it has been: <b>Real Estate 37</b>, <b>Legal 31</b>, <b>Health clinics 16</b>, <b>Financial planning 10</b>, which is 66% of the day's pitchable in four niches.</p>
+  </div>
+
+  <div class="q accent-teal">
+    <div class="ask"><span class="qn">Q3</span><span>Yesterday's rec was "watch the new alarms actually fire." Did they?</span></div>
+    <p><b>One did, within 22 hours, and it was right.</b> At 05:47Z the <code>pitchable_rate_collapse</code> detector logged its first real anomaly: score-6-plus rate had fallen to <b>7.5% over the last 67 new leads against a 23% trailing baseline</b>, with the scoring failure rate normal, so it correctly ruled out the token budget bug and pointed at the term mix instead.</p>
+    <p>The hourly fix agent picked it up at 05:52Z and found the cause. Probe terms were winning promotion on samples of one or two channels, so a term that returned 2 candidates and qualified 1 scored a 0.5 qualified rate and outranked terms proven over hundreds of runs. Off-target terms (addiction and rehab intervention, dual diagnosis, aviation licensing, Whop course selling) had climbed into the active pool on pure noise. The fix floors the denominator at 20 channels for both priority scoring and promotion verdicts, and small probes now sit in a "building sample" bucket instead of being judged early.</p>
+    <p>That is the loop working the way it was designed: a free detector spotted it, a cheap agent diagnosed and shipped it, nothing paged, and it cost <b>$0 on Anthropic</b>. The scoring failure alarm did not fire, correctly, because the rate was 0.14%.</p>
+  </div>
+
+  <h2>What broke, and where it stands</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Issue</th><th>Mechanism</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr class="fix"><td>733 rows stranded without a score</td><td>Rows written during the 08-04/05 token budget bug kept <code>scoring_failed</code> until rescored</td><td class="up">Cleared. 733 of 733 rescored by 15:20Z, 337 of them pitchable. Live backlog verified at 0</td></tr>
+        <tr class="fix"><td>Probes promoted on samples of one or two channels</td><td>A term returning 2 candidates and qualifying 1 read as a 0.5 qualified rate, outranking terms proven over hundreds of runs</td><td class="up">Fixed 05:52Z by the check-in agent: qualified-rate denominator floored at 20 for priority and promotion; smaller probes wait in a "building sample" bucket</td></tr>
+        <tr class="fix"><td>Recovering a scoring outage needed a human to notice</td><td>The rescue was a hand-launched script. Nothing swept <code>scoring_failed</code> on its own, so leads sat stranded for 30h</td><td class="up">Fixed today: every campaign session now ends by rescuing stranded rows, but only when its own passes prove the scorer is currently healthy. Bounded and resumable</td></tr>
+        <tr><td>Pitchable per day sliding: 313, 259, 184, 143</td><td>The term table keeps growing but new terms convert worse than the ones they replace</td><td class="warn">Watch. Not a fault, and per-pass finding is back to the 08-03 level. Two more cycles before calling it</td></tr>
+        <tr><td>Every one of 104 passes registered as a "fade"</td><td>The fade threshold is 12 fresh pitchable per pass; the best pass all cycle hit 6, so the signal is always on</td><td class="warn">Harmless today, because both things a fade triggers are separately gated (2h harvest floor, discovery dry-guard skipped 73 of 104). Left alone on purpose: the gates are tuned and the fade itself costs nothing</td></tr>
+        <tr><td>Outlet gap: 8,877 parked, 0 sent</td><td>No send process for <code>approved_hold</code>, no recovery engine for <code>needs_contact</code></td><td class="down">Open, seventh day. Needs Casey's call, not a build</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Recommended next, ranked</h2>
+  <ol class="recs">
+    <li><b>Decide the send outlet for <code>approved_hold</code>.</b> <span class="pill">4,069</span> prepped, validated leads. This has been the top unanswered question for a week and today made it sharper: the pipeline just proved it can recover 337 leads out of a hole in eight hours, and every one of them is now sitting in the same pile as the other four thousand.</li>
+    <li><b>Build the <code>needs_contact</code> recovery engine.</b> <span class="pill">4,808</span> scored creators with no verifiable email, and it grew by 270 today alone. It now holds more leads than <code>approved_hold</code> does. Still the biggest unbuilt lever, still deferred.</li>
+    <li><b>Watch the pitchable slide for two more cycles.</b> 313, 259, 184, 143 across the clean days. If it keeps sliding while the term table keeps growing, the problem is term quality, not term count, and the answer is the frontier vertical list rather than more harvesting.</li>
+    <li><b>Confirm the auto-rescue fires the first time it is needed.</b> It ships in the next session, and it is deliberately hard to trigger: it needs at least 25 new leads in the session, a scoring failure rate under 20%, and something actually stranded. The backlog is 0 right now, so the first real test will be the next time scoring has a bad hour.</li>
+    <li><b>Meter OpenRouter spend as a first-class cost.</b> The burn ledger is Anthropic-only by design, so <code>$0</code> still reads as "the pipeline is free." Today's rescue alone spent 1,229 model calls that no ledger records.</li>
+  </ol>
+
+  <div class="foot">
+    <b>Status caveat:</b> everything is <b>parked</b>, nothing sent. <code>approved_hold</code> is now <b>4,069</b> and <code>needs_contact</code> <b>4,808</b>, so <b>8,877 leads parked, 0 sent</b>. The loop ran <b>14 sessions</b>, all 14 finished on the wall-clock budget, with <b>0 hard stops, 0 quota stops, 0 fatal signatures</b> and <b>$0 Anthropic</b>. It is <b>still running</b> for the next cycle. Two fixes shipped today across two repos, both typecheck-clean. The rescue path was run live to confirm it loads and exits cleanly, and the empty backlog was verified with a direct Airtable count rather than inferred from the logs. The auto-rescue trigger itself has not yet fired in production, because there is currently nothing stranded for it to find.
+  </div>
+
+</div>
+
+<script>
+  // Leads parked per campaign session, chronological, from the `done` events in
+  // logs/campaign-2026-08-0{5,6}.jsonl (cycle window 08-05 07:00Z to 08-06 07:00Z).
+  // The first five sessions overlap the rescore-failed rescue pass (06:44Z to 15:20Z).
+  var parked = [35, 20, 23, 21, 30, 8, 6, 4, 2, 7, 2, 7, 4, 7];
+  var RESCUE_SESSIONS = 5;
+  var pmax = Math.max.apply(null, parked);
+  var strip = document.getElementById('strip');
+  parked.forEach(function (v, i) {
+    var b = document.createElement('div');
+    b.className = 'bar ' + (i < RESCUE_SESSIONS ? 'teal' : 'mid');
+    b.style.height = Math.max(4, Math.round((v / pmax) * 100)) + '%';
+    b.title = v + ' parked' + (i < RESCUE_SESSIONS ? ' (rescue still feeding verify)' : '');
+    strip.appendChild(b);
+  });
+
+  // Scoring failure rate per campaign session across TWO cycles, from the finder
+  // RUN SUMMARY blocks in logs/autopilot-sessions/*.log. [scored_ok, scoring_failed].
+  // First 13 are the 08-05 cycle (carried from yesterday's debrief); last 14 are today.
+  var sessions = [
+    [14,20],[33,77],[4,24],[4,74],[3,82],[9,84],[4,57],[27,54],[9,16],[10,48],[2,25],[28,19],[13,0],
+    [64,0],[20,0],[77,0],[26,0],[57,0],[28,0],[71,1],[22,0],[76,0],[24,0],[66,0],[46,0],[82,0],[46,0]
+  ];
+  var strip2 = document.getElementById('strip2');
+  sessions.forEach(function (s) {
+    var total = s[0] + s[1];
+    var pct = total ? Math.round((100 * s[1]) / total) : 0;
+    var b = document.createElement('div');
+    b.className = 'bar' + (pct >= 80 ? '' : pct >= 40 ? ' mid' : ' ok');
+    b.style.height = Math.max(4, pct) + '%';
+    b.title = pct + '% failed (' + s[1] + ' failed / ' + total + ' attempts)';
+    strip2.appendChild(b);
+  });
+</script>
