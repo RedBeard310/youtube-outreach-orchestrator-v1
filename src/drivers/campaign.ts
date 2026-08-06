@@ -313,6 +313,61 @@ async function evaluateProbes(opts: CampaignOpts): Promise<void> {
   log({ event: 'evaluate_probes', exit: r.exit_code });
 }
 
+// Rescue rows stranded at review_status=scoring_failed (2026-08-06).
+//
+// WHY THIS IS AUTOMATIC NOW. On 08-04/05 a scoring token-budget bug wrote 733 rows as
+// scoring_failed over ~30h. Those are real prospect rows that simply never got a score,
+// so nothing was lost — but nothing swept them either: recovery took a HAND-LAUNCHED
+// `scripts/rescore-failed.ts`, and the leads sat stranded until a human noticed. The
+// rescue itself worked (733/733 rescored, 337 of them score >= 6, and they are a large
+// part of today's +173 parked), which is exactly why it should not depend on a human
+// noticing. Any future scoring outage — a model swap, a provider having a bad hour, a
+// rubric change — now self-heals on the next session.
+//
+// SAFETY. Rescoring while the scorer is broken burns LLM calls to re-fail every row, so
+// this only fires when THIS session's own passes prove scoring currently works:
+//   • a real sample of newly-discovered leads (RESCUE_MIN_SAMPLE), and
+//   • a scoring_failed rate under RESCUE_MAX_FAIL_RATE_PCT.
+// The child is additionally wall-clock-bounded (RESCUE_MAX_MINUTES) and self-aborts on a
+// run of consecutive failures (its exit 4). It is naturally resumable — it re-queries
+// whatever is still stranded on each start — so a bounded slice per session drains a big
+// backlog over a few sessions without ever blocking one session for hours.
+async function rescueScoringFailed(
+  opts: CampaignOpts,
+  health: { newLeads: number; scoringFailed: number },
+): Promise<void> {
+  const maxMinutes = Number(process.env.RESCUE_MAX_MINUTES ?? 20);
+  if (maxMinutes <= 0) return; // explicitly disabled
+  if (opts.dryRun) {
+    console.log(`[campaign] DRY RUN — would rescue stranded scoring_failed rows: npx tsx scripts/rescore-failed.ts --max-minutes ${maxMinutes}`);
+    return;
+  }
+
+  const minSample = Number(process.env.RESCUE_MIN_SAMPLE ?? 25);
+  const maxFailPct = Number(process.env.RESCUE_MAX_FAIL_RATE_PCT ?? 20);
+  const failPct = health.newLeads > 0 ? (100 * health.scoringFailed) / health.newLeads : 0;
+
+  if (health.newLeads < minSample) {
+    console.log(`[campaign] scoring_failed rescue skipped — only ${health.newLeads} new leads this session (< ${minSample}), not enough evidence the scorer is healthy.`);
+    log({ event: 'rescue_scoring_failed', skipped: true, reason: 'insufficient_sample', new_leads: health.newLeads });
+    return;
+  }
+  if (failPct >= maxFailPct) {
+    console.warn(`[campaign] scoring_failed rescue skipped — this session's own scoring_failed rate is ${failPct.toFixed(0)}% (>= ${maxFailPct}%). Rescoring would re-fail every row; fix scoring first.`);
+    log({ event: 'rescue_scoring_failed', skipped: true, reason: 'scorer_unhealthy', fail_pct: Number(failPct.toFixed(1)), new_leads: health.newLeads });
+    return;
+  }
+
+  console.log(`[campaign] rescuing stranded scoring_failed rows (scorer healthy: ${failPct.toFixed(0)}% failures over ${health.newLeads} new leads; budget ${maxMinutes}min)…`);
+  const r = await runChild('npx', ['tsx', 'scripts/rescore-failed.ts', '--max-minutes', String(maxMinutes)], finderRepo());
+  log({ event: 'rescue_scoring_failed', skipped: false, exit: r.exit_code, max_minutes: maxMinutes, fail_pct: Number(failPct.toFixed(1)) });
+  if (r.exit_code === 4) {
+    console.error('[campaign] rescue aborted — the scoring pipeline still looks broken (see the finder log). Non-fatal; the next session re-checks.');
+  } else if (r.exit_code !== 0) {
+    console.error(`[campaign] rescue exited ${r.exit_code} (non-fatal; retries next session).`);
+  }
+}
+
 // Run N finder passes over DISJOINT term slices concurrently (offset 0, topN,
 // 2·topN…). Returns an aggregate: worst exit code + summed fresh-pitchable yield.
 // NOTE: concurrency>1 can create rare duplicate lead rows when the same channel
@@ -376,6 +431,10 @@ export async function driveCampaign(opts: CampaignOpts): Promise<void> {
   let consecutiveFinderFailures = 0;
   let fadeCount = 0; // fades since the last mid-run evaluate-probes (#3)
   const probeEvalEveryFades = Number(process.env.PROBE_EVAL_EVERY_FADES ?? 3);
+  // Session-level scoring health, accumulated across passes. Used at finish time to
+  // decide whether it is safe to rescue rows stranded at scoring_failed.
+  let sessionNewLeads = 0;
+  let sessionScoringFailed = 0;
   const startedMs = Date.now();
   const elapsedMin = () => (Date.now() - startedMs) / 60000;
   let lastPassMin = 0; // wall-clock of the previous finder pass, for deadline reservation
@@ -449,6 +508,8 @@ export async function driveCampaign(opts: CampaignOpts): Promise<void> {
     }
 
     const freshPitchable = finder.freshPitchable;
+    sessionNewLeads += finder.newLeads;
+    sessionScoringFailed += finder.scoringFailed;
     log({
       event: 'finder_run',
       run,
@@ -510,6 +571,10 @@ export async function driveCampaign(opts: CampaignOpts): Promise<void> {
   await verifyPending(opts, seen);
   await promoteSeen(opts, seen);
   await evaluateProbes(opts);
+  // Last, because it is the only step that can be skipped without costing this session
+  // anything: sweep any rows stranded at scoring_failed back through the (now verified
+  // healthy) scorer. Bounded + resumable — see rescueScoringFailed above.
+  await rescueScoringFailed(opts, { newLeads: sessionNewLeads, scoringFailed: sessionScoringFailed });
 
   const endParked = opts.dryRun ? 0 : await countByReviewStatus('approved_hold');
   const finalGain = endParked - startParked;
