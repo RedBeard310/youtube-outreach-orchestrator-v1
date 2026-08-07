@@ -22,6 +22,20 @@ CHAINLOG=$DIR/chain.log
 
 log() { echo "[$(date -u +%FT%TZ)] $*" >>"$CHAINLOG"; }
 
+# Supadata preflight (added 2026-08-07): enrichment dies at the transcript stage
+# when the Supadata plan quota is exhausted (the 2026-08-05 incident burned 187
+# leads' retry budget in ~70 min). Probe before every batch; while limited, WAIT
+# instead of launching. This also makes the chain safe against well-meaning
+# restarts from other sessions — relaunching it while Supadata is down just waits.
+supadata_ok() {
+  local code
+  code=$(cd /home/casey/repos/quick-youtube-channel-research-v1 && node -e '
+require("dotenv/config");
+fetch("https://api.supadata.ai/v1/transcript?url=https://www.youtube.com/watch?v=dQw4w9WgXcQ",{headers:{"x-api-key":(process.env.SUPADATA_API_KEY||"").trim()}}).then(r=>{console.log(r.status);}).catch(()=>{console.log("ERR");});
+' 2>/dev/null)
+  [ "$code" = "200" ]
+}
+
 log "chain started (pid $$, batch size ${BACKFILL_BATCH_SIZE:-500})"
 
 # Let any already-running batch finish before taking over.
@@ -35,6 +49,15 @@ while true; do
   if [ -f "$HALT" ]; then
     log "halt flag present — stopping"
     exit 0
+  fi
+
+  if ! supadata_ok; then
+    log "supadata limit still active — waiting (probe every 30m, silent until it clears)"
+    while ! supadata_ok; do
+      [ -f "$HALT" ] && { log "halt flag present — stopping"; exit 0; }
+      sleep 1800
+    done
+    log "supadata is back — resuming batches"
   fi
 
   fetch_out=$(cd "$EMAIL" && node "$ORCH/scripts/backfill/next-batch-ids.cjs" 2>&1)
