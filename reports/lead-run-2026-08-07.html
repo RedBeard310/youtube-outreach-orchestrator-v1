@@ -1,0 +1,220 @@
+<title>Lead Run Debrief — 2026-08-07</title>
+<style>
+  :root {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+      --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+      --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+    --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+    --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 40px 22px 80px; }
+  .eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); font-weight: 600; }
+  h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.12; margin: 10px 0 6px; text-wrap: balance; letter-spacing: -.02em; }
+  h2 { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); margin: 44px 0 16px; font-weight: 700; }
+  h3 { font-size: 18px; margin: 0 0 6px; letter-spacing: -.01em; }
+  p { margin: 0 0 14px; }
+  .lede { font-size: 18px; color: var(--ink-soft); max-width: 68ch; }
+  .tag { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--red-soft); color: var(--red); letter-spacing: .02em; }
+  .tag.ok { background: var(--teal-soft); color: var(--teal); }
+  .tag.warn { background: var(--amber-soft); color: var(--amber); }
+  .grid { display: grid; gap: 14px; }
+  .stats { grid-template-columns: repeat(4, 1fr); margin-top: 26px; }
+  @media (max-width: 720px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; box-shadow: var(--shadow); }
+  .stat .n { font-size: 30px; font-weight: 750; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .stat .l { font-size: 12.5px; color: var(--ink-soft); margin-top: 3px; }
+  .stat .s { font-size: 12px; margin-top: 8px; font-weight: 600; }
+  .up { color: var(--good); } .down { color: var(--red); } .warn { color: var(--amber); }
+  .accent-red { border-left: 3px solid var(--red); }
+  .accent-teal { border-left: 3px solid var(--teal); }
+  .accent-amber { border-left: 3px solid var(--amber); }
+
+  .strip { display: flex; align-items: flex-end; gap: 3px; height: 150px; padding: 14px 14px 10px; overflow-x: auto; }
+  .strip.thin { height: 108px; gap: 6px; }
+  .bar { flex: 1 0 8px; min-width: 6px; border-radius: 2px 2px 0 0; background: var(--red); opacity: .92; position: relative; }
+  .bar.mid { background: var(--amber); }
+  .bar.ok { background: var(--good); }
+  .bar.zero { background: var(--red); height: 4px !important; }
+  .bar.teal { background: var(--teal); }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-soft); padding: 0 14px 14px; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+
+  .q { border-radius: 14px; padding: 20px 22px; margin-bottom: 14px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); }
+  .q .ask { font-size: 17px; font-weight: 700; color: var(--ink); margin-bottom: 10px; display: flex; gap: 10px; align-items: baseline; }
+  .q .ask .qn { color: var(--teal); font-weight: 800; flex: 0 0 auto; }
+  .q p { color: var(--ink-soft); }
+  .q b { color: var(--ink); }
+  .pill { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink); background: var(--panel-2); padding: 1px 7px; border-radius: 6px; border: 1px solid var(--line); white-space: nowrap; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+  th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); }
+  td .num { font-variant-numeric: tabular-nums; font-weight: 650; }
+  .fix td:first-child { color: var(--good); font-weight: 650; }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); box-shadow: var(--shadow); }
+  ol.recs { padding-left: 0; list-style: none; counter-reset: r; margin: 0; }
+  ol.recs li { counter-increment: r; position: relative; padding: 14px 16px 14px 52px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 10px; box-shadow: var(--shadow); }
+  ol.recs li::before { content: counter(r); position: absolute; left: 14px; top: 14px; width: 26px; height: 26px; border-radius: 8px; background: var(--teal-soft); color: var(--teal); font-weight: 800; font-size: 14px; display: grid; place-items: center; }
+  ol.recs b { color: var(--ink); }
+  .foot { margin-top: 46px; padding: 16px 18px; border-radius: 12px; background: var(--amber-soft); border: 1px solid var(--line); font-size: 14px; color: var(--ink-soft); }
+  .foot b { color: var(--ink); }
+  .muted { color: var(--ink-soft); font-size: 13.5px; }
+  code { background: var(--panel-2); border: 1px solid var(--line); border-radius: 5px; padding: 0 5px; font-size: 13px; }
+</style>
+
+<div class="wrap">
+
+  <div class="eyebrow">Lead Run Debrief · YouTube outreach</div>
+  <h1>2026-08-07: the machine threw away its own bad terms, then discovered it had nothing left to fall back on</h1>
+  <p class="lede">The hourly fix agent fired twice today and was right both times. At 13:00Z it retired <b>2,101 search terms</b> that were pulling in consumer curiosity instead of business creators. That was the correct call, and the quality numbers held. But it left the active term pool at <b>28 terms out of a book of 15,397</b>, and the safety net built for exactly this moment turned out to be empty. Seven of the day's fourteen sessions hard-stopped with nothing to search. Parked came in at <b>+32</b>, the lowest of the run.</p>
+  <div style="margin-top:14px"><span class="tag warn">+32 PARKED · LOWEST OF THE RUN</span> <span class="tag ok">$0 · 0 FATAL SIGNATURES · STILL RUNNING</span> <span class="tag">28 ACTIVE TERMS OF 15,397</span></div>
+
+  <div class="grid stats">
+    <div class="card stat accent-amber">
+      <div class="n">+32</div>
+      <div class="l">parked into <code>approved_hold</code></div>
+      <div class="s warn">4,069 → 4,101. Was +173</div>
+    </div>
+    <div class="card stat accent-red">
+      <div class="n">7 of 14</div>
+      <div class="l">sessions hard-stopped, all on term supply</div>
+      <div class="s down">0 yesterday. All in the back half</div>
+    </div>
+    <div class="card stat accent-red">
+      <div class="n">28</div>
+      <div class="l">active terms left in the book</div>
+      <div class="s down">13,251 paused, 2,118 retired</div>
+    </div>
+    <div class="card stat accent-teal">
+      <div class="n">8.6</div>
+      <div class="l">net-new channels per productive pass</div>
+      <div class="s up">Up from 7.1. Efficiency rose</div>
+    </div>
+  </div>
+
+  <h2>The shape of the day</h2>
+  <div class="card" style="padding:0">
+    <div class="strip" id="strip"></div>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--teal)"></span>reservoir stocked, session ran its full time budget</span>
+      <span><span class="dot" style="background:var(--red)"></span>reservoir short, session hard-stopped on empty term pool</span>
+    </div>
+  </div>
+  <p class="muted">Each bar is one campaign session in order, height is leads parked. The day splits at <b>15:25Z</b>, and the split is sharp. Every session before it opened with a stocked reservoir and ran its full 83 to 118 minutes. Every session after it opened short and seven of them aborted early with <code>term_supply_exhausted</code>. The six stocked sessions parked <b>21</b> between them; the eight starved ones parked <b>12</b>. Two of the starved sessions gave up after <b>two passes</b>, roughly 90 seconds of work before the loop went back to sleep. The wall arrived about two hours after the 13:00Z term retirement, which is how long the remaining pool took to burn down.</p>
+
+  <div class="card" style="padding:0; margin-top:14px">
+    <div class="strip thin" id="strip2"></div>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--good)"></span>pitchable creators found per day, 08-02 through today</span>
+    </div>
+  </div>
+  <p class="muted">The slide yesterday's debrief asked to watch for two more cycles: <b>313, 259, 184, 143, 110</b>. It kept sliding. The important qualifier is that today's drop is a <b>volume</b> drop, not a quality one. The share of discoveries worth pitching held at <b>19.3%</b> against 20.1% yesterday, and net-new channels per productive pass actually <b>rose</b> from 7.1 to 8.6. The machine got better at searching and ran out of things to search for.</p>
+
+  <h2>The three questions</h2>
+
+  <div class="q accent-amber">
+    <div class="ask"><span class="qn">Q1</span><span>Parking fell from +173 to +32. Is something broken?</span></div>
+    <p><b>No. It ran out of search terms, and the reserve that was supposed to cover that was already spent.</b> At 13:00Z the hourly agent retired 2,101 active terms after tracing a pitchable-rate collapse to the keyword prefilter: <b>93% of the active pool sat in five niches</b> and was almost entirely personal-curiosity searches like "cessna 150 cost of ownership" and "yacht running costs", not business-creator content. Retiring them was right. It also took the pool from roughly 2,233 terms to 132.</p>
+    <p>What should have happened next is the anti-starvation floor built on 2026-07-10 pulling good paused terms back in. It didn't, and it said so plainly: <b>30 times this cycle</b> the finder logged <code>NO never-run paused terms remain</code>. That floor only ever revives terms that have <b>never been run</b>, and that reserve drains permanently, because every term eventually gets a run. It emptied at some point and quietly stopped being a safety net.</p>
+    <p>Counted directly against the live term book: <span class="pill">15,397 terms</span>, of which <span class="pill">28 active</span>, <span class="pill">13,251 paused</span> and <span class="pill">2,118 retired</span>. Sitting inside those 13,251 were <b>3,348 proven converters</b> that had cooled for three weeks or more, including terms measured at 13 to 19% qualified rate whose last run was in July. The finder hard-stopped seven times while that was on the shelf.</p>
+  </div>
+
+  <div class="q accent-teal">
+    <div class="ask"><span class="qn">Q2</span><span>Was throwing away 2,101 terms actually the right call?</span></div>
+    <p><b>Yes, and the numbers back it.</b> On the terms that survived, the pitchable rate held at <b>19.3%</b> (110 of 571) against 20.1% yesterday, and net-new channels per productive pass went <b>up</b>, 7.1 to 8.6. Cutting a third of the pool cost volume and cost nothing in quality, which is what you'd expect if the cut terms were genuinely junk.</p>
+    <p>The agent fired a second time at 00:03Z on a recurrence with a different cause, and that one is worth knowing about. The keyword harvest only deduplicates on the <b>exact string</b>, so autocomplete's expansion of one popular branch, "solicitor for defamation of character", exploded into about 32 respellings of the same query: "lawyer for defamation lawsuit", "civil attorney for defamation of character", and so on, most returning under 7 channels each. By 23:47Z <b>12 of the pool's 18 active terms were respellings of one branch</b>. The fix collapses role-word synonyms to a single phrase signature and caps how many variants of one shape get written. It had happened on four separate days before anyone noticed.</p>
+    <p>The niche mix stayed where it lives: <b>Legal 22</b>, <b>Health clinics 14</b>, <b>Manufacturing 10</b>, <b>Real Estate 9</b>, which is 50% of the day's pitchable in four niches.</p>
+  </div>
+
+  <div class="q accent-teal">
+    <div class="ask"><span class="qn">Q3</span><span>Yesterday's rec was "confirm the auto-rescue fires when something is actually stranded." Did it?</span></div>
+    <p><b>The trigger works. The recovery is still untested, because nothing got stranded.</b> The auto-rescue shipped yesterday evaluated itself <b>12 times</b>. It ran on <b>5</b> of them and exited clean each time with a measured scoring failure rate of <b>0%</b>. It correctly declined the other 7, all with <code>insufficient_sample</code>, because those sessions had produced too few new leads to prove the scorer was healthy: <b>0, 0, 0, 5, 17 and 24 new leads</b> against a threshold of 25.</p>
+    <p>Two of those refusals sat at 17 and 24, just under the bar, on sessions that were short because the term pool was dry. That is the guard doing its job rather than a tuning problem: a session that barely ran is exactly the session whose scoring health you shouldn't trust.</p>
+    <p>Scoring itself stayed perfect for a second day: <b>0 failures, 0.0%</b>, no stranded rows, no fatal signatures for the eighth straight cycle, and <b>$0 on Anthropic</b>.</p>
+  </div>
+
+  <h2>What broke, and where it stands</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Issue</th><th>Mechanism</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr class="fix"><td>The anti-starvation floor had no reserve left</td><td>It only revives terms with <code>runs_executed = 0</code>. That pool drains permanently, since every term eventually gets a run. It emptied and kept reporting empty, 30 times this cycle</td><td class="up">Fixed today. A second tier revives proven paused terms that have cooled 21 days or more, ranked by measured qualified rate. 3,348 currently qualify</td></tr>
+        <tr class="fix"><td>A 28-term pool read as healthy</td><td>Starvation was detected on term <i>rank</i> only, so a handful of high-priority terms looked fine right up until the pool emptied and the finder aborted "No active terms"</td><td class="up">Fixed today. Starvation now also trips on pool <i>size</i> (<code>STARVATION_MIN_POOL</code>, default 12)</td></tr>
+        <tr class="fix"><td>2,101 terms were pulling consumer curiosity, not creators</td><td>The prefilter's flight-school golden example contradicted its own hands-on-delivery test, and the model generalized it into "keep everything in this niche"</td><td class="up">Fixed 13:00Z by the check-in agent. Terms retired, prefilter skill corrected. Pitchable rate held at 19.3% afterwards</td></tr>
+        <tr class="fix"><td>One search branch cloned itself into the whole pool</td><td>Harvest deduplicates on exact string only, so 32 respellings of "solicitor for defamation of character" all counted as distinct. By 23:47Z they were 12 of 18 active terms. Had recurred on four separate days</td><td class="up">Fixed 00:03Z by the check-in agent. Role-word synonyms now collapse to one phrase signature with a per-shape cap</td></tr>
+        <tr><td>Term refuel is running far below burn</td><td>Eleven harvest runs mined thousands of net-new autocomplete phrases and wrote <b>199 probes</b> between them: 5, 76, 10, 19, 50, 0, 3, 0, 12, 23, 1. The prefilter swung from keeping too much to keeping roughly 1 to 2%</td><td class="warn">Watch. This is now the real ceiling on supply, and today's fix buys time against it rather than solving it</td></tr>
+        <tr><td>Pitchable per day still sliding: 313, 259, 184, 143, 110</td><td>Volume, not quality. Rate held at 19.3% and per-pass finding improved</td><td class="warn">Watch. Third cycle. Today's cause is understood, so the next clean cycle is the real reading</td></tr>
+        <tr><td>Outlet gap: 8,979 parked, 0 sent</td><td>No send process for <code>approved_hold</code>, no recovery engine for <code>needs_contact</code></td><td class="down">Open, eighth day. Needs Casey's call, not a build</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Recommended next, ranked</h2>
+  <ol class="recs">
+    <li><b>Decide the send outlet for <code>approved_hold</code>.</b> <span class="pill">4,101</span> prepped, validated leads, none of them sent. Eighth day at the top of this list. Today the machine went to some trouble to add 32 more to a pile nothing draws from.</li>
+    <li><b>Build the <code>needs_contact</code> recovery engine.</b> <span class="pill">4,878</span> scored creators with no verifiable email, up 70 today. It is now the larger of the two piles and it grew on a day when finding barely worked.</li>
+    <li><b>Watch the second-chance revive next cycle.</b> It should show up as fewer than seven hard stops and a batch of revived proven terms in the session logs. The number to judge it on is whether the revived cohort converts, since these terms were paused for looking saturated and the bet is that saturation decays.</li>
+    <li><b>Fix the term refuel rate, which is now the real ceiling.</b> Harvest wrote 199 terms across 11 runs today. Before the prefilter correction it was writing up to its 200-per-run cap. Somewhere between "keep the yacht searches" and "keep 1%" there is a calibrated setting, and finding it needs an eval against labeled terms rather than another live swing.</li>
+    <li><b>Meter OpenRouter spend as a first-class cost.</b> The burn ledger is Anthropic-only by design, so <code>$0</code> still reads as "the pipeline is free". Every scoring, prefilter and discovery call today was unrecorded.</li>
+  </ol>
+
+  <div class="foot">
+    <b>Status caveat:</b> everything is <b>parked</b>, nothing sent. <code>approved_hold</code> is <b>4,101</b> and <code>needs_contact</code> <b>4,878</b>, so <b>8,979 leads parked, 0 sent</b>. The loop ran <b>14 sessions</b> and <b>93 finder passes</b>, with <b>7 hard stops (all term supply), 0 quota stops, 0 fatal signatures</b> and <b>$0 Anthropic</b>. It is <b>still running</b> for the next cycle. One fix shipped today, in the finder, typecheck clean. The term book counts (15,397 total, 28 active, 13,251 paused, 2,118 retired) and the 3,348-term revive reserve were counted directly against live Airtable, not inferred from logs, and the new revive filter was run read-only against the live book before shipping. The revive itself has <b>not</b> fired in production yet, because it only triggers on a starved pool and the next session has to reach that state on its own.
+  </div>
+
+</div>
+
+<script>
+  // Leads parked per campaign session, chronological, from the `done` events in
+  // logs/campaign-2026-08-0{6,7}.jsonl (cycle window 08-06 07:00Z to 08-07 07:00Z).
+  // Sessions 7 onward opened with a STOCK-UP reservoir; 7 of those 8 hard-stopped
+  // on term_supply_exhausted.
+  var parked = [1, 3, 2, 9, 0, 6, 1, 1, 0, 5, 0, 0, 3, 2];
+  var STOCKED_SESSIONS = 6;
+  var pmax = Math.max.apply(null, parked);
+  var strip = document.getElementById('strip');
+  parked.forEach(function (v, i) {
+    var b = document.createElement('div');
+    b.className = 'bar ' + (i < STOCKED_SESSIONS ? 'teal' : '');
+    b.style.height = Math.max(4, Math.round((v / pmax) * 100)) + '%';
+    b.title = v + ' parked' + (i < STOCKED_SESSIONS ? ' (reservoir stocked)' : ' (reservoir short)');
+    strip.appendChild(b);
+  });
+
+  // Pitchable creators discovered per cycle, from each day's debrief JSON
+  // (discovered_today.pitchable_score_ge6). 08-05 omitted: the scoring outage
+  // made that day's 48 a floor reading, not a measurement.
+  var daily = [
+    ['08-02', 313], ['08-03', 259], ['08-04', 184], ['08-06', 143], ['08-07', 110]
+  ];
+  var dmax = Math.max.apply(null, daily.map(function (d) { return d[1]; }));
+  var strip2 = document.getElementById('strip2');
+  daily.forEach(function (d) {
+    var b = document.createElement('div');
+    b.className = 'bar ok';
+    b.style.height = Math.max(4, Math.round((d[1] / dmax) * 100)) + '%';
+    b.title = d[0] + ': ' + d[1] + ' pitchable';
+    strip2.appendChild(b);
+  });
+</script>
