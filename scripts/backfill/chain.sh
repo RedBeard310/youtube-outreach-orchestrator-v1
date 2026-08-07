@@ -22,16 +22,53 @@ CHAINLOG=$DIR/chain.log
 
 log() { echo "[$(date -u +%FT%TZ)] $*" >>"$CHAINLOG"; }
 
-# Supadata preflight (added 2026-08-07): enrichment dies at the transcript stage
-# when the Supadata plan quota is exhausted (the 2026-08-05 incident burned 187
-# leads' retry budget in ~70 min). Probe before every batch; while limited, WAIT
-# instead of launching. This also makes the chain safe against well-meaning
-# restarts from other sessions — relaunching it while Supadata is down just waits.
+# Supadata preflight (added 2026-08-07, fixed same day): enrichment dies at the
+# transcript stage when the Supadata plan quota is exhausted (the 2026-08-05
+# incident burned 187 leads' retry budget in ~70 min). Probe before every batch;
+# while EVERY configured key is limited, WAIT instead of launching. This also
+# makes the chain safe against well-meaning restarts from other sessions —
+# relaunching it while Supadata is down just waits.
+#
+# Fix (same day): the first version of this probe only ever checked the bare
+# SUPADATA_API_KEY via a plain `dotenv/config` — which finds nothing (this repo
+# has no local .env by design) and never sees the SUPADATA_API_KEY_1/_2 rotation
+# pool added that morning. It always reported "limited" even with a fresh key 2
+# sitting right there. Now it loads the real shared env file (same lookup order
+# as src/lib/load-env.ts) and succeeds if ANY configured key returns 200.
 supadata_ok() {
   local code
-  code=$(cd /home/casey/repos/quick-youtube-channel-research-v1 && node -e '
-require("dotenv/config");
-fetch("https://api.supadata.ai/v1/transcript?url=https://www.youtube.com/watch?v=dQw4w9WgXcQ",{headers:{"x-api-key":(process.env.SUPADATA_API_KEY||"").trim()}}).then(r=>{console.log(r.status);}).catch(()=>{console.log("ERR");});
+  code=$(node -e '
+const { existsSync } = require("fs");
+const { homedir } = require("os");
+const { join } = require("path");
+const dotenv = require("/home/casey/repos/quick-youtube-channel-research-v1/node_modules/dotenv");
+const candidates = [
+  process.env.SHARED_ENV_FILE,
+  join(homedir(), "Claude", "env-storage", ".env"),
+  join(homedir(), "env-storage", ".env"),
+].filter(Boolean);
+const shared = candidates.find((p) => existsSync(p));
+if (shared) dotenv.config({ path: shared });
+
+const keys = [];
+const seen = new Set();
+const add = (v) => { v = (v || "").trim(); if (v && !seen.has(v)) { seen.add(v); keys.push(v); } };
+add(process.env.SUPADATA_API_KEY);
+let gap = 0;
+for (let i = 1; i <= 50; i++) {
+  const v = process.env[`SUPADATA_API_KEY_${i}`];
+  if (v) { gap = 0; add(v); } else if (++gap >= 5) break;
+}
+
+(async () => {
+  for (const key of keys) {
+    try {
+      const r = await fetch("https://api.supadata.ai/v1/transcript?url=https://www.youtube.com/watch?v=dQw4w9WgXcQ", { headers: { "x-api-key": key } });
+      if (r.status === 200) { console.log("200"); return; }
+    } catch {}
+  }
+  console.log(keys.length === 0 ? "NOKEYS" : "ERR");
+})();
 ' 2>/dev/null)
   [ "$code" = "200" ]
 }
