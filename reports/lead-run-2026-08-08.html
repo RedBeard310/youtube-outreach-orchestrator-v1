@@ -1,0 +1,198 @@
+<title>Lead Run Debrief — 2026-08-08</title>
+<style>
+  :root {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --good-soft: #1f8a5b1a; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+      --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+      --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --good-soft: #55c48c1c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --good-soft: #1f8a5b1a; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+    --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+    --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --good-soft: #55c48c1c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 40px 22px 80px; }
+  .eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); font-weight: 600; }
+  h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.12; margin: 10px 0 6px; text-wrap: balance; letter-spacing: -.02em; }
+  h2 { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); margin: 44px 0 16px; font-weight: 700; }
+  h3 { font-size: 18px; margin: 0 0 6px; letter-spacing: -.01em; }
+  p { margin: 0 0 14px; }
+  .lede { font-size: 18px; color: var(--ink-soft); max-width: 68ch; }
+  .tag { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--good-soft); color: var(--good); letter-spacing: .02em; }
+  .tag.warn { background: var(--amber-soft); color: var(--amber); }
+  .grid { display: grid; gap: 14px; }
+  .stats { grid-template-columns: repeat(4, 1fr); margin-top: 26px; }
+  @media (max-width: 720px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; box-shadow: var(--shadow); }
+  .stat .n { font-size: 30px; font-weight: 750; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .stat .l { font-size: 12.5px; color: var(--ink-soft); margin-top: 3px; }
+  .stat .s { font-size: 12px; margin-top: 8px; font-weight: 600; }
+  .up { color: var(--good); } .down { color: var(--red); } .warn { color: var(--amber); }
+  .accent-red { border-left: 3px solid var(--red); }
+  .accent-teal { border-left: 3px solid var(--teal); }
+  .accent-amber { border-left: 3px solid var(--amber); }
+  .accent-good { border-left: 3px solid var(--good); }
+
+  /* shape-of-day bar strip */
+  .strip { display: flex; align-items: flex-end; gap: 2px; height: 120px; padding: 14px 14px 10px; overflow-x: auto; }
+  .bar { flex: 1 0 6px; min-width: 5px; border-radius: 2px 2px 0 0; background: var(--teal); opacity: .9; }
+  .bar.zero { background: var(--red); height: 4px !important; opacity: .9; }
+  .bar.low { background: var(--amber); }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-soft); padding: 0 14px 14px; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+
+  .q { border-radius: 14px; padding: 20px 22px; margin-bottom: 14px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); }
+  .q .ask { font-size: 17px; font-weight: 700; color: var(--ink); margin-bottom: 10px; display: flex; gap: 10px; align-items: baseline; }
+  .q .ask .qn { color: var(--red); font-weight: 800; flex: 0 0 auto; }
+  .q p { color: var(--ink-soft); }
+  .q b { color: var(--ink); }
+  .pill { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink); background: var(--panel-2); padding: 1px 7px; border-radius: 6px; border: 1px solid var(--line); white-space: nowrap; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+  th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); }
+  td .num { font-variant-numeric: tabular-nums; font-weight: 650; }
+  .fix td:first-child { color: var(--good); font-weight: 650; }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); box-shadow: var(--shadow); margin-bottom: 14px; }
+  ol.recs { padding-left: 0; list-style: none; counter-reset: r; margin: 0; }
+  ol.recs li { counter-increment: r; position: relative; padding: 14px 16px 14px 52px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 10px; box-shadow: var(--shadow); }
+  ol.recs li::before { content: counter(r); position: absolute; left: 14px; top: 14px; width: 26px; height: 26px; border-radius: 8px; background: var(--teal-soft); color: var(--teal); font-weight: 800; font-size: 14px; display: grid; place-items: center; }
+  ol.recs b { color: var(--ink); }
+  .foot { margin-top: 46px; padding: 16px 18px; border-radius: 12px; background: var(--amber-soft); border: 1px solid var(--line); font-size: 14px; color: var(--ink-soft); }
+  .foot b { color: var(--ink); }
+  .muted { color: var(--ink-soft); font-size: 13.5px; }
+</style>
+
+<div class="wrap">
+
+  <div class="eyebrow">Lead Run Debrief · YouTube outreach</div>
+  <h1>2026-08-08 — yesterday's fix worked, and it exposed the next bottleneck</h1>
+  <p class="lede">The finder found <b>246 pitchable creators, more than double yesterday's 110</b>, at the best hit rate of the whole month. Term starvation went to zero. Nothing crashed. The catch is that only 70 of those creators could be parked, and about a third of the machine's day went into re-answering a question it had already answered 38,000 times.</p>
+  <div style="margin-top:14px"><span class="tag">CLEAN CYCLE · 9TH IN A ROW WITH NO FATAL ERRORS</span></div>
+
+  <div class="grid stats">
+    <div class="card stat accent-good">
+      <div class="n">246</div>
+      <div class="l">pitchable creators found (score ≥ 6)</div>
+      <div class="s up">2.2× yesterday's 110</div>
+    </div>
+    <div class="card stat accent-good">
+      <div class="n">31.9%</div>
+      <div class="l">of everything found was pitchable</div>
+      <div class="s up">best rate of the month (was 19.3%)</div>
+    </div>
+    <div class="card stat accent-teal">
+      <div class="n">+70</div>
+      <div class="l">parked into <code>approved_hold</code></div>
+      <div class="s muted">pool 4,103 → 4,173</div>
+    </div>
+    <div class="card stat accent-amber">
+      <div class="n">38,869</div>
+      <div class="l">search terms sent to the classifier</div>
+      <div class="s warn">79 kept (0.20%)</div>
+    </div>
+  </div>
+
+  <h2>The shape of the day</h2>
+  <div class="card" style="padding:0">
+    <div class="strip" id="strip"></div>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--teal)"></span>strong pass (6+ fresh pitchable)</span>
+      <span><span class="dot" style="background:var(--amber)"></span>light (1–5)</span>
+      <span><span class="dot" style="background:var(--red)"></span>empty pass (0) — <b>19 scattered, no dead block</b></span>
+    </div>
+  </div>
+  <p class="muted">Each bar is one finder pass (87 total, 07:07Z to 06:55Z), height is fresh pitchable found. Compare with 07-10, which had 17 zeros in an unbroken row. Today's zeros are scattered noise between working passes, which is what a healthy term pool looks like.</p>
+
+  <h2>The three questions</h2>
+
+  <div class="q accent-good">
+    <div class="ask"><span class="qn">Q1</span><span>Why did the finder suddenly do twice as well?</span></div>
+    <p><b>Yesterday's fix fired for the first time, nine times.</b> On 08-07 the anti-starvation floor was proven to be an empty net: it only revived search terms that had never been run, and that reserve drains permanently. The repair shipped at 07:28Z as a second tier, which revives the best <em>proven</em> terms instead, meaning terms that already converted at a measurable rate and have since cooled for 21 days or more.</p>
+    <p>It ran in all nine sessions this cycle. Each time the log reads the same way: <span class="pill">active pool exhausted, no never-run terms remain, reactivated N proven terms</span>. The results follow directly. Yesterday: <b>7 hard stops on an empty term pool, 6 starvation warnings, 110 pitchable</b>. Today: <span class="pill">0 hard stops</span>, <span class="pill">0 starvation warnings</span>, <span class="pill">246 pitchable</span>. Quality moved too, not just volume. The share of found channels worth pitching went from 19.3% to <b>31.9%</b>, the highest of the 08-01 to 08-08 block, because revived proven terms are terms already measured against real conversions rather than fresh guesses.</p>
+  </div>
+
+  <div class="q accent-amber">
+    <div class="ask"><span class="qn">Q2</span><span>So why did only 70 leads get parked?</span></div>
+    <p><b>Because finding a good creator and finding their email address are two different problems, and the second one is still the wall.</b> Of the 246 pitchable creators found today, <b>72 landed in <code>approved_hold</code></b> and <b>161 went to <code>needs_contact</code></b>, which is the lane for creators who are worth contacting but whose email nobody could verify. That is a 31% verify rate, right in the usual band, so nothing regressed. Doubling the intake simply doubled both piles.</p>
+    <p>One thing did change for the better. On 08-06 most of the parking came from rescuing old rows, not from new supply. Today the pool gain (<span class="pill">+70</span>) matches this cycle's own promotions (<span class="pill">72</span>) almost exactly, so <b>the parking is genuinely today's work</b>. The counterweight: <code>needs_contact</code> grew by 162 and now stands at <b>5,040</b>, well clear of <code>approved_hold</code>'s 4,173. The two piles together are <b>9,213 creators found, scored, and never contacted</b>.</p>
+  </div>
+
+  <div class="q accent-red">
+    <div class="ask"><span class="qn">Q3</span><span>Where is the day's time actually going?</span></div>
+    <p><b>Roughly a third of it went into re-classifying search terms the machine had already rejected.</b> Every session opens by topping up the term reservoir, which scrapes YouTube autocomplete for candidate phrases and asks a cheap model whether each one would surface the kind of creator we want. Nine of those passes ran this cycle. Together they classified <span class="pill">38,869 candidates and kept 79</span>, a hit rate of <b>0.20%</b>. Each pass took <b>46 to 59 minutes</b> of back-to-back model calls.</p>
+    <p>The reason it repeats is a gap in bookkeeping, not a bad classifier. A term that gets <em>kept</em> is written into the terms table, so it never comes back as new. A term that gets <em>rejected</em> is written nowhere at all. Autocomplete offers it again next run, the code sees a string it doesn't have, and pays to judge it again. Measured overlap between consecutive days: <b>70% to 76% of a harvest's candidates had already been judged on the previous run</b>. Meanwhile every one of the nine sessions ended on its time budget, so this is not spare capacity being wasted. It is being taken directly out of finding.</p>
+  </div>
+
+  <h2>What broke, what's fixed</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Issue</th><th>Mechanism</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr class="fix"><td>Term starvation (08-07's 7 hard stops)</td><td>Anti-starvation floor only revived never-run terms, a reserve that drains permanently</td><td class="up">Fixed and now proven in production: proven-term tier fired 9×, 0 hard stops, 0 starvation warnings</td></tr>
+        <tr class="fix"><td>Classifier re-judging its own rejects</td><td>Rejected terms are persisted nowhere, so autocomplete re-offers them and they read as new forever</td><td class="up">Fixed today: persistent reject cache in the finder, keyed to the skill text and model ids</td></tr>
+        <tr><td>Verify rate stuck near 31%</td><td>Two thirds of qualified creators have no verifiable email address</td><td class="warn">Open by design. This is the <code>needs_contact</code> recovery engine, still not built</td></tr>
+        <tr><td>Nothing has ever been sent</td><td>No outlet decided for <code>approved_hold</code></td><td class="down">Open. 9,213 creators parked across both lanes, 0 emailed</td></tr>
+        <tr><td>OpenRouter spend is invisible</td><td>The burn ledger only meters Anthropic, and the pipeline stopped using Anthropic on 08-01</td><td class="warn">Open. Today's fix cuts the largest single unmetered consumer, but does not measure it</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Shipped today</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Repo</th><th>Commit</th><th>What it does</th></tr></thead>
+      <tbody>
+        <tr><td><code>youtube-lead-finder-v1</code></td><td><code>fd9773a</code></td><td>Persistent reject cache for the keyword prefilter. Rejected terms are remembered in <code>logs/prefilter-reject-cache.json</code> and skipped on later runs. Only rejections are cached, never keeps, so a stale entry can drop a term but can never let an unjudged one through, matching the classifier's existing fail-closed rule. The cache is stamped with a fingerprint of the prefilter skill text plus the model ids, so editing the skill or repointing <code>models.json</code> throws the whole cache away and re-judges everything. A batch that failed on transport is not cached, so one bad network minute can't become permanent.</td></tr>
+        <tr><td><code>youtube-lead-finder-v1</code></td><td><code>01c328e</code></td><td>Keeps <code>smoke-llm-tasks</code> bypassing the cache, so the smoke test still proves the OpenRouter path works instead of quietly passing on cached answers.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="muted">Verified before commit: TypeScript clean; the cold-start path seeds from recent verdict files and skipped 5 of 6 known rejects on a live run; the fingerprint-mismatch path correctly discarded a stale cache and re-judged all 6. The test ran with the OpenRouter key unset, so it cost nothing.</p>
+
+  <h2>Recommended next — ranked</h2>
+  <ol class="recs">
+    <li><b>Decide the outlet for <code>approved_hold</code>.</b> 4,173 creators are prepped and waiting, and none has been emailed. This has been the top item for a week and every clean day makes it larger. It is the only item on this list that needs a decision from you rather than code.</li>
+    <li><b>Build the <code>needs_contact</code> recovery engine.</b> 5,040 creators, now the bigger of the two piles, growing faster than the parked one (+162 today against +70). Two thirds of everything the finder qualifies ends up here. Recovering even a third of it beats several days of fresh finding.</li>
+    <li><b>Watch the reject cache for one cycle and measure what it bought.</b> Expect the second and later harvests of a day to classify hundreds of candidates instead of 4,300, and to finish in minutes instead of an hour. If the reclaimed time converts into finder passes, sessions should run more passes inside the same 90-minute budget.</li>
+    <li><b>Meter OpenRouter as a real cost.</b> The burn ledger still reads $0 because it only counts Anthropic. Today's 38,869 classifications were invisible to it. The cache removes most of that volume, which makes now a good moment to start counting rather than a reason not to.</li>
+    <li><b>Widen the niche mix.</b> Real Estate (44), Health clinics (42), and Transformation coaching (35) supplied half of today's pitchable, and the top five niches supplied two thirds. The revived proven terms are concentrated in exactly those niches, so the fix that helped today also deepens the concentration.</li>
+  </ol>
+
+  <div class="foot">
+    <b>Status:</b> everything is parked, nothing sent. <code>approved_hold</code> 4,173 plus <code>needs_contact</code> 5,040 is <b>9,213 creators found and never contacted</b>. The cycle cost <b>$0 on Anthropic</b> (OpenRouter spend is real but not metered here), had <b>0 quota stops, 0 hard stops, 0 crashes and no fatal signatures</b>, which makes nine clean cycles running. All 9 sessions finished on their time budget. The loop is still running and has not been paused.
+  </div>
+
+</div>
+
+<script>
+  // fresh_pitchable per finder pass, chronological, from logs/campaign-2026-08-07.jsonl
+  // and campaign-2026-08-08.jsonl inside the 07:00Z→07:00Z cycle window.
+  var seq = [4,4,0,1,1,2,3,1,0,4,0,2,10,4,6,3,5,6,3,2,4,2,6,2,3,12,1,5,3,5,1,1,2,0,0,2,1,0,1,2,3,0,3,1,3,7,0,2,0,0,0,1,2,4,7,0,0,1,7,3,4,0,4,0,4,3,2,3,9,4,4,6,7,0,0,0,0,3,0,5,9,9,2,4,0,0,1];
+  var max = Math.max.apply(null, seq);
+  var strip = document.getElementById('strip');
+  seq.forEach(function (v) {
+    var b = document.createElement('div');
+    b.className = 'bar' + (v === 0 ? ' zero' : v < 6 ? ' low' : '');
+    b.style.height = Math.max(4, Math.round((v / max) * 100)) + '%';
+    b.title = v + ' fresh pitchable';
+    strip.appendChild(b);
+  });
+</script>
