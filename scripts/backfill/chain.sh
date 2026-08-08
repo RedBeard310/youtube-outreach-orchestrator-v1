@@ -88,6 +88,21 @@ while true; do
     exit 0
   fi
 
+  # Orphan sweep (2026-08-08): a killed batch strands npm-exec'd enrichment
+  # children (run-channel/export-run). They hang at ~1 GB RSS each and starved
+  # the box before the 08-08 batch. Only kill TRUE orphans — ppid 1 (reparented
+  # to init) — so a live d100/deep-research run or manual tick, whose processes
+  # keep a real parent, is never touched. A hung node whose npm wrapper dies
+  # first reparents to init and gets caught on the next pass of this loop.
+  for pat in "scripts/run-channel[.]ts" "scripts/export-run[.]ts"; do
+    for p in $(pgrep -f "$pat"); do
+      ppid=$(ps -o ppid= -p "$p" 2>/dev/null | tr -d ' ')
+      if [ "$ppid" = "1" ]; then
+        kill "$p" 2>/dev/null && log "orphan sweep: killed stray enrichment pid $p"
+      fi
+    done
+  done
+
   if ! supadata_ok; then
     log "supadata limit still active — waiting (probe every 30m, silent until it clears)"
     while ! supadata_ok; do
