@@ -18,9 +18,11 @@
 import 'dotenv/config';
 import { appendFileSync, existsSync, openSync, readdirSync, readFileSync, writeFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import { spawn } from 'node:child_process';
+import { spawn, execSync } from 'node:child_process';
 import { summarizeToday, pacificDate } from './burn-ledger.js';
 import { countByReviewStatus } from '../../src/airtable.ts';
+
+const FINDER_REPO = '/home/casey/repos/youtube-lead-finder-v1';
 
 const REPO = '/home/casey/repos/youtube-outreach-orchestrator-v1';
 const LOGS = join(REPO, 'logs');
@@ -420,6 +422,43 @@ async function main(): Promise<void> {
           detail: `score>=6 rate is ${(rate * 100).toFixed(1)}% over the last ${pitchableYieldWindow.newLeads} new leads, vs a ${(baseline * 100).toFixed(1)}% trailing baseline (${prior.length} prior check-ins) — less than half. scoring_failed rate is normal (${scoringFailedRatePct.toFixed(0)}%), so this isn't the token-budget bug; likely a scoring-rubric, prefilter, or term-mix regression worth a look.`,
         });
       }
+    }
+  }
+
+  // 7) Sweep-daemon staleness (2026-08-09). graph-sweep sat idle 8 days (2026-08-01 ->
+  // 2026-08-09) with zero signal anywhere — a clean drain and a silent stall look
+  // identical unless something actually checks. Refill timers now exist for
+  // graph-sweep and peer-sweep (every 4h) and comment-sweep runs on its own daily
+  // timer, so a state file untouched well past its own cadence means the automation
+  // itself broke (timer disabled, script erroring, systemd unit removed), not just
+  // "between refills." Deliberately independent of Airtable/campaign.jsonl, both of
+  // which this check must survive to be useful.
+  function isEnabled(unit: string): boolean | null {
+    try { return execSync(`systemctl is-enabled ${unit}`, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }).trim() === 'enabled'; }
+    catch { return null; }
+  }
+  function sweepStateAgeHours(stateFile: string): number | null {
+    const p = join(FINDER_REPO, 'logs', stateFile);
+    if (!existsSync(p)) return null;
+    try {
+      const updated = (JSON.parse(readFileSync(p, 'utf8')) as { updated?: string }).updated;
+      return updated ? (Date.now() - Date.parse(updated)) / 3_600_000 : null;
+    } catch { return null; }
+  }
+  const sweepChecks: Array<{ method: string; timer: string; stateFile: string; maxAgeH: number }> = [
+    { method: 'recommended_videos_feed', timer: 'graph-sweep-refill.timer', stateFile: 'graph-sweep-state.json', maxAgeH: 8 },
+    { method: 'peer_sweep', timer: 'peer-sweep-refill.timer', stateFile: 'peer-sweep-state.json', maxAgeH: 8 },
+    { method: 'comment_sweep', timer: 'comment-sweep-daily.timer', stateFile: 'comment-sweep-state.json', maxAgeH: 30 },
+  ];
+  for (const c of sweepChecks) {
+    const enabled = isEnabled(c.timer);
+    if (enabled === false) {
+      anomalies.push({ kind: 'sweep_daemon_disabled', detail: `${c.timer} is not enabled — ${c.method} will never refill/rerun. Re-enable: sudo systemctl enable --now ${c.timer}.` });
+      continue;
+    }
+    const ageH = sweepStateAgeHours(c.stateFile);
+    if (ageH !== null && ageH > c.maxAgeH) {
+      anomalies.push({ kind: 'sweep_daemon_stale', detail: `${c.method}'s state file hasn't updated in ${ageH.toFixed(1)}h (expected within ~${c.maxAgeH}h). Check: systemctl status ${c.timer}, and the unit this timer drives, for an error.` });
     }
   }
 
