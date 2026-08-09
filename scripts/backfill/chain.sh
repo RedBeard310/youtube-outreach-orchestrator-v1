@@ -156,10 +156,23 @@ while true; do
   excluded=$(echo "$fetch_out" | sed -n 's/^EXCLUDED=//p')
 
   if [ "${count:-0}" -eq 0 ]; then
-    log "pool drained (pool=$pool, permanently excluded=$excluded) — DONE"
-    touch "$DIR/chain-done.flag"
-    exit 0
+    # Role-aware empty-pool handling (2026-08-09): on the Mac the claimed list
+    # genuinely finishes — exit DONE. On the VPS an empty pool just means "no
+    # new approved_hold inflow right now" — idle and re-poll, else the chain
+    # exits and relaunchers thrash it forever.
+    if [ "${BACKFILL_CLAIM_ROLE:-vps}" = "mac" ]; then
+      log "pool drained (pool=$pool, permanently excluded=$excluded) — DONE"
+      touch "$DIR/chain-done.flag"
+      exit 0
+    fi
+    if [ "${idle_logged:-0}" != "1" ]; then
+      log "no pending inflow — idling (re-poll every 30m, silent until work arrives)"
+      idle_logged=1
+    fi
+    sleep 1800
+    continue
   fi
+  idle_logged=0
 
   runlog=$DIR/$(basename "$file" -ids.txt)-run.log
   log "launching batch: count=$count pool=$pool excluded=$excluded file=$file"
