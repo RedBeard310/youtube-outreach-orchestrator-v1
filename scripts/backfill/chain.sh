@@ -123,6 +123,27 @@ while true; do
     log "supadata is back — resuming batches"
   fi
 
+  # Enrichment-base capacity gate (2026-08-09): the 08-09 mass-fail was 495
+  # instant 422s against a full Airtable base (LIMIT_CHECK_TOO_MANY_RECORDS).
+  # External halt flags are unreliable (other sessions' relaunchers delete
+  # them), so the chain checks the cleanup service's own fill reading and
+  # waits while the base is at/over the valve line. No reading (e.g. on the
+  # Mac, where journalctl doesn't exist) → proceed; the mass-fail guard
+  # below is the backstop.
+  base_fill() {
+    journalctl -u enrichment-db-cleanup.service --since "-40 min" --no-pager 2>/dev/null \
+      | grep -oE "fill=[0-9]+" | tail -1 | cut -d= -f2
+  }
+  fill=$(base_fill)
+  if [ -n "$fill" ] && [ "$fill" -ge 70 ]; then
+    log "enrichment base at ${fill}% — waiting for the cleanup to drain it below 70%"
+    while fill=$(base_fill); [ -n "$fill" ] && [ "$fill" -ge 70 ]; do
+      [ -f "$HALT" ] && { log "halt flag present — stopping"; exit 0; }
+      sleep 900
+    done
+    log "enrichment base drained (${fill:-?}%) — resuming batches"
+  fi
+
   fetch_out=$(cd "$EMAIL" && node "$ORCH/scripts/backfill/next-batch-ids.cjs" 2>&1)
   if [ $? -ne 0 ]; then
     log "id fetch failed, retrying in 10m: $fetch_out"
@@ -149,6 +170,18 @@ while true; do
   done_n=$(grep -c "enrich run done" "$runlog" 2>/dev/null || echo 0)
   failed_n=$(grep -c "\] FAILED:" "$runlog" 2>/dev/null || echo 0)
   log "batch finished: exit=$rc done=$done_n failed=$failed_n log=$runlog"
+
+  # Mass-failure guard (2026-08-09): a batch where failures dominate is an
+  # infrastructure outage (full base, dead transcript quota, stripped env),
+  # never 250+ individually-bad leads. Refund the attempt (rename the ids
+  # file out of the *-ids.txt attempt-count glob) and cool down before the
+  # next batch instead of burning the pool's retry budget at full speed.
+  if [ "$failed_n" -gt 100 ] && [ "$failed_n" -gt "$done_n" ]; then
+    mv "$file" "${file%.txt}.infra" 2>/dev/null
+    log "MASS FAILURE ($failed_n failed vs $done_n done) — infra outage assumed: attempts refunded, cooling down 1h"
+    sleep 3600
+    continue
+  fi
 
   if [ "$rc" -ne 0 ]; then
     consec_fail=$((consec_fail + 1))

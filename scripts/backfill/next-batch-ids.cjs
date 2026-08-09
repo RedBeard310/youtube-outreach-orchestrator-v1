@@ -71,8 +71,23 @@ function fetchPage(offset) {
     }
   }
 
-  const eligible = ids.filter((id) => (attempts.get(id) || 0) < MAX_ATTEMPTS);
-  const excluded = ids.length - eligible.length;
+  // Machine split (2026-08-09, Casey's plan): the Mac owns the whole backfill
+  // snapshot (scripts/backfill/mac-claimed-ids.txt, 1,836 ids frozen 08-09);
+  // the VPS owns everything else — i.e. new approved_hold inflow. Same script
+  // both sides: BACKFILL_CLAIM_ROLE=mac processes ONLY claimed ids, anything
+  // else (the VPS default) processes only UNclaimed ids. The claim file is
+  // committed, so both machines see the same split via git.
+  const claimFile = path.join(__dirname, "mac-claimed-ids.txt");
+  const claimed = new Set(
+    fs.existsSync(claimFile)
+      ? fs.readFileSync(claimFile, "utf8").split("\n").map((l) => l.trim()).filter(Boolean)
+      : [],
+  );
+  const role = (process.env.BACKFILL_CLAIM_ROLE || "vps").toLowerCase();
+  const mine = ids.filter((id) => (role === "mac" ? claimed.has(id) : !claimed.has(id)));
+
+  const eligible = mine.filter((id) => (attempts.get(id) || 0) < MAX_ATTEMPTS);
+  const excluded = mine.length - eligible.length;
   const batch = eligible.slice(0, BATCH_SIZE);
 
   let file = "";
@@ -84,8 +99,9 @@ function fetchPage(offset) {
 
   console.log(`COUNT=${batch.length}`);
   console.log(`FILE=${file}`);
-  console.log(`POOL=${ids.length}`);
+  console.log(`POOL=${mine.length}`);
   console.log(`EXCLUDED=${excluded}`);
+  console.log(`ROLE=${role} (total pending across both machines: ${ids.length})`);
 })().catch((e) => {
   console.error(e.message || e);
   process.exit(1);
