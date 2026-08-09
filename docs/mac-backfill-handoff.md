@@ -41,7 +41,9 @@ them to the Mac master, the sync will strip them from the VPS and break BOTH sid
 gitignored payloads that a clone silently loses):
 
 - `youtube-outreach-orchestrator-v1` — brings this doc, `scripts/backfill/*`
-  (chain script, id fetcher, your claim file).
+  (chain script, id fetcher, your claim file). **Everything lives on branch
+  `docs/manual-ticks-and-backend-2026-06-01`** (the VPS working branch, pushed to
+  origin) — check it out if your clone sits on another branch.
 - `youtube-email-outreach-v1` — zero-Anthropic guards, models.json. `npm install`.
 - `quick-youtube-channel-research-v1` — Supadata key rotation
   (`src/lib/supadata-keys.ts`), optional-Anthropic fixes in `run-channel.ts` /
