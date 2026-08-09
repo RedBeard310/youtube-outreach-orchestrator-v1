@@ -17,12 +17,17 @@ ExecStart=/usr/bin/env bash /home/casey/repos/youtube-outreach-orchestrator-v1/s
 # (same pattern as enrichment-db-cleanup.timer / autopilot-campaign.service)
 # runs it outside that lifecycle entirely.
 #
-# on-failure (not always): chain.sh itself exits 0 cleanly on halt.flag or a
-# drained pool (touches chain-done.flag) — those should stay stopped, not spin.
-# A crash/kill (nonzero) restarts. Resume after halting with:
+# Restart=always (not on-failure): chain.sh's own flock (scripts/backfill/chain.sh,
+# 2026-08-09) makes exit-0 ambiguous between three cases — halt.flag, a drained
+# pool, AND "another instance already holds the lock." An interactively-launched
+# chain.sh is expected to hold the lock most of the time; this unit should keep
+# retrying every 60s so it's already waiting and picks up instantly the moment
+# that lock is free (session death, drained pool, whatever) — not just on crash.
+# halt.flag still stops it for real (exits 0, retries, sees the flag, exits 0
+# again — harmless spin at 60s intervals). Resume after halting with:
 #   rm logs/backfill-2026-07/halt.flag && sudo systemctl restart backfill-chain
-Restart=on-failure
-RestartSec=30
+Restart=always
+RestartSec=60
 
 [Install]
 WantedBy=multi-user.target
