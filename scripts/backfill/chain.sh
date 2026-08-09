@@ -180,8 +180,16 @@ while true; do
     --lead-ids-file "$file" --stop-after enrich --concurrency "${BACKFILL_CONCURRENCY:-8}") \
     >"$runlog" 2>&1
   rc=$?
-  done_n=$(grep -c "enrich run done" "$runlog" 2>/dev/null || echo 0)
-  failed_n=$(grep -c "\] FAILED:" "$runlog" 2>/dev/null || echo 0)
+  # `grep -c` prints "0" AND exits 1 on zero matches — the old `|| echo 0`
+  # fallback then ran too, appending a second "0" on its own line ("0\n0"),
+  # which broke the `-gt` comparisons below with "integer expected" (found
+  # 2026-08-09 via journalctl -u backfill-chain). This script has no `set -e`,
+  # so grep's exit code was never fatal — just drop the `||` and default via
+  # `${var:-0}` instead of adding a second producer of the value.
+  done_n=$(grep -c "enrich run done" "$runlog" 2>/dev/null)
+  failed_n=$(grep -c "\] FAILED:" "$runlog" 2>/dev/null)
+  done_n=${done_n:-0}
+  failed_n=${failed_n:-0}
   log "batch finished: exit=$rc done=$done_n failed=$failed_n log=$runlog"
 
   # Mass-failure guard (2026-08-09): a batch where failures dominate is an
