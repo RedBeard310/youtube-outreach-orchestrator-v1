@@ -1,0 +1,201 @@
+<title>Lead Run Debrief — 2026-08-09</title>
+<style>
+  :root {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --good-soft: #1f8a5b1a; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+      --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+      --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --good-soft: #55c48c1c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --good-soft: #1f8a5b1a; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+    --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+    --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --good-soft: #55c48c1c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 40px 22px 80px; }
+  .eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); font-weight: 600; }
+  h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.12; margin: 10px 0 6px; text-wrap: balance; letter-spacing: -.02em; }
+  h2 { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); margin: 44px 0 16px; font-weight: 700; }
+  h3 { font-size: 18px; margin: 0 0 6px; letter-spacing: -.01em; }
+  p { margin: 0 0 14px; }
+  .lede { font-size: 18px; color: var(--ink-soft); max-width: 68ch; }
+  .tag { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--good-soft); color: var(--good); letter-spacing: .02em; }
+  .tag.warn { background: var(--amber-soft); color: var(--amber); }
+  .grid { display: grid; gap: 14px; }
+  .stats { grid-template-columns: repeat(4, 1fr); margin-top: 26px; }
+  @media (max-width: 720px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; box-shadow: var(--shadow); }
+  .stat .n { font-size: 30px; font-weight: 750; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .stat .l { font-size: 12.5px; color: var(--ink-soft); margin-top: 3px; }
+  .stat .s { font-size: 12px; margin-top: 8px; font-weight: 600; }
+  .up { color: var(--good); } .down { color: var(--red); } .warn { color: var(--amber); }
+  .accent-red { border-left: 3px solid var(--red); }
+  .accent-teal { border-left: 3px solid var(--teal); }
+  .accent-amber { border-left: 3px solid var(--amber); }
+  .accent-good { border-left: 3px solid var(--good); }
+
+  /* shape-of-day bar strip */
+  .strip { display: flex; align-items: flex-end; gap: 2px; height: 120px; padding: 14px 14px 10px; overflow-x: auto; }
+  .bar { flex: 1 0 6px; min-width: 5px; border-radius: 2px 2px 0 0; background: var(--teal); opacity: .9; }
+  .bar.zero { background: var(--red); height: 4px !important; opacity: .9; }
+  .bar.low { background: var(--amber); }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-soft); padding: 0 14px 14px; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+
+  .q { border-radius: 14px; padding: 20px 22px; margin-bottom: 14px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); }
+  .q .ask { font-size: 17px; font-weight: 700; color: var(--ink); margin-bottom: 10px; display: flex; gap: 10px; align-items: baseline; }
+  .q .ask .qn { color: var(--red); font-weight: 800; flex: 0 0 auto; }
+  .q p { color: var(--ink-soft); }
+  .q b { color: var(--ink); }
+  .pill { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink); background: var(--panel-2); padding: 1px 7px; border-radius: 6px; border: 1px solid var(--line); white-space: nowrap; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+  th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); }
+  td .num { font-variant-numeric: tabular-nums; font-weight: 650; }
+  .fix td:first-child { color: var(--good); font-weight: 650; }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); box-shadow: var(--shadow); margin-bottom: 14px; }
+  ol.recs { padding-left: 0; list-style: none; counter-reset: r; margin: 0; }
+  ol.recs li { counter-increment: r; position: relative; padding: 14px 16px 14px 52px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 10px; box-shadow: var(--shadow); }
+  ol.recs li::before { content: counter(r); position: absolute; left: 14px; top: 14px; width: 26px; height: 26px; border-radius: 8px; background: var(--teal-soft); color: var(--teal); font-weight: 800; font-size: 14px; display: grid; place-items: center; }
+  ol.recs b { color: var(--ink); }
+  .foot { margin-top: 46px; padding: 16px 18px; border-radius: 12px; background: var(--amber-soft); border: 1px solid var(--line); font-size: 14px; color: var(--ink-soft); }
+  .foot b { color: var(--ink); }
+  .muted { color: var(--ink-soft); font-size: 13.5px; }
+</style>
+
+
+<div class="wrap">
+
+  <div class="eyebrow">Lead Run Debrief · YouTube outreach</div>
+  <h1>2026-08-09 — the cache paid off, and the term supply behind it is mined out</h1>
+  <p class="lede">Yesterday's fix did exactly what it was built to do. Session startup fell from 74 minutes to 21, the loop ran <b>120 finder passes instead of 87</b>, and parking rose to <b>+93</b>. The reclaimed hours also made a second problem impossible to miss: the search-term harvest ran 14 times, was offered 58,746 candidate phrases, and kept 15.</p>
+  <div style="margin-top:14px"><span class="tag">CLEAN CYCLE · 10TH IN A ROW WITH NO FATAL ERRORS</span></div>
+
+  <div class="grid stats">
+    <div class="card stat accent-teal">
+      <div class="n">+93</div>
+      <div class="l">parked into <code>approved_hold</code></div>
+      <div class="s up">pool 4,173 → 4,266, best since 08-06</div>
+    </div>
+    <div class="card stat accent-good">
+      <div class="n">21 min</div>
+      <div class="l">average session startup</div>
+      <div class="s up">was 74 min yesterday</div>
+    </div>
+    <div class="card stat accent-good">
+      <div class="n">120</div>
+      <div class="l">finder passes</div>
+      <div class="s up">up from 87, and 1,046 new leads</div>
+    </div>
+    <div class="card stat accent-amber">
+      <div class="n">15</div>
+      <div class="l">usable search terms from 14 harvests</div>
+      <div class="s warn">out of 58,746 candidates offered</div>
+    </div>
+  </div>
+
+  <h2>The shape of the day</h2>
+  <div class="card" style="padding:0">
+    <div class="strip" id="strip"></div>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--teal)"></span>strong pass (6+ fresh pitchable)</span>
+      <span><span class="dot" style="background:var(--amber)"></span>light (1&ndash;5)</span>
+      <span><span class="dot" style="background:var(--red)"></span>empty pass (0) &mdash; <b>22 scattered, no dead block</b></span>
+    </div>
+  </div>
+  <p class="muted">Each bar is one finder pass (120 total, 07:41Z to 06:59Z), height is fresh pitchable found. There are 33 more bars here than yesterday for the same 24 hours, and that is the whole point of the fix: the day is denser, not longer.</p>
+
+  <h2>The three questions</h2>
+
+  <div class="q accent-good">
+    <div class="ask"><span class="qn">Q1</span><span>Did yesterday's fix actually buy anything?</span></div>
+    <p><b>Yes, and it is the cleanest before-and-after of the whole block.</b> The fix taught the term classifier to remember what it had already rejected, so it stops paying to judge the same phrases every session. It worked on the first day: across 14 harvests it was offered <span class="pill">58,746 candidates</span> and skipped <span class="pill">54,129 from cache</span>, which is <b>92.1%</b>. Only 4,617 phrases got sent to a model, against 38,869 yesterday.</p>
+    <p><b>The saved time landed where it was supposed to.</b> Every session opens by topping up its search terms before it can search for anything, and that opening step used to take 74 minutes. Today it took <b>21</b>. Over the cycle that is <span class="pill">301 minutes of startup instead of 668</span>, and that is with 14 sessions running rather than 9. The campaign's own 90-minute clock never changed. What changed is that a "90-minute session" used to occupy 156 minutes of real time and now occupies about 100, so more of them fit in a day.</p>
+    <p>Everything downstream moved with it: <b>120 finder passes against 87</b>, <b>1,046 new leads against 757</b>, <b>294 pitchable creators against 246</b>, <b>+93 parked against +70</b>. Density per hour of session time went from 3.5 passes to <b>5.1</b>. Nothing about the finder itself got better today. It simply got more of the day.</p>
+  </div>
+
+  <div class="q accent-amber">
+    <div class="ask"><span class="qn">Q2</span><span>Then why is parking still only +93?</span></div>
+    <p><b>Because email is still the wall, exactly as it was.</b> Of 294 pitchable creators found today, <b>93 landed in <code>approved_hold</code></b> and <b>180 went to <code>needs_contact</code></b>, the lane for creators worth contacting whose email address nobody could verify. That is a <b>34% verify rate</b>, in the same band it has held all month. More intake gives you more of both piles in the same proportion.</p>
+    <p><code>needs_contact</code> now holds <b>5,221</b> and grew by 181 today against the parked pool's 93. Together the two lanes are <b>9,487 creators found, scored, and never contacted</b>. One genuine improvement worth recording: the niche mix widened. The top three niches supplied <b>37%</b> of today's pitchable, down from 49% yesterday, and Real Estate stopped dominating on its own (43 of 294, with Coaching 34, Financial Planning 33 and Health clinics 32 close behind).</p>
+  </div>
+
+  <div class="q accent-red">
+    <div class="ask"><span class="qn">Q3</span><span>What did the reclaimed time reveal?</span></div>
+    <p><b>The autocomplete term source is mined out, and the loop had no way to notice.</b> Now that the machine stops re-judging its own rejects, what is left is a clear reading of how much genuinely new material the source still holds. Across 14 harvests it wrote <span class="pill">15 usable terms</span>. Seven of the fourteen wrote nothing at all. Even among the 4,617 phrases that were genuinely unjudged, the keep rate was <b>0.32%</b>.</p>
+    <p><b>The gate that triggers the harvest cannot be satisfied.</b> Every session begins with a stock-up check on the term reservoir. All 14 opened the same way: <span class="pill">STOCK-UP, fresh: 0, short_by: 48</span>. That verdict forces a harvest at a one-hour floor, deliberately overriding the normal four-hour cadence. The handful of terms a harvest does write get consumed by the next few passes, so the following session reads <code>fresh: 0</code> again and fires another one. Fourteen sessions, fourteen forced harvests, fifteen terms.</p>
+    <p><b>Term supply is not at risk, which is what makes this pure waste.</b> The pool is being carried by the other two sources: the proven-term revive shipped on 08-07 fired <b>31 times</b> and the invented-vein discovery ran 133 times with 117 promotions. The result was <b>0 hard stops and 0 quota stops</b>, and the term pool visibly rebuilt inside every session. The harvest is the third leg, and it is the dry one.</p>
+  </div>
+
+  <h2>What broke, what's fixed</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Issue</th><th>Mechanism</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr class="fix"><td>Classifier re-judging its own rejects (08-08's finding)</td><td>Rejected terms were persisted nowhere, so autocomplete re-offered them forever</td><td class="up">Fixed and now proven in production: 92.1% of candidates skipped from cache, startup 74 min → 21 min</td></tr>
+        <tr class="fix"><td>An exhausted harvest force-fired every session</td><td>The stock-up gate reads <code>fresh: 0</code>, forces a harvest at a 1h floor, and the few terms it writes are consumed before the next check</td><td class="up">Fixed today: the campaign now measures what a harvest writes and backs off 6h after three near-empty runs</td></tr>
+        <tr><td>Verify rate stuck near a third</td><td>Two thirds of qualified creators have no verifiable email address</td><td class="warn">Open by design. This is the <code>needs_contact</code> recovery engine, still not built</td></tr>
+        <tr><td>Nothing has ever been sent</td><td>No outlet decided for <code>approved_hold</code></td><td class="down">Open. 9,487 creators parked across both lanes, 0 emailed</td></tr>
+        <tr><td>Term supply now rests on two legs, not three</td><td>Autocomplete is mined out against the current 42 seeds; revive and LLM discovery carry the pool</td><td class="warn">Open. Not urgent today, but it is a real narrowing. New seeds are the supply-side answer</td></tr>
+        <tr><td>OpenRouter spend is invisible</td><td>The burn ledger only meters Anthropic, and the pipeline stopped using Anthropic on 08-01</td><td class="warn">Open. Today's fix removes most of the remaining unmetered volume without measuring it</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Shipped today</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Repo</th><th>Commit</th><th>What it does</th></tr></thead>
+      <tbody>
+        <tr><td><code>youtube-outreach-orchestrator-v1</code></td><td><code>44233a0</code></td><td>Low-yield backoff for the keyword harvest. The campaign now reads how many probes a harvest actually wrote and remembers it in <code>logs/keyword-harvest-yield-state.json</code>. When the last three harvests each wrote fewer than three, it skips the harvest for six hours and spends the time on finder passes instead. The check sits <em>before</em> the cadence gate on purpose, because the stock-up pre-flight overrides that gate down to one hour, and that pre-flight is the caller that was force-firing an exhausted source every session. Self-clearing: after the window one harvest always runs, and a single good yield clears the streak and restores normal cadence. That matters because harvest yield is not permanently dead. Editing the prefilter skill or repointing <code>models.json</code> throws away the reject cache and makes everything judgeable again, and new seeds do the same. A harvest whose output can't be read records no sample at all, so an unreadable harvest can never quietly disable itself. Escape hatch <code>HARVEST_LOW_YIELD_BACKOFF_HOURS=0</code>.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="muted">Verified before commit: TypeScript clean; 14 behaviour checks green, covering the streak, the window expiry, a good yield clearing a streak mid-run, cold start, the disable switch, and the fail-open path; and the output parser was run against the real harvest text from two live 08-09 sessions and read both correctly. No API calls, so it cost nothing.</p>
+
+  <h2>Recommended next — ranked</h2>
+  <ol class="recs">
+    <li><b>Decide the outlet for <code>approved_hold</code>.</b> 4,266 creators are prepped and waiting, and none has been emailed. This has led the list for over a week and every clean day makes it bigger. It is still the only item here that needs a decision from you rather than code.</li>
+    <li><b>Build the <code>needs_contact</code> recovery engine.</b> 5,221 creators, the bigger of the two lanes, growing at roughly twice the parked rate (+181 against +93). Two thirds of everything the finder qualifies ends up here.</li>
+    <li><b>Feed the harvest new seeds.</b> Today's backoff stops the waste but it does not restore the supply. The 42-seed set has been fully mined against the current classifier, and adding seeds is the one action that makes autocomplete productive again. It also automatically clears the backoff, because a good yield breaks the streak.</li>
+    <li><b>Check tomorrow that the backoff fires and that the time converts.</b> Expect roughly four harvests instead of fourteen, the line <code>keyword harvest skipped — last 3 harvests each wrote &lt; 3 probes</code> in the session logs, and startup falling from 21 minutes toward a few. If it works, passes should clear 140.</li>
+    <li><b>Meter OpenRouter as a real cost.</b> The burn ledger still reads $0 because it only counts Anthropic. Two days of fixes have cut the largest unmetered consumer by roughly 99%, which makes this a good moment to start counting rather than a reason to keep not counting.</li>
+  </ol>
+
+  <div class="foot">
+    <b>Status:</b> everything is parked, nothing sent. <code>approved_hold</code> 4,266 plus <code>needs_contact</code> 5,221 is <b>9,487 creators found and never contacted</b>. The cycle cost <b>$0 on Anthropic</b> (OpenRouter spend is real but not metered here), had <b>0 quota stops, 0 hard stops, 0 crashes, 0 scoring failures and no fatal signatures</b>, which makes ten clean cycles running. All 14 sessions finished on their time budget. The loop is still running and has not been paused.
+  </div>
+
+</div>
+
+<script>
+  // fresh_pitchable per finder pass, chronological, from logs/campaign-2026-08-08.jsonl
+  // and campaign-2026-08-09.jsonl inside the 07:00Z→07:00Z cycle window.
+  var seq = [0,3,2,2,3,3,3,8,1,1,3,0,1,0,0,1,6,4,1,0,2,0,0,4,0,5,4,2,5,5,4,6,0,0,2,3,2,3,3,4,7,4,4,2,0,3,1,1,2,2,2,1,0,1,4,6,0,1,1,0,1,1,0,2,3,2,2,0,3,5,3,3,2,6,6,2,3,3,2,7,2,6,5,2,3,3,2,3,1,0,2,4,5,1,3,0,0,0,2,1,1,4,5,5,5,1,2,5,4,2,2,2,1,2,3,2,0,0,1,2];
+  var max = Math.max.apply(null, seq);
+  var strip = document.getElementById('strip');
+  seq.forEach(function (v) {
+    var b = document.createElement('div');
+    b.className = 'bar' + (v === 0 ? ' zero' : v < 6 ? ' low' : '');
+    b.style.height = Math.max(4, Math.round((v / max) * 100)) + '%';
+    b.title = v + ' fresh pitchable';
+    strip.appendChild(b);
+  });
+</script>
