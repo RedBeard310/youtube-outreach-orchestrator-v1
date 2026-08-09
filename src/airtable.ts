@@ -40,6 +40,12 @@ export interface Lead {
   niche_category: string | null;
   signal_score: number | null;
   first_discovered_at: string | null;
+  /** JSON-array string, e.g. '["graph:Wes McDowell"]' — see prospects.ts's
+   *  discovered_via_term. Prefix identifies the discovery method: a bare search
+   *  term (keyword engine), "graph:" (recommended-videos feed), "comment:"
+   *  (comment-sweep), "peer-comment:"/"peer-guest:" (peer-sweep). Used by
+   *  debrief-data.ts to attribute daily discovery counts per method. */
+  discovered_via: string | null;
 }
 
 // Note: `failed` and `deep_research_failed` are intentionally NOT terminal.
@@ -139,6 +145,7 @@ function recordToLead(record: { id: string; get: (field: string) => unknown }): 
     niche_category: (record.get('niche_category') as string | undefined) ?? null,
     signal_score: (record.get('signal_score') as number | undefined) ?? null,
     first_discovered_at: (record.get('first_discovered_at') as string | undefined) ?? null,
+    discovered_via: (record.get('discovered_via') as string | undefined) ?? null,
   };
 }
 

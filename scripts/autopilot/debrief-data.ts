@@ -6,6 +6,7 @@
 // logs/autopilot-debrief-<pacific-date>.json.
 
 import 'dotenv/config';
+import { execSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { countByReviewStatus, getLeadsDiscoveredSince, type Lead } from '../../src/airtable.ts';
@@ -13,6 +14,58 @@ import { summarizeToday, pacificDate } from './burn-ledger.js';
 
 const REPO = '/home/casey/repos/youtube-outreach-orchestrator-v1';
 const LOGS = join(REPO, 'logs');
+const FINDER_REPO = '/home/casey/repos/youtube-lead-finder-v1';
+
+// Health snapshot for the three sweep-based discovery methods (2026-08-09). None of
+// these show up in campaign.jsonl (that's the keyword engine only), so without this
+// a stalled daemon is invisible to the daily report — exactly how graph-sweep sat
+// idle 8 days (2026-08-01 -> 2026-08-09) before anyone noticed. Deliberately reads
+// only local state/systemd, no Airtable calls — cheap, and can't itself be the thing
+// that's broken if Airtable is having a bad day.
+function serviceActive(name: string): boolean | null {
+  try {
+    return execSync(`systemctl is-active ${name}`, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }).trim() === 'active';
+  } catch {
+    return null; // systemctl unavailable or unit unknown — don't claim unhealthy on a check that couldn't run
+  }
+}
+function sweepStateUpdatedAt(stateFile: string): string | null {
+  const p = join(FINDER_REPO, 'logs', stateFile);
+  if (!existsSync(p)) return null;
+  try { return (JSON.parse(readFileSync(p, 'utf8')) as { updated?: string }).updated ?? null; } catch { return null; }
+}
+function hoursSince(iso: string | null): number | null {
+  if (!iso) return null;
+  const ms = Date.now() - Date.parse(iso);
+  return Number.isFinite(ms) ? Math.round((ms / 3_600_000) * 10) / 10 : null;
+}
+function discoveryMethodsHealth(): Record<string, unknown> {
+  const graphUpdated = sweepStateUpdatedAt('graph-sweep-state.json');
+  const commentUpdated = sweepStateUpdatedAt('comment-sweep-state.json');
+  const peerUpdated = sweepStateUpdatedAt('peer-sweep-state.json');
+  return {
+    recommended_videos_feed: {
+      service_active: serviceActive('graph-sweep.service'),
+      refill_timer_active: serviceActive('graph-sweep-refill.timer'),
+      state_updated_at: graphUpdated,
+      hours_since_update: hoursSince(graphUpdated),
+    },
+    comment_sweep: {
+      daily_timer_active: serviceActive('comment-sweep-daily.timer'),
+      state_updated_at: commentUpdated,
+      hours_since_update: hoursSince(commentUpdated),
+      // Runs once/day by design — flag only past ~30h (a missed day plus slack), not
+      // on every reading the way the continuous daemons below are judged.
+      stale: hoursSince(commentUpdated) !== null && (hoursSince(commentUpdated) as number) > 30,
+    },
+    peer_sweep: {
+      service_active: serviceActive('peer-sweep.service'),
+      refill_timer_active: serviceActive('peer-sweep-refill.timer'),
+      state_updated_at: peerUpdated,
+      hours_since_update: hoursSince(peerUpdated),
+    },
+  };
+}
 
 // UTC instant of midnight America/Los_Angeles for the current cycle.
 function pacificMidnightISO(now = new Date()): string {
@@ -207,6 +260,38 @@ async function main(): Promise<void> {
     const k = l.review_status ?? '?';
     byReview[k] = (byReview[k] ?? 0) + 1;
   }
+
+  // Discovery-method attribution (2026-08-09, Casey-requested). discovered_via is a
+  // JSON-array string; the FIRST entry's prefix identifies the method (see the Lead
+  // type doc in src/airtable.ts). A bare term with no colon-prefix is the keyword
+  // engine — the original method, so it has no tag of its own. This is what makes
+  // comment-sweep/graph-sweep/peer-sweep's contribution visible in the daily report
+  // instead of invisibly folded into "discovered_today" — see
+  // [[comment-sweep-built-and-first-run]] memory for why that mattered.
+  function discoveryMethod(discoveredVia: string | null): string {
+    if (!discoveredVia) return 'unknown';
+    let first = '';
+    try {
+      const arr = JSON.parse(discoveredVia) as unknown;
+      first = Array.isArray(arr) && typeof arr[0] === 'string' ? arr[0] : '';
+    } catch { first = discoveredVia; }
+    if (first.startsWith('graph:')) return 'recommended_videos_feed';
+    if (first.startsWith('peer-comment:')) return 'peer_network';
+    if (first.startsWith('peer-guest:')) return 'guest_link_mining';
+    if (first.startsWith('comment:')) return 'comment_sweep';
+    return 'keyword_search';
+  }
+  const byMethod: Record<string, number> = {};
+  const byMethodPitchable: Record<string, number> = {};
+  for (const l of discovered) {
+    const m = discoveryMethod(l.discovered_via);
+    byMethod[m] = (byMethod[m] ?? 0) + 1;
+  }
+  for (const l of pitchable) {
+    const m = discoveryMethod(l.discovered_via);
+    byMethodPitchable[m] = (byMethodPitchable[m] ?? 0) + 1;
+  }
+
   const emailVerified = discovered.filter((l) => l.outreach_status === 'email_verified').length;
   // Scoring health as a FIRST-CLASS metric (2026-08-05, autopilot-improve). It was already
   // present inside by_review_status, but buried there the 08-04 debrief walked straight past
@@ -273,7 +358,10 @@ async function main(): Promise<void> {
         : 0,
       by_niche_pitchable: byNiche,
       by_review_status: byReview,
+      by_discovery_method: byMethod,
+      by_discovery_method_pitchable: byMethodPitchable,
     },
+    discovery_methods_health: discoveryMethodsHealth(),
     campaign: {
       sessions_started: count('start'),
       sessions_done: count('done'),
