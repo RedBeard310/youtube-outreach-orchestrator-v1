@@ -22,6 +22,17 @@ CHAINLOG=$DIR/chain.log
 
 log() { echo "[$(date -u +%FT%TZ)] $*" >>"$CHAINLOG"; }
 
+# Single-instance guard (2026-08-09): multiple sessions (this one, the automator
+# session's own relauncher) all restart this script and have raced each other
+# into duplicate chains — two chains double-process the same leads. flock makes
+# the winner exclusive; every later launch exits here quietly. The lock dies
+# with the process, so a crashed chain never wedges the next launch.
+exec 9>"$DIR/.chain-lock"
+if ! flock -n 9; then
+  log "another chain instance already holds the lock — exiting (pid $$)"
+  exit 0
+fi
+
 # Supadata preflight (added 2026-08-07, fixed same day): enrichment dies at the
 # transcript stage when the Supadata plan quota is exhausted (the 2026-08-05
 # incident burned 187 leads' retry budget in ~70 min). Probe before every batch;
@@ -132,7 +143,7 @@ while true; do
   runlog=$DIR/$(basename "$file" -ids.txt)-run.log
   log "launching batch: count=$count pool=$pool excluded=$excluded file=$file"
   (cd "$EMAIL" && YOUTUBE_API_BACKEND=rapidapi npm run outreach -- \
-    --lead-ids-file "$file" --stop-after enrich --concurrency "${BACKFILL_CONCURRENCY:-12}") \
+    --lead-ids-file "$file" --stop-after enrich --concurrency "${BACKFILL_CONCURRENCY:-8}") \
     >"$runlog" 2>&1
   rc=$?
   done_n=$(grep -c "enrich run done" "$runlog" 2>/dev/null || echo 0)
