@@ -247,6 +247,70 @@ function autocompleteBlocked(): boolean {
   // No fresh marker in the newest logs — trust the persisted backoff (fixes the oscillation).
   return blockedRecently();
 }
+// --- Low-yield harvest backoff (2026-08-09) ---------------------------------
+// The 08-08 prefilter reject cache did its job: harvests stopped re-classifying the same
+// ~4.3k already-rejected terms (92.1% of candidates now skipped from cache). What it
+// EXPOSED is that the 42-seed autocomplete set is mined out. Over the 08-09 cycle 14
+// harvests were offered 58,746 candidates, found 4,617 genuinely unjudged, and kept 15
+// terms — seven of the fourteen wrote nothing at all. Yet every one of the 14 sessions
+// opened `STOCK-UP` with `fresh: 0`, which force-harvests at a 1h floor, so the loop paid
+// ~21 minutes of session startup EVERY session (301 min across the cycle) for about one
+// usable term. The stock-up gate is structurally unsatisfiable against an exhausted seed
+// set: the handful of terms a harvest does write are consumed immediately, so the next
+// pre-flight reads `fresh: 0` again and re-fires.
+//
+// That time is not spare capacity — all 14 sessions ended on their time budget, so it
+// comes straight out of finding (a pass is ~9 min and writes ~8.7 new leads).
+//
+// So: measure what a harvest actually WRITES and back off when it stops paying. Same
+// shape as the autocomplete-block guard above, and self-clearing for the same reason —
+// after the window one harvest always runs, and a single good yield clears the streak and
+// restores normal cadence. That matters because harvest yield is not permanently dead:
+// editing skills/keyword-icp-prefilter.md or models.json invalidates the reject cache
+// fingerprint and everything becomes judgeable again, and new seeds do the same.
+//
+// Fail-open on supply: a harvest whose yield can't be parsed (crash, changed output)
+// records NO sample, so it neither extends nor starts a backoff streak. The worst case
+// of an unreadable harvest is the status quo, never a silently disabled one.
+// Escape hatch: HARVEST_LOW_YIELD_BACKOFF_HOURS=0 disables the guard entirely.
+interface HarvestYieldSample { ts: string; probes: number }
+function harvestYieldStatePath(): string {
+  return join('logs', 'keyword-harvest-yield-state.json');
+}
+function readHarvestYield(): HarvestYieldSample[] {
+  try {
+    const s = JSON.parse(readFileSync(harvestYieldStatePath(), 'utf8')) as { runs?: HarvestYieldSample[] };
+    return Array.isArray(s.runs) ? s.runs.filter(r => r && Number.isFinite(r.probes)) : [];
+  } catch { return []; }
+}
+function recordHarvestYield(probes: number): void {
+  try {
+    mkdirSync('logs', { recursive: true });
+    const runs = [...readHarvestYield(), { ts: new Date().toISOString(), probes }].slice(-20);
+    writeFileSync(harvestYieldStatePath(), JSON.stringify({ runs }) + '\n');
+  } catch { /* best-effort; a missing sample only means we harvest again next interval */ }
+}
+// How many probes did this harvest write? Reads the two terminal lines keyword-harvest.ts
+// prints on its write path. Returns null when neither is present — see fail-open above.
+export function parseHarvestProbes(stdout: string): number | null {
+  const done = [...stdout.matchAll(/\[harvest\] done\. (\d+) probes written/g)];
+  if (done.length) return Number(done[done.length - 1][1]);
+  if (/\[harvest\] nothing to write\./.test(stdout)) return 0;
+  return null;
+}
+// Have the last N harvests all come back near-empty, and was the newest one recent enough
+// that the seed set can't plausibly have refilled since? Exported for the unit check.
+export function harvestLowYieldBackoff(
+  runs: HarvestYieldSample[],
+  nowMs: number,
+  env: { samples: number; minProbes: number; backoffH: number },
+): { skip: boolean; streak: number; sinceH: number } {
+  const recent = runs.slice(-env.samples);
+  const streak = recent.length === env.samples && recent.every(r => r.probes < env.minProbes) ? env.samples : 0;
+  const lastTs = runs.length ? Date.parse(runs[runs.length - 1].ts) : NaN;
+  const sinceH = Number.isFinite(lastTs) ? (nowMs - lastTs) / 3_600_000 : Infinity;
+  return { skip: env.backoffH > 0 && streak > 0 && sinceH < env.backoffH, streak, sinceH };
+}
 function hoursSinceLastHarvest(): number {
   try {
     const s = JSON.parse(readFileSync(harvestStatePath(), 'utf8')) as { last?: string };
@@ -280,18 +344,40 @@ async function harvestKeywords(opts: CampaignOpts, intervalOverrideH?: number): 
     log({ event: 'keyword_harvest', skipped: true, reason: 'autocomplete_blocked' });
     return false;
   }
+  // Low-yield backoff (2026-08-09). Checked BEFORE the cadence gate because the STOCK-UP
+  // pre-flight deliberately overrides that gate down to 1h — which is exactly the caller
+  // that was force-firing an exhausted harvest every session.
+  const lowYield = harvestLowYieldBackoff(readHarvestYield(), Date.now(), {
+    samples: Number(process.env.HARVEST_LOW_YIELD_SAMPLES ?? 3),
+    minProbes: Number(process.env.HARVEST_LOW_YIELD_MIN_PROBES ?? 3),
+    backoffH: Number(process.env.HARVEST_LOW_YIELD_BACKOFF_HOURS ?? 6),
+  });
+  if (lowYield.skip) {
+    console.log(
+      `[campaign] keyword harvest skipped — last ${lowYield.streak} harvests each wrote < ` +
+        `${process.env.HARVEST_LOW_YIELD_MIN_PROBES ?? 3} probes (autocomplete seed set is mined out); ` +
+        `backing off ${process.env.HARVEST_LOW_YIELD_BACKOFF_HOURS ?? 6}h, ${lowYield.sinceH.toFixed(1)}h elapsed. ` +
+        `Time goes to finder passes instead. Remedy is supply-side: new seeds, or edit the prefilter skill / models.json (either invalidates the reject cache).`,
+    );
+    log({ event: 'keyword_harvest', skipped: true, reason: 'low_yield_backoff', streak: lowYield.streak, since_hours: Number(lowYield.sinceH.toFixed(2)) });
+    return false;
+  }
   if (sinceH < intervalH) {
     console.log(`[campaign] keyword harvest skipped — last run ${sinceH.toFixed(1)}h ago (< ${intervalH}h gate).`);
     log({ event: 'keyword_harvest', skipped: true, since_hours: Number(sinceH.toFixed(2)) });
     return false;
   }
   console.log(`[campaign] harvesting real autocomplete terms → probes (cap ${cap})…`);
-  const r = await runChild('npx', ['tsx', 'scripts/keyword-harvest.ts', '--apply', '--cap', String(cap)], finderRepo());
+  const r = await runChildCapture('npx', ['tsx', 'scripts/keyword-harvest.ts', '--apply', '--cap', String(cap)], finderRepo());
+  // runChildCapture tees to the terminal, so the session log is byte-identical to before;
+  // we just also get the stdout needed to read the yield.
+  const probes = parseHarvestProbes(r.stdout);
+  if (probes !== null) recordHarvestYield(probes);
   // Record the ATTEMPT regardless of exit code so a persistently-failing harvest can't
   // re-block the session every pass; a transient failure simply retries next interval.
   mkdirSync('logs', { recursive: true });
   writeFileSync(harvestStatePath(), JSON.stringify({ last: new Date().toISOString(), exit: r.exit_code, cap }) + '\n');
-  log({ event: 'keyword_harvest', skipped: false, exit: r.exit_code, cap });
+  log({ event: 'keyword_harvest', skipped: false, exit: r.exit_code, cap, probes_written: probes });
   // If this run just slammed into the 403 wall, persist the block now (autocompleteBlocked()
   // reads this session's fresh marker and stamps) so the NEXT session backs off immediately
   // instead of oscillating back into another futile harvest.
