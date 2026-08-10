@@ -123,32 +123,53 @@ while true; do
     log "supadata is back — resuming batches"
   fi
 
-  # RapidAPI quota gate (2026-08-10): two machines share one RapidAPI YouTube
-  # quota pool; when the daily bucket drains, every lead 429s at the channels
-  # fetch (301/301 failed on 08-10). One probe call per batch attempt — a 429
-  # answer means wait, not launch. Rejected 429 calls don't consume quota.
-  rapidapi_ok() {
-    local code
-    code=$(node -e '
+  # YouTube quota gate (2026-08-10, generalized same day for backend=auto):
+  # the batch runs with YOUTUBE_API_BACKEND=auto — direct-key rotation first
+  # (pool grew 7 → 39 keys on 08-10), RapidAPI fallback. So only wait when
+  # BOTH pools are dead: every direct key exhausted/blocked AND RapidAPI 429.
+  # A pure RapidAPI-429 wait would idle the chain while 39 healthy direct
+  # keys sit unused (the 08-10 outage shape). Direct probe = 1 unit/key max;
+  # rejected 429 RapidAPI calls don't consume quota.
+  youtube_quota_ok() {
+    local out
+    out=$(node -e '
 const { existsSync } = require("fs");
 const { homedir } = require("os");
 const { join } = require("path");
 const dotenv = require("/home/casey/repos/quick-youtube-channel-research-v1/node_modules/dotenv");
 const shared = [process.env.SHARED_ENV_FILE, join(homedir(),"Claude","env-storage",".env"), join(homedir(),"env-storage",".env")].filter(Boolean).find((p)=>existsSync(p));
 if (shared) dotenv.config({ path: shared });
-const key=(process.env.RAPIDAPI_KEY||"").trim(), host=(process.env.RAPIDAPI_YOUTUBE_HOST||"").trim();
-if(!key||!host){console.log("NOKEYS");process.exit(0);}
-fetch(`https://${host}/channels?part=id&id=UC_x5XG1OV2P6uZZ5FSM9Ttw`,{headers:{"x-rapidapi-key":key,"x-rapidapi-host":host}}).then(r=>console.log(r.status)).catch(()=>console.log("ERR"));
-' 2>/dev/null)
-    [ "$code" != "429" ]
+const keys=[]; const seen=new Set();
+const add=(v)=>{v=(v||"").trim(); if(v&&!seen.has(v)){seen.add(v);keys.push(v);}};
+add(process.env.YOUTUBE_API_KEY);
+let gap=0;
+for(let i=1;i<=60;i++){const v=process.env[`YOUTUBE_API_KEY_${i}`]; if(v){gap=0;add(v);} else if(++gap>=5) break;}
+(async()=>{
+  for(const k of keys){
+    try{
+      const r=await fetch(`https://www.googleapis.com/youtube/v3/channels?part=id&id=UC_x5XG1OV2P6uZZ5FSM9Ttw&key=${k}`);
+      if(r.status===200){console.log("OK direct");return;}
+    }catch{}
   }
-  if ! rapidapi_ok; then
-    log "rapidapi quota exhausted — waiting (probe every 30m, silent until it clears)"
-    while ! rapidapi_ok; do
+  const key=(process.env.RAPIDAPI_KEY||"").trim(), host=(process.env.RAPIDAPI_YOUTUBE_HOST||"").trim();
+  if(key&&host){
+    try{
+      const r=await fetch(`https://${host}/channels?part=id&id=UC_x5XG1OV2P6uZZ5FSM9Ttw`,{headers:{"x-rapidapi-key":key,"x-rapidapi-host":host}});
+      if(r.status!==429){console.log("OK rapidapi "+r.status);return;}
+    }catch{}
+  }
+  console.log(keys.length===0&&!key?"NOKEYS":"DRAINED");
+})();
+' 2>/dev/null)
+    case "$out" in OK*|NOKEYS) return 0 ;; *) return 1 ;; esac
+  }
+  if ! youtube_quota_ok; then
+    log "youtube quota exhausted on BOTH pools (direct + rapidapi) — waiting (probe every 30m, silent until it clears)"
+    while ! youtube_quota_ok; do
       [ -f "$HALT" ] && { log "halt flag present — stopping"; exit 0; }
       sleep 1800
     done
-    log "rapidapi quota is back — resuming batches"
+    log "youtube quota is back — resuming batches"
   fi
 
   # Enrichment-base capacity gate (2026-08-09): the 08-09 mass-fail was 495
@@ -204,7 +225,10 @@ fetch(`https://${host}/channels?part=id&id=UC_x5XG1OV2P6uZZ5FSM9Ttw`,{headers:{"
 
   runlog=$DIR/$(basename "$file" -ids.txt)-run.log
   log "launching batch: count=$count pool=$pool excluded=$excluded file=$file"
-  (cd "$EMAIL" && YOUTUBE_API_BACKEND=rapidapi npm run outreach -- \
+  # Backend switched rapidapi → auto 2026-08-10 (Casey): RapidAPI is 429-dead
+  # and the direct pool grew 7 → 39 keys. auto = direct rotation first, RapidAPI
+  # fallback when the pool drains.
+  (cd "$EMAIL" && YOUTUBE_API_BACKEND=auto npm run outreach -- \
     --lead-ids-file "$file" --stop-after enrich --concurrency "${BACKFILL_CONCURRENCY:-8}") \
     >"$runlog" 2>&1
   rc=$?
