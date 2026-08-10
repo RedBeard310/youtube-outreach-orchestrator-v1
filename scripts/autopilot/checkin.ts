@@ -447,6 +447,7 @@ async function main(): Promise<void> {
     { method: 'recommended_videos_feed', timer: 'graph-sweep-refill.timer', stateFile: 'graph-sweep-state.json', maxAgeH: 8 },
     { method: 'peer_sweep', timer: 'peer-sweep-refill.timer', stateFile: 'peer-sweep-state.json', maxAgeH: 8 },
     { method: 'comment_sweep', timer: 'comment-sweep-daily.timer', stateFile: 'comment-sweep-state.json', maxAgeH: 30 },
+    { method: 'podcast_crossover', timer: 'podcast-crossover-daily.timer', stateFile: 'podcast-crossover-state.json', maxAgeH: 30 },
   ];
   for (const c of sweepChecks) {
     const enabled = isEnabled(c.timer);

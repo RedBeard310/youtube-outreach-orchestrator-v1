@@ -43,6 +43,7 @@ function discoveryMethodsHealth(): Record<string, unknown> {
   const graphUpdated = sweepStateUpdatedAt('graph-sweep-state.json');
   const commentUpdated = sweepStateUpdatedAt('comment-sweep-state.json');
   const peerUpdated = sweepStateUpdatedAt('peer-sweep-state.json');
+  const podcastUpdated = sweepStateUpdatedAt('podcast-crossover-state.json');
   return {
     recommended_videos_feed: {
       service_active: serviceActive('graph-sweep.service'),
@@ -63,6 +64,12 @@ function discoveryMethodsHealth(): Record<string, unknown> {
       refill_timer_active: serviceActive('peer-sweep-refill.timer'),
       state_updated_at: peerUpdated,
       hours_since_update: hoursSince(peerUpdated),
+    },
+    podcast_crossover: {
+      daily_timer_active: serviceActive('podcast-crossover-daily.timer'),
+      state_updated_at: podcastUpdated,
+      hours_since_update: hoursSince(podcastUpdated),
+      stale: hoursSince(podcastUpdated) !== null && (hoursSince(podcastUpdated) as number) > 30,
     },
   };
 }
@@ -279,6 +286,7 @@ async function main(): Promise<void> {
     if (first.startsWith('peer-comment:')) return 'peer_network';
     if (first.startsWith('peer-guest:')) return 'guest_link_mining';
     if (first.startsWith('comment:')) return 'comment_sweep';
+    if (first.startsWith('podcast:')) return 'podcast_crossover';
     return 'keyword_search';
   }
   const byMethod: Record<string, number> = {};
