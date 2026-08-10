@@ -24,12 +24,15 @@ YouTube key, and "direct quota exhausted" is NOT a dead end.
   Rotation is automatic and failure-specific: 403 quota/blocked marks a key sticky-dead and moves
   on; 429 rotates but keeps the key eligible; any other 403 (e.g. `commentsDisabled`) propagates
   and never burns a key.
-- **When every direct key is dead, `auto` mode falls through to the RapidAPI YouTube mirror** —
-  a separate paid credit pool (`RAPIDAPI_KEY` + `RAPIDAPI_YOUTUBE_HOST`, host
-  `youtube-data-api-v33.p.rapidapi.com`) returning identical JSON. All repos default to
-  `YOUTUBE_API_BACKEND=auto` (the var is unset everywhere = auto). A run should degrade to
-  RapidAPI, not halt, when direct keys drain. Don't forget these credits exist when planning
-  or debugging quota problems.
+- **RapidAPI is being retired (2026-08-10) — see the YouTube API Key Pool block at the bottom
+  of this file.** Historically, when every direct key died, `auto` mode fell through to the
+  RapidAPI YouTube mirror (`RAPIDAPI_KEY` + `RAPIDAPI_YOUTUBE_HOST`, host
+  `youtube-data-api-v33.p.rapidapi.com`), a separate paid credit pool returning identical JSON.
+  Those credits stop working within days of 2026-08-10. All repos still default to
+  `YOUTUBE_API_BACKEND=auto` (the var is unset everywhere = auto), and `auto` behaves as
+  direct-only once RapidAPI is gone, so no config change is needed. What changes: when the
+  direct pool drains, a run now halts instead of degrading. That's expected. The answer is more
+  direct keys, and the pool went from 9 to 39 on 2026-08-10 for exactly that reason.
 - **Canonical doc: `youtube-deep-research-v1/docs/youtube-api-key-rotation.md`** — the portable
   spec for the whole scheme (env contract, rotation rules, reference implementation, quota
   costs). Read it before touching or re-implementing any key handling anywhere.
@@ -451,3 +454,24 @@ Key values must never be printed, echoed, logged, or committed. That applies to 
 - Mac: `~/Claude/casey-assistant/brain/infrastructure/notion-access.md`
 - VPS: `/home/casey/repos/casey-assistant/brain/infrastructure/notion-access.md`
 <!-- /NOTION-ACCESS -->
+
+<!-- YOUTUBE-KEY-POOL v1 — managed block; keep identical in every repo -->
+## YouTube API Key Pool (house law — updated 2026-08-10)
+
+**The pool is 39 keys, not 9.** It was rebuilt on 2026-08-10 from the Notion "YouTube API Key Database" and every key was tested against the live API first. That's roughly 390,000 quota units a day.
+
+**Expect it to keep growing.** Casey is adding Google Cloud accounts and wants the pool doubled or tripled within a week of 2026-08-10. So never hard-code a key count, a slot ceiling, or a "we have N keys" assumption. Read `YOUTUBE_API_KEY_1..N` out of the env and use however many are there.
+
+**RapidAPI is being retired.** `RAPIDAPI_KEY` stops working within days of 2026-08-10. That is planned, not a fault, and it needs no config change: nothing anywhere pins `YOUTUBE_API_BACKEND`, so every repo runs `auto`, and `auto` already behaves as direct-keys-only when RapidAPI is missing. Don't build anything new on the mirror, and don't debug its failure as a bug. If a run dies with every direct key exhausted, the answer is more keys, not reviving RapidAPI.
+
+**Keep the slot numbering contiguous, starting at `_1`.** Several key loaders stop scanning after 5 empty slots in a row. If you retire a dead key from the middle of the pool, renumber the rest. A gap of 5 or more silently hides every key past it, and the only symptom is a smaller pool than you expected with no error raised.
+
+**A dead key is normal, not an incident.** Keys go over daily quota or get their Google Cloud project suspended. Rotate past them. Match failures specifically: `quotaExceeded` and `keyInvalid` retire a key for the run, `403 forbidden` means suspended, a plain 429 rotates but keeps the key eligible, and anything else (like `commentsDisabled`) must propagate without burning a key.
+
+**Source of truth is the Notion "YouTube API Key Database."** New keys land there before they reach `.env`, so re-read it rather than assuming the pool is current. It needs no Notion connector, only the API token (see the Notion Access block). The `Select` column carries Working / Suspended, and a blank status means nobody has checked yet, not that the key is bad.
+
+**Full detail:**
+
+- Rotation spec: `youtube-deep-research-v1/docs/youtube-api-key-rotation.md`
+- Pool history and audit method: `casey-assistant/brain/infrastructure/youtube-api-key-pool.md`
+<!-- /YOUTUBE-KEY-POOL -->
