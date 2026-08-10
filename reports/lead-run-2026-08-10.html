@@ -1,0 +1,222 @@
+<title>Lead Run Debrief — 2026-08-10</title>
+<style>
+  :root {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --good-soft: #1f8a5b1a; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+      --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+      --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --good-soft: #55c48c1c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --good-soft: #1f8a5b1a; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+    --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+    --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --good-soft: #55c48c1c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 40px 22px 80px; }
+  .eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); font-weight: 600; }
+  h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.12; margin: 10px 0 6px; text-wrap: balance; letter-spacing: -.02em; }
+  h2 { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); margin: 44px 0 16px; font-weight: 700; }
+  h3 { font-size: 18px; margin: 0 0 6px; letter-spacing: -.01em; }
+  p { margin: 0 0 14px; }
+  .lede { font-size: 18px; color: var(--ink-soft); max-width: 68ch; }
+  .tag { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--good-soft); color: var(--good); letter-spacing: .02em; }
+  .tag.warn { background: var(--amber-soft); color: var(--amber); }
+  .grid { display: grid; gap: 14px; }
+  .stats { grid-template-columns: repeat(4, 1fr); margin-top: 26px; }
+  @media (max-width: 720px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; box-shadow: var(--shadow); }
+  .stat .n { font-size: 30px; font-weight: 750; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .stat .l { font-size: 12.5px; color: var(--ink-soft); margin-top: 3px; }
+  .stat .s { font-size: 12px; margin-top: 8px; font-weight: 600; }
+  .up { color: var(--good); } .down { color: var(--red); } .warn { color: var(--amber); }
+  .accent-red { border-left: 3px solid var(--red); }
+  .accent-teal { border-left: 3px solid var(--teal); }
+  .accent-amber { border-left: 3px solid var(--amber); }
+  .accent-good { border-left: 3px solid var(--good); }
+
+  /* shape-of-day bar strip */
+  .strip { display: flex; align-items: flex-end; gap: 2px; height: 120px; padding: 14px 14px 10px; overflow-x: auto; }
+  .bar { flex: 1 0 6px; min-width: 5px; border-radius: 2px 2px 0 0; background: var(--teal); opacity: .9; }
+  .bar.zero { background: var(--red); height: 4px !important; opacity: .9; }
+  .bar.low { background: var(--amber); }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-soft); padding: 0 14px 14px; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+
+  .q { border-radius: 14px; padding: 20px 22px; margin-bottom: 14px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); }
+  .q .ask { font-size: 17px; font-weight: 700; color: var(--ink); margin-bottom: 10px; display: flex; gap: 10px; align-items: baseline; }
+  .q .ask .qn { color: var(--red); font-weight: 800; flex: 0 0 auto; }
+  .q p { color: var(--ink-soft); }
+  .q b { color: var(--ink); }
+  .pill { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink); background: var(--panel-2); padding: 1px 7px; border-radius: 6px; border: 1px solid var(--line); white-space: nowrap; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+  th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); }
+  td .num { font-variant-numeric: tabular-nums; font-weight: 650; }
+  td.n { font-variant-numeric: tabular-nums; text-align: right; }
+  .fix td:first-child { color: var(--good); font-weight: 650; }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); box-shadow: var(--shadow); margin-bottom: 14px; }
+  ol.recs { padding-left: 0; list-style: none; counter-reset: r; margin: 0; }
+  ol.recs li { counter-increment: r; position: relative; padding: 14px 16px 14px 52px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 10px; box-shadow: var(--shadow); }
+  ol.recs li::before { content: counter(r); position: absolute; left: 14px; top: 14px; width: 26px; height: 26px; border-radius: 8px; background: var(--teal-soft); color: var(--teal); font-weight: 800; font-size: 14px; display: grid; place-items: center; }
+  ol.recs b { color: var(--ink); }
+  .foot { margin-top: 46px; padding: 16px 18px; border-radius: 12px; background: var(--amber-soft); border: 1px solid var(--line); font-size: 14px; color: var(--ink-soft); }
+  .foot b { color: var(--ink); }
+  .muted { color: var(--ink-soft); font-size: 13.5px; }
+</style>
+
+
+<div class="wrap">
+
+  <div class="eyebrow">Lead Run Debrief · YouTube outreach</div>
+  <h1>2026-08-10 — the best day in nine, and the finder was taking credit for it</h1>
+  <p class="lede">The pool grew by <b>350</b>, more than the last four days put together. Almost none of that came from the original keyword engine. Five other ways of finding creators now write into the same database, they supplied <b>81% of the day's intake</b>, and because the finder measures itself by watching that database, it has been reporting their work as its own.</p>
+  <div style="margin-top:14px"><span class="tag">CLEAN CYCLE · 11TH IN A ROW WITH NO FATAL ERRORS</span></div>
+
+  <div class="grid stats">
+    <div class="card stat accent-good">
+      <div class="n">+350</div>
+      <div class="l">parked into <code>approved_hold</code></div>
+      <div class="s up">pool 4,267 → 4,617, best since 08-01</div>
+    </div>
+    <div class="card stat accent-teal">
+      <div class="n">5,332</div>
+      <div class="l">creators discovered</div>
+      <div class="s up">up 48% on yesterday's 3,600</div>
+    </div>
+    <div class="card stat accent-teal">
+      <div class="n">19%</div>
+      <div class="l">of intake came from the keyword engine</div>
+      <div class="s">1,017 rows. The other five methods wrote 4,315</div>
+    </div>
+    <div class="card stat accent-amber">
+      <div class="n">3.2%</div>
+      <div class="l">of peer-network finds were pitchable</div>
+      <div class="s warn">1,280 creators in, 41 worth contacting</div>
+    </div>
+  </div>
+
+  <h2>The shape of the day</h2>
+  <div class="card" style="padding:0">
+    <div class="strip" id="strip"></div>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--teal)"></span>strong pass (6+ pitchable seen)</span>
+      <span><span class="dot" style="background:var(--amber)"></span>light (1 to 5)</span>
+      <span><span class="dot" style="background:var(--red)"></span>empty pass (0), <b>only 5 all day</b></span>
+    </div>
+  </div>
+  <p class="muted">Each bar is one finder pass (132 total, across 16 sessions). Height is what the pass <i>reported</i> as its own fresh pitchable yield. Read the shape, not the height: this is the number today's fix corrects, because it counts every pitchable creator that appeared in the database while the pass was running, including the ones the five other methods wrote.</p>
+
+  <h2>The three questions</h2>
+
+  <div class="q accent-good">
+    <div class="ask"><span class="qn">Q1</span><span>Where did +350 come from?</span></div>
+    <p><b>From having six ways to find creators instead of one.</b> The pool went <span class="pill">4,267 → 4,617</span>, the biggest single-day gain since 08-01 and the fourth-biggest on record. Intake rose <b>48%</b> to 5,332 creators, and the split by method is the whole story:</p>
+    <div class="tablewrap" style="margin-top:6px">
+      <table>
+        <thead><tr><th>How it found them</th><th class="n">Creators</th><th class="n">Worth contacting</th><th class="n">Hit rate</th></tr></thead>
+        <tbody>
+          <tr><td>Recommended-videos feed</td><td class="n">2,028</td><td class="n">482</td><td class="n">23.8%</td></tr>
+          <tr><td>Peer-network comments</td><td class="n">1,280</td><td class="n">41</td><td class="n warn">3.2%</td></tr>
+          <tr><td>Keyword search (the original finder)</td><td class="n">1,017</td><td class="n">255</td><td class="n">25.1%</td></tr>
+          <tr><td>Comment sweep</td><td class="n">986</td><td class="n">117</td><td class="n">11.9%</td></tr>
+          <tr><td>Guest-link mining</td><td class="n">11</td><td class="n">4</td><td class="n">36.4%</td></tr>
+          <tr><td>Podcast crossover</td><td class="n">10</td><td class="n">2</td><td class="n">20.0%</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p><b>The verify rate improved too, for the first time in weeks.</b> Of today's creators who reached an email outcome, <b>363 parked and 492 went to <code>needs_contact</code></b>, which is a <b>42.5% verify rate</b> against the low-to-mid thirties this has held all month. Treat that as directional rather than settled: the day's leads were counted about an hour after the cycle closed, so some are still being worked.</p>
+    <p>The loop itself was quiet and healthy. <b>16 sessions, 132 finder passes, 0 hard stops, 0 quota stops, 0 crashes, 0 scoring failures</b>, every session ending on its own time budget rather than on a problem.</p>
+  </div>
+
+  <div class="q accent-red">
+    <div class="ask"><span class="qn">Q2</span><span>So why does the finder think it had a great day?</span></div>
+    <p><b>Because it grades itself by looking at the shared database, and it is no longer the only thing writing there.</b> A finder pass records what it produced by asking the lead database which rows appeared since the pass began. That was accurate when the keyword engine was the only writer. Since 08-08 three background services have been writing continuously into the same place, and the newest of them, peer-network comments, only started yesterday and wrote 1,280 rows today.</p>
+    <p>The gap is not subtle. Across 132 passes the counter claimed <span class="pill">762 fresh pitchable</span> for itself. The keyword engine's entire output for the <em>whole 24 hours</em> was <span class="pill">255</span>. So at least two-thirds of what those passes claimed was work something else did, and the real figure is lower still, because passes only cover part of the day.</p>
+    <p><b>The number moved in the opposite direction to reality.</b> Reported per-pass yield went from 2.40 yesterday to 5.77 today, which reads like the finder suddenly got twice as good. Measured properly, the keyword engine's pitchable-per-pass <b>fell</b>, from 3.75 to 1.93. Yesterday's report told the same story in reverse and nobody could see it: the counter also misses everything found between passes, and until peer-sweep arrived that undercount was bigger than the over-credit, so the two errors hid each other.</p>
+    <p><b>What it actually costs.</b> That number is the trigger for the fade check, the rule that says "this batch of search terms is worked out, go invent new ones." A pass that reads 12 or more is treated as still productive and skips the pivot. <b>Eight passes cleared 12 today</b>, and on the keyword engine's real rate none of them plausibly did it on their own work. Eight missed pivots is small. The direction is not: the background services are days old and growing, so left alone this quietly switches off the mechanism that keeps the term supply alive. <b>Fixed today.</b></p>
+  </div>
+
+  <div class="q accent-amber">
+    <div class="ask"><span class="qn">Q3</span><span>Did yesterday's harvest backoff deliver?</span></div>
+    <p><b>Yes, at about half the size predicted.</b> The search-term harvest stopped force-firing every session: it ran <b>6 times against 14</b>, skipped <b>106 times</b> on the new low-yield backoff and 26 more on the ordinary cadence gate. Session startup fell from <b>21.5 minutes to 13.7</b>, and the cycle spent <b>218 minutes on startup instead of 301</b>, with 16 sessions running rather than 14.</p>
+    <p>The forecast was roughly four harvests, startup near a few minutes, and passes clearing 140. Actual: six harvests, 13.7 minutes, <b>132 passes</b>. The shortfall is simply that the harvest was never the only thing in the opening stretch. The reservoir check, the verify kickoff, promotion and probe evaluation all sit there too, so removing the harvest cannot take startup to zero.</p>
+    <p><b>And the source really is dry.</b> The six harvests that did run wrote <b>4 usable terms between them</b> (0, 1, 2, 0, 1, and one unmeasured). The backoff is stopping waste, not restoring supply. Term supply held anyway: <b>138 discovery runs, 131 promotions, 0 quota stops</b>, which is the invented-vein path carrying the pool on its own.</p>
+  </div>
+
+  <h2>What broke, what's fixed</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Issue</th><th>Mechanism</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr class="fix"><td>The finder counted other services' work as its own</td><td>A pass measures itself by diffing the shared lead database, and three background services now write there continuously</td><td class="up">Fixed today. The fade signal counts keyword-engine rows only; the base-wide figure is still logged next to it</td></tr>
+        <tr class="fix"><td>An exhausted harvest force-fired every session (08-09's finding)</td><td>The stock-up gate read <code>fresh: 0</code> and forced a harvest at a 1h floor</td><td class="up">Fixed and now proven: 6 harvests instead of 14, startup 21.5 min → 13.7, 106 skips logged</td></tr>
+        <tr><td>Peer-network comments has a 3.2% hit rate</td><td>1,280 creators mined for 41 worth contacting, roughly one eighth the precision of every other method</td><td class="warn">Open, and one day old. Worth a look before it becomes a quarter of intake permanently</td></tr>
+        <tr><td>Overall pitchable rate fell, 24.1% to 16.9%</td><td>Intake grew 48% but the growth came mostly from the two lowest-precision methods</td><td class="warn">Open. Volume is not the constraint any more, precision is</td></tr>
+        <tr><td>Verify rate still leaves most creators uncontactable</td><td>Roughly six in ten qualified creators have no verifiable email address</td><td class="warn">Improved to 42.5% today, from the low thirties. The <code>needs_contact</code> recovery engine is still not built</td></tr>
+        <tr><td>Nothing has ever been sent</td><td>No outlet decided for <code>approved_hold</code></td><td class="down">Open. 10,322 creators parked across both lanes, 0 emailed</td></tr>
+        <tr><td>Autocomplete term source is mined out</td><td>6 harvests wrote 4 terms. Invented-vein discovery is carrying the pool alone</td><td class="warn">Open. New seeds are the supply-side answer, and a good yield clears the backoff by itself</td></tr>
+        <tr><td>OpenRouter spend is invisible</td><td>The burn ledger only meters Anthropic, and the pipeline stopped using Anthropic on 08-01</td><td class="warn">Open. Six discovery methods now run LLM work that nothing counts</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Shipped today</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Repo</th><th>Commit</th><th>What it does</th></tr></thead>
+      <tbody>
+        <tr><td><code>youtube-outreach-orchestrator-v1</code></td><td><code>bc3945a</code></td><td>Attributes each finder pass's yield to the method that actually produced it. The rule that reads a lead's origin tag moved into one shared file, <code>src/discovery-method.ts</code>, so the daily report and the finder can never drift apart. A pass now reports two numbers: the base-wide count it always reported, which still feeds the scoring-health checks because the scorer is shared by every method and a bigger sample is a better one, and a keyword-engine-only count, which is what the fade check reads. Both go into the run log, so the trend line stays readable across the change. Deliberately fail-soft: anything the tagger does not recognise counts as the keyword engine, so if attribution ever breaks the finder over-counts exactly as it does today instead of reading zero on every pass and throwing the campaign into permanent discovery churn.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="muted">Verified before commit: TypeScript clean; 13 tagger cases green, covering all six method prefixes, a bare untagged term, a null field, an empty string, malformed JSON and a two-entry array in both orders; 3 yield-split cases green, covering a mixed pass, the host-identified gate and an empty pass; and the campaign command was run and correctly no-opped against the live lockfile, which proves the new module loads in the real entry point. No API calls, so it cost nothing.</p>
+
+  <h2>Recommended next — ranked</h2>
+  <ol class="recs">
+    <li><b>Decide the outlet for <code>approved_hold</code>.</b> 4,617 creators are prepped and waiting, and none has been emailed. This has led the list for over a week, and today it grew faster than on any day since 08-01. It is still the only item here that needs a decision from you rather than code.</li>
+    <li><b>Look at peer-network comments before it settles in.</b> It took 24% of the day's intake and returned 4.6% of the pitchable. Every other method runs between 12% and 36% precision; this one runs 3.2%. It is one day old, so this is the cheap moment to tighten which channels it mines or to cap its share. It also spends YouTube quota that the higher-precision methods could use.</li>
+    <li><b>Build the <code>needs_contact</code> recovery engine.</b> 5,705 creators, still the larger lane, and it grew by roughly 490 today against the parked pool's 350. Today's verify rate was the best in weeks and this lane still grew faster.</li>
+    <li><b>Check tomorrow that the corrected yield reads right.</b> Expect reported fresh-pitchable per pass to drop to roughly 2, not because anything got worse but because it is finally counting the right rows. Expect nearly every pass to fade and pivot to discovery, which is correct behaviour at that rate. The line <code>of which this pass's own keyword-engine work</code> in the session logs shows both numbers side by side.</li>
+    <li><b>Feed the harvest new seeds.</b> Six harvests wrote four terms. The backoff stops the waste but does not restore the supply, and the 42-seed set is fully mined against the current classifier. This is now the only stalled leg of the three term sources.</li>
+    <li><b>Meter OpenRouter as a real cost.</b> The ledger still reads $0 because it only counts Anthropic. Six discovery methods and a scorer now run on OpenRouter, so the unmetered volume is growing rather than shrinking.</li>
+  </ol>
+
+  <div class="foot">
+    <b>Status:</b> everything is parked, nothing sent. <code>approved_hold</code> 4,617 plus <code>needs_contact</code> 5,705 is <b>10,322 creators found and never contacted</b>, past ten thousand for the first time. The cycle cost <b>$0 on Anthropic</b> (OpenRouter spend is real but not metered here), had <b>0 quota stops, 0 hard stops, 0 crashes, 0 scoring failures and no fatal signatures</b>, which makes eleven clean cycles running. All 16 sessions finished on their time budget, and all four background discovery services reported fresh state. The loop is still running and has not been paused.
+  </div>
+
+</div>
+
+<script>
+  // Reported fresh_pitchable per finder pass, chronological, from logs/campaign-2026-08-09.jsonl
+  // and campaign-2026-08-10.jsonl inside the 07:00Z→07:00Z cycle window. NOTE: base-wide,
+  // i.e. inflated by the sweep daemons' concurrent writes — this is the metric today's fix
+  // corrects, kept here as-logged so the day's shape is honest about what was recorded.
+  var seq = [2,5,4,2,2,1,0,5,7,3,5,2,9,10,3,6,11,1,10,9,5,0,4,5,9,12,7,8,5,4,3,8,8,8,12,4,6,10,4,9,10,6,9,6,4,7,12,6,22,5,3,8,7,10,3,12,9,7,3,3,6,2,5,7,2,3,9,3,8,4,8,3,12,6,16,0,7,7,7,11,4,1,7,12,11,5,7,5,4,10,6,9,5,3,11,5,2,2,10,3,2,3,4,2,5,2,1,1,2,1,4,3,0,0,1,1,1,2,3,7,10,7,7,9,9,6,11,10,15,2,1,2];
+  var max = Math.max.apply(null, seq);
+  var strip = document.getElementById('strip');
+  seq.forEach(function (v) {
+    var b = document.createElement('div');
+    b.className = 'bar' + (v === 0 ? ' zero' : v < 6 ? ' low' : '');
+    b.style.height = Math.max(4, Math.round((v / max) * 100)) + '%';
+    b.title = v + ' fresh pitchable (as reported)';
+    strip.appendChild(b);
+  });
+</script>
