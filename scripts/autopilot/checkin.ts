@@ -22,8 +22,6 @@ import { spawn, execSync } from 'node:child_process';
 import { summarizeToday, pacificDate } from './burn-ledger.js';
 import { countByReviewStatus } from '../../src/airtable.ts';
 
-const FINDER_REPO = '/home/casey/repos/youtube-lead-finder-v1';
-
 const REPO = '/home/casey/repos/youtube-outreach-orchestrator-v1';
 const LOGS = join(REPO, 'logs');
 const HALT_FLAG = join(LOGS, 'autopilot-halt.flag');
