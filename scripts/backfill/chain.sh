@@ -123,6 +123,34 @@ while true; do
     log "supadata is back — resuming batches"
   fi
 
+  # RapidAPI quota gate (2026-08-10): two machines share one RapidAPI YouTube
+  # quota pool; when the daily bucket drains, every lead 429s at the channels
+  # fetch (301/301 failed on 08-10). One probe call per batch attempt — a 429
+  # answer means wait, not launch. Rejected 429 calls don't consume quota.
+  rapidapi_ok() {
+    local code
+    code=$(node -e '
+const { existsSync } = require("fs");
+const { homedir } = require("os");
+const { join } = require("path");
+const dotenv = require("/home/casey/repos/quick-youtube-channel-research-v1/node_modules/dotenv");
+const shared = [process.env.SHARED_ENV_FILE, join(homedir(),"Claude","env-storage",".env"), join(homedir(),"env-storage",".env")].filter(Boolean).find((p)=>existsSync(p));
+if (shared) dotenv.config({ path: shared });
+const key=(process.env.RAPIDAPI_KEY||"").trim(), host=(process.env.RAPIDAPI_YOUTUBE_HOST||"").trim();
+if(!key||!host){console.log("NOKEYS");process.exit(0);}
+fetch(`https://${host}/channels?part=id&id=UC_x5XG1OV2P6uZZ5FSM9Ttw`,{headers:{"x-rapidapi-key":key,"x-rapidapi-host":host}}).then(r=>console.log(r.status)).catch(()=>console.log("ERR"));
+' 2>/dev/null)
+    [ "$code" != "429" ]
+  }
+  if ! rapidapi_ok; then
+    log "rapidapi quota exhausted — waiting (probe every 30m, silent until it clears)"
+    while ! rapidapi_ok; do
+      [ -f "$HALT" ] && { log "halt flag present — stopping"; exit 0; }
+      sleep 1800
+    done
+    log "rapidapi quota is back — resuming batches"
+  fi
+
   # Enrichment-base capacity gate (2026-08-09): the 08-09 mass-fail was 495
   # instant 422s against a full Airtable base (LIMIT_CHECK_TOO_MANY_RECORDS).
   # External halt flags are unreliable (other sessions' relaunchers delete
