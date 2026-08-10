@@ -10,6 +10,7 @@ import { execSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { countByReviewStatus, getLeadsDiscoveredSince, type Lead } from '../../src/airtable.ts';
+import { discoveryMethod } from '../../src/discovery-method.ts';
 import { summarizeToday, pacificDate } from './burn-ledger.js';
 
 const REPO = '/home/casey/repos/youtube-outreach-orchestrator-v1';
@@ -275,20 +276,8 @@ async function main(): Promise<void> {
   // comment-sweep/graph-sweep/peer-sweep's contribution visible in the daily report
   // instead of invisibly folded into "discovered_today" — see
   // [[comment-sweep-built-and-first-run]] memory for why that mattered.
-  function discoveryMethod(discoveredVia: string | null): string {
-    if (!discoveredVia) return 'unknown';
-    let first = '';
-    try {
-      const arr = JSON.parse(discoveredVia) as unknown;
-      first = Array.isArray(arr) && typeof arr[0] === 'string' ? arr[0] : '';
-    } catch { first = discoveredVia; }
-    if (first.startsWith('graph:')) return 'recommended_videos_feed';
-    if (first.startsWith('peer-comment:')) return 'peer_network';
-    if (first.startsWith('peer-guest:')) return 'guest_link_mining';
-    if (first.startsWith('comment:')) return 'comment_sweep';
-    if (first.startsWith('podcast:')) return 'podcast_crossover';
-    return 'keyword_search';
-  }
+  // Classifier moved to src/discovery-method.ts (2026-08-10) — the finder's per-pass yield
+  // needs the same rule, and two copies would drift the moment a seventh method lands.
   const byMethod: Record<string, number> = {};
   const byMethodPitchable: Record<string, number> = {};
   for (const l of discovered) {

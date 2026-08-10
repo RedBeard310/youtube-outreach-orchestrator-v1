@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { getLeadsDiscoveredSince, type Lead } from '../airtable.ts';
+import { isKeywordEngineLead } from '../discovery-method.ts';
 import { runChild } from '../run.ts';
 
 const STATE_PATH = join('logs', 'lead-finder-state.json');
@@ -12,6 +13,18 @@ export interface YieldBreakdown {
   score_6_plus: number;
   host_identified: number;
   score_6_plus_AND_host_identified: number;
+  /** The same counts restricted to rows the KEYWORD ENGINE wrote — i.e. this pass's own
+   *  work, with the sweep daemons' concurrent writes excluded. The totals above stay
+   *  base-wide on purpose: the scoring-health checks want the biggest sample they can get
+   *  (the scorer is shared by every method), while the fade detector wants only what the
+   *  term slice produced. See discovery-method.ts for why this split exists. */
+  keyword_engine: {
+    new_leads: number;
+    score_6_plus: number;
+    score_6_plus_AND_host_identified: number;
+  };
+  /** Rows written by the sweep daemons during this pass (feed / comments / peers / podcast). */
+  sweep_leads: number;
 }
 
 export interface LeadFinderResult {
@@ -56,12 +69,15 @@ function writeState(state: State): void {
   writeFileSync(STATE_PATH, JSON.stringify(state, null, 2) + '\n');
 }
 
-function buildBreakdown(newLeads: Lead[]): YieldBreakdown {
+export function buildBreakdown(newLeads: Lead[]): YieldBreakdown {
   const byScore: Record<string, number> = {};
   const byReview: Record<string, number> = {};
   let score6Plus = 0;
   let hostIdentified = 0;
   let both = 0;
+  let kwLeads = 0;
+  let kwScore6Plus = 0;
+  let kwBoth = 0;
 
   for (const lead of newLeads) {
     const score = lead.signal_score ?? null;
@@ -77,6 +93,12 @@ function buildBreakdown(newLeads: Lead[]): YieldBreakdown {
     if (passScore) score6Plus += 1;
     if (passHost) hostIdentified += 1;
     if (passScore && passHost) both += 1;
+
+    if (isKeywordEngineLead(lead)) {
+      kwLeads += 1;
+      if (passScore) kwScore6Plus += 1;
+      if (passScore && passHost) kwBoth += 1;
+    }
   }
 
   return {
@@ -86,6 +108,12 @@ function buildBreakdown(newLeads: Lead[]): YieldBreakdown {
     score_6_plus: score6Plus,
     host_identified: hostIdentified,
     score_6_plus_AND_host_identified: both,
+    keyword_engine: {
+      new_leads: kwLeads,
+      score_6_plus: kwScore6Plus,
+      score_6_plus_AND_host_identified: kwBoth,
+    },
+    sweep_leads: newLeads.length - kwLeads,
   };
 }
 
@@ -176,6 +204,12 @@ export async function driveLeadFinder(opts: DriverOpts = {}): Promise<LeadFinder
           `host_identified: ${breakdown.host_identified} | ` +
           `both: ${breakdown.score_6_plus_AND_host_identified} | ` +
           `scoring_failed: ${breakdown.by_review_status.scoring_failed ?? 0}`
+      );
+      console.log(
+        `[lead-finder] of which this pass's own keyword-engine work: ` +
+          `${breakdown.keyword_engine.new_leads} new leads | ` +
+          `pitchable: ${breakdown.keyword_engine.score_6_plus_AND_host_identified} ` +
+          `(${breakdown.sweep_leads} rows came from the sweep daemons mid-pass and are not this pass's yield)`
       );
     } catch (e) {
       console.error('[lead-finder] failed to query post-run breakdown:', e);

@@ -459,7 +459,7 @@ async function rescueScoringFailed(
 // NOTE: concurrency>1 can create rare duplicate lead rows when the same channel
 // surfaces under terms in two different slices within the race window — run
 // scripts/dedupe-leads.ts after a concurrent session. Default 1 = sequential/safe.
-async function runFinderPasses(opts: CampaignOpts, concurrencyOverride?: number): Promise<{ exit_code: number | null; freshPitchable: number; newLeads: number; scoringFailed: number; score6Plus: number }> {
+async function runFinderPasses(opts: CampaignOpts, concurrencyOverride?: number): Promise<{ exit_code: number | null; freshPitchable: number; freshPitchableBaseWide: number; keywordNewLeads: number; newLeads: number; scoringFailed: number; score6Plus: number }> {
   const n = Math.max(1, concurrencyOverride ?? opts.concurrentPasses);
   const runs = Array.from({ length: n }, (_, i) =>
     driveLeadFinder({ force: true, topN: opts.topN, llmCap: opts.llmCap, termOffset: i * opts.topN, dryRun: opts.dryRun }),
@@ -468,11 +468,31 @@ async function runFinderPasses(opts: CampaignOpts, concurrencyOverride?: number)
   const exit_code = results.some(r => r.exit_code !== 0 && r.exit_code !== null)
     ? (results.find(r => r.exit_code !== 0 && r.exit_code !== null)?.exit_code ?? 1)
     : 0;
-  const freshPitchable = results.reduce((s, r) => s + (r.yield_breakdown?.score_6_plus_AND_host_identified ?? 0), 0);
+  // FADE SIGNAL — keyword-engine rows only (2026-08-10). The sweep daemons write into the
+  // same lead base continuously, so the base-wide count includes rows this pass did not
+  // produce; on 08-10 that read 762 fresh pitchable against the keyword engine's actual
+  // 255. Fade is a statement about whether the TERM SLICE still has a vein, so it has to
+  // ignore work no term did. `?? …score_6_plus_AND_host_identified` keeps the old
+  // behaviour if the sub-count is ever missing, so a shape change degrades to over-
+  // counting (fewer discovery pivots) rather than to a fake zero (permanent churn).
+  const freshPitchable = results.reduce(
+    (s, r) =>
+      s +
+      (r.yield_breakdown?.keyword_engine?.score_6_plus_AND_host_identified ??
+        r.yield_breakdown?.score_6_plus_AND_host_identified ??
+        0),
+    0,
+  );
+  // Base-wide on purpose — this is the denominator of the scoring-health checks, and the
+  // scorer is shared by every discovery method, so a bigger sample is a better one.
   const newLeads = results.reduce((s, r) => s + (r.yield_breakdown?.new_leads ?? 0), 0);
   const scoringFailed = results.reduce((s, r) => s + (r.yield_breakdown?.by_review_status?.scoring_failed ?? 0), 0);
   const score6Plus = results.reduce((s, r) => s + (r.yield_breakdown?.score_6_plus ?? 0), 0);
-  return { exit_code, freshPitchable, newLeads, scoringFailed, score6Plus };
+  // Kept for the log line so the daily debrief can still read the base-wide figure and
+  // see how much of the day's intake the daemons are now carrying.
+  const freshPitchableBaseWide = results.reduce((s, r) => s + (r.yield_breakdown?.score_6_plus_AND_host_identified ?? 0), 0);
+  const keywordNewLeads = results.reduce((s, r) => s + (r.yield_breakdown?.keyword_engine?.new_leads ?? r.yield_breakdown?.new_leads ?? 0), 0);
+  return { exit_code, freshPitchable, freshPitchableBaseWide, keywordNewLeads, newLeads, scoringFailed, score6Plus };
 }
 
 export async function driveCampaign(opts: CampaignOpts): Promise<void> {
@@ -601,6 +621,10 @@ export async function driveCampaign(opts: CampaignOpts): Promise<void> {
       run,
       exit: finder.exit_code,
       fresh_pitchable: freshPitchable,
+      // fresh_pitchable is keyword-engine-only since 2026-08-10; these two carry the
+      // base-wide view so a trend line across the change is still readable.
+      fresh_pitchable_base_wide: finder.freshPitchableBaseWide,
+      keyword_new_leads: finder.keywordNewLeads,
       concurrent: opts.concurrentPasses,
       new_leads: finder.newLeads,
       scoring_failed: finder.scoringFailed,
