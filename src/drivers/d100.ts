@@ -151,7 +151,7 @@ export async function driveD100(leads: Lead[], opts: DriverOpts = {}): Promise<D
     if (opts.dryRun) {
       console.log(`[d100] DRY RUN — lead ${lead.id} slug="${slug}" bootstrap=${needsBootstrap}`);
       if (needsBootstrap) {
-        console.log(`  would run: npx tsx scripts/setup-airtable.ts --client ${slug} --name "${lead.channel_name}"`);
+        console.log(`  would run: npx tsx scripts/register-client.ts --client ${slug} --name "${lead.channel_name}"`);
         result.bootstrap_attempted += 1;
       }
       console.log(`  would run: npx tsx scripts/run-channel.ts ${lead.channel_url} --client ${slug} --business-model ${businessModel} --research-purpose research_target`);
@@ -172,7 +172,7 @@ export async function driveD100(leads: Lead[], opts: DriverOpts = {}): Promise<D
       console.log(`[d100] bootstrapping client "${slug}" for lead ${lead.id}`);
       const bs = await runChild(
         'npx',
-        ['tsx', 'scripts/setup-airtable.ts', '--client', slug, '--name', lead.channel_name],
+        ['tsx', 'scripts/register-client.ts', '--client', slug, '--name', lead.channel_name],
         deepResearchPath
       );
       if (bs.exit_code !== 0) {
