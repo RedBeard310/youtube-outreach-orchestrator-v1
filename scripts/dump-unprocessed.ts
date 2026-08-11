@@ -1,4 +1,4 @@
-import 'dotenv/config'; import Airtable from 'airtable'; import { writeFileSync } from 'node:fs';
+import 'dotenv/config'; import Airtable from 'pipeline-db/sdk'; import { writeFileSync } from 'node:fs';
 const OUT=process.argv[2]??'/tmp/hold-candidates-0708-b.txt';
 (async()=>{
   const lb=new Airtable({apiKey:process.env.AIRTABLE_PAT!}).base(process.env.LEAD_BASE_ID!);

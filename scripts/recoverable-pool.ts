@@ -1,4 +1,4 @@
-import 'dotenv/config'; import Airtable from 'airtable';
+import 'dotenv/config'; import Airtable from 'pipeline-db/sdk';
 (async()=>{
   const lb=new Airtable({apiKey:process.env.AIRTABLE_PAT!}).base(process.env.LEAD_BASE_ID!);
   // Whole-base counts by outreach_status (proves nothing was tossed)

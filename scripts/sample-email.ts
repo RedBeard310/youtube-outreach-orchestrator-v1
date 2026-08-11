@@ -1,7 +1,7 @@
 // READ-ONLY: count sent_to_smartlead leads and print a couple of sample emails
 // so we can see how the proposed video title sits inside the body.
 import 'dotenv/config';
-import Airtable from 'airtable';
+import Airtable from 'pipeline-db/sdk';
 
 const apiKey = process.env.AIRTABLE_PAT;
 const baseId = process.env.LEAD_BASE_ID;

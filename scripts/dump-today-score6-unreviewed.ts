@@ -3,7 +3,7 @@
 // promote-verified-to-hold.ts. Excludes demo_niche_excluded / below_threshold
 // (those aren't review_status=unreviewed). Scoped to the daytime push (>=17:14Z).
 import 'dotenv/config';
-import Airtable from 'airtable';
+import Airtable from 'pipeline-db/sdk';
 import { writeFileSync } from 'node:fs';
 const SINCE = process.argv[2] ?? '2026-07-08T17:14:00Z';
 const OUT = process.argv[3] ?? '/tmp/hold-candidates-0708.txt';

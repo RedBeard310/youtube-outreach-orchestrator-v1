@@ -2,7 +2,7 @@
 // so we can tell transient/recoverable failures (quota, timeouts) apart from
 // terminal ones (no email, rejected email, no host). Prints a table + buckets.
 import 'dotenv/config';
-import Airtable from 'airtable';
+import Airtable from 'pipeline-db/sdk';
 
 const apiKey = process.env.AIRTABLE_PAT;
 const baseId = process.env.LEAD_BASE_ID;

@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import Airtable from 'airtable';
+import Airtable from 'pipeline-db/sdk';
 import { writeFileSync } from 'fs';
 async function main() {
   const out = process.argv[2];

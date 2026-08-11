@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import Airtable from 'airtable';
+import Airtable from 'pipeline-db/sdk';
 const base = new Airtable({ apiKey: process.env.AIRTABLE_PAT! }).base(process.env.LEAD_BASE_ID!);
 const table = process.env.LEAD_TABLE_NAME ?? 'lead_candidates';
 const recs = await base(table).select({

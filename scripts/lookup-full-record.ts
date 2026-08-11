@@ -1,6 +1,6 @@
 // Dump full record(s) for an email in the lead base, incl. createdTime.
 import 'dotenv/config';
-import Airtable from 'airtable';
+import Airtable from 'pipeline-db/sdk';
 
 const apiKey = process.env.AIRTABLE_PAT;
 const baseId = process.env.LEAD_BASE_ID;

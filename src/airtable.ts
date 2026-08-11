@@ -1,4 +1,4 @@
-import Airtable, { type FieldSet } from 'airtable';
+import Airtable, { type FieldSet } from 'pipeline-db/sdk';
 
 export type ReviewStatus =
   | 'unreviewed'

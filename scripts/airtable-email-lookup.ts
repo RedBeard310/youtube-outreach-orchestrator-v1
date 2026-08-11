@@ -1,7 +1,7 @@
 // Look up one or more emails in the lead base and print channel_url/_name.
 // Usage: npx tsx scripts/airtable-email-lookup.ts email1 [email2 ...]
 import 'dotenv/config';
-import Airtable from 'airtable';
+import Airtable from 'pipeline-db/sdk';
 
 const apiKey = process.env.AIRTABLE_PAT;
 const baseId = process.env.LEAD_BASE_ID;

@@ -16,7 +16,8 @@
   },
   "dependencies": {
     "airtable": "^0.12.2",
-    "dotenv": "^16.4.5"
+    "dotenv": "^16.4.5",
+    "pipeline-db": "file:../pipeline-db"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

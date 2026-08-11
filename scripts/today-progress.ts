@@ -1,4 +1,4 @@
-import 'dotenv/config'; import Airtable from 'airtable';
+import 'dotenv/config'; import Airtable from 'pipeline-db/sdk';
 const sleep=(ms:number)=>new Promise(r=>setTimeout(r,ms));
 async function run(){
   const lb=new Airtable({apiKey:process.env.AIRTABLE_PAT!}).base(process.env.LEAD_BASE_ID!);

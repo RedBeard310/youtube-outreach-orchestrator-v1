@@ -4,7 +4,7 @@
 import 'dotenv/config';
 import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import Airtable from 'airtable';
+import Airtable from 'pipeline-db/sdk';
 
 const apiKey = process.env.AIRTABLE_PAT;
 const baseId = process.env.LEAD_BASE_ID;

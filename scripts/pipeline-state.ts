@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import Airtable from 'airtable';
+import Airtable from 'pipeline-db/sdk';
 const base = new Airtable({ apiKey: process.env.AIRTABLE_PAT! }).base(process.env.LEAD_BASE_ID!);
 const recs = await base('lead_candidates').select({
   fields: ['review_status','outreach_status','signal_score'] }).all();
