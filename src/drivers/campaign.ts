@@ -65,10 +65,13 @@ function emailRepo(): string {
 // (2026-07-10 hit 99.9% of the RapidAPI cap because nothing governed across passes).
 // Returns the WORST (highest) used-% across buckets, or null if no snapshot yet
 // (e.g. still on direct keys, which are the cheap-preferred path and self-abort).
-function readFinderQuotaUsedPct(): number | null {
+export function readFinderQuotaUsedPct(): number | null {
   try {
     const raw = readFileSync(join(finderRepo(), 'logs', 'quota-state.json'), 'utf8');
-    const snap = JSON.parse(raw) as { ts?: string } & Record<string, { used_pct?: number }>;
+    const snap = JSON.parse(raw) as { ts?: string } & Record<
+      string,
+      { used_pct?: number; remaining?: number }
+    >;
     // STALENESS GUARD: a snapshot older than QUOTA_STALE_MINUTES is meaningless —
     // e.g. last night's 99.9% still on disk at 00:07 after the midnight quota reset,
     // when the finder is back on fresh direct keys and hasn't rewritten it yet.
@@ -76,8 +79,27 @@ function readFinderQuotaUsedPct(): number | null {
     const staleMin = Number(process.env.QUOTA_STALE_MINUTES ?? 90);
     const ts = typeof snap.ts === 'string' ? Date.parse(snap.ts) : NaN;
     if (Number.isFinite(ts) && (Date.now() - ts) / 60000 > staleMin) return null;
-    const pcts = Object.values(snap)
-      .map((v) => (v && typeof v === 'object' ? v.used_pct : undefined))
+    // RETIRED-BACKEND GUARD (2026-08-11): this snapshot describes RapidAPI ONLY,
+    // and RapidAPI was retired on 2026-08-10. A dead plan answers with
+    // `remaining: -1` (or any negative), which the guard below turns into
+    // used_pct 100.1 — so the governor read "quota at 100.1%" and hard-stopped
+    // every session at run 2 for the last 8 hours of the 08-11 cycle, on a
+    // backend we deliberately switched off. There are no credits left to
+    // preserve, and the real backend (the direct key pool) has its own
+    // per-key rotation and self-aborts. A negative bucket therefore means
+    // "backend gone", not "quota low", and must NOT govern the campaign.
+    //
+    // Buckets with real headroom still govern normally, so this stays correct
+    // if RapidAPI is ever revived.
+    const buckets = Object.values(snap).filter(
+      (v): v is { used_pct?: number; remaining?: number } =>
+        Boolean(v) && typeof v === 'object',
+    );
+    if (buckets.some((b) => typeof b.remaining === 'number' && b.remaining < 0)) {
+      return null; // retired/expired plan → governor inactive
+    }
+    const pcts = buckets
+      .map((v) => v.used_pct)
       .filter((n): n is number => typeof n === 'number' && Number.isFinite(n));
     return pcts.length ? Math.max(...pcts) : null;
   } catch {
