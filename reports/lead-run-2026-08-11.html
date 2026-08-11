@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lead Run Debrief — 2026-08-11</title>
+<style>
+  :root {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --good-soft: #1f8a5b1a; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+      --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+      --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --good-soft: #55c48c1c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --good-soft: #1f8a5b1a; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+    --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+    --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --good-soft: #55c48c1c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 40px 22px 80px; }
+  .eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); font-weight: 600; }
+  h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.12; margin: 10px 0 6px; text-wrap: balance; letter-spacing: -.02em; }
+  h2 { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); margin: 44px 0 16px; font-weight: 700; }
+  h3 { font-size: 18px; margin: 0 0 6px; letter-spacing: -.01em; }
+  p { margin: 0 0 14px; }
+  .lede { font-size: 18px; color: var(--ink-soft); max-width: 68ch; }
+  .tag { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--good-soft); color: var(--good); letter-spacing: .02em; }
+  .tag.warn { background: var(--amber-soft); color: var(--amber); }
+  .tag.bad { background: var(--red-soft); color: var(--red); }
+  .grid { display: grid; gap: 14px; }
+  .stats { grid-template-columns: repeat(4, 1fr); margin-top: 26px; }
+  @media (max-width: 720px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; box-shadow: var(--shadow); }
+  .stat .n { font-size: 30px; font-weight: 750; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .stat .l { font-size: 12.5px; color: var(--ink-soft); margin-top: 3px; }
+  .stat .s { font-size: 12px; margin-top: 8px; font-weight: 600; }
+  .up { color: var(--good); } .down { color: var(--red); } .warn { color: var(--amber); }
+  .accent-red { border-left: 3px solid var(--red); }
+  .accent-teal { border-left: 3px solid var(--teal); }
+  .accent-amber { border-left: 3px solid var(--amber); }
+  .accent-good { border-left: 3px solid var(--good); }
+
+  /* shape-of-day bar strip */
+  .strip { display: flex; align-items: flex-end; gap: 2px; height: 120px; padding: 14px 14px 10px; overflow-x: auto; }
+  .bar { flex: 1 0 6px; min-width: 5px; border-radius: 2px 2px 0 0; background: var(--teal); opacity: .9; }
+  .bar.zero { background: var(--red); height: 4px !important; opacity: .9; }
+  .bar.low { background: var(--amber); }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-soft); padding: 0 14px 14px; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+
+  .q { border-radius: 14px; padding: 20px 22px; margin-bottom: 14px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); }
+  .q .ask { font-size: 17px; font-weight: 700; color: var(--ink); margin-bottom: 10px; display: flex; gap: 10px; align-items: baseline; }
+  .q .ask .qn { color: var(--red); font-weight: 800; flex: 0 0 auto; }
+  .q p { color: var(--ink-soft); }
+  .q b { color: var(--ink); }
+  .pill { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink); background: var(--panel-2); padding: 1px 7px; border-radius: 6px; border: 1px solid var(--line); white-space: nowrap; }
+
+  pre { background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 13px 15px; overflow-x: auto; font-size: 13px; line-height: 1.5; margin: 0 0 14px; color: var(--ink); }
+  code { font-size: .92em; background: var(--panel-2); padding: 1px 5px; border-radius: 5px; border: 1px solid var(--line); }
+  pre code { background: none; border: none; padding: 0; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+  th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); }
+  td .num { font-variant-numeric: tabular-nums; font-weight: 650; }
+  td.n { font-variant-numeric: tabular-nums; text-align: right; }
+  .fix td:first-child { color: var(--good); font-weight: 650; }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); box-shadow: var(--shadow); margin-bottom: 14px; }
+  ol.recs { padding-left: 0; list-style: none; counter-reset: r; margin: 0; }
+  ol.recs li { counter-increment: r; position: relative; padding: 14px 16px 14px 52px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 10px; box-shadow: var(--shadow); }
+  ol.recs li::before { content: counter(r); position: absolute; left: 14px; top: 14px; width: 26px; height: 26px; border-radius: 8px; background: var(--teal-soft); color: var(--teal); font-weight: 800; font-size: 14px; display: grid; place-items: center; }
+  ol.recs b { color: var(--ink); }
+  .foot { margin-top: 46px; padding: 16px 18px; border-radius: 12px; background: var(--amber-soft); border: 1px solid var(--line); font-size: 14px; color: var(--ink-soft); }
+  .foot b { color: var(--ink); }
+  .muted { color: var(--ink-soft); font-size: 13.5px; }
+</style>
+
+
+<div class="wrap">
+
+  <div class="eyebrow">Lead Run Debrief · YouTube outreach</div>
+  <h1>2026-08-11 — the worst day on record, and nothing was actually broken</h1>
+  <p class="lede">The pool grew by <b>29</b>. Yesterday it grew by 350. Every repo in the pipeline was rotating <b>7 YouTube keys while the shared key bank held 39</b>, so runs kept hitting a wall that wasn't there. Then the retired RapidAPI mirror told the campaign its quota was gone, and the last eight hours ran one search per session and quit. Fixed in four repos.</p>
+  <div style="margin-top:14px"><span class="tag bad">SELF-INFLICTED · NO CRASHES, NO FATAL ERRORS, 8% OF YESTERDAY'S OUTPUT</span></div>
+
+  <div class="grid stats">
+    <div class="card stat accent-red">
+      <div class="n">+29</div>
+      <div class="l">parked into <code>approved_hold</code></div>
+      <div class="s down">pool 4,613 → 4,642. Was +350</div>
+    </div>
+    <div class="card stat accent-red">
+      <div class="n">930</div>
+      <div class="l">creators discovered</div>
+      <div class="s down">down 83% from 5,332</div>
+    </div>
+    <div class="card stat accent-amber">
+      <div class="n">7 of 39</div>
+      <div class="l">YouTube keys the pipeline could see</div>
+      <div class="s warn">the other 32 were sitting in the shared bank</div>
+    </div>
+    <div class="card stat accent-red">
+      <div class="n">6</div>
+      <div class="l">sessions stopped for "no quota left"</div>
+      <div class="s down">all six were false. Quota was fine</div>
+    </div>
+  </div>
+
+  <h2>The shape of the day</h2>
+  <div class="card" style="padding:0">
+    <div class="strip" id="strip"></div>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--teal)"></span>strong pass (6+ pitchable)</span>
+      <span><span class="dot" style="background:var(--amber)"></span>light (1 to 5)</span>
+      <span><span class="dot" style="background:var(--red)"></span>empty pass (0), <b>38 of 72, and the last 22 in a row</b></span>
+    </div>
+  </div>
+  <p class="muted">Each bar is one finder pass, 72 across 21 sessions, left to right through the cycle. One healthy session, then eight hours of decay, then eight hours of near-silence. The first session alone produced half the day's pitchable finds. Unlike yesterday, these heights are honest: this is the corrected keyword-engine-only count that shipped in the 08-10 fix.</p>
+
+  <h2>The three questions</h2>
+
+  <div class="q accent-red">
+    <div class="ask"><span class="qn">Q1</span><span>Why did output fall 92% overnight?</span></div>
+    <p><b>Because the pipeline was using 7 API keys when 39 were available, and it never knew.</b> The key pool was rebuilt on 08-10, going from 9 keys to 39, with every key tested against the live API before it landed. That work went into the shared key file that all the repos are supposed to draw from.</p>
+    <p>None of them read it. The finder, the email repo and the deep-research repo each load their keys from a file inside their own folder, and those files were last written on 08-07 with 7 keys in them. So the 39 verified keys existed, worked, and reached nothing. The finder said so in its own startup line every single run: <span class="pill">auto (7 direct keys)</span>.</p>
+    <p><b>This hit every way we find creators, not just one.</b> All five of the background discovery methods live inside the finder and share its keys, which is why the drop is across the board rather than in one lane:</p>
+  </div>
+
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Method</th><th class="n">Found 08-10</th><th class="n">Found today</th><th class="n">Change</th><th class="n">Pitchable</th><th class="n">Hit rate</th></tr></thead>
+      <tbody>
+        <tr><td>Recommended-videos feed</td><td class="n">2,028</td><td class="n">381</td><td class="n"><span class="down">−81%</span></td><td class="n">47</td><td class="n">12.3%</td></tr>
+        <tr><td>Peer-network comments</td><td class="n">1,280</td><td class="n">269</td><td class="n"><span class="down">−79%</span></td><td class="n">7</td><td class="n"><span class="warn">2.6%</span></td></tr>
+        <tr><td>Keyword search</td><td class="n">1,017</td><td class="n">250</td><td class="n"><span class="down">−75%</span></td><td class="n">43</td><td class="n">17.2%</td></tr>
+        <tr><td>Comment sweep</td><td class="n">986</td><td class="n">16</td><td class="n"><span class="down">−98%</span></td><td class="n">2</td><td class="n">12.5%</td></tr>
+        <tr><td>Podcast crossover</td><td class="n">10</td><td class="n">10</td><td class="n">flat</td><td class="n">2</td><td class="n">20.0%</td></tr>
+        <tr><td>Guest-link mining</td><td class="n">11</td><td class="n">4</td><td class="n"><span class="down">−64%</span></td><td class="n">1</td><td class="n">25.0%</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="muted">All four background services still reported fresh, healthy state at snapshot time. They were running fine. They just had almost no capacity to run on.</p>
+
+  <div class="q accent-red">
+    <div class="ask"><span class="qn">Q2</span><span>Why did the last eight hours run one search per session?</span></div>
+    <p><b>A backend we switched off yesterday told the campaign it was out of quota, and the campaign believed it.</b></p>
+    <p>Here's the chain. With only 7 keys, a single pass burns through all of them in about three seconds and gets a "too many requests this minute" answer from each one. The rotation code couldn't tell that apart from "every key is permanently dead", so it gave up on the direct keys and fell through to the RapidAPI mirror, which is exactly what it's designed to do. But we retired that mirror on 08-10. It answered:</p>
+    <pre><code>YouTube API error 429: You have exceeded the DAILY quota for Requests
+on your current plan, BASIC.</code></pre>
+    <p>That dead answer gets written to a shared status file as <b>100.1% of quota used</b>. The campaign reads that file before every search and stops the whole session above 95%. So from 22:44Z, once per session, six times:</p>
+    <pre><code>[campaign] YouTube quota at 100.1% (>= hard floor 95%) — stopping to preserve remaining credits.</code></pre>
+    <p><b>There were no credits to preserve.</b> The guard was protecting a service we'd already turned off, while the real key pool sat idle and healthy. A live test call on it succeeds today. The rate limit that started all this clears by itself in under 60 seconds; nothing needed to fail here, it needed to wait.</p>
+  </div>
+
+  <div class="q accent-amber">
+    <div class="ask"><span class="qn">Q3</span><span>Once the keys are fixed, is the pipeline back?</span></div>
+    <p><b>Partly. There's a second wall behind this one, and it's real.</b> The 14 sessions that stopped for "term supply exhausted" have nothing to do with the keys. The finder ran out of things to search for.</p>
+    <p>The active search-term pool is down to <b>8 terms</b>. There are no never-run terms and no rested proven terms left in reserve. Vein discovery ran <b>76 times and produced 0 usable new ideas</b> against a table of 16,134 terms it has already tried. The autocomplete harvest is backed off because its seed list is mined out. <b>All three sources of new search terms are dry at the same time</b>, which hasn't happened before.</p>
+    <p>So the key fix restores the ability to search. It does not restore things worth searching for. Expect intake to recover tomorrow because the five sweep methods don't depend on search terms, but the keyword engine specifically will stay thin until it gets new material.</p>
+    <p><b>One piece of good news I checked rather than assumed:</b> the famine did not poison the term table. Failed searches are deliberately excluded from the "this term is used up" signal, so a burst of errors can't retire a healthy term. The terms that look mined out genuinely are.</p>
+  </div>
+
+  <h2>What broke, what's fixed</h2>
+  <div class="tablewrap">
+    <table class="fix">
+      <thead><tr><th>What broke</th><th>Effect</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr><td>Repos read keys only from their own folder</td><td>7 keys in use out of 39. Every discovery method starved at once</td><td>Fixed in 3 repos</td></tr>
+        <tr><td>A burst of rate limits read as a dead key pool</td><td>Runs bailed to a retired backend and aborted after ~3 seconds</td><td>Fixed, waits out the window</td></tr>
+        <tr><td>Retired RapidAPI reported 100.1% quota used</td><td>6 sessions stopped after one search each. Eight hours lost</td><td>Fixed, guard goes inert</td></tr>
+        <tr><td>All three term sources dry at once</td><td>14 sessions stopped early. Only 8 active terms left</td><td><span class="warn">Open. Needs new material</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="muted">Worth sitting with: the automated error check reported a <b>clean cycle with zero fatal signatures</b>, its twelfth in a row. Nothing crashed. Every component reported success while the pipeline delivered 8% of yesterday's output. A health check that only looks for crashes cannot see a day like this.</p>
+
+  <h2>Shipped today</h2>
+  <div class="tablewrap">
+    <table class="fix">
+      <thead><tr><th>Repo</th><th>Commit</th><th>What it does</th></tr></thead>
+      <tbody>
+        <tr><td><code>youtube-lead-finder-v1</code></td><td><code>d1a9a5b</code></td><td>Reads YouTube keys from the shared bank as well as its own file, so the pool grows in one place and every run inherits it. Also stops treating a burst of per-minute rate limits as a dead pool: if every key is merely rate-limited, it now waits out the window and tries again, twice, at 20 then 40 seconds. A genuinely dead pool, meaning keys that are quota-exhausted or suspended, still fails immediately with no waiting.</td></tr>
+        <tr><td><code>youtube-outreach-orchestrator-v1</code></td><td><code>fabefa9</code></td><td>A retired RapidAPI can no longer stop the campaign. A negative "requests remaining" means the backend is gone, not that quota is low, so the guard switches itself off instead of hard-stopping. Buckets that report real headroom still govern normally, so the 80% throttle and 95% stop stay correct if that service ever comes back.</td></tr>
+        <tr><td><code>youtube-email-outreach-v1</code></td><td><code>353be16a</code></td><td>Same key-bank fix. Verification and enrichment were running the same 7-key pool.</td></tr>
+        <tr><td><code>youtube-deep-research-v1</code></td><td><code>6be528f</code></td><td>Same key-bank fix, for the d100 research path.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>Two design details in the key fix that are worth recording, because the obvious version of it is wrong:</p>
+  <p><b>It merges keys by value, not by layering files.</b> The natural approach is to load the shared file underneath the local one. That silently loses keys: the loader matches on slot names like <code>YOUTUBE_API_KEY_1</code>, and a stale local slot 1 wins its name and discards the bank's key sitting in that same slot. Here that would have thrown away 7 of the 39. Reading the bank separately and merging on the key values themselves keeps every distinct key from both files.</p>
+  <p><b>It only merges when reading the real environment.</b> Hand the loader an explicit set of variables and it resolves exactly what you handed it. Without that rule, 9 of the finder's tests broke and one of them printed a real API key into the test output. Tests stay sealed off from the machine they run on. An unreadable bank falls back to the smaller pool and never fails a run.</p>
+  <p class="muted">Verified before commit: TypeScript clean in all four repos; 168/168 finder tests and 15/15 email-repo tests pass; the production path now resolves <b>39 distinct keys instead of 7</b> in all three repos; a live 1-unit API call on the new pool succeeds; the rate-limit fix was tested all three ways (a burst recovers, a dead pool throws in 1ms, a permanent storm gives up after a bounded 3 sweeps rather than hanging); the quota guard was tested against 5 snapshot shapes including today's real file; and <code>campaign:dry</code> now walks past the second search instead of stopping there. No <code>.env</code> file was touched. Cost: the one live test call, so effectively nothing.</p>
+
+  <h2>Yesterday's fix, verified</h2>
+  <p>The 08-10 debrief shipped a correction to how each search pass measures its own yield, and predicted the reported number would fall to about 2 per pass and that nearly every pass would then pivot into discovery.</p>
+  <p>Actual: <span class="pill">0.96 per pass</span> and <span class="pill">54 pivots across 72 passes</span>. Both predictions landed. The number is now counting the keyword engine's own work instead of crediting it with the background methods' finds. Today it's also genuinely low, but the measurement is right.</p>
+
+  <h2>Recommended next — ranked</h2>
+  <ol class="recs">
+    <li><b>Term supply is now the real constraint, and all three sources are dry at once.</b> 8 active terms left, no reserve, 76 discovery runs producing nothing usable against a 16,134-term table, and the harvest backed off with a mined-out seed list. The key fix gives back the ability to search; it doesn't give back things worth searching for. This is what will cap tomorrow.</li>
+    <li><b>Check tomorrow's first session to confirm the key fix landed.</b> Expect the finder's startup line to read 39 keys instead of 7, zero quota stops, and the background methods back near their 08-10 volumes. If intake recovers but parked stays low, then term supply is the whole remaining story and item 1 is everything.</li>
+    <li><b>Decide the outlet for <code>approved_hold</code>.</b> 4,642 creators prepped and waiting, none emailed. This has led the list for over a week and is still the only item that needs a decision from you rather than code.</li>
+    <li><b>Build the <code>needs_contact</code> recovery engine.</b> 5,755 creators, still the larger lane.</li>
+    <li><b>Peer-network comments is still the weakest method.</b> 2.6% of its finds were worth contacting today, against 12% to 25% for everything else, and it was the second-largest consumer of the scarce key capacity. Yesterday's recommendation to cap or tighten it now has a second day behind it.</li>
+    <li><b>Consider removing the RapidAPI path outright.</b> Today the quota guard did active harm and offered no benefit, because the service it guards is gone. The fix makes it inert, which is the safe minimum. Deleting the fallback entirely would remove this whole class of failure, but that's a bigger change than an unattended cycle should make on its own.</li>
+    <li><b>Meter OpenRouter as a real cost.</b> Still unmetered. The ledger reads $0 because it only counts Anthropic.</li>
+  </ol>
+
+  <div class="foot">
+    <b>Status:</b> everything is parked, nothing sent. <code>approved_hold</code> 4,642 plus <code>needs_contact</code> 5,755 is <b>10,397 creators found and never contacted</b>. The cycle cost <b>$0 on Anthropic</b> (OpenRouter spend is real but not metered here), with <b>0 crashes, 0 scoring failures and no fatal signatures</b>. The loop is still running and has not been paused: the failure mode today was doing too little, not spending too much, and all three fixes are in place for the next cycle.
+  </div>
+
+</div>
+
+<script>
+  // Keyword-engine fresh_pitchable per finder pass, chronological, from
+  // logs/campaign-2026-08-10.jsonl and campaign-2026-08-11.jsonl inside the
+  // 07:00Z→07:00Z cycle window. This is the CORRECTED metric shipped on 08-10:
+  // keyword-engine only, no longer inflated by the sweep daemons' writes.
+  var seq = [3,2,0,0,2,0,0,2,6,5,4,3,4,4,3,2,0,0,1,0,1,1,1,5,2,0,0,0,0,0,0,1,3,2,1,3,0,0,1,1,0,0,0,1,1,0,1,1,0,0,0,0,0,0,1,3,1,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0];
+  var max = Math.max.apply(null, seq);
+  var strip = document.getElementById('strip');
+  seq.forEach(function (v) {
+    var b = document.createElement('div');
+    b.className = 'bar' + (v === 0 ? ' zero' : v < 6 ? ' low' : '');
+    b.style.height = Math.max(4, Math.round((v / max) * 100)) + '%';
+    b.title = v + ' fresh pitchable';
+    strip.appendChild(b);
+  });
+</script>
+</html>
