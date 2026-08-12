@@ -40,7 +40,83 @@ function hoursSince(iso: string | null): number | null {
   const ms = Date.now() - Date.parse(iso);
   return Number.isFinite(ms) ? Math.round((ms / 3_600_000) * 10) / 10 : null;
 }
-function discoveryMethodsHealth(): Record<string, unknown> {
+
+// PRODUCTIVITY, not just liveness (2026-08-12). The block above only asks "is the
+// state file being touched", and a sweep that bails in its first second still
+// rewrites its state file — so all four daemons reported fresh, healthy and
+// active for the whole 08-11 -> 08-12 cycle while walking ZERO seeds and
+// contributing 0 of the day's 212 leads. Liveness was green; the work was not
+// happening. This reads each daemon's own session logs for the cycle and reports
+// how many seeds it actually advanced, plus why it stopped if it stopped.
+//
+// Local files only, same as above: no Airtable, no network, can't itself fail.
+const SWEEP_SESSION_DIRS: Record<string, string> = {
+  recommended_videos_feed: 'graph-sweep-sessions',
+  peer_sweep: 'peer-sweep-sessions',
+  comment_sweep: 'comment-sweep-sessions',
+  podcast_crossover: 'podcast-crossover-sessions',
+};
+type SweepWork = {
+  runs_in_cycle: number;
+  seeds_advanced: number | null;
+  idle_reason: string | null;
+  productive: boolean | null;
+};
+function sweepWorkInCycle(dirName: string, sinceMs: number, untilMs: number): SweepWork {
+  const blank: SweepWork = { runs_in_cycle: 0, seeds_advanced: null, idle_reason: null, productive: null };
+  const dir = join(FINDER_REPO, 'logs', dirName);
+  if (!existsSync(dir)) return blank;
+  let files: string[];
+  try {
+    files = readdirSync(dir)
+      .filter((f) => f.endsWith('.log'))
+      .map((f) => join(dir, f))
+      .filter((p) => {
+        const m = statSync(p).mtimeMs;
+        return m >= sinceMs && m <= untilMs;
+      })
+      .sort((a, b) => statSync(a).mtimeMs - statSync(b).mtimeMs);
+  } catch {
+    return blank;
+  }
+  if (files.length === 0) return blank;
+
+  // "[sweep] 7845 seeds total | 7719 done | 126 remaining" — every sweep prints
+  // this shape on startup. The delta between the first and last run of the cycle
+  // is the honest measure of whether the daemon did anything.
+  const doneCount = (path: string): number | null => {
+    try {
+      const m = /\|\s*(\d+)\s+done\s*\|/.exec(readFileSync(path, 'utf8'));
+      return m?.[1] ? Number(m[1]) : null;
+    } catch {
+      return null;
+    }
+  };
+  const first = doneCount(files[0]!);
+  const last = doneCount(files[files.length - 1]!);
+  const advanced = first !== null && last !== null ? last - first : null;
+
+  // Why it stopped, taken from the most recent run: a PAUSE/HALT/STOP line if
+  // there is one. This is the line that would have named the outage on day one.
+  let idle: string | null = null;
+  try {
+    const tail = readFileSync(files[files.length - 1]!, 'utf8');
+    const m = /^\[[^\]]+\]\s+(PAUSE|STOP|HALTED)\b.*$/m.exec(tail);
+    idle = m?.[0]?.trim() ?? null;
+  } catch {
+    idle = null;
+  }
+
+  return {
+    runs_in_cycle: files.length,
+    seeds_advanced: advanced,
+    idle_reason: idle,
+    productive: advanced === null ? null : advanced > 0,
+  };
+}
+function discoveryMethodsHealth(sinceMs: number, untilMs: number): Record<string, unknown> {
+  const work = (key: string): SweepWork =>
+    sweepWorkInCycle(SWEEP_SESSION_DIRS[key]!, sinceMs, untilMs);
   const graphUpdated = sweepStateUpdatedAt('graph-sweep-state.json');
   const commentUpdated = sweepStateUpdatedAt('comment-sweep-state.json');
   const peerUpdated = sweepStateUpdatedAt('peer-sweep-state.json');
@@ -51,11 +127,13 @@ function discoveryMethodsHealth(): Record<string, unknown> {
       refill_timer_active: serviceActive('graph-sweep-refill.timer'),
       state_updated_at: graphUpdated,
       hours_since_update: hoursSince(graphUpdated),
+      ...work('recommended_videos_feed'),
     },
     comment_sweep: {
       daily_timer_active: serviceActive('comment-sweep-daily.timer'),
       state_updated_at: commentUpdated,
       hours_since_update: hoursSince(commentUpdated),
+      ...work('comment_sweep'),
       // Runs once/day by design — flag only past ~30h (a missed day plus slack), not
       // on every reading the way the continuous daemons below are judged.
       stale: hoursSince(commentUpdated) !== null && (hoursSince(commentUpdated) as number) > 30,
@@ -65,11 +143,13 @@ function discoveryMethodsHealth(): Record<string, unknown> {
       refill_timer_active: serviceActive('peer-sweep-refill.timer'),
       state_updated_at: peerUpdated,
       hours_since_update: hoursSince(peerUpdated),
+      ...work('peer_sweep'),
     },
     podcast_crossover: {
       daily_timer_active: serviceActive('podcast-crossover-daily.timer'),
       state_updated_at: podcastUpdated,
       hours_since_update: hoursSince(podcastUpdated),
+      ...work('podcast_crossover'),
       stale: hoursSince(podcastUpdated) !== null && (hoursSince(podcastUpdated) as number) > 30,
     },
   };
@@ -358,7 +438,7 @@ async function main(): Promise<void> {
       by_discovery_method: byMethod,
       by_discovery_method_pitchable: byMethodPitchable,
     },
-    discovery_methods_health: discoveryMethodsHealth(),
+    discovery_methods_health: discoveryMethodsHealth(sinceMs, Date.parse(untilISO)),
     campaign: {
       sessions_started: count('start'),
       sessions_done: count('done'),
