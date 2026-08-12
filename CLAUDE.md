@@ -8,7 +8,7 @@ Full spec: [orchestrator-spec.md](orchestrator-spec.md). Read it before making n
 
 - **No business logic here.** Don't find emails, enrich channels, or compose copy in this repo. If a stage needs new logic, it belongs in the underlying repo (`youtube-email-outreach-v1`, deep-research repo, etc.), not the orchestrator.
 - **No direct skill calls.** The orchestrator calls `youtube-email-outreach-v1`; that repo routes compose to `5-ideas-email` / `nick-saraev-cold-email` via its own A/B variant system.
-- **Airtable is the state store.** The orchestrator reads `review_status` and `outreach_status` from the lead base (`appenY7r5jlZMRpJ0`) and writes nothing directly — underlying repos write their own state.
+- **Postgres is the state store** (since 2026-08-12; Airtable before that). The orchestrator reads `review_status` and `outreach_status` from `leads.lead_candidates` in the `pipeline` database and writes nothing directly — underlying repos write their own state. Access goes through the `pipeline-db` package, which presents the same interface the Airtable SDK did, so call sites read the same as they always did.
 - **Don't retry inside a tick.** Failed leads get picked up on the next tick automatically. Log non-zero exits, continue, don't stop the world.
 - **`failed` and `deep_research_failed` are non-terminal** (since 2026-05-24). The orchestrator auto-retries them on the next tick because most failures here are transient (YouTube quota, Airtable timeouts). No failure-count bounding in v1 — genuinely broken leads will loop until manually fixed. This is an intentional simplification, not an oversight.
 - **Single-instance.** No concurrent ticks. Use a lockfile at `logs/.tick-lock`; if held, the new tick no-ops.
@@ -56,7 +56,7 @@ Lead-finder (interval-driven, runs LAST in the tick), plus two lead-driven branc
 Branched on `review_status` (case-sensitive — Airtable values are `approved` lowercase, `D100` uppercase):
 
 - `approved` → **the tick preps only.** Shell out to `youtube-email-outreach-v1` for find → verify → enrich (Quick research) with `--stop-after enrich`, then **park the lead at `outreach_status = "ready_data_scraped"`** (enriched, ready to write). Writing and sending the email are **deliberately decoupled from the tick** (since 2026-07-17) — see [Writing/sending is decoupled from the tick](#writingsending-is-decoupled-from-the-tick-since-2026-07-17). Fire the parked leads on demand with **`npm run send`** (compose → push to SmartLead, paused). Tick-terminal: `ready_data_scraped`. Overall-terminal: `outreach_status = "sent_to_smartlead"`.
-- `D100` → step A: `youtube-email-outreach-v1 --stop-after verify`; step B: per-lead invocation of `youtube-deep-research-v1`'s `scripts/run-channel.ts` (with auto-bootstrap via `scripts/setup-airtable.ts` if the slug is new to `clients.json`). Each d100 lead gets its own Airtable base. **No compose, no SmartLead in v1.** Terminal: `outreach_status = "deep_research_complete"`.
+- `D100` → step A: `youtube-email-outreach-v1 --stop-after verify`; step B: per-lead invocation of `youtube-deep-research-v1`'s `scripts/run-channel.ts` (with auto-bootstrap via `scripts/register-client.ts` if the slug is new to `clients.json`). Each d100 lead is a `client_id` in the shared `research` schema; it used to be a whole Airtable base of its own. **No compose, no SmartLead in v1.** Terminal: `outreach_status = "deep_research_complete"`.
 
 All other `review_status` values (`unreviewed`, `rejected`, `sent`, `below_threshold`, `scoring_failed`, `demo_niche_excluded`, `approved_hold`, `needs_contact`) are ignored.
 
@@ -88,7 +88,7 @@ Persisted on the singleSelect:
 - **Prep (on the tick, `npm run tick`):** `approved` leads go find → verify → enrich (`--stop-after enrich` inside `youtube-email-outreach-v1`) and **park at `outreach_status = "ready_data_scraped"`**. The tick **never composes or pushes**. Every approved lead ends the tick "lying in wait, ready to write." Prep is idempotent — a lead already at `ready_data_scraped`/`email_drafted`/`sent_to_smartlead` is skipped by the prep query (`APPROVED_PREP_DONE` in `src/airtable.ts`), so re-ticking never re-drives a parked lead.
 - **Send (on demand, `npm run send`):** drives the parked leads (`ready_data_scraped`, or `email_drafted` from a partial prior send — `APPROVED_FIRE_READY`) through compose → push to SmartLead. This is the **only** path that sends, and it runs exactly when you trigger it. `npm run send:dry` previews the shell-out and sends nothing; `--lead-ids a,b` fires a subset; `--limit N` caps the batch. It acquires the same `logs/.tick-lock` as the tick, so a send and a tick can't overlap. Driver: `driveApprovedSend` in `src/drivers/approved.ts`; the inbox-health gate still fires here (at send time), not during prep.
 
-**Why: the enrichment-DB cleanup can never strand a ready-to-write lead.** The cleanup (`youtube-email-outreach-v1/scripts/airtable-cleanup.ts`) runs on its own systemd timer (see [Enrichment cleanup is automated](#enrichment-cleanup-is-automated-since-2026-07-30)) — nothing in the tick, campaign, or autopilot triggers it, and it is age-driven, never send-driven. Its `--auto` mode only targets leads already at `sent_to_smartlead` (i.e. it follows a *send*, and never touches a `ready_data_scraped` parked lead), and it is non-destructive to what compose needs: it always exports a re-importable JSON and keeps the on-disk research bundle (`enrichment-bundles/<recId>/`), and compose reads its input from that **on-disk bundle**, not from the Airtable enrichment base. So even a fully-cleaned lead can still be (re)composed. Composing an email cannot arm the cleanup; only a send can, and the send is now yours to trigger.
+**Why it was decoupled: the enrichment-DB cleanup could never be allowed to strand a ready-to-write lead.** That cleanup is now retired (see [Enrichment cleanup is retired](#enrichment-cleanup-is-retired-since-2026-08-12)) because it only ever existed to stay under Airtable's record cap, so the hazard is gone entirely. The decoupling stays: it is a good property on its own, and compose still reads from the **on-disk bundle** (`enrichment-bundles/<recId>/`) rather than the database, so a lead is composable regardless of what the store holds.
 
 ## What the orchestrator does each tick
 
@@ -119,11 +119,21 @@ Implications for the orchestrator (no code changes needed here — keep it that 
 | Deep-research repo (TBN, likely `youtube-deep-research-v1`) | Shell out for d100 enrichment. Doesn't exist yet. |
 | `youtube-lead-finder-v1` | Not called. Writes leads independently; orchestrator only reads its output. |
 
-## Airtable architecture
+## Database architecture (Postgres, since 2026-08-12)
 
-- **Lead base `appenY7r5jlZMRpJ0`** — being renamed in the Airtable UI to "Scraped YouTube Leads" (base ID unchanged). Holds `lead_candidates`. The orchestrator reads everything, and writes `outreach_status` transitions for the d100 path only (since no other agent updates `lead_candidates` for d100).
-- **Per-prospect d100 bases** — one Airtable base per d100 lead, created by `youtube-deep-research-v1/scripts/setup-airtable.ts` on first encounter. The slug is derived deterministically by the orchestrator from `channel_name` (must match `youtube-deep-research-v1`'s `slugify`); the resulting base ID is recorded in `clients.json` in that repo.
-- **Quick enrichment scratch base `appTvzwOiTLmqC5Mw`** — unchanged. Still used by `quick-youtube-channel-research-v1` for the approved path; still cleaned 24h after send.
+One database, `pipeline`, on a private box reachable at `10.0.0.3`. Three schemas, because Postgres cannot join across databases and these do need joining:
+
+- **`leads`** — `lead_candidates` and `search_terms`, the old lead base `appenY7r5jlZMRpJ0`. The orchestrator reads everything and writes `outreach_status` transitions for the d100 path only (no other agent updates `lead_candidates` for d100).
+- **`enrichment`** — the old quick-research scratch base `appTvzwOiTLmqC5Mw`. **No longer a scratch base**: there is no record cap, so nothing is purged and nothing needs exporting.
+- **`research`** — deep research. The 52 per-client Airtable bases collapsed into one set of tables with a `client_id` column. Isolation is a query filter now rather than a separate base, so it lives inside `pipeline-db` and cannot be forgotten at a call site.
+
+**Nothing here talks to Airtable.** The `pipeline-db` package presents the same interface the Airtable SDK did — `base('table').select({ filterByFormula }).all()` and the rest — so existing call sites were unchanged. Its filter translator refuses any expression it cannot render exactly rather than approximating, because a wrong filter does not crash, it selects the wrong leads and emails them.
+
+Connection string: `/home/casey/.pipeline-db.env`. Deliberately not in the shared env bank, which the Mac overwrites every couple of minutes.
+
+Browse the data in NocoDB at `db.contentgetsclients.com`.
+
+**What went away with the cap:** the 15-minute cleanup timer, the export-and-purge cycle, bank chunking at 100,000 characters per cell, the 10-records-per-request batching, and the 5-requests-per-second token bucket. All of it was tax paid to Airtable's limits.
 
 For the schema fields the orchestrator reads/writes, see [LEAD_CANDIDATES_SCHEMA.md](LEAD_CANDIDATES_SCHEMA.md) (paste from the email-outreach repo).
 
@@ -132,7 +142,7 @@ For the schema fields the orchestrator reads/writes, see [LEAD_CANDIDATES_SCHEMA
 For each verified-email d100 lead:
 
 1. Derive slug = `slugify(channel_name)` (must match `youtube-deep-research-v1/src/lib/clients.ts`).
-2. Read `<DEEP_RESEARCH_REPO_PATH>/clients.json`. If the slug isn't there, shell out to `npx tsx scripts/setup-airtable.ts --client <slug> --name "<channel_name>"`.
+2. Read `<DEEP_RESEARCH_REPO_PATH>/clients.json`. If the slug isn't there, shell out to `npx tsx scripts/register-client.ts --client <slug> --name "<channel_name>"`. That inserts one row; it used to provision an entire Airtable base in three phases.
 3. Set `outreach_status = deep_research_in_progress` on the lead row.
 4. Shell out to `npx tsx scripts/run-channel.ts <channel_url> --client <slug> --business-model $D100_BUSINESS_MODEL --research-purpose research_target`.
 5. On exit-0 → set `deep_research_complete`. On non-zero → set `deep_research_failed`.
@@ -163,7 +173,7 @@ Estimated ~200–300 lines TS across `src/cli/orchestrate.ts` + a lead-query hel
 
 ## Ticks are manual-only (since 2026-06-01)
 
-**The 4-hour `launchd` cron is DISABLED** — agent unloaded, plist renamed `com.caseybrown.youtube-outreach-orchestrator.plist.disabled`. Reason: the Mac is usually asleep or the repo closed at scheduled tick times, so scheduled ticks silently no-fired (a stale `ENRICHMENT_REPO_PATH` had also been killing them — now fixed). **Run ticks by hand: `npm run tick`. Do NOT re-enable the cron unless Casey explicitly says so.** Note the tick now only **preps** leads to `ready_data_scraped` — writing/sending is the separate `npm run send` step (see [Writing/sending is decoupled from the tick](#writingsending-is-decoupled-from-the-tick-since-2026-07-17)). The enrichment-DB cleanup is **no longer manual** — see [Enrichment cleanup is automated](#enrichment-cleanup-is-automated-since-2026-07-30) below. The tick itself stays manual.
+**The 4-hour `launchd` cron is DISABLED** — agent unloaded, plist renamed `com.caseybrown.youtube-outreach-orchestrator.plist.disabled`. Reason: the Mac is usually asleep or the repo closed at scheduled tick times, so scheduled ticks silently no-fired (a stale `ENRICHMENT_REPO_PATH` had also been killing them — now fixed). **Run ticks by hand: `npm run tick`. Do NOT re-enable the cron unless Casey explicitly says so.** Note the tick now only **preps** leads to `ready_data_scraped` — writing/sending is the separate `npm run send` step (see [Writing/sending is decoupled from the tick](#writingsending-is-decoupled-from-the-tick-since-2026-07-17)). The enrichment-DB cleanup is **retired** — see [Enrichment cleanup is retired](#enrichment-cleanup-is-retired-since-2026-08-12) below. The tick itself stays manual.
 
 Former cron (for reference if ever re-enabled): `17 */4 * * *` (every 4h, off-zero minute).
 
@@ -225,36 +235,31 @@ agents may edit + commit any of the 5 repos but NEVER `.env`. Full detail:
 [scripts/autopilot/README.md](scripts/autopilot/README.md). This supersedes "manual-only"
 below for the campaign; `npm run campaign` by hand still works and shares the same lock.
 
-## Enrichment cleanup is automated (since 2026-07-30)
+## Enrichment cleanup is retired (since 2026-08-12)
 
-The enrichment scratch base (`appTvzwOiTLmqC5Mw`) empties itself on the VPS. Nothing
-here needs running by hand, and the old "run it manually after each send batch"
-instruction was Mac-era text that stopped being true at the migration.
+`enrichment-db-cleanup.timer` is **stopped and disabled**. Do not re-enable it.
 
-`enrichment-db-cleanup.timer` fires **every 15 minutes** (`OnCalendar=*:0/15`) and runs
-`automator/scripts/enrichment-db-cleanup.py --live`, which:
+It existed for one reason: Airtable capped a base at 125,000 records, so the enrichment
+base had to be emptied on a schedule and its contents exported to JSON to avoid hitting
+the ceiling. Postgres has no such cap, so there is nothing to purge and nothing to
+export. Running it now would purge a database nothing writes to.
 
-1. Sweeps runs older than `CLEANUP_ROUTINE_AGE_DAYS` (default **7d**) via
-   `airtable-cleanup.ts --older-than`. **Age-driven, not send-driven** — it does not
-   care whether a lead was ever emailed, so it can never be armed by composing.
-2. Opens a capacity valve if the base crosses 80% of the 125,000-record cap.
-3. Archives each purged run to `Exported Leads in JSON/`, then auto-rolls those
-   staging files into one dated `YYYY-MM-DD.json`. **Consolidation defaults ON**
-   (`runRollup` → `consolidate: true`) — without it, a 15-minute timer mints a new
-   same-day file every firing, which is exactly how 2026-07-24 ended up as 30 files.
-4. Syncs the archive folder to Google Drive (folder `1OjW2Qa29MxKb0E3qaX2WseSWhNFaedyl`,
-   set via `ENRICHMENT_DRIVE_FOLDER_ID` in the unit). **Run the sync only through the
-   service or with that env var set** — invoking `enrichment_drive_sync.py` bare makes
-   it create a *second* folder of the same name and rewrite the saved folder id.
+Everything it did is either unnecessary or already done:
 
-Bundles are **never** touched: the cleanup keeps `enrichment-bundles/<recId>/` on disk,
-which is where compose reads from, so a fully-cleaned lead is still composable.
+- **Purging runs older than 7 days** — unnecessary. Data accumulates; that was the point.
+- **The capacity valve at 80% of the cap** — no cap exists.
+- **Exporting purged runs to `Exported Leads in JSON/`** — the archive is now history, not
+  a live dependency. It has been loaded into Postgres and stays on disk.
+- **Syncing that folder to Google Drive** — stopped with the timer.
 
-Manual equivalents, if you ever need them: `npx tsx scripts/airtable-cleanup.ts
---older-than 7d --dry-run` to preview, `npx tsx scripts/rollup-archived-runs.ts
---consolidate --dry-run` to preview a rollup.
+**The archives it produced were lossy, which is worth knowing.** `2026-06-08.json` holds
+97 runs and zero transcripts; across all archives 53,024 transcripts were captured while
+67,491 transcript files sit on disk. Roughly 14,500 transcripts were purged from Airtable
+and never archived. The research itself is safe -- the on-disk bundles are complete, and
+compose reads from the bundle -- but a run whose rows were lost cannot be re-exported
+from the database. Nothing is purged now, so this stops here.
 
-### The archive is now a complete record of a run
+## The archive is now a complete record of a run
 
 Until 2026-07-30 the generated banks (enemies / insights / insights_analysis / offer /
 examples / bio) lived **only** as `researched/*.md` inside a bundle. Every other bundle
@@ -282,6 +287,8 @@ cleanup exports and purges it like every other table.
   skips them; treating one as a per-run archive would rewrite it as an empty shell.
 
 ## Operational gotchas (verified 2026-06-01)
+
+- **The store is Postgres, not Airtable** (2026-08-12). Anything below that describes an Airtable base, an export, or a purge is history. `pipeline-db` is the only way in.
 
 - **SmartLead "sent" ≠ emailed.** Our push only LOADS leads into a campaign; SmartLead's scheduler sends on Mon–Thu 09:00–15:00 ET (Fri/Sat/Sun = 0 by design). The SmartLead UI/Ask-AI lag and lie about volume — verify real sends with `youtube-email-outreach-v1/scripts/sl-sent-per-day.ts`, never the UI. See `system-overview.md` → "Verifying SmartLead sends".
 - **YouTube backend is `auto` (direct-keys-first), merged to `main`.** No active branch landmine. Each downstream repo configures its own backend; enrichment repo is separate.
