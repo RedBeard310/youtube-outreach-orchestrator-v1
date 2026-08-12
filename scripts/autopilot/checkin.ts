@@ -152,6 +152,16 @@ const SCORING_MIN_SAMPLE = Number(process.env.AUTOPILOT_SCORING_MIN_SAMPLE ?? 20
 const PITCHABLE_MIN_SAMPLE = Number(process.env.AUTOPILOT_PITCHABLE_MIN_SAMPLE ?? 40);
 const PITCHABLE_BASELINE_MIN_POINTS = Number(process.env.AUTOPILOT_PITCHABLE_BASELINE_MIN_POINTS ?? 8);
 const PITCHABLE_COLLAPSE_RATIO = Number(process.env.AUTOPILOT_PITCHABLE_COLLAPSE_RATIO ?? 0.5);
+// Baseline window cap (2026-08-12, the term-floor-fallback incident). The baseline used to
+// average over the ENTIRE history file since inception — by 2026-08-12 that was 148+ hourly
+// points back to 08-05. An unbounded mean can't absorb a sustained, intentional rate shift
+// (e.g. 37ceb96's tier-2 fallback floor, which openly trades rate for not starving): the
+// alert fired every hour for 5+ straight hours after four separate fix-agents each confirmed
+// it wasn't a bug, because 5 new low points barely move a 148-point all-time average. Capping
+// to the most recent N points makes "trailing baseline" actually trailing — it still needs
+// PITCHABLE_BASELINE_MIN_POINTS before firing, so a sudden real regression is still caught,
+// but a deliberate multi-hour-plus shift stops re-paging the same diagnosis indefinitely.
+const PITCHABLE_BASELINE_WINDOW = Number(process.env.AUTOPILOT_PITCHABLE_BASELINE_WINDOW ?? 72);
 const PITCHABLE_RATE_HIST = join(LOGS, 'autopilot-pitchable-rate-history.jsonl');
 
 // Walk recent finder_run events (newest campaign-*.jsonl first, falling back one day if the
@@ -411,13 +421,14 @@ async function main(): Promise<void> {
     const hist = existsSync(PITCHABLE_RATE_HIST)
       ? readFileSync(PITCHABLE_RATE_HIST, 'utf8').split('\n').filter((l) => l.trim()).map((l) => { try { return JSON.parse(l) as { ts: string; rate: number; sample: number }; } catch { return null; } }).filter((x): x is { ts: string; rate: number; sample: number } => x !== null)
       : [];
-    const prior = hist.slice(0, -1); // exclude the point we just appended
+    const priorAll = hist.slice(0, -1); // exclude the point we just appended
+    const prior = priorAll.slice(-PITCHABLE_BASELINE_WINDOW); // trailing window, not all-time
     if (prior.length >= PITCHABLE_BASELINE_MIN_POINTS) {
       const baseline = prior.reduce((s, p) => s + p.rate, 0) / prior.length;
       if (baseline > 0 && rate < baseline * PITCHABLE_COLLAPSE_RATIO && !scoringFailedAlarm) {
         anomalies.push({
           kind: 'pitchable_rate_collapse',
-          detail: `score>=6 rate is ${(rate * 100).toFixed(1)}% over the last ${pitchableYieldWindow.newLeads} new leads, vs a ${(baseline * 100).toFixed(1)}% trailing baseline (${prior.length} prior check-ins) — less than half. scoring_failed rate is normal (${scoringFailedRatePct.toFixed(0)}%), so this isn't the token-budget bug; likely a scoring-rubric, prefilter, or term-mix regression worth a look.`,
+          detail: `score>=6 rate is ${(rate * 100).toFixed(1)}% over the last ${pitchableYieldWindow.newLeads} new leads, vs a ${(baseline * 100).toFixed(1)}% trailing baseline (${prior.length} of last ${PITCHABLE_BASELINE_WINDOW} check-ins) — less than half. scoring_failed rate is normal (${scoringFailedRatePct.toFixed(0)}%), so this isn't the token-budget bug; likely a scoring-rubric, prefilter, or term-mix regression worth a look.`,
         });
       }
     }
