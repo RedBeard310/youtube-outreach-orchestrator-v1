@@ -1,0 +1,26 @@
+# PG schema additions — 2026-08-12 (from the Mac backfill session)
+
+After the Postgres cutover, both machines' enrichment batches were failing on
+pipeline-db's writable-field guard: the DDL generation dropped every table's
+Airtable primary "label" field plus the bank chunking fields, all of which the
+quick repo writes at insert time. Applied directly to the live DB (additive,
+nullable, `IF NOT EXISTS`):
+
+- `enrichment.transcripts.transcript_label` text
+- `enrichment.classifications.classification_label` text
+- `enrichment.pinned_comments.comment_label` text
+- `enrichment.top_comments.comment_label` text
+- `enrichment.icp_avatar.avatar_label` text
+- `enrichment.banks.bank_label` text
+- `enrichment.banks.chunk_index` integer
+- `enrichment.banks.chunk_count` integer
+
+Not added: `videos.is_trending_outlier` / `is_all_time_outlier` (Airtable
+formula fields — computed, never written) and `outbound_links.link_label`
+(nothing writes it). pipeline-db's catalog reads live from information_schema,
+so no code or rebuild was needed — fresh processes pick the columns up
+automatically.
+
+If the DDL generator (`quick-youtube-channel-research-v1/scripts/gen-leads-ddl.py`
+family) re-runs against these tables, fold these columns in so a regenerate
+doesn't drop them again.
