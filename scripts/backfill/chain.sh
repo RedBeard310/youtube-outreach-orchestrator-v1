@@ -8,10 +8,9 @@
 # Stop cleanly: touch logs/backfill-2026-07/halt.flag (takes effect at the
 # next batch boundary; kill the outreach process too if you want it NOW).
 #
-# Enrichment-base capacity is handled by the enrichment-db-cleanup.timer
-# (15-min cadence, CLEANUP_MIN_AGE_HOURS=2 blitz drop-in) — no manual drain.
-# Two consecutive nonzero batch exits = hard wall (quota/Airtable down): stop
-# and leave hard-wall.flag rather than grind.
+# Enrichment storage needs no drain: the store is Postgres and has no record cap.
+# Two consecutive nonzero batch exits = hard wall (quota exhausted, or the database
+# unreachable): stop and leave hard-wall.flag rather than grind.
 
 set -u
 ORCH=/home/casey/repos/youtube-outreach-orchestrator-v1
@@ -172,26 +171,13 @@ for(let i=1;i<=60;i++){const v=process.env[`YOUTUBE_API_KEY_${i}`]; if(v){gap=0;
     log "youtube quota is back — resuming batches"
   fi
 
-  # Enrichment-base capacity gate (2026-08-09): the 08-09 mass-fail was 495
-  # instant 422s against a full Airtable base (LIMIT_CHECK_TOO_MANY_RECORDS).
-  # External halt flags are unreliable (other sessions' relaunchers delete
-  # them), so the chain checks the cleanup service's own fill reading and
-  # waits while the base is at/over the valve line. No reading (e.g. on the
-  # Mac, where journalctl doesn't exist) → proceed; the mass-fail guard
-  # below is the backstop.
-  base_fill() {
-    journalctl -u enrichment-db-cleanup.service --since "-40 min" --no-pager 2>/dev/null \
-      | grep -oE "fill=[0-9]+" | tail -1 | cut -d= -f2
-  }
-  fill=$(base_fill)
-  if [ -n "$fill" ] && [ "$fill" -ge 70 ]; then
-    log "enrichment base at ${fill}% — waiting for the cleanup to drain it below 70%"
-    while fill=$(base_fill); [ -n "$fill" ] && [ "$fill" -ge 70 ]; do
-      [ -f "$HALT" ] && { log "halt flag present — stopping"; exit 0; }
-      sleep 900
-    done
-    log "enrichment base drained (${fill:-?}%) — resuming batches"
-  fi
+  # The enrichment-base capacity gate was removed on 2026-08-12. It waited while
+  # the Airtable enrichment base sat above 70% of its 125,000-record cap, reading
+  # the fill percentage out of enrichment-db-cleanup.service's journal. The store
+  # is Postgres now: there is no cap, the cleanup timer is stopped and disabled,
+  # and the journal it read has no new entries — so the gate could only ever find
+  # no reading and proceed. It went out with the thing it was protecting against.
+  # The mass-failure guard below still backstops a batch that fails wholesale.
 
   fetch_out=$(cd "$EMAIL" && node "$ORCH/scripts/backfill/next-batch-ids.cjs" 2>&1)
   if [ $? -ne 0 ]; then
