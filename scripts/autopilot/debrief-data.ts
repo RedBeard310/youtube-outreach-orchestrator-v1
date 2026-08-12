@@ -175,6 +175,34 @@ function readJsonl(file: string): Array<Record<string, unknown>> {
 }
 
 // All campaign events within the cycle window [sinceISO, untilISO) (spans the UTC-dated files).
+// Drop every event belonging to a `--dry-run` campaign session (2026-08-12).
+//
+// campaign:dry logs to the same JSONL as a real session, and it walks its whole
+// run plan instantly without touching anything. On 08-12 two verification dry
+// runs contributed 2 of the reported 16 sessions and 30 of the reported 80
+// finder passes — all of them zero-yield — which halved the reported per-pass
+// yield (0.60/pass reported vs 0.96/pass actually worked) and made the day look
+// worse than it was. A dry run is a check on the code, not a unit of work, so it
+// must not appear in the cycle's numbers at all.
+//
+// Attribution is positional: a `start` carrying opts.dryRun opens a dry session
+// and everything up to and including its `done` belongs to it. Sessions never
+// interleave (single-instance lockfile), so this is exact.
+function withoutDryRunSessions(
+  ev: Array<Record<string, unknown>>,
+): Array<Record<string, unknown>> {
+  const kept: Array<Record<string, unknown>> = [];
+  let inDry = false;
+  for (const e of ev) {
+    if (e.event === 'start') {
+      inDry = (e.opts as { dryRun?: boolean } | undefined)?.dryRun === true;
+    }
+    if (!inDry) kept.push(e);
+    if (e.event === 'done') inDry = false;
+  }
+  return kept;
+}
+
 function cycleCampaignEvents(sinceISO: string, untilISO: string): Array<Record<string, unknown>> {
   const ev: Array<Record<string, unknown>> = [];
   for (const f of readdirSync(LOGS)) {
@@ -377,7 +405,11 @@ async function main(): Promise<void> {
   // daily report even if the hourly check-in's alarm is ever mis-tuned.
   const scoringFailed = discovered.filter((l) => l.review_status === 'scoring_failed').length;
 
-  const ev = cycleCampaignEvents(sinceISO, untilISO);
+  const evAll = cycleCampaignEvents(sinceISO, untilISO);
+  const ev = withoutDryRunSessions(evAll);
+  const dryRunSessions = evAll.filter(
+    (e) => e.event === 'start' && (e.opts as { dryRun?: boolean } | undefined)?.dryRun === true,
+  ).length;
   const count = (name: string) => ev.filter((e) => e.event === name).length;
   const sum = (name: string, field: string) =>
     ev.filter((e) => e.event === name).reduce((s, e) => s + (Number(e[field]) || 0), 0);
@@ -450,6 +482,7 @@ async function main(): Promise<void> {
       hard_stops: count('hard_stop'),
       quota_stops: count('quota_stop'),
       time_budget_stops: count('time_budget_stop'),
+      dry_run_sessions_excluded: dryRunSessions,
     },
     // scope is Anthropic-only: since the 2026-08-01 zero-Anthropic migration the pipeline's
     // LLM work runs on OpenRouter, which the burn ledger never meters — total_usd:0 == "$0
