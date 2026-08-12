@@ -113,7 +113,7 @@ npm run typecheck        # tsc --noEmit
 | `pipeline-state.ts`, `diagnose-failed.ts`, `check-ready-for-email.ts`, `quality-check-ready.ts`, `check-today.ts`, `check-recent.ts`, `count-recent-loaded.ts` | Count / categorize leads by status (pipeline health, stuck-`failed` triage) | read-only |
 | `airtable-email-lookup.ts`, `sample-email.ts`, `check-bundle-coverage.ts` | Look up emails / sample composed copy / check enrichment coverage | read-only |
 | `pick-pilot.ts`, `pick-batch2.ts`, `verify-batch2.ts`, `check-pilot-status.ts` | Select & verify ad-hoc lead batches for pilot sends | read-only |
-| `verify-singleselect.mjs` | Confirm the `outreach_status` Airtable options exist | read-only |
+| `verify-status-vocab.mjs` | Confirm every `review_status` / `outreach_status` the orchestrator uses is in the database vocabulary | read-only |
 | **`purge-host-gate-failed.ts`** | **Export-then-DELETE** `host_name_low_confidence` failures (writes a verified JSON backup to `backups/` first) | **DESTRUCTIVE** |
 
 **Onboarding a new D100 prospect** is automatic — the D100 driver bootstraps the per-prospect base on first encounter. No manual step.
