@@ -142,6 +142,23 @@ function autocompleteBlocked(): boolean {
   return false;
 }
 
+// Is the finder currently running term-pool tier-2 fallback (2026-08-12, search_terms.ts
+// commit 37ceb96)? When no paused term clears the preferred 3.5% qualified-rate floor after
+// cooling, tier 2 drops to a 2% floor and revives the best available mediocre terms instead
+// of starving. Casey's own commit message documents the expected yield of those terms:
+// ~78 channels returned, ~1.5 scoring >=6 (~1.9%) — well under half the trailing baseline,
+// by design. Left undetected, this reads exactly like a scoring-rubric regression and pages
+// a fix-agent every hour the term pool stays thin, for a condition that already has a name,
+// a reason, and a self-healing path (discovery/keyword-harvest refilling the active pool).
+function tier2FallbackActive(): boolean {
+  for (const f of recentSessionLogs(2)) {
+    let body = '';
+    try { body = readFileSync(f, 'utf8'); } catch { continue; }
+    if (body.includes('[tier2] no term cleared')) return true;
+  }
+  return false;
+}
+
 // Scoring-pipeline health thresholds (2026-08-05, the reasoning-token-truncation
 // incident — see youtube-lead-finder-v1/src/scoring/score.ts HOTFIX comment). The
 // checkin ran hourly through 20+ hours of a 76-86% scoring_failed rate and never
@@ -426,10 +443,19 @@ async function main(): Promise<void> {
     if (prior.length >= PITCHABLE_BASELINE_MIN_POINTS) {
       const baseline = prior.reduce((s, p) => s + p.rate, 0) / prior.length;
       if (baseline > 0 && rate < baseline * PITCHABLE_COLLAPSE_RATIO && !scoringFailedAlarm) {
-        anomalies.push({
-          kind: 'pitchable_rate_collapse',
-          detail: `score>=6 rate is ${(rate * 100).toFixed(1)}% over the last ${pitchableYieldWindow.newLeads} new leads, vs a ${(baseline * 100).toFixed(1)}% trailing baseline (${prior.length} of last ${PITCHABLE_BASELINE_WINDOW} check-ins) — less than half. scoring_failed rate is normal (${scoringFailedRatePct.toFixed(0)}%), so this isn't the token-budget bug; likely a scoring-rubric, prefilter, or term-mix regression worth a look.`,
-        });
+        if (tier2FallbackActive()) {
+          // Already explained — see tier2FallbackActive() above. Not fix-agent-fixable:
+          // the remedy is the term pool refilling (discovery/keyword-harvest), which is
+          // already automatic. Observe it instead of paging, same pattern as section 5.
+          const tdetail = `score>=6 rate is ${(rate * 100).toFixed(1)}% over the last ${pitchableYieldWindow.newLeads} new leads, vs a ${(baseline * 100).toFixed(1)}% trailing baseline — but tier-2 term-pool fallback (search_terms.ts, commit 37ceb96) is active in the recent session logs, which is documented to convert around ~2%. Expected, not a regression; observing only.`;
+          appendFileSync(OBSERVATIONS, JSON.stringify({ ts: new Date().toISOString(), kind: 'pitchable_rate_tier2_fallback', detail: tdetail, parked }) + '\n');
+          console.log(`[checkin ${day}] OBSERVATION pitchable_rate_tier2_fallback — ${tdetail}`);
+        } else {
+          anomalies.push({
+            kind: 'pitchable_rate_collapse',
+            detail: `score>=6 rate is ${(rate * 100).toFixed(1)}% over the last ${pitchableYieldWindow.newLeads} new leads, vs a ${(baseline * 100).toFixed(1)}% trailing baseline (${prior.length} of last ${PITCHABLE_BASELINE_WINDOW} check-ins) — less than half. scoring_failed rate is normal (${scoringFailedRatePct.toFixed(0)}%), so this isn't the token-budget bug; likely a scoring-rubric, prefilter, or term-mix regression worth a look.`,
+          });
+        }
       }
     }
   }
