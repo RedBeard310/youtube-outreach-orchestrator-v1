@@ -15,7 +15,6 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "airtable": "^0.12.2",
     "dotenv": "^16.4.5",
     "pipeline-db": "file:../pipeline-db"
   },

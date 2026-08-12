@@ -1,0 +1,2 @@
+migration freeze: Airtable -> Postgres cutover in progress (2026-08-12T07:49:20Z)
+Remove this file to resume: rm scripts/backfill/halt.flag
