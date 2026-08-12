@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lead Run Debrief — 2026-08-12</title>
+<style>
+  :root {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --good-soft: #1f8a5b1a; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+      --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+      --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --good-soft: #55c48c1c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --good-soft: #1f8a5b1a; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+    --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+    --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --good-soft: #55c48c1c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 40px 22px 80px; }
+  .eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); font-weight: 600; }
+  h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.12; margin: 10px 0 6px; text-wrap: balance; letter-spacing: -.02em; }
+  h2 { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); margin: 44px 0 16px; font-weight: 700; }
+  h3 { font-size: 18px; margin: 0 0 6px; letter-spacing: -.01em; }
+  p { margin: 0 0 14px; }
+  .lede { font-size: 18px; color: var(--ink-soft); max-width: 68ch; }
+  .tag { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--good-soft); color: var(--good); letter-spacing: .02em; }
+  .tag.warn { background: var(--amber-soft); color: var(--amber); }
+  .tag.bad { background: var(--red-soft); color: var(--red); }
+  .grid { display: grid; gap: 14px; }
+  .stats { grid-template-columns: repeat(4, 1fr); margin-top: 26px; }
+  @media (max-width: 720px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; box-shadow: var(--shadow); }
+  .stat .n { font-size: 30px; font-weight: 750; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .stat .l { font-size: 12.5px; color: var(--ink-soft); margin-top: 3px; }
+  .stat .s { font-size: 12px; margin-top: 8px; font-weight: 600; }
+  .up { color: var(--good); } .down { color: var(--red); } .warn { color: var(--amber); }
+  .accent-red { border-left: 3px solid var(--red); }
+  .accent-teal { border-left: 3px solid var(--teal); }
+  .accent-amber { border-left: 3px solid var(--amber); }
+  .accent-good { border-left: 3px solid var(--good); }
+
+  /* shape-of-day bar strip */
+  .strip { display: flex; align-items: flex-end; gap: 2px; height: 120px; padding: 14px 14px 10px; overflow-x: auto; }
+  .bar { flex: 1 0 6px; min-width: 5px; border-radius: 2px 2px 0 0; background: var(--teal); opacity: .9; }
+  .bar.zero { background: var(--red); height: 4px !important; opacity: .9; }
+  .bar.low { background: var(--amber); }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-soft); padding: 0 14px 14px; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+
+  .q { border-radius: 14px; padding: 20px 22px; margin-bottom: 14px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); }
+  .q .ask { font-size: 17px; font-weight: 700; color: var(--ink); margin-bottom: 10px; display: flex; gap: 10px; align-items: baseline; }
+  .q .ask .qn { color: var(--red); font-weight: 800; flex: 0 0 auto; }
+  .q p { color: var(--ink-soft); }
+  .q b { color: var(--ink); }
+  .pill { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink); background: var(--panel-2); padding: 1px 7px; border-radius: 6px; border: 1px solid var(--line); white-space: nowrap; }
+
+  pre { background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 13px 15px; overflow-x: auto; font-size: 13px; line-height: 1.5; margin: 0 0 14px; color: var(--ink); }
+  code { font-size: .92em; background: var(--panel-2); padding: 1px 5px; border-radius: 5px; border: 1px solid var(--line); }
+  pre code { background: none; border: none; padding: 0; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+  th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); }
+  td .num { font-variant-numeric: tabular-nums; font-weight: 650; }
+  td.n { font-variant-numeric: tabular-nums; text-align: right; }
+  .fix td:first-child { color: var(--good); font-weight: 650; }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); box-shadow: var(--shadow); margin-bottom: 14px; }
+  ol.recs { padding-left: 0; list-style: none; counter-reset: r; margin: 0; }
+  ol.recs li { counter-increment: r; position: relative; padding: 14px 16px 14px 52px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 10px; box-shadow: var(--shadow); }
+  ol.recs li::before { content: counter(r); position: absolute; left: 14px; top: 14px; width: 26px; height: 26px; border-radius: 8px; background: var(--teal-soft); color: var(--teal); font-weight: 800; font-size: 14px; display: grid; place-items: center; }
+  ol.recs b { color: var(--ink); }
+  .foot { margin-top: 46px; padding: 16px 18px; border-radius: 12px; background: var(--amber-soft); border: 1px solid var(--line); font-size: 14px; color: var(--ink-soft); }
+  .foot b { color: var(--ink); }
+  .muted { color: var(--ink-soft); font-size: 13.5px; }
+</style>
+
+
+<div class="wrap">
+
+  <div class="eyebrow">Lead Run Debrief · YouTube outreach</div>
+  <h1>2026-08-12 — one search method did all the work, and the last 11 hours were a deliberate pause</h1>
+  <p class="lede">The pool grew by <b>18</b>. Yesterday's key fix landed and is verified working: the pipeline now sees all 39 YouTube keys, and no session stopped for a false quota reading. But the four background discovery methods spent the entire day paused on the same false reading, in three more copies of the bug nobody had found yet. Then at 20:09Z the campaign stopped on purpose, for the Airtable to Postgres migration.</p>
+  <div style="margin-top:14px"><span class="tag warn">NO CRASHES · KEY FIX CONFIRMED · 4 OF 5 SEARCH METHODS SILENTLY IDLE ALL DAY</span></div>
+
+  <div class="grid stats">
+    <div class="card stat accent-amber">
+      <div class="n">+18</div>
+      <div class="l">parked into <code>approved_hold</code></div>
+      <div class="s warn">pool 4,642 → 4,660. Was +29</div>
+    </div>
+    <div class="card stat accent-good">
+      <div class="n">39</div>
+      <div class="l">YouTube keys now in use</div>
+      <div class="s up">was 7 of 39. Flipped at 07:27Z</div>
+    </div>
+    <div class="card stat accent-red">
+      <div class="n">0</div>
+      <div class="l">seeds walked by the sweeps</div>
+      <div class="s down">across 192 runs of 4 daemons</div>
+    </div>
+    <div class="card stat accent-amber">
+      <div class="n">11h</div>
+      <div class="l">of the cycle with no campaign</div>
+      <div class="s warn">migration freeze, on purpose</div>
+    </div>
+  </div>
+
+  <h2>The shape of the day</h2>
+  <div class="card" style="padding:0">
+    <div class="strip" id="strip"></div>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--teal)"></span>strong pass (6+ pitchable)</span>
+      <span><span class="dot" style="background:var(--amber)"></span>light (1 to 5)</span>
+      <span><span class="dot" style="background:var(--red)"></span>empty pass (0), <b>28 of 50</b></span>
+    </div>
+  </div>
+  <p class="muted">Each bar is one keyword-search pass, 50 of them across 14 real sessions, left to right through the cycle. Two decent stretches around midday and late afternoon, everything else thin, and then the day simply ends: the last bar is 19:38Z, and nothing ran after 20:09Z. Note the pass count. The grounded snapshot reports 80 passes across 16 sessions, but 30 of those passes and 2 of those sessions were <code>campaign:dry</code> verification runs that do no work. Excluding them is a fix that shipped today.</p>
+
+  <h2>The three questions</h2>
+
+  <div class="q accent-red">
+    <div class="ask"><span class="qn">Q1</span><span>Why did only one of five search methods find anything?</span></div>
+    <p><b>Because yesterday's fix was applied in one place and the same bug lived in three more.</b> Every one of the day's 212 finds came from keyword search. The other methods contributed nothing.</p>
+    <p>Yesterday the campaign was hard-stopping because a retired service kept reporting "100.1% of quota used". The fix taught the campaign that a negative "requests remaining" means the service is switched off, not that quota is low, so the guard turns itself off instead of stopping the run. That worked. The campaign had <b>zero</b> quota stops today, down from six.</p>
+    <p>What nobody checked is that the four background sweeps each carried their own private copy of that same quota check, and none of the copies got the fix. So they read the same stale file, saw the same phantom 100.1%, and paused. Every 15 minutes. All day:</p>
+    <pre><code>[sweep] PAUSE: quota at 100.1% >= 70% cap. Leaving headroom for the campaign.</code></pre>
+    <p><b>There was no campaign to leave headroom for, and no quota being consumed.</b> The file they were reading was written at 06:41Z the previous morning and has not been touched since, because nothing writes it once the retired service is gone. They were pausing on a snapshot of a world that no longer exists.</p>
+  </div>
+
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Method</th><th class="n">Runs today</th><th class="n">Seeds walked</th><th class="n">Found</th><th>Why it did nothing</th></tr></thead>
+      <tbody>
+        <tr><td>Recommended-videos feed</td><td class="n">96</td><td class="n"><span class="down">0</span></td><td class="n">0</td><td>false quota pause</td></tr>
+        <tr><td>Peer-network comments</td><td class="n">95</td><td class="n"><span class="down">0</span></td><td class="n">0</td><td>false quota pause</td></tr>
+        <tr><td>Comment sweep</td><td class="n">1</td><td class="n"><span class="down">0</span></td><td class="n">0</td><td>false quota pause</td></tr>
+        <tr><td>Podcast crossover</td><td class="n">1</td><td class="n">1,317 feeds</td><td class="n">2</td><td>ran fine, it has no quota gate</td></tr>
+        <tr><td>Keyword search</td><td class="n">50</td><td class="n">50 passes</td><td class="n"><b>212</b></td><td>the only working lane</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="muted">The daily health check reported all four sweeps <b>active, fresh and healthy</b> the whole time, because it only asks whether their progress file is being touched. A sweep that quits in its first second still touches its progress file. That gap is also fixed today.</p>
+
+  <div class="q accent-amber">
+    <div class="ask"><span class="qn">Q2</span><span>Why did everything stop at 20:09Z?</span></div>
+    <p><b>Somebody paused it on purpose, and left a note saying so.</b> This is not a fault and it needs no repair:</p>
+    <pre><code>migration freeze: Airtable -> Postgres code swap in progress (2026-08-11T20:09:19Z)
+Written by the migration work, not by an autopilot breach.
+Remove this file to resume: rm logs/autopilot-halt.flag</code></pre>
+    <p>The migration plan itself calls for exactly this, so the cutover doesn't land on a repo mid-run. The commits back it up: the email repo pointed its lead store at Postgres, and the deep-research repo collapsed its 52 per-client bases into one Postgres schema, both in that window. <b>I left the freeze in place.</b> Removing it is your call, not an unattended agent's.</p>
+    <p>One thing the freeze exposed. The halt flag is supposed to be the pipeline's one stop-everything switch, and the four sweeps have never honoured it. They kept running straight through, independently, and would have gone on writing leads into a database being swapped underneath them. Today that was hidden, because the false quota reading happened to be holding them still for the wrong reason. Fixing the quota bug on its own would have turned a silent problem into a live one, so both went in together.</p>
+  </div>
+
+  <div class="q accent-teal">
+    <div class="ask"><span class="qn">Q3</span><span>Underneath all that, is the finding engine healthy?</span></div>
+    <p><b>The part that ran was the best-quality finding we have had in a while. There just wasn't much of it.</b></p>
+    <p><b>21.7% of everything found was worth contacting</b>, up from 11.0% yesterday, and 18 emails verified against 3 yesterday. Some of that is flattering: the low-precision method (peer-network comments, which has been running at 2.6%) contributed nothing today, so the average rose because the weak lane went quiet, not because the strong lane improved. Per pass, keyword search returned <b>0.96 pitchable</b>, identical to yesterday.</p>
+    <p><b>Term supply is still the wall.</b> 13 of 14 sessions stopped on "term supply exhausted", and the finder's own line is blunt about it: <span class="pill">active pool exhausted, NO never-run and NO cooled proven terms remain</span>. The probe table now holds 12,307 terms, 7,418 of them already tried, and <b>0 were promoted as winners</b> this cycle. Nine sessions ran under 12 minutes against a 90-minute budget, because they ran out of things to search for and quit.</p>
+    <p><b>Legal Services was 27 of the 46 worth contacting, 59% of the day.</b> That is the narrowest niche mix on record. It is what the last un-mined vein looks like when everything else is dry, and it will not hold for many more days.</p>
+  </div>
+
+  <h2>What broke, what's fixed</h2>
+  <div class="tablewrap">
+    <table class="fix">
+      <thead><tr><th>What broke</th><th>Effect</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr><td>Three more copies of the retired-backend quota bug, one per sweep</td><td>4 of 5 search methods idle for the full 24h, 192 runs, 0 seeds walked</td><td>Fixed, one shared check now</td></tr>
+        <tr><td>The sweeps never honoured the halt flag</td><td>A deliberate freeze stopped the campaign and left 4 daemons free to write</td><td>Fixed, they pause and self-resume</td></tr>
+        <tr><td>Health check measured liveness, not work</td><td>All four reported healthy for 24h while walking 0 seeds</td><td>Fixed, it now reports work done</td></tr>
+        <tr><td>Dry runs counted as real work</td><td>Reported yield halved, 0.60/pass against 0.96 actually worked</td><td>Fixed, dry sessions excluded</td></tr>
+        <tr><td>All three term sources still dry</td><td>13 of 14 sessions stopped early. 0 probe winners promoted</td><td><span class="warn">Open. Needs new material</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="muted">Second cycle running where the fatal-error list came back <b>empty</b> and the day was still mostly idle. Nothing crashed, again. A check that only looks for crashes cannot see a day like this, which is why two of today's four fixes are about measurement rather than behaviour.</p>
+
+  <h2>Yesterday's fix, verified</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Prediction</th><th>What happened</th><th class="n">Verdict</th></tr></thead>
+      <tbody>
+        <tr><td>Finder startup should read 39 keys, not 7</td><td>Flipped at 07:27Z and held all cycle: <code>auto (39 direct keys)</code></td><td class="n"><span class="up">confirmed</span></td></tr>
+        <tr><td>Zero false quota stops</td><td>0 quota stops, down from 6</td><td class="n"><span class="up">confirmed</span></td></tr>
+        <tr><td>Sweeps back near their 08-10 volumes</td><td>Still zero, for the separate reason in Q1</td><td class="n"><span class="down">no</span></td></tr>
+        <tr><td>If intake recovers but parked stays low, term supply is the whole story</td><td>Intake did not recover, so this is still untested</td><td class="n"><span class="warn">pending</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Shipped today</h2>
+  <div class="tablewrap">
+    <table class="fix">
+      <thead><tr><th>Repo</th><th>Commit</th><th>What it does</th></tr></thead>
+      <tbody>
+        <tr><td><code>youtube-lead-finder-v1</code></td><td><code>4329d0a</code></td><td>The four sweeps now share one quota check with the campaign instead of keeping three private copies of an older one, so a retired backend can never pause them again. They also honour the halt flag now, and do it by sleeping rather than exiting, so they pick straight back up when the flag is removed with nothing to restart by hand. Covered by 8 new tests, including the two cases that mattered today: a genuinely exhausted plan still pauses, a retired one does not.</td></tr>
+        <tr><td><code>youtube-outreach-orchestrator-v1</code></td><td><code>43508d6</code></td><td>The daily health check now reports how many seeds each sweep actually advanced during the cycle, and quotes the line explaining why it stopped. Before, it only asked whether the progress file had been touched, which is why four idle daemons read as healthy for 24 hours straight. Run against today's real logs it reports "96 runs, 0 seeds advanced" and the exact pause line.</td></tr>
+        <tr><td><code>youtube-outreach-orchestrator-v1</code></td><td><code>9829e9c</code></td><td>Dry runs no longer count as cycle work. A <code>campaign:dry</code> check writes to the same log as a real session and walks its whole plan instantly, so today's two verification runs added 30 phantom empty passes and dragged the reported yield from 0.96 per pass down to 0.60. Real events are untouched: the fade and stop counts are identical before and after.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="muted">Every change was typechecked, the finder's full suite passes at 176 tests, and all four sweeps were run live to confirm they stop on the flag and return the resume code rather than the finished code. No <code>.env</code> file was touched.</p>
+
+  <h2>Per session</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Session closed (UTC)</th><th class="n">Passes</th><th class="n">Pitchable</th><th class="n">Wall</th><th class="n">Parked</th><th>Stopped on</th></tr></thead>
+      <tbody>
+        <tr><td>08-11 08:23</td><td class="n">3</td><td class="n">2</td><td class="n">12m</td><td class="n">1</td><td>term supply</td></tr>
+        <tr><td>08-11 08:55</td><td class="n">1</td><td class="n">0</td><td class="n">2m</td><td class="n">0</td><td>term supply</td></tr>
+        <tr><td>08-11 09:27</td><td class="n">1</td><td class="n">0</td><td class="n">2m</td><td class="n">0</td><td>term supply</td></tr>
+        <tr><td>08-11 10:28</td><td class="n">7</td><td class="n">3</td><td class="n">31m</td><td class="n">1</td><td>term supply</td></tr>
+        <tr><td>08-11 11:00</td><td class="n">1</td><td class="n">0</td><td class="n">2m</td><td class="n">0</td><td>term supply</td></tr>
+        <tr><td>08-11 13:10</td><td class="n">9</td><td class="n"><b>18</b></td><td class="n">99m</td><td class="n">5</td><td>time budget</td></tr>
+        <tr><td>08-11 13:41</td><td class="n">5</td><td class="n">5</td><td class="n">31m</td><td class="n">2</td><td>term supply</td></tr>
+        <tr><td>08-11 14:14</td><td class="n">1</td><td class="n">0</td><td class="n">2m</td><td class="n">0</td><td>term supply</td></tr>
+        <tr><td>08-11 14:54</td><td class="n">1</td><td class="n">0</td><td class="n">10m</td><td class="n">0</td><td>term supply</td></tr>
+        <tr><td>08-11 15:47</td><td class="n">5</td><td class="n">5</td><td class="n">23m</td><td class="n">3</td><td>term supply</td></tr>
+        <tr><td>08-11 17:30</td><td class="n">11</td><td class="n">13</td><td class="n">74m</td><td class="n">6</td><td>term supply</td></tr>
+        <tr><td>08-11 18:27</td><td class="n">3</td><td class="n">2</td><td class="n">27m</td><td class="n">1</td><td>term supply</td></tr>
+        <tr><td>08-11 18:59</td><td class="n">1</td><td class="n">0</td><td class="n">2m</td><td class="n">0</td><td>term supply</td></tr>
+        <tr><td>08-11 19:39</td><td class="n">1</td><td class="n">0</td><td class="n">10m</td><td class="n">0</td><td>term supply</td></tr>
+        <tr><td><b>Total</b></td><td class="n"><b>50</b></td><td class="n"><b>48</b></td><td class="n"></td><td class="n"><b>19</b></td><td>then the freeze</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="muted">Two sessions carried the day between them, the 13:10 and 17:30 closes, and they are the only two that got a real amount of wall-clock. Nine of the fourteen ran under 12 minutes against a 90-minute budget. Short sessions here mean the finder had nothing to search for, not that it worked quickly.</p>
+
+  <h2>Recommended next — ranked</h2>
+  <ol class="recs">
+    <li><b>Decide when to lift the migration freeze, and expect a burst when you do.</b> Both sweep backlogs have been frozen for a day and the recommended-videos feed has 126 seeds left in its current lap while peer-network has 5,147. When the flag comes off, all four daemons resume at once against a 39-key pool. That is the intended behaviour, but it is a much heavier first hour than the last two days have looked like.</li>
+    <li><b>Term supply is still the binding constraint, and it is now a single-niche problem.</b> Legal Services was 59% of everything worth contacting. There are no never-run terms and no rested proven terms left, 7,418 probes have been tried, and 0 were promoted this cycle. New seed material or a wider definition of who counts as a good lead is the only way past this, and it is the thing that caps every day until it changes.</li>
+    <li><b>Decide the outlet for <code>approved_hold</code>.</b> 4,660 creators prepped and waiting, none emailed. This has led the list for over a week and is still the only item that needs a decision from you rather than code.</li>
+    <li><b>Build the <code>needs_contact</code> recovery engine.</b> 5,783 creators, and it grew faster than the parked pool did today.</li>
+    <li><b>Consider removing the RapidAPI path outright.</b> Its retirement has now caused two separate outages on two consecutive days, in four different copies of the same check. Every copy is inert now, but the mirror is still wired in and still writes the stale file everything reads. Deleting it removes the whole class of failure, though that is a bigger change than an unattended cycle should make on its own.</li>
+    <li><b>Have the hourly check-in watch sweep productivity, not just the campaign.</b> Today's fix makes an idle daemon visible in the daily report, which is a day late. The same measurement in the hourly check would have caught this within an hour of it starting.</li>
+    <li><b>Meter OpenRouter as a real cost.</b> Still unmetered. The ledger reads $0 because it only counts Anthropic.</li>
+  </ol>
+
+  <div class="foot">
+    <b>Status:</b> everything is parked, nothing sent. <code>approved_hold</code> 4,660 plus <code>needs_contact</code> 5,783 is <b>10,443 creators found and never contacted</b>. The cycle cost <b>$0 on Anthropic</b> (OpenRouter spend is real but not metered here), with <b>0 crashes, 0 scoring failures and no fatal signatures</b>. The campaign is paused under a migration freeze written by hand at 20:09Z, and I have left it that way: it is a deliberate pause for a database swap, and lifting it is a decision for you. The four fixes above are in place for whenever it resumes.
+  </div>
+
+</div>
+
+<script>
+  // Keyword-engine fresh_pitchable per finder pass, chronological, from
+  // logs/campaign-2026-08-11.jsonl inside the 07:00Z→07:00Z cycle window.
+  // Real sessions only: the two campaign:dry verification runs and their 30
+  // phantom zero passes are excluded, which is the fix shipped in 9829e9c.
+  var seq = [2,0,0,0,0,0,0,0,1,2,0,0,0,0,2,4,4,3,1,1,1,2,2,2,1,0,0,0,0,2,3,0,0,0,1,0,2,7,0,0,2,1,0,0,0,2,0,0,0,0];
+  var max = Math.max.apply(null, seq);
+  var strip = document.getElementById('strip');
+  seq.forEach(function (v) {
+    var b = document.createElement('div');
+    b.className = 'bar' + (v === 0 ? ' zero' : v < 6 ? ' low' : '');
+    b.style.height = Math.max(4, Math.round((v / max) * 100)) + '%';
+    b.title = v + ' fresh pitchable';
+    strip.appendChild(b);
+  });
+</script>
+</html>
