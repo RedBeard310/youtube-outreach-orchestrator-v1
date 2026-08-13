@@ -46,7 +46,25 @@ export interface Lead {
    *  (comment-sweep), "peer-comment:"/"peer-guest:" (peer-sweep). Used by
    *  debrief-data.ts to attribute daily discovery counts per method. */
   discovered_via: string | null;
+  /** True when this person is on the do-not-contact registry (`leads.do_not_contact`,
+   *  maintained by automator/scripts/dnc-sync.py). Set for anyone who asked us to
+   *  stop, declined, became a client, got free work, is mid-conversation, or whose
+   *  address bounced. NEVER compose or send to one of these. */
+  do_not_contact: boolean;
+  /** Why they're suppressed: opted_out | hostile | client | free_work |
+   *  in_conversation | bounced | not_interested | manual. `not_interested` is the
+   *  only one that expires (45 days), and dnc-sync releases it on its own. */
+  dnc_reason: string | null;
 }
+
+// Every lead-selection query carries this. It is a plain boolean column so the
+// filter translator in pipeline-db compiles it without a special case.
+//
+// The queries are the cheap half of the guard, not the whole of it: the orchestrator
+// always calls the email repo with `--lead-ids`, and that path fetches leads by id
+// with no filter at all. The gate that actually protects a send lives per-lead in
+// youtube-email-outreach-v1/src/cli/outreach.ts.
+const NOT_SUPPRESSED = `NOT({do_not_contact})`;
 
 // Note: `failed` and `deep_research_failed` are intentionally NOT terminal.
 // The orchestrator auto-retries them on the next tick (most failures here are
@@ -146,12 +164,14 @@ function recordToLead(record: { id: string; get: (field: string) => unknown }): 
     signal_score: (record.get('signal_score') as number | undefined) ?? null,
     first_discovered_at: (record.get('first_discovered_at') as string | undefined) ?? null,
     discovered_via: (record.get('discovered_via') as string | undefined) ?? null,
+    do_not_contact: record.get('do_not_contact') === true,
+    dnc_reason: (record.get('dnc_reason') as string | undefined) ?? null,
   };
 }
 
 export async function getLeadsForOrchestration(): Promise<Lead[]> {
   const base = getBase();
-  const formula = `OR({review_status}='approved', {review_status}='D100')`;
+  const formula = `AND(OR({review_status}='approved', {review_status}='D100'), ${NOT_SUPPRESSED})`;
   const records = await withRetry(
     () => base(tableName()).select({ filterByFormula: formula }).all(),
     'getLeadsForOrchestration',
@@ -175,7 +195,7 @@ export async function getLeadsForOrchestration(): Promise<Lead[]> {
 export async function getApprovedFireLeads(): Promise<Lead[]> {
   const base = getBase();
   const readyClauses = APPROVED_FIRE_READY.map(s => `{outreach_status}='${s}'`).join(', ');
-  const formula = `AND({review_status}='approved', OR(${readyClauses}))`;
+  const formula = `AND({review_status}='approved', OR(${readyClauses}), ${NOT_SUPPRESSED})`;
   const records = await withRetry(
     () => base(tableName()).select({ filterByFormula: formula }).all(),
     'getApprovedFireLeads',
@@ -188,6 +208,7 @@ export async function getApprovedFireLeads(): Promise<Lead[]> {
 // mid-prep, or already sent) is skipped rather than re-driven.
 export function isApprovedFireReady(lead: Lead): boolean {
   return (
+    !lead.do_not_contact &&
     lead.review_status === 'approved' &&
     lead.outreach_status != null &&
     APPROVED_FIRE_READY.includes(lead.outreach_status)
@@ -231,7 +252,8 @@ export async function getVerifiablePitchableLeads(): Promise<Lead[]> {
   const formula = `AND(
     {review_status}='unreviewed',
     {signal_score}>=6,
-    OR({outreach_status}='', {outreach_status}='pending', {outreach_status}='email_found', {outreach_status}='failed')
+    OR({outreach_status}='', {outreach_status}='pending', {outreach_status}='email_found', {outreach_status}='failed'),
+    ${NOT_SUPPRESSED}
   )`;
   const records = await withRetry(
     () => base(tableName()).select({ filterByFormula: formula }).all(),
