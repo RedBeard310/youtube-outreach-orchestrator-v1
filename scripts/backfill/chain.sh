@@ -70,14 +70,41 @@ for (let i = 1; i <= 50; i++) {
   if (v) { gap = 0; add(v); } else if (++gap >= 5) break;
 }
 
+// Decodo (2026-08-13) is now the PRIMARY transcript provider in the quick/deep
+// repos, so the gate passes if a live Decodo probe returns a transcript, even
+// with every Supadata key exhausted. Probe = one real youtube_subtitles request
+// (~$0.0005) against a stable video, tried twice (their 613 scrape-failure is
+// transient); Supadata keys are only probed if Decodo cannot answer.
+let decodoKey = null;
+for (const [name, value] of Object.entries(process.env)) {
+  if (name.toLowerCase() === "decodo_api_key" && (value || "").trim()) { decodoKey = value.trim(); break; }
+}
+
 (async () => {
+  if (decodoKey) {
+    const auth = decodoKey.includes(":") ? `Basic ${Buffer.from(decodoKey).toString("base64")}` : `Basic ${decodoKey}`;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const r = await fetch("https://scraper-api.decodo.com/v2/scrape", {
+          method: "POST",
+          headers: { "content-type": "application/json", authorization: auth },
+          body: JSON.stringify({ target: "youtube_subtitles", query: "dQw4w9WgXcQ" }),
+          signal: AbortSignal.timeout(60000),
+        });
+        if (r.status === 200) {
+          const body = await r.json();
+          if (body?.results?.[0]?.content) { console.log("200"); return; }
+        }
+      } catch {}
+    }
+  }
   for (const key of keys) {
     try {
       const r = await fetch("https://api.supadata.ai/v1/transcript?url=https://www.youtube.com/watch?v=dQw4w9WgXcQ", { headers: { "x-api-key": key } });
       if (r.status === 200) { console.log("200"); return; }
     } catch {}
   }
-  console.log(keys.length === 0 ? "NOKEYS" : "ERR");
+  console.log(keys.length === 0 && !decodoKey ? "NOKEYS" : "ERR");
 })();
 ' 2>/dev/null)
   [ "$code" = "200" ]
