@@ -396,7 +396,22 @@ async function main(): Promise<void> {
     countByReviewStatus('needs_contact'),
   ]);
 
-  const discovered: Lead[] = await getLeadsDiscoveredSince(sinceISO).catch(() => []);
+  // Close the window at the cycle end too. The query is open-ended, so every row the
+  // sweeps write between midnight PT and whenever this actually runs used to land in
+  // "today" — and the debrief is written FROM these numbers, so a rerun silently
+  // reported different intake than the first run. Trimmed here rather than in the
+  // filter formula: the Postgres translator refuses anything it can't render exactly,
+  // and a debrief that returns nothing is worse than one that returns 0.2% too much.
+  // Parsed, not string-compared: Postgres hands back `2026-08-13 07:23:19.265+00`
+  // (space, no Z) and lexical order puts that BEFORE `2026-08-13T07:00:00.000Z`,
+  // which would quietly keep every row it is meant to drop.
+  const untilMsExact = Date.parse(untilISO);
+  const discovered: Lead[] = (await getLeadsDiscoveredSince(sinceISO).catch(() => []))
+    .filter((l) => {
+      if (!l.first_discovered_at) return true;
+      const t = Date.parse(l.first_discovered_at);
+      return !Number.isFinite(t) || t < untilMsExact;
+    });
   const pitchable = discovered.filter((l) => (l.signal_score ?? 0) >= 6);
   const byNiche: Record<string, number> = {};
   for (const l of pitchable) {
