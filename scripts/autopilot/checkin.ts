@@ -142,21 +142,35 @@ function autocompleteBlocked(): boolean {
   return false;
 }
 
-// Is the finder currently running term-pool tier-2 fallback (2026-08-12, search_terms.ts
-// commit 37ceb96)? When no paused term clears the preferred 3.5% qualified-rate floor after
-// cooling, tier 2 drops to a 2% floor and revives the best available mediocre terms instead
-// of starving. Casey's own commit message documents the expected yield of those terms:
-// ~78 channels returned, ~1.5 scoring >=6 (~1.9%) — well under half the trailing baseline,
-// by design. Left undetected, this reads exactly like a scoring-rubric regression and pages
-// a fix-agent every hour the term pool stays thin, for a condition that already has a name,
-// a reason, and a self-healing path (discovery/keyword-harvest refilling the active pool).
-function tier2FallbackActive(): boolean {
+// Is the finder currently running on a degraded term pool (2026-08-12+, search_terms.ts)?
+// Two signatures in the recent session logs, both self-healing and already documented as
+// low-conversion by design — the remedy is the term pool refilling (discovery/keyword-
+// harvest, already automatic), not a scoring-pipeline fix:
+//
+//   - tier2_fallback (commit 37ceb96): no paused term clears the preferred 3.5% qualified-
+//     rate floor after cooling, so tier 2 drops to a 2% floor and revives the best available
+//     mediocre terms instead of starving. Casey's own commit message documents the expected
+//     yield: ~78 channels, ~1.5 scoring >=6 (~1.9%) — well under half the trailing baseline,
+//     by design.
+//   - anti_starvation_exhausted (2026-08-13): a strictly worse supply state — even tier 2's
+//     cooled-proven fallback comes up empty (NO never-run AND NO cooled proven terms at
+//     all), so the pass runs entirely on freshly harvested/discovery-invented probe terms,
+//     which are unvalidated and convert lower than the proven pool until evaluate-probes
+//     promotes the winners. Same "not a bug" shape, just one rung further down.
+//
+// Left undetected, either one reads exactly like a scoring-rubric regression and pages a
+// fix-agent every hour the term pool stays thin, for a condition that already has a name,
+// a reason, and a self-healing path.
+function termSupplyDegradationActive(): 'tier2_fallback' | 'anti_starvation_exhausted' | null {
   for (const f of recentSessionLogs(2)) {
     let body = '';
     try { body = readFileSync(f, 'utf8'); } catch { continue; }
-    if (body.includes('[tier2] no term cleared')) return true;
+    if (body.includes('[tier2] no term cleared')) return 'tier2_fallback';
+    if (body.includes('[anti-starvation] active pool exhausted') && body.includes('NO never-run and NO cooled proven terms remain')) {
+      return 'anti_starvation_exhausted';
+    }
   }
-  return false;
+  return null;
 }
 
 // Scoring-pipeline health thresholds (2026-08-05, the reasoning-token-truncation
@@ -443,13 +457,18 @@ async function main(): Promise<void> {
     if (prior.length >= PITCHABLE_BASELINE_MIN_POINTS) {
       const baseline = prior.reduce((s, p) => s + p.rate, 0) / prior.length;
       if (baseline > 0 && rate < baseline * PITCHABLE_COLLAPSE_RATIO && !scoringFailedAlarm) {
-        if (tier2FallbackActive()) {
-          // Already explained — see tier2FallbackActive() above. Not fix-agent-fixable:
-          // the remedy is the term pool refilling (discovery/keyword-harvest), which is
-          // already automatic. Observe it instead of paging, same pattern as section 5.
-          const tdetail = `score>=6 rate is ${(rate * 100).toFixed(1)}% over the last ${pitchableYieldWindow.newLeads} new leads, vs a ${(baseline * 100).toFixed(1)}% trailing baseline — but tier-2 term-pool fallback (search_terms.ts, commit 37ceb96) is active in the recent session logs, which is documented to convert around ~2%. Expected, not a regression; observing only.`;
-          appendFileSync(OBSERVATIONS, JSON.stringify({ ts: new Date().toISOString(), kind: 'pitchable_rate_tier2_fallback', detail: tdetail, parked }) + '\n');
-          console.log(`[checkin ${day}] OBSERVATION pitchable_rate_tier2_fallback — ${tdetail}`);
+        const degradation = termSupplyDegradationActive();
+        if (degradation) {
+          // Already explained — see termSupplyDegradationActive() above. Not fix-agent-
+          // fixable: the remedy is the term pool refilling (discovery/keyword-harvest),
+          // which is already automatic. Observe it instead of paging, same pattern as
+          // section 5.
+          const reason = degradation === 'tier2_fallback'
+            ? 'tier-2 term-pool fallback (search_terms.ts, commit 37ceb96) is active in the recent session logs, which is documented to convert around ~2%'
+            : 'the anti-starvation floor found NO never-run and NO cooled proven terms at all in the recent session logs — the pass is running entirely on freshly harvested/discovery-invented probe terms, which convert lower than the proven pool until evaluate-probes promotes the winners';
+          const tdetail = `score>=6 rate is ${(rate * 100).toFixed(1)}% over the last ${pitchableYieldWindow.newLeads} new leads, vs a ${(baseline * 100).toFixed(1)}% trailing baseline — but ${reason}. Expected, not a regression; observing only.`;
+          appendFileSync(OBSERVATIONS, JSON.stringify({ ts: new Date().toISOString(), kind: 'pitchable_rate_term_supply_degraded', detail: tdetail, degradation, parked }) + '\n');
+          console.log(`[checkin ${day}] OBSERVATION pitchable_rate_term_supply_degraded (${degradation}) — ${tdetail}`);
         } else {
           anomalies.push({
             kind: 'pitchable_rate_collapse',
