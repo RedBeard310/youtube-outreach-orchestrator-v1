@@ -99,6 +99,30 @@ Persisted on the singleSelect:
 
 Pseudo-code in spec §"Sequential stage handoffs".
 
+## Do-not-contact is enforced, and the reason matters (since 2026-08-13)
+
+`leads.do_not_contact` is the registry of everyone we have already spoken to, and
+`lead_candidates.do_not_contact` is the flag every lead-selection query filters on.
+It is maintained by `automator/scripts/dnc-sync.py` (hourly, `dnc-sync.timer`).
+Full detail: [automator/docs/dnc-sync.md](../automator/docs/dnc-sync.md).
+
+- **Every query here already carries `NOT({do_not_contact})`** — the tick queue, the
+  send queue, the campaign verify lane, and `isApprovedFireReady`. If you add a new
+  lead-selection query, add it there too.
+- **A bulk filter is not the guard.** This repo always shells out with `--lead-ids`,
+  and the email repo fetches those by id with no filter at all. The check that
+  actually stops a send is per-lead in `youtube-email-outreach-v1/src/cli/outreach.ts`,
+  once at the top of `runLead` and once more immediately before the SmartLead POST.
+  Never remove either.
+- **Reasons are not interchangeable.** `opted_out` is permanent and legally load-
+  bearing. `not_interested` is a 45-day cooldown that releases itself, because
+  someone who said "not right now" never asked to be removed. `client`, `free_work`
+  and `in_conversation` are people we still talk to, just never by cold sequence, so
+  they are NOT pushed to SmartLead's block list.
+- **Suppressing someone by hand** means an entry in `automator/config/dnc-manual.json`,
+  not a status change here. Releasing them means deleting the config entry AND the
+  registry row; deleting only the config does nothing, on purpose.
+
 ## Inbox health gate (lives in youtube-email-outreach-v1, not here)
 
 Since 2026-06-16 the `approved` path self-protects against sending from bad inboxes. When the orchestrator shells out `npm run outreach`, `youtube-email-outreach-v1` first runs a staleness-gated **inbox health gate** (`ensureInboxHealthFresh()`): it reads per-mailbox warmup health from InboxKit and pauses/resumes the matching SmartLead inbox via `is_suspended`. Pause rules: health_score < 90, OR warmup day < 14, OR landing rate < 90 with real volume. It runs at most once per 24h, never on `--dry-run`, and never blocks sending if it errors.
