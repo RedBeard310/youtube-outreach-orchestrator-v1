@@ -62,50 +62,82 @@ type SweepWork = {
   idle_reason: string | null;
   productive: boolean | null;
 };
+// A session log's own start instant, read off its filename (`sweep-20260812-120629.log`,
+// `daily-20260812-165034.log`) rather than its mtime, because mtime is the LAST write.
+// Falls back to mtime when the name doesn't carry a stamp.
+export function sessionStartMs(path: string, mtimeMs: number): number {
+  const m = /(\d{8})-(\d{6})\.log$/.exec(path);
+  if (!m) return mtimeMs;
+  const [, d, t] = m as unknown as [string, string, string];
+  const iso = `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)}T${t.slice(0, 2)}:${t.slice(2, 4)}:${t.slice(4, 6)}Z`;
+  const parsed = Date.parse(iso);
+  return Number.isFinite(parsed) ? parsed : mtimeMs;
+}
+
+// Seeds this ONE session advanced: where its chunk counter ended, minus where its
+// startup line said it began.
+//
+//   [peer-sweep] 7587 seeds total | 2470 done | 5117 remaining   <- startup
+//   [chunk 445/512]  seeds 6911-6920 of 7587                     <- progress
+//
+// Reading only the startup line (as the 2026-08-12 version did) measures a session
+// that has not finished as zero, forever. Returns null when the session printed no
+// progress line at all — genuinely unknown, which is not the same as zero.
+export function sessionSeedsAdvanced(text: string): number | null {
+  const start = /\|\s*(\d+)\s+done\s*\|/.exec(text);
+  if (!start?.[1]) return null;
+  const chunks = [...text.matchAll(/\[chunk[^\]]*\]\s+seeds\s+\d+\s*-\s*(\d+)\s+of\b/g)];
+  const end = chunks.length ? chunks[chunks.length - 1]![1] : undefined;
+  if (end === undefined) return null;
+  // Per-session, so a mid-cycle seed refill (which resets `done`) can't drive the
+  // total negative the way a first-file/last-file delta could.
+  return Math.max(0, Number(end) - Number(start[1]));
+}
+
 function sweepWorkInCycle(dirName: string, sinceMs: number, untilMs: number): SweepWork {
   const blank: SweepWork = { runs_in_cycle: 0, seeds_advanced: null, idle_reason: null, productive: null };
   const dir = join(FINDER_REPO, 'logs', dirName);
   if (!existsSync(dir)) return blank;
-  let files: string[];
+  let files: Array<{ path: string; startMs: number }>;
   try {
     files = readdirSync(dir)
       .filter((f) => f.endsWith('.log'))
-      .map((f) => join(dir, f))
-      .filter((p) => {
-        const m = statSync(p).mtimeMs;
-        return m >= sinceMs && m <= untilMs;
+      .map((f) => {
+        const path = join(dir, f);
+        const endMs = statSync(path).mtimeMs;
+        return { path, startMs: sessionStartMs(path, endMs), endMs };
       })
-      .sort((a, b) => statSync(a).mtimeMs - statSync(b).mtimeMs);
+      // Interval overlap, not "mtime landed inside the window". A daemon that runs one
+      // 19-hour session is still being appended to when the debrief fires, so its mtime
+      // sits AFTER the cycle end and the old containment test dropped it — which is how
+      // peer-sweep walked 4,530 seeds on 2026-08-13 and was reported as 0, idle.
+      .filter((f) => f.startMs <= untilMs && f.endMs >= sinceMs)
+      .sort((a, b) => a.startMs - b.startMs)
+      .map(({ path, startMs }) => ({ path, startMs }));
   } catch {
     return blank;
   }
   if (files.length === 0) return blank;
 
-  // "[sweep] 7845 seeds total | 7719 done | 126 remaining" — every sweep prints
-  // this shape on startup. The delta between the first and last run of the cycle
-  // is the honest measure of whether the daemon did anything.
-  const doneCount = (path: string): number | null => {
-    try {
-      const m = /\|\s*(\d+)\s+done\s*\|/.exec(readFileSync(path, 'utf8'));
-      return m?.[1] ? Number(m[1]) : null;
-    } catch {
-      return null;
-    }
+  const read = (path: string): string | null => {
+    try { return readFileSync(path, 'utf8'); } catch { return null; }
   };
-  const first = doneCount(files[0]!);
-  const last = doneCount(files[files.length - 1]!);
-  const advanced = first !== null && last !== null ? last - first : null;
+
+  let advanced: number | null = null;
+  for (const { path } of files) {
+    const text = read(path);
+    if (text === null) continue;
+    const n = sessionSeedsAdvanced(text);
+    if (n === null) continue;
+    advanced = (advanced ?? 0) + n;
+  }
 
   // Why it stopped, taken from the most recent run: a PAUSE/HALT/STOP line if
   // there is one. This is the line that would have named the outage on day one.
-  let idle: string | null = null;
-  try {
-    const tail = readFileSync(files[files.length - 1]!, 'utf8');
-    const m = /^\[[^\]]+\]\s+(PAUSE|STOP|HALTED)\b.*$/m.exec(tail);
-    idle = m?.[0]?.trim() ?? null;
-  } catch {
-    idle = null;
-  }
+  const tail = read(files[files.length - 1]!.path);
+  const idle = tail === null
+    ? null
+    : /^\[[^\]]+\]\s+(PAUSE|STOP|HALTED)\b.*$/m.exec(tail)?.[0]?.trim() ?? null;
 
   return {
     runs_in_cycle: files.length,
