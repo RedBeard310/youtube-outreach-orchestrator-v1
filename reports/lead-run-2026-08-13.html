@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lead Run Debrief — 2026-08-13</title>
+<style>
+  :root {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --good-soft: #1f8a5b1a; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+      --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+      --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --good-soft: #55c48c1c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --good-soft: #1f8a5b1a; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+    --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+    --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --good-soft: #55c48c1c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 40px 22px 80px; }
+  .eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); font-weight: 600; }
+  h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.12; margin: 10px 0 6px; text-wrap: balance; letter-spacing: -.02em; }
+  h2 { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); margin: 44px 0 16px; font-weight: 700; }
+  h3 { font-size: 18px; margin: 0 0 6px; letter-spacing: -.01em; }
+  p { margin: 0 0 14px; }
+  .lede { font-size: 18px; color: var(--ink-soft); max-width: 68ch; }
+  .tag { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--good-soft); color: var(--good); letter-spacing: .02em; }
+  .tag.warn { background: var(--amber-soft); color: var(--amber); }
+  .tag.bad { background: var(--red-soft); color: var(--red); }
+  .grid { display: grid; gap: 14px; }
+  .stats { grid-template-columns: repeat(4, 1fr); margin-top: 26px; }
+  @media (max-width: 720px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; box-shadow: var(--shadow); }
+  .stat .n { font-size: 30px; font-weight: 750; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .stat .l { font-size: 12.5px; color: var(--ink-soft); margin-top: 3px; }
+  .stat .s { font-size: 12px; margin-top: 8px; font-weight: 600; }
+  .up { color: var(--good); } .down { color: var(--red); } .warn { color: var(--amber); }
+  .accent-red { border-left: 3px solid var(--red); }
+  .accent-teal { border-left: 3px solid var(--teal); }
+  .accent-amber { border-left: 3px solid var(--amber); }
+  .accent-good { border-left: 3px solid var(--good); }
+
+  /* shape-of-day bar strip */
+  .strip { display: flex; align-items: flex-end; gap: 2px; height: 120px; padding: 14px 14px 10px; overflow-x: auto; }
+  .bar { flex: 1 0 6px; min-width: 5px; border-radius: 2px 2px 0 0; background: var(--teal); opacity: .9; }
+  .bar.zero { background: var(--red); height: 4px !important; opacity: .9; }
+  .bar.low { background: var(--amber); }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-soft); padding: 0 14px 14px; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+
+  .q { border-radius: 14px; padding: 20px 22px; margin-bottom: 14px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); }
+  .q .ask { font-size: 17px; font-weight: 700; color: var(--ink); margin-bottom: 10px; display: flex; gap: 10px; align-items: baseline; }
+  .q .ask .qn { color: var(--red); font-weight: 800; flex: 0 0 auto; }
+  .q p { color: var(--ink-soft); }
+  .q b { color: var(--ink); }
+  .pill { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink); background: var(--panel-2); padding: 1px 7px; border-radius: 6px; border: 1px solid var(--line); white-space: nowrap; }
+
+  pre { background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 13px 15px; overflow-x: auto; font-size: 13px; line-height: 1.5; margin: 0 0 14px; color: var(--ink); }
+  code { font-size: .92em; background: var(--panel-2); padding: 1px 5px; border-radius: 5px; border: 1px solid var(--line); }
+  pre code { background: none; border: none; padding: 0; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+  th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); }
+  td .num { font-variant-numeric: tabular-nums; font-weight: 650; }
+  td.n { font-variant-numeric: tabular-nums; text-align: right; }
+  .fix td:first-child { color: var(--good); font-weight: 650; }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); box-shadow: var(--shadow); margin-bottom: 14px; }
+  ol.recs { padding-left: 0; list-style: none; counter-reset: r; margin: 0; }
+  ol.recs li { counter-increment: r; position: relative; padding: 14px 16px 14px 52px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 10px; box-shadow: var(--shadow); }
+  ol.recs li::before { content: counter(r); position: absolute; left: 14px; top: 14px; width: 26px; height: 26px; border-radius: 8px; background: var(--teal-soft); color: var(--teal); font-weight: 800; font-size: 14px; display: grid; place-items: center; }
+  ol.recs b { color: var(--ink); }
+  .foot { margin-top: 46px; padding: 16px 18px; border-radius: 12px; background: var(--amber-soft); border: 1px solid var(--line); font-size: 14px; color: var(--ink-soft); }
+  .foot b { color: var(--ink); }
+  .muted { color: var(--ink-soft); font-size: 13.5px; }
+</style>
+
+
+<div class="wrap">
+
+  <div class="eyebrow">Lead Run Debrief · YouTube outreach</div>
+  <h1>2026-08-13 — the freeze lifted, the pipeline came back hard, and two numbers need a person</h1>
+  <p class="lede">The pool grew by <b>149</b>, the best day since 08-10, and the whole pipeline is now running on Postgres. Two things need your attention. The two parked pools read less than half what they read in Airtable, while the row count says nothing was lost. And the health check built yesterday to catch a dead daemon reported the day's biggest producer as dead. Both are explained below, and the second one is fixed.</p>
+  <div style="margin-top:14px"><span class="tag">BEST DAY IN THREE · NO CRASHES · ALL FIVE METHODS LIVE</span> <span class="tag warn">PARKED POOLS NEED RECONCILING</span></div>
+
+  <div class="grid stats">
+    <div class="card stat accent-good">
+      <div class="n">+149</div>
+      <div class="l">parked into <code>approved_hold</code></div>
+      <div class="s up">pool 1,964 → 2,113. Was +18</div>
+    </div>
+    <div class="card stat accent-good">
+      <div class="n">8,482</div>
+      <div class="l">channels found</div>
+      <div class="s up">40× yesterday's 212</div>
+    </div>
+    <div class="card stat accent-amber">
+      <div class="n">4.6%</div>
+      <div class="l">of intake worth contacting</div>
+      <div class="s warn">391 pitchable. Rate down, volume up</div>
+    </div>
+    <div class="card stat accent-red">
+      <div class="n">4,610</div>
+      <div class="l">seeds the top daemon walked</div>
+      <div class="s down">reported as 0, idle</div>
+    </div>
+  </div>
+
+  <h2>The shape of the day</h2>
+  <div class="card" style="padding:0">
+    <div class="strip" id="strip"></div>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--teal)"></span>strong hour (20+ pitchable)</span>
+      <span><span class="dot" style="background:var(--amber)"></span>light (1 to 19)</span>
+      <span><span class="dot" style="background:var(--red)"></span>nothing running (0), <b>5 of 24 hours</b></span>
+    </div>
+  </div>
+  <p class="muted">One bar per hour of the cycle, 07:00Z on the left through 06:00Z on the right, counting every creator found that scored 6 or better, across all five methods. The first five bars are the tail of the migration freeze, which held until 11:45Z. After that the day never stalled: the quietest hour still returned 7, the best returned 37, and the overnight stretch held rather than fading out the way it did on 07-16.</p>
+
+  <h2>The three questions</h2>
+
+  <div class="q accent-amber">
+    <div class="ask"><span class="qn">Q1</span><span>The pipeline is on Postgres now. Did everything come across?</span></div>
+    <p><b>Every row did. Two labels did not, and that gap needs you.</b> The campaign resumed on the new store at 12:00Z and ran a clean 19 hours against it. That part is settled. But the two pools that hold the whole asset came back at under half their Airtable values, in a single jump across the cutover:</p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Pool</th><th class="n">Last Airtable reading<br>08-11 19:47Z</th><th class="n">First Postgres reading<br>08-12 12:48Z</th></tr></thead>
+        <tbody>
+          <tr><td><code>approved_hold</code></td><td class="n">4,661</td><td class="n"><span class="down">1,964</span></td></tr>
+          <tr><td><code>needs_contact</code></td><td class="n">5,783</td><td class="n"><span class="down">2,508</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>The hourly sampler that tracks those pools stopped when the freeze went up and started again after the cutover, so there is nothing between those two readings. The drop is the cutover and nothing else.</p>
+    <p><b>The rows themselves reconcile, which is the reassuring part.</b> Postgres holds <b>53,913</b> lead rows, every one a distinct channel, going back to 2026-05-13. Take away the 8,482 found this cycle and 45,431 predate it. The migration plan recorded the Airtable base at <b>44,541 rows on 08-10</b>, and two days of finding sit in between. That lines up. Nothing was thrown away.</p>
+    <p>So this is a labelling question. Either roughly 2,700 rows arrived carrying a different review status than they had, or the old and new counts are counting different things. I could not separate those two from here, and it is not the sort of thing to guess at. There is no spelling variant hiding the difference either: <code>approved_hold</code> appears exactly once in the new store, at 2,113.</p>
+    <p><b>The check that would settle it cannot run from this machine.</b> The migration plan says to keep Airtable in place, read-only, for a week as the rollback path, and <code>pipeline-db/scripts/verify-against-airtable.ts</code> exists to run exactly this comparison. The Airtable token in the shared env now answers <code>401 AUTHENTICATION_REQUIRED</code> on that base, so neither the parity check nor the rollback is reachable. Worth knowing before the week is out.</p>
+    <p><b>I did not stop the pipeline over this.</b> The campaign only adds rows, so leaving it running does not make the question harder to answer.</p>
+  </div>
+
+  <div class="q accent-red">
+    <div class="ask"><span class="qn">Q2</span><span>Which method did the work?</span></div>
+    <p><b>Peer-network comments, by a distance, and it is also the least accurate one we have.</b> All five methods ran together for the first time since 08-10.</p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Method</th><th class="n">Found</th><th class="n">Worth contacting</th><th class="n">Hit rate</th><th class="n">Parked</th></tr></thead>
+        <tbody>
+          <tr><td>Peer-network comments</td><td class="n"><b>6,664</b></td><td class="n">200</td><td class="n"><span class="down">3.0%</span></td><td class="n">67</td></tr>
+          <tr><td>Recommended-videos feed</td><td class="n">867</td><td class="n">111</td><td class="n"><span class="up">12.8%</span></td><td class="n">54</td></tr>
+          <tr><td>Keyword search</td><td class="n">931</td><td class="n">77</td><td class="n">8.3%</td><td class="n">26</td></tr>
+          <tr><td>Guest-link mining</td><td class="n">17</td><td class="n">3</td><td class="n">17.6%</td><td class="n">1</td></tr>
+          <tr><td>Podcast crossover</td><td class="n">3</td><td class="n">0</td><td class="n">—</td><td class="n">0</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>Peer-network is <b>79% of everything found and 51% of everything worth contacting</b>, at a 3.0% hit rate. That single fact explains both of today's headline numbers: it is why the day parked 149 instead of 18, and it is why the overall hit rate reads 4.6% against yesterday's 21.7%. Both are true at once.</p>
+    <p>It is not free, though. That one daemon exhausted the daily quota on <b>20 of the 52 YouTube keys</b> in a single session. The seeds it walks explain the hit rate. Its three biggest contributors this cycle were channels called "Ty Myers" (183 channels found, 4 worth contacting), "Rob the Maritimer" (135, 1) and "Asian Dad Energy" (43, 1). It is reading the comment sections of creators well outside the kind of business we sell to.</p>
+    <p>The fix is the seed list, not the throughput. Half the day's good leads come out of this thing, so capping it would cost real volume. Pointing it at better channels would not.</p>
+  </div>
+
+  <div class="q accent-teal">
+    <div class="ask"><span class="qn">Q3</span><span>Is the keyword engine recovering?</span></div>
+    <p><b>No. It is the same wall as the last three days, and it is now a small share of the pipeline.</b> Eight of fifteen sessions stopped because they ran out of search terms, the finder logged 10 starvation observations, and <b>118 of 173 passes returned nothing</b>. Per-pass yield fell to <span class="pill">0.44 pitchable</span> from 0.96 yesterday.</p>
+    <p>The keyword harvest, which is what refills the term pool, ran 9 times out of 179 chances and wrote 137 new probe terms. The other 170 attempts were skipped: 76 under a six-hour backoff that trips when three harvests in a row come back nearly empty, and 94 under the four-hour cadence gate. Both gates are behaving as designed. The question is whether a six-hour backoff is the right setting on a day when eight sessions stopped for want of terms, and that is a tuning decision worth making on purpose rather than in an unattended cycle.</p>
+    <p><b>The niche mix reopened, and that is the sweeps' doing, not the keyword engine's.</b> Yesterday Legal Services was 59% of everything worth contacting, the narrowest mix on record. Today Legal Services is 7 of 391, and the top of the list is Coaching &amp; Consulting (123), Transformation &amp; Performance Coaching (63) and Real Estate (48). Nothing was fixed about term supply. The other four methods simply came back, and yesterday's narrow mix turns out to have been a picture of the keyword engine alone.</p>
+  </div>
+
+  <h2>What broke, what's fixed</h2>
+  <div class="tablewrap">
+    <table class="fix">
+      <thead><tr><th>What broke</th><th>Effect</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr><td>Sweep productivity dropped any log still being written</td><td>Peer-network reported 0 seeds and idle while walking 4,610 and writing 79% of the day's intake</td><td>Fixed, matched by overlap now</td></tr>
+        <tr><td>Seeds walked was read from the startup line only</td><td>A 19-hour session that never restarts reads as no movement, forever</td><td>Fixed, last chunk minus startup</td></tr>
+        <tr><td>The cycle window had no upper bound</td><td>31 rows written after the cycle closed counted as part of the day, so a rerun reported different intake</td><td>Fixed, trimmed at cycle end</td></tr>
+        <tr><td>Peer-sweep crashed on every launch at 12:01</td><td>Four dead one-minute runs before it caught</td><td>Fixed 08-12 in the finder, <code>70d364e</code></td></tr>
+        <tr><td>Term supply for the keyword engine</td><td>8 sessions stopped early, 118 of 173 passes empty, 0.44 per pass</td><td><span class="warn">Open. Needs new material</span></td></tr>
+        <tr><td>Peer-network seed quality</td><td>3.0% hit rate, 20 of 52 keys exhausted in one session</td><td><span class="warn">Open. Seed list, not throughput</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="muted">Three cycles in four, the reporting has been wrong before the pipeline was. Yesterday's fix was built to stop a dead daemon looking healthy, and today it made a working one look dead. That is worth saying plainly: the finding machinery has been more reliable than the instruments watching it.</p>
+
+  <h2>Yesterday's fixes, verified</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Prediction</th><th>What happened</th><th class="n">Verdict</th></tr></thead>
+      <tbody>
+        <tr><td>The shared quota check stops the sweeps pausing on a retired service</td><td>0 quota stops, all five methods ran</td><td class="n"><span class="up">confirmed</span></td></tr>
+        <tr><td>The sweeps honour the halt flag and resume themselves when it lifts</td><td>All resumed within 15 minutes of the freeze lifting, nothing restarted by hand</td><td class="n"><span class="up">confirmed</span></td></tr>
+        <tr><td>Dry runs stop counting as cycle work</td><td>1 excluded, real event counts unchanged</td><td class="n"><span class="up">confirmed</span></td></tr>
+        <tr><td>Sweep productivity makes an idle daemon visible</td><td>It made a working daemon look idle instead. Fixed today</td><td class="n"><span class="down">no</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Shipped today</h2>
+  <div class="tablewrap">
+    <table class="fix">
+      <thead><tr><th>Repo</th><th>Commit</th><th>What it does</th></tr></thead>
+      <tbody>
+        <tr><td><code>youtube-outreach-orchestrator-v1</code></td><td><code>4fa0f51</code></td><td>Sweep productivity now counts a session that is still running, and the cycle window closes at the cycle end. A log is matched to the cycle by whether it overlaps it, using the timestamp in its filename as the start rather than its last write, so a daemon that runs one long session is no longer invisible. Each session's progress is read as its last chunk line minus its own startup line and then summed, clamped at zero so a mid-cycle seed refill cannot push the total negative. A session that printed no progress at all still reports unknown rather than zero, because calling an unknown zero is exactly how a working daemon gets reported as broken.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="muted">Typechecked, nine unit cases green in a new <code>debrief-data.selftest.ts</code> (a long unfinished session, a startup-only session, a log with no startup line, a finished sweep, a refill reset, a crash on the first chunk, three filename shapes), and the whole snapshot regenerated against today's real logs before committing: peer-network 0 → 4,610, the feed 423 → 481, comment sweep unknown → 10, podcast still unknown. The window trim compares parsed timestamps rather than strings, because Postgres returns <code>2026-08-13 07:23:19.265+00</code> and lexically that sorts <em>before</em> <code>2026-08-13T07:00:00.000Z</code>, so a string comparison would have kept every row it was meant to drop. No <code>.env</code> file was touched.</p>
+
+  <h2>Per session</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Session closed (UTC)</th><th class="n">Passes</th><th class="n">Pitchable</th><th class="n">Wall</th><th class="n">Parked</th><th>Stopped on</th></tr></thead>
+      <tbody>
+        <tr><td>08-12 13:02</td><td class="n">3</td><td class="n">0</td><td class="n">28m</td><td class="n">11</td><td>target reached</td></tr>
+        <tr><td>08-12 14:37</td><td class="n">19</td><td class="n">4</td><td class="n">91m</td><td class="n">17</td><td>time budget</td></tr>
+        <tr><td>08-12 16:06</td><td class="n">17</td><td class="n"><b>16</b></td><td class="n">88m</td><td class="n">10</td><td>time budget</td></tr>
+        <tr><td>08-12 17:37</td><td class="n">19</td><td class="n">11</td><td class="n">90m</td><td class="n">17</td><td>time budget</td></tr>
+        <tr><td>08-12 19:10</td><td class="n">15</td><td class="n">13</td><td class="n">91m</td><td class="n">15</td><td>time budget</td></tr>
+        <tr><td>08-12 20:44</td><td class="n">20</td><td class="n"><b>14</b></td><td class="n">94m</td><td class="n">14</td><td>time budget</td></tr>
+        <tr><td>08-12 22:27</td><td class="n">19</td><td class="n">6</td><td class="n">102m</td><td class="n"><b>19</b></td><td>time budget</td></tr>
+        <tr><td>08-12 23:15</td><td class="n">10</td><td class="n">4</td><td class="n">47m</td><td class="n">4</td><td>term supply</td></tr>
+        <tr><td>08-13 00:48</td><td class="n">12</td><td class="n">2</td><td class="n">63m</td><td class="n">18</td><td>term supply</td></tr>
+        <tr><td>08-13 02:25</td><td class="n">17</td><td class="n">0</td><td class="n">66m</td><td class="n">5</td><td>term supply</td></tr>
+        <tr><td>08-13 03:40</td><td class="n">10</td><td class="n">4</td><td class="n">44m</td><td class="n">7</td><td>term supply</td></tr>
+        <tr><td>08-13 04:50</td><td class="n">7</td><td class="n">3</td><td class="n">40m</td><td class="n">6</td><td>term supply</td></tr>
+        <tr><td>08-13 05:35</td><td class="n">3</td><td class="n">0</td><td class="n">14m</td><td class="n">1</td><td>term supply</td></tr>
+        <tr><td>08-13 06:08</td><td class="n">1</td><td class="n">0</td><td class="n">2m</td><td class="n">1</td><td>term supply</td></tr>
+        <tr><td>08-13 06:41</td><td class="n">1</td><td class="n">0</td><td class="n">3m</td><td class="n">3</td><td>term supply</td></tr>
+        <tr><td><b>Total</b></td><td class="n"><b>173</b></td><td class="n"><b>77</b></td><td class="n"></td><td class="n"><b>148</b></td><td>still running</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="muted">Six of fifteen sessions ran their full 90-minute budget, the most in a week, and the drop-off after midnight UTC is term supply rather than anything failing. The pitchable column counts the keyword engine only, which is now about 8% of what the pipeline finds. One more session ran as <code>campaign:dry</code> and is excluded, along with its 3 empty passes, which is the fix that shipped yesterday working as intended.</p>
+
+  <h2>Recommended next — ranked</h2>
+  <ol class="recs">
+    <li><b>Reconcile the two parked pools, and do it before the Airtable week runs out.</b> 4,661 became 1,964 and 5,783 became 2,508 across the cutover, while the row count says nothing was lost. The Airtable token on this box answers 401, so the parity script and the rollback path both need a working credential before either can be used. This is the only item on the list that needs you rather than code.</li>
+    <li><b>Fix the seed list peer-network comments works from.</b> 79% of everything found, a 3.0% hit rate, and 20 of 52 YouTube keys exhausted in one session. It is walking the comment sections of channels like "Asian Dad Energy". Half the day's good leads still come from it, so point it somewhere better rather than turning it down.</li>
+    <li><b>Decide the outlet for <code>approved_hold</code>.</b> 2,113 creators prepped and waiting, none emailed. Second week at the top of this list.</li>
+    <li><b>Retune term supply for the keyword engine on purpose.</b> 8 sessions stopped for want of terms while the harvest skipped 170 of 179 chances under two gates that are each individually correct. The six-hour low-yield backoff is the specific number to look at.</li>
+    <li><b>Build the <code>needs_contact</code> recovery engine.</b> 2,508 creators found, scored, and unreachable.</li>
+    <li><b>Give the hourly check-in the same productivity numbers.</b> Today's fix makes a broken daemon visible once a day. Hourly would have caught the 08-12 outage within an hour instead of two days, and would have caught today's false alarm before it reached a report at all.</li>
+  </ol>
+
+  <div class="foot">
+    <b>Status:</b> everything is parked, nothing sent. <code>approved_hold</code> 2,113 plus <code>needs_contact</code> 2,508 is <b>4,621 creators found and never contacted</b>, subject to the reconciliation question in Q1. The cycle cost <b>$0 on Anthropic and $0.64 on OpenRouter</b>, which is the first day OpenRouter spend was measured at all. <b>0 crashes, 0 scoring failures, 0 quota stops</b>, and no fatal signatures for the 14th cycle running. The campaign is running and I have left it that way. The next cycle will be the first full 24 hours with all five methods live on Postgres, which makes it the first clean read on what this pipeline actually produces.
+  </div>
+
+</div>
+
+<script>
+  // Creators found scoring 6+, per hour of the cycle, 07:00Z through 06:00Z,
+  // all five discovery methods, from leads.lead_candidates.first_discovered_at.
+  // The first five hours are the tail of the migration freeze, which held until 11:45Z.
+  var seq = [0,0,0,0,0,26,29,8,20,30,35,27,27,37,12,20,12,27,12,9,16,23,7,14];
+  var max = Math.max.apply(null, seq);
+  var strip = document.getElementById('strip');
+  seq.forEach(function (v) {
+    var b = document.createElement('div');
+    b.className = 'bar' + (v === 0 ? ' zero' : v < 20 ? ' low' : '');
+    b.style.height = Math.max(4, Math.round((v / max) * 100)) + '%';
+    b.title = v + ' pitchable';
+    strip.appendChild(b);
+  });
+</script>
+</html>
