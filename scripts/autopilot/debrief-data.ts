@@ -62,6 +62,32 @@ type SweepWork = {
   idle_reason: string | null;
   productive: boolean | null;
 };
+// Every `outreach_status` that can only be reached by verifying an email first. The
+// debrief reports "emails verified today" and used to test `=== 'email_verified'`, which
+// is a snapshot of where a lead is standing RIGHT NOW rather than a count of what the
+// verifier did. The moment a verified lead advances — and the campaign's own promote step
+// advances it to `ready_data_scraped` within the same cycle — it stops being counted, so
+// the metric decays toward zero as the pipeline works properly.
+//
+// It reached exactly zero on 2026-08-14: every one of the day's 53 newly-parked leads had
+// a verified email and sat at `ready_data_scraped`, and the funnel reported 0 verified out
+// of 170 pitchable. A headline number that reads 0 on a working day is worse than no
+// number, because the obvious reading is that verification broke.
+//
+// `ready_no_data` is deliberately NOT here. It is a reserved manual holding label that
+// nothing in the pipeline writes, so counting it would mean trusting a hand-applied label
+// as evidence that the verifier ran.
+const VERIFIED_OR_BEYOND: ReadonlySet<string> = new Set([
+  'email_verified',
+  'ready_data_scraped',
+  'enriched', // legacy alias for ready_data_scraped, still recognised on read
+  'email_drafted',
+  'sent_to_smartlead',
+]);
+export function isVerifiedOrBeyond(status: unknown): boolean {
+  return typeof status === 'string' && VERIFIED_OR_BEYOND.has(status);
+}
+
 // A session log's own start instant, read off its filename (`sweep-20260812-120629.log`,
 // `daily-20260812-165034.log`) rather than its mtime, because mtime is the LAST write.
 // Falls back to mtime when the name doesn't carry a stamp.
@@ -444,7 +470,7 @@ async function main(): Promise<void> {
     byMethodPitchable[m] = (byMethodPitchable[m] ?? 0) + 1;
   }
 
-  const emailVerified = discovered.filter((l) => l.outreach_status === 'email_verified').length;
+  const emailVerified = discovered.filter((l) => isVerifiedOrBeyond(l.outreach_status)).length;
   // Scoring health as a FIRST-CLASS metric (2026-08-05, autopilot-improve). It was already
   // present inside by_review_status, but buried there the 08-04 debrief walked straight past
   // 128 scoring_failed rows (16% of the day's discovery) and reported a clean day; by 08-05 it

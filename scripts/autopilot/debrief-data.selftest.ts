@@ -1,4 +1,4 @@
-import { sessionSeedsAdvanced, sessionStartMs } from './debrief-data.ts';
+import { isVerifiedOrBeyond, sessionSeedsAdvanced, sessionStartMs } from './debrief-data.ts';
 let fail = 0;
 const ok = (name: string, got: unknown, want: unknown) => {
   const pass = JSON.stringify(got) === JSON.stringify(want);
@@ -23,6 +23,19 @@ ok('crash-on-first-chunk still counts what it walked',
 ok('sweep- name', sessionStartMs('/x/sweep-20260812-120629.log', 999), Date.parse('2026-08-12T12:06:29Z'));
 ok('daily- name', sessionStartMs('/x/daily-20260812-165034.log', 999), Date.parse('2026-08-12T16:50:34Z'));
 ok('unstamped name falls back to mtime', sessionStartMs('/x/peer-sweep-smoketest.log', 999), 999);
+
+// isVerifiedOrBeyond — a verified lead still counts after it advances past verification
+ok('email_verified', isVerifiedOrBeyond('email_verified'), true);
+ok('ready_data_scraped counts (the 08-14 zero)', isVerifiedOrBeyond('ready_data_scraped'), true);
+ok('enriched legacy alias counts', isVerifiedOrBeyond('enriched'), true);
+ok('email_drafted counts', isVerifiedOrBeyond('email_drafted'), true);
+ok('sent_to_smartlead counts', isVerifiedOrBeyond('sent_to_smartlead'), true);
+ok('no_email_found does not', isVerifiedOrBeyond('no_email_found'), false);
+ok('email_invalid does not', isVerifiedOrBeyond('email_invalid'), false);
+ok('ready_no_data is a manual label, not evidence', isVerifiedOrBeyond('ready_no_data'), false);
+ok('pending does not', isVerifiedOrBeyond('pending'), false);
+ok('null does not', isVerifiedOrBeyond(null), false);
+ok('undefined does not', isVerifiedOrBeyond(undefined), false);
 
 console.log(fail === 0 ? '\nALL PASS' : `\n${fail} FAILED`);
 process.exit(fail === 0 ? 0 : 1);
