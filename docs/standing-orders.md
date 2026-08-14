@@ -73,3 +73,10 @@ everything up to "parked, ready to write" is automatic.
   Lap 2 closed at 0.373 qualified/seed (82% of lap 1 — compounding holds).
   OPEN DECISION for Casey: auto-`--relap` on drain (extend-seeds.ts) once
   this re-walk's rate is measured, so the lane never idles again.
+- 2026-08-14 (later): Comment-seed discovery engine LIVE
+  (finder scripts/discover-comment-seeds.ts + 40-query bank, runs before the
+  09:11 UTC daily sweep, cursor rotates queries daily). First run: 15 new
+  seeds (vidIQ, TubeBuddy tier); first chunk surfaced 4,546 net-new
+  commenters. Expect elevated OpenRouter scoring spend on rich days; the
+  --max-llm 4000 cap pausing a walk mid-day (exit 10) is normal, it resumes
+  next day.
