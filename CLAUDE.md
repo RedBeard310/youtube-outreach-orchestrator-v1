@@ -1,5 +1,12 @@
 # youtube-outreach-orchestrator-v1
 
+> **⚡ FIRST: read [docs/standing-orders.md](docs/standing-orders.md) — the
+> living priority document.** It says which discovery lanes are primary TODAY
+> and what Casey most recently ordered. It outranks any stale priority
+> implied elsewhere in this file, and it must be updated in-session whenever
+> Casey changes a priority in chat. (Created 2026-08-14 because day-to-day
+> instructions kept slipping between sessions.)
+
 Thin coordination loop. Polls Airtable on a cron, advances leads through whichever stage they're ready for by shelling out to existing repos. Owns no business logic of its own.
 
 Full spec: [orchestrator-spec.md](orchestrator-spec.md). Read it before making non-trivial changes.
