@@ -68,3 +68,8 @@ everything up to "parked, ready to write" is automatic.
   discovery engine commissioned; keyword lane demoted to opportunistic.
   (Casey's instruction after a thin overnight: don't let exhausted lanes
   masquerade as primary ones.)
+- 2026-08-14 (later): Lap 3 re-walk LIVE — 8,409 seeds queued, ~3 days of
+  continuous walking, watch `npx tsx scripts/lap2-progress.ts` (finder repo).
+  Lap 2 closed at 0.373 qualified/seed (82% of lap 1 — compounding holds).
+  OPEN DECISION for Casey: auto-`--relap` on drain (extend-seeds.ts) once
+  this re-walk's rate is measured, so the lane never idles again.
