@@ -165,9 +165,21 @@ function termSupplyDegradationActive(): 'tier2_fallback' | 'anti_starvation_exha
   for (const f of recentSessionLogs(2)) {
     let body = '';
     try { body = readFileSync(f, 'utf8'); } catch { continue; }
-    if (body.includes('[tier2] no term cleared')) return 'tier2_fallback';
+    // 2026-08-14 (finder commit 7ea99ab) rewrote the tier2 log line from the single
+    // '[tier2] no term cleared ...' message this used to match to a 4-rung ladder that
+    // only logs when it lands below rung 1 ('[tier2] rung N/4: nothing available at the
+    // stricter bars; ...'). Rung 1 (the preferred bar, full cooldown) is silent by design,
+    // so any '[tier2] rung' line at all means tier 2 fell back — match generically instead
+    // of a literal rung number so the next ladder-length tweak can't silently break this again.
+    if (/\[tier2\] rung \d+\/\d+/.test(body)) return 'tier2_fallback';
     if (body.includes('[anti-starvation] active pool exhausted') && body.includes('NO never-run and NO cooled proven terms remain')) {
       return 'anti_starvation_exhausted';
+    }
+    // Tier 2 landed (reactivated cooled-proven terms) rather than exhausting outright —
+    // same self-healing, lower-conversion-by-design shape as tier2_fallback above, just
+    // reached via the anti-starvation path's own wording rather than the tier2 ladder log.
+    if (body.includes('[anti-starvation] active pool exhausted') && body.includes('reactivated') && body.includes('proven paused terms that have cooled off')) {
+      return 'tier2_fallback';
     }
   }
   return null;
