@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lead Run Debrief — 2026-08-15</title>
+<style>
+  :root {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --good-soft: #1f8a5b1a; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+      --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+      --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --good-soft: #55c48c1c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --good-soft: #1f8a5b1a; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+    --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+    --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --good-soft: #55c48c1c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 40px 22px 80px; }
+  .eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); font-weight: 600; }
+  h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.12; margin: 10px 0 6px; text-wrap: balance; letter-spacing: -.02em; }
+  h2 { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); margin: 44px 0 16px; font-weight: 700; }
+  h3 { font-size: 18px; margin: 0 0 6px; letter-spacing: -.01em; }
+  p { margin: 0 0 14px; }
+  .lede { font-size: 18px; color: var(--ink-soft); max-width: 68ch; }
+  .tag { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--good-soft); color: var(--good); letter-spacing: .02em; }
+  .tag.warn { background: var(--amber-soft); color: var(--amber); }
+  .tag.bad { background: var(--red-soft); color: var(--red); }
+  .grid { display: grid; gap: 14px; }
+  .stats { grid-template-columns: repeat(4, 1fr); margin-top: 26px; }
+  @media (max-width: 720px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; box-shadow: var(--shadow); }
+  .stat .n { font-size: 30px; font-weight: 750; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .stat .l { font-size: 12.5px; color: var(--ink-soft); margin-top: 3px; }
+  .stat .s { font-size: 12px; margin-top: 8px; font-weight: 600; }
+  .up { color: var(--good); } .down { color: var(--red); } .warn { color: var(--amber); }
+  .accent-red { border-left: 3px solid var(--red); }
+  .accent-teal { border-left: 3px solid var(--teal); }
+  .accent-amber { border-left: 3px solid var(--amber); }
+  .accent-good { border-left: 3px solid var(--good); }
+
+  /* shape-of-day bar strip */
+  .strip { display: flex; align-items: flex-end; gap: 2px; height: 120px; padding: 14px 14px 10px; overflow-x: auto; }
+  .bar { flex: 1 0 6px; min-width: 5px; border-radius: 2px 2px 0 0; background: var(--teal); opacity: .9; }
+  .bar.zero { background: var(--red); height: 4px !important; opacity: .9; }
+  .bar.low { background: var(--amber); }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-soft); padding: 0 14px 14px; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+
+  .q { border-radius: 14px; padding: 20px 22px; margin-bottom: 14px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); }
+  .q .ask { font-size: 17px; font-weight: 700; color: var(--ink); margin-bottom: 10px; display: flex; gap: 10px; align-items: baseline; }
+  .q .ask .qn { color: var(--red); font-weight: 800; flex: 0 0 auto; }
+  .q p { color: var(--ink-soft); }
+  .q b { color: var(--ink); }
+  .pill { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink); background: var(--panel-2); padding: 1px 7px; border-radius: 6px; border: 1px solid var(--line); white-space: nowrap; }
+
+  pre { background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 13px 15px; overflow-x: auto; font-size: 13px; line-height: 1.5; margin: 0 0 14px; color: var(--ink); }
+  code { font-size: .92em; background: var(--panel-2); padding: 1px 5px; border-radius: 5px; border: 1px solid var(--line); }
+  pre code { background: none; border: none; padding: 0; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+  th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); }
+  td .num { font-variant-numeric: tabular-nums; font-weight: 650; }
+  td.n { font-variant-numeric: tabular-nums; text-align: right; }
+  .fix td:first-child { color: var(--good); font-weight: 650; }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); box-shadow: var(--shadow); margin-bottom: 14px; }
+  ol.recs { padding-left: 0; list-style: none; counter-reset: r; margin: 0; }
+  ol.recs li { counter-increment: r; position: relative; padding: 14px 16px 14px 52px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 10px; box-shadow: var(--shadow); }
+  ol.recs li::before { content: counter(r); position: absolute; left: 14px; top: 14px; width: 26px; height: 26px; border-radius: 8px; background: var(--teal-soft); color: var(--teal); font-weight: 800; font-size: 14px; display: grid; place-items: center; }
+  ol.recs b { color: var(--ink); }
+  .foot { margin-top: 46px; padding: 16px 18px; border-radius: 12px; background: var(--amber-soft); border: 1px solid var(--line); font-size: 14px; color: var(--ink-soft); }
+  .foot b { color: var(--ink); }
+  .muted { color: var(--ink-soft); font-size: 13.5px; }
+</style>
+
+
+<div class="wrap">
+
+  <div class="eyebrow">Lead Run Debrief · YouTube outreach</div>
+  <h1>2026-08-15 — the keyword lane came back, and the newest lane burned half the day's scoring on 19 leads</h1>
+  <p class="lede">Yesterday's fix worked. The 38 sessions that all stopped for want of search terms became <b>4</b> stops out of 17 sessions, finder passes went from 64 to <b>348</b>, and the pool grew by <b>119</b>, more than twice yesterday's gain. The day also had its first genuinely bad lane. Comment sweep found <b>3,648</b> channels and 19 of them were worth contacting, because the seed picker it got yesterday ranks candidate channels by how many comments they have.</p>
+  <div style="margin-top:14px"><span class="tag">NO CRASHES · NO QUOTA STOPS · 16TH CLEAN CYCLE</span> <span class="tag">HARD STOPS 38 → 4</span> <span class="tag warn">COMMENT SWEEP AT 0.5%</span> <span class="tag">2 FIXES SHIPPED</span></div>
+
+  <div class="grid stats">
+    <div class="card stat accent-good">
+      <div class="n">+119</div>
+      <div class="l">parked into <code>approved_hold</code></div>
+      <div class="s up">pool 2,165 → 2,284. Was +52</div>
+    </div>
+    <div class="card stat accent-good">
+      <div class="n">348</div>
+      <div class="l">leads worth contacting</div>
+      <div class="s up">double yesterday's 170</div>
+    </div>
+    <div class="card stat accent-good">
+      <div class="n">4 / 17</div>
+      <div class="l">sessions stopped on an empty term pool</div>
+      <div class="s up">was 38 of 38</div>
+    </div>
+    <div class="card stat accent-red">
+      <div class="n">0.52%</div>
+      <div class="l">comment sweep hit rate</div>
+      <div class="s down">3,648 channels, 19 leads</div>
+    </div>
+  </div>
+
+  <h2>The shape of the day</h2>
+
+  <div class="card" style="padding:0">
+    <div class="strip">
+      <div class="bar" style="height:10%"></div>
+      <div class="bar" style="height:26%"></div>
+      <div class="bar" style="height:68%"></div>
+      <div class="bar" style="height:94%"></div>
+      <div class="bar" style="height:81%"></div>
+      <div class="bar" style="height:68%"></div>
+      <div class="bar" style="height:78%"></div>
+      <div class="bar" style="height:100%"></div>
+      <div class="bar" style="height:86%"></div>
+      <div class="bar" style="height:60%"></div>
+      <div class="bar" style="height:36%"></div>
+      <div class="bar" style="height:20%"></div>
+      <div class="bar" style="height:26%"></div>
+      <div class="bar" style="height:21%"></div>
+      <div class="bar" style="height:33%"></div>
+      <div class="bar" style="height:22%"></div>
+      <div class="bar" style="height:19%"></div>
+      <div class="bar" style="height:11%"></div>
+      <div class="bar" style="height:35%"></div>
+      <div class="bar" style="height:13%"></div>
+      <div class="bar" style="height:20%"></div>
+      <div class="bar" style="height:20%"></div>
+      <div class="bar" style="height:31%"></div>
+      <div class="bar" style="height:17%"></div>
+    </div>
+    <div class="legend">
+      <span>Channels found per hour, 07:00Z 2026-08-14 to 07:00Z 2026-08-15 (midnight to midnight Pacific). Peak 787 at 14:00Z.</span>
+      <span><span class="dot" style="background:var(--teal)"></span>normal hour</span>
+      <span><span class="dot" style="background:var(--amber)"></span>under 50 found</span>
+      <span><span class="dot" style="background:var(--red)"></span>nothing found</span>
+    </div>
+  </div>
+
+  <p><b>This is the first cycle with no dead hours.</b> The quietest hour of the night still found 84 channels. Every previous cycle this month had at least one hour at zero and usually a long tail of them. The morning did most of the work, 67% of intake landed before 17:00Z, but the overnight kept a real floor under it instead of falling off a cliff.</p>
+
+  <p>Nothing crashed. No session stopped for quota. No hourly check-in raised an anomaly, so no fix-agent was spent. The <code>fatal_signatures</code> list came back empty for the sixteenth cycle running.</p>
+
+  <div class="tablewrap">
+    <table>
+      <tr><th>Metric</th><th class="n">Value</th><th>Note</th></tr>
+      <tr><td>Parked into <code>approved_hold</code></td><td class="n"><span class="num">+119</span></td><td>pool 2,165 → 2,284. Was +52</td></tr>
+      <tr><td><code>needs_contact</code> pool</td><td class="n"><span class="num">2,809</span></td><td>up 203</td></tr>
+      <tr><td><b>Total parked, none sent</b></td><td class="n"><span class="num">5,093</span></td><td>crossed 5,000 today</td></tr>
+      <tr><td>Channels found</td><td class="n"><span class="num">7,832</span></td><td>was 4,407</td></tr>
+      <tr><td>Worth contacting (score ≥ 6)</td><td class="n"><span class="num">348</span></td><td><b>4.4%</b> of intake, was 3.9%</td></tr>
+      <tr><td>Emails verified</td><td class="n"><span class="num">118</span></td><td>34% of the pitchable ones</td></tr>
+      <tr><td>Of today's cohort</td><td class="n"><span class="num">118 / 202</span></td><td>parked / held for contact recovery. 7,009 below the bar, 371 niche-excluded, 132 unreviewed</td></tr>
+      <tr><td><code>scoring_failed</code></td><td class="n"><span class="num">0</span></td><td>tenth clean day</td></tr>
+      <tr><td>Campaign sessions</td><td class="n"><span class="num">17</span></td><td>16 completed, none dry-run</td></tr>
+      <tr><td>Finder passes</td><td class="n"><span class="num">348</span></td><td><b>was 64</b></td></tr>
+      <tr><td>Hard stops</td><td class="n"><span class="num">4</span></td><td><b>was 38.</b> All <code>term_supply_exhausted</code></td></tr>
+      <tr><td>Stopped on the 90-minute clock</td><td class="n"><span class="num">12</span></td><td>sessions ran their full budget instead of dying early</td></tr>
+      <tr><td>Quota stops</td><td class="n"><span class="num">0</span></td><td>fourth clean day</td></tr>
+      <tr><td>Net-new channels from the keyword lane</td><td class="n"><span class="num">1,252</span></td><td>was 133</td></tr>
+      <tr><td>Fresh pitchable per finder pass</td><td class="n"><span class="num">0.24</span></td><td>was 0.19</td></tr>
+      <tr><td>Anthropic spend</td><td class="n"><span class="num">$0</span></td><td></td></tr>
+      <tr><td>OpenRouter spend</td><td class="n"><span class="num">$7.45</span></td><td>11,208 calls, was $2.21 across 3,245</td></tr>
+      <tr><td><code>fatal_signatures</code></td><td class="n"><span class="num">[]</span></td><td>sixteenth straight cycle</td></tr>
+    </table>
+  </div>
+
+  <h2>The three questions</h2>
+
+  <div class="q">
+    <div class="ask"><span class="qn">Q1</span><span>Did yesterday's fix actually work?</span></div>
+    <p>Yes, and the number to check was the one named yesterday. Hard stops went from <b>38 of 38 sessions to 4 of 17</b>. The keyword lane went from 133 channels to 1,252 and from 12 usable leads to 85. Twelve sessions ran their full 90-minute budget and stopped on the clock, which is what a working session looks like.</p>
+    <p>The cooldown ladder fired <span class="pill">303</span> times and revived <span class="pill">1,990</span> terms. Neither of the two strict rungs ever fired. Rung 3 fired 140 times and rung 4 fired 163 times, so every single revival all cycle came from the relaxed cooldown that was added yesterday. Without it the day looks like yesterday.</p>
+    <p><b>One prediction was wrong, and it matters.</b> Yesterday's simulation said each revival would return about 24 terms. The real average was <b>6.6</b>. So the keyword lane is not restocked, it is on a drip: the active pool sits at zero, a pass empties it, the next pass revives seven more. Measured this morning the pool held <b>zero active terms</b>, which is where it has been all cycle. The lane works, but it works the way a hand pump works.</p>
+  </div>
+
+  <div class="q">
+    <div class="ask"><span class="qn">Q2</span><span>Where did the good leads actually come from?</span></div>
+    <p>From the recommended-videos feed, by a wide margin.</p>
+    <div class="tablewrap" style="margin-top:8px">
+      <table>
+        <tr><th>Method</th><th class="n">Found</th><th class="n">Worth contacting</th><th class="n">Rate</th><th class="n">Cost per lead</th></tr>
+        <tr><td>Recommended-videos feed</td><td class="n">2,421</td><td class="n"><b>225</b></td><td class="n"><b>9.3%</b></td><td class="n">1.6¢</td></tr>
+        <tr><td>Keyword search</td><td class="n">1,252</td><td class="n">85</td><td class="n">6.8%</td><td class="n">1.4¢</td></tr>
+        <tr><td>Peer-network comments</td><td class="n">506</td><td class="n">19</td><td class="n">3.8%</td><td class="n">1.7¢</td></tr>
+        <tr><td>Comment sweep</td><td class="n">3,648</td><td class="n">19</td><td class="n"><b>0.5%</b></td><td class="n"><b>11.3¢</b></td></tr>
+        <tr><td>Guest-link mining</td><td class="n">4</td><td class="n">0</td><td class="n">—</td><td class="n">—</td></tr>
+        <tr><td>Podcast crossover</td><td class="n">1</td><td class="n">0</td><td class="n">—</td><td class="n">—</td></tr>
+      </table>
+    </div>
+    <p>The recommended-videos feed produced <b>65% of the day's good leads off 31% of the intake</b>, and it only ran twice. It is the best lane by hit rate, the second-best by volume, and the cheapest per lead alongside keyword search. Everything else combined produced fewer usable leads than it did alone.</p>
+    <p>Peer-network went quiet, down from 3,914 channels to 506, and its hit rate rose from 2.9% to 3.8% as it did. Nobody changed it. It walked out of the stretch of already-seen seeds it was stuck in yesterday and is now finding less but finding better.</p>
+  </div>
+
+  <div class="q">
+    <div class="ask"><span class="qn">Q3</span><span>Why did comment sweep return 3,648 channels and only 19 leads?</span></div>
+    <p>Because its new seed picker chooses channels by comment volume, and on YouTube the channels with the most comments about YouTube are the ones teaching people to get rich on YouTube. Their commenters are aspiring creators. They don't own a business, so there's nobody to pitch.</p>
+    <p>The self-refilling seed engine shipped yesterday and this was its first full cycle. It added 30 seeds. Nearly all of the day's 3,648 channels came from those 30. The 39 hand-picked seeds are exhausted and produced 14 channels between them. Here is the whole lane in five rows:</p>
+    <div class="tablewrap">
+      <table>
+        <tr><th>Seed</th><th class="n">Channels found</th><th class="n">Worth contacting</th><th>What the channel says it does</th></tr>
+        <tr><td>Marcus Jones</td><td class="n">439</td><td class="n">2</td><td>"help 10,000 people become fulltime YouTubers"</td></tr>
+        <tr><td>vidIQ</td><td class="n">387</td><td class="n"><b>0</b></td><td>"help YouTubers get more views, more subscribers, and get monetized"</td></tr>
+        <tr><td>Adam Ivy</td><td class="n">313</td><td class="n">2</td><td>"help coaches, consultants, and business owners use YouTube to get leads"</td></tr>
+        <tr><td>Aprilynne Alter</td><td class="n">207</td><td class="n"><b>6</b></td><td>"deep-dive YouTube breakdowns"</td></tr>
+        <tr><td>Nataleh Nicole</td><td class="n">199</td><td class="n">4</td><td>"helping experts and entrepreneurs turn content into community"</td></tr>
+      </table>
+    </div>
+    <p>Nine of the 30 seeds sat squarely in the faceless-channel and YouTube-automation space. Between them they returned <b>720 channels and 1 usable lead</b>. The four whose own descriptions name a business audience returned 572 channels and 6, which is <b>seven times the rate</b> off a fifth of the volume.</p>
+    <p>This is not a cost problem. The whole pipeline ran on $7.45 of model spend, so 11 cents a lead is affordable. It's a selection problem: the picker was optimising for the biggest audience rather than the right one, and the fix is to change what it sorts on. That shipped today.</p>
+  </div>
+
+  <h2>What broke, what's fixed</h2>
+
+  <h3>The keyword harvest is mined out and the backoff is the only thing hiding it</h3>
+  <p>The harvest is the one process that puts genuinely new search terms into the book. It ran 11 times this cycle and pulled about 4,400 raw autocomplete phrases each time. Almost all of them were phrases it had already rejected on a previous run:</p>
+  <div class="tablewrap">
+    <table>
+      <tr><th>Harvest run</th><th class="n">Raw phrases</th><th class="n">Already rejected before</th><th class="n">New terms written</th></tr>
+      <tr><td>08-14 00:29</td><td class="n">4,617</td><td class="n">4,426</td><td class="n"><b>54</b></td></tr>
+      <tr><td>08-14 01:55</td><td class="n">4,429</td><td class="n">4,381</td><td class="n">10</td></tr>
+      <tr><td>08-14 03:18 through 08-15 06:05</td><td class="n">39,104</td><td class="n">39,069</td><td class="n"><b>8</b></td></tr>
+      <tr><td><b>Cycle total</b></td><td class="n"><b>48,150</b></td><td class="n"><b>47,876</b></td><td class="n"><b>72</b></td></tr>
+    </table>
+  </div>
+  <p>It walks the same 42 seed phrases every run, and that list hasn't grown since 2026-07-13. Autocomplete gives back nearly the same answers each time, so the input barely changes and neither does the output. The low-yield backoff caught this correctly and skipped 355 of 361 harvest attempts, which is the guard doing its job. It also means the term book has no restock path at all right now, and the only thing standing between the keyword lane and yesterday's outcome is the seven-terms-at-a-time revival drip.</p>
+  <p>The backoff message names the remedy itself: new seeds. That's rec #3 below.</p>
+
+  <h3>Three quarters of the term book is now guesswork</h3>
+  <p>The book holds 14,751 paused terms. <b>10,772 of them are probes</b>, phrases invented by a cheap model or scraped from autocomplete, and they convert at <b>0.23%</b>. The 3,979 real book terms convert at <b>2.25%</b>, ten times better. The campaign wrote about 40 fresh probes after nearly every one of its 348 passes, because the fade check fires whenever a pass returns fewer than 12 fresh leads and no pass all cycle returned more than 3.</p>
+  <p>That's the second thing fixed today. Revived proven terms were being written at priority 30 while those fresh probes went in at 70, so a term with a measured conversion rate was ranked below a phrase a model had invented seconds earlier.</p>
+
+  <h3>One thing worth knowing that is not a fault</h3>
+  <p><b>OpenRouter cost $7.45 across 11,208 calls</b>, up from $2.21. The rise is intake, not waste: the pipeline found 7,832 channels instead of 4,407 and every one gets scored. That works out to <b>2.1 cents per lead worth contacting</b> and 6.3 cents per lead parked. Anthropic spend was $0.</p>
+
+  <h2>Yesterday's fixes, verified</h2>
+  <div class="tablewrap">
+    <table>
+      <tr><th>Prediction</th><th>What happened</th><th>Verdict</th></tr>
+      <tr><td>The cooldown ladder turns 38 hard stops into a working keyword lane</td><td>4 hard stops in 17 sessions, 348 finder passes, 85 usable leads from the keyword lane against 12 yesterday</td><td><b class="up">confirmed</b></td></tr>
+      <tr><td>Each revival returns roughly 24 proven terms</td><td>303 revivals returned 1,990 terms, an average of 6.6</td><td><b class="down">wrong</b></td></tr>
+      <tr><td>Emails-verified counts leads that advanced past verification</td><td>Reported 118 rather than the 0 the old metric would have shown</td><td><b class="up">confirmed</b></td></tr>
+    </table>
+  </div>
+
+  <h2>Shipped today</h2>
+  <p>One commit in the finder carrying two changes. Typecheck clean, all 193 unit tests pass, and both regex sets were checked in node against the 30 real seed channels pulled from the live API. No <code>.env</code> file was touched.</p>
+  <div class="tablewrap">
+    <table class="fix">
+      <tr><th>Repo</th><th>Commit</th><th>Change</th></tr>
+      <tr><td><code>youtube-lead-finder-v1</code></td><td><code>71d235c</code></td><td>Comment-sweep seed discovery ranks by audience before comment volume; revived proven terms outrank invented probes</td></tr>
+    </table>
+  </div>
+
+  <p><b>The seed ranking.</b> Candidate seeds now sort into three tiers, business audience first, general creator education second, YouTube hustle last, and only then by comment volume. Checked against the 30 seeds the engine actually picked, the tiers line up with realized yield exactly: business 1.05%, creator education 0.52%, hustle 0.14%. Hustle is tested before business, because half the hustle channels describe themselves with business words ("YouTube Automation Expert", "Coach Yotz") and testing business first put two of the worst seeds at the very top. <b>Nothing is rejected.</b> Seeds over the per-run cap stay eligible for a later run, so a low-tier seed is deferred rather than thrown away. Aprilynne Alter is the reason for that restraint: she came out of "start a faceless youtube channel", the most hustle-flavoured query in the bank, and returned the best yield of the entire cycle. A hard filter would have lost her. The tier is written into each seed's source string and the run log, so next cycle can measure whether the ranking earned anything.</p>
+
+  <p><b>The term priority.</b> Raised from 30 to 72, above both probe tiers and below hand-curated terms at 75, and made tunable with <code>PROVEN_REVIVE_PRIORITY</code>. This mattered less when the never-run reserve still had stock. It has been empty since about 08-07, so the revival is now the only thing refilling the pool, and all 1,990 revived terms this cycle landed underneath the fresh probes. If a revived term turns out to be mined out after all, the fast-pause rule retires it again after one run, so being wrong costs a single search.</p>
+
+  <h2>Recommended next, ranked</h2>
+  <ol class="recs">
+    <li><b>Run the recommended-videos feed harder.</b> It is the best lane on every measure and it ran twice. 9.3% hit rate, 65% of the day's good leads, 1.6 cents each. Comment sweep runs on a daily timer and produced 19 leads; this produced 225. Whatever governs its cadence is the highest-value knob on the board, and finding out what that is comes before turning it.</li>
+    <li><b>Reconcile the two parked pools.</b> Open for three days, still the only item that needs a person. The pools dropped from 4,661 and 5,783 in Airtable to their current Postgres figures while the row count says nothing was lost. The Airtable token on this box returns 401, so the parity script can't run until someone supplies a working credential.</li>
+    <li><b>Give the keyword harvest new seeds.</b> Its 42 seed phrases haven't changed since 07-13 and returned 72 new terms out of 48,150 raw candidates this cycle. The obvious source is the term book itself: seed autocomplete from the terms that have already proven they convert, so the list refreshes itself as new terms prove out. That would replace the seven-at-a-time drip with actual restocking.</li>
+    <li><b>Decide the outlet for <code>approved_hold</code>.</b> 2,284 leads prepped and ready to write, none emailed. Total parked crossed 5,000 today. Fourth week at or near the top of this list.</li>
+    <li><b>Check the comment-sweep tier split next cycle.</b> Today's fix changes which seeds get picked, not how many channels get scored, so the number to watch is the hit rate, not the volume. If it doesn't move off 0.5%, the problem is the whole lane rather than its seed picker, and the honest answer then is to stop running it.</li>
+    <li><b>Build the <code>needs_contact</code> recovery engine.</b> 2,809 creators found, scored and unreachable, up 203 today. It grows every cycle.</li>
+  </ol>
+
+  <div class="foot">
+    <b>Status.</b> Everything is parked, nothing is sent. <code>approved_hold</code> 2,284 plus <code>needs_contact</code> 2,809 is <b>5,093 creators found and never contacted</b>, subject to the reconciliation question above. $0 on Anthropic, $7.45 on OpenRouter. Zero crashes, zero scoring failures, zero quota stops, no fatal signatures for the sixteenth cycle running. The campaign is still running and I have left it that way.
+    <br><br>
+    Grounded metrics: <code>youtube-outreach-orchestrator-v1/logs/autopilot-debrief-2026-08-15.json</code>. Cycle window 2026-08-14T07:00Z to 2026-08-15T07:00Z. Markdown companion: <code>lead-run-2026-08-15-analysis.md</code>.
+  </div>
+
+</div>
+</html>
