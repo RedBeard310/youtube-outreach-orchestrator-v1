@@ -73,6 +73,24 @@ everything up to "parked, ready to write" is automatic.
   Lap 2 closed at 0.373 qualified/seed (82% of lap 1 — compounding holds).
   OPEN DECISION for Casey: auto-`--relap` on drain (extend-seeds.ts) once
   this re-walk's rate is measured, so the lane never idles again.
+- 2026-08-16: **The lap-3 re-walk measurement came in, and the OPEN DECISION above
+  is closed: auto-relap SHIPPED, but the "compounding holds at ~80%" premise is
+  dead.** The re-walk ran at **0.053 qualified/seed** (lap 1 0.453, lap 2 0.373).
+  It had looked like +85% because `lap2-progress.ts` divided all-time `qualified`
+  by one lap's `seeds_done` — that counter resets at every relap while the others
+  accumulate. Fixed in finder `673a8a6` (`src/discovery/graph/lap.ts`); the sweep's
+  own "/seed" summary line was wrong the same way. **Judge a lap in dollars, not
+  seeds:** a lap costs ~$7.60 for ~480 leads = **1.6¢/lead**, cheaper than every
+  lane but keyword search, over wall-clock the lane would otherwise spend idle.
+  `refill-graph-sweep.sh` now closes and re-opens a drained book by itself, gated on
+  `RELAP_MAX_USD_PER_LEAD` (25¢) and `RELAP_COOLDOWN_HOURS` (12). Expect **~$5/day
+  OpenRouter** from this lane while it has nothing fresher to walk. **Still true and
+  unsolved: relapping is a holding pattern.** The lane only grows on first-time
+  seeds, which come from the other lanes' qualified output (~3/hour right now).
+- 2026-08-16: Comment-sweep's seed picker is proven to rank correctly (business tier
+  1.17% vs creator-ed 0%) and the lane still ran at **0.54%** for a second cycle, at
+  9.6¢/lead against the feed's 1.4¢. Per the 08-15 rule this is now Casey's
+  keep-or-kill call. **Left running** — nothing was changed.
 - 2026-08-14 (later): Comment-seed discovery engine LIVE
   (finder scripts/discover-comment-seeds.ts + 40-query bank, runs before the
   09:11 UTC daily sweep, cursor rotates queries daily). First run: 15 new
