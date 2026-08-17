@@ -506,6 +506,24 @@ Key values must never be printed, echoed, logged, or committed. That applies to 
 
 **A dead key is normal, not an incident.** Keys go over daily quota or get their Google Cloud project suspended. Rotate past them. Match failures specifically: `quotaExceeded` and `keyInvalid` retire a key for the run, `403 forbidden` means suspended, a plain 429 rotates but keeps the key eligible, and anything else (like `commentsDisabled`) must propagate without burning a key.
 
+**A "run" is not a process (learned 2026-08-17).** Key handling used to keep its dead-key
+list in memory on the assumption of one client per run. The autonomous campaign runs
+hundreds of short processes a cycle, so that list was thrown away hundreds of times a
+day: the 08-16 cycle spent 2,091 requests re-learning which keys were spent, and 403 of
+its 411 per-minute rate limits landed on slots #1–#3 because every process opened
+rotation at index 0. Two rules follow, both now enforced in
+`youtube-lead-finder-v1/src/youtube/dead-keys.ts`:
+
+- **Key deaths belong on disk, not in a process.** They live in
+  `youtube-lead-finder-v1/logs/youtube-dead-keys.json`, keyed by a truncated SHA-256 so
+  no key value is ever written or logged. Quota deaths expire at the next **Pacific
+  midnight** (Google's actual reset); suspensions hold for `YT_BLOCKED_TTL_HOURS`
+  (48) because they need a human appeal. A 429 is never recorded. Remembered state that
+  marks the *whole* pool dead is discarded and re-probed, so a stale file can never kill
+  a run before it issues a single request.
+- **Never open rotation at index 0.** Start at a spread offset. Otherwise the whole
+  fleet's opening burst piles onto the front of the pool and the back never gets used.
+
 **Source of truth is the Notion "YouTube API Key Database."** New keys land there before they reach `.env`, so re-read it rather than assuming the pool is current. It needs no Notion connector, only the API token (see the Notion Access block). The `Select` column carries Working / Suspended, and a blank status means nobody has checked yet, not that the key is bad.
 
 **Full detail:**
