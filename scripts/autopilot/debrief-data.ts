@@ -10,7 +10,7 @@ import { execSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { countByReviewStatus, getLeadsDiscoveredSince, type Lead } from '../../src/airtable.ts';
-import { discoveryMethod } from '../../src/discovery-method.ts';
+import { discoveryReportKey } from '../../src/discovery-method.ts';
 import { summarizeToday, pacificDate } from './burn-ledger.js';
 
 const REPO = '/home/casey/repos/youtube-outreach-orchestrator-v1';
@@ -462,11 +462,11 @@ async function main(): Promise<void> {
   const byMethod: Record<string, number> = {};
   const byMethodPitchable: Record<string, number> = {};
   for (const l of discovered) {
-    const m = discoveryMethod(l.discovered_via);
+    const m = discoveryReportKey(l.discovered_via);
     byMethod[m] = (byMethod[m] ?? 0) + 1;
   }
   for (const l of pitchable) {
-    const m = discoveryMethod(l.discovered_via);
+    const m = discoveryReportKey(l.discovered_via);
     byMethodPitchable[m] = (byMethodPitchable[m] ?? 0) + 1;
   }
 
