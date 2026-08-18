@@ -185,7 +185,7 @@ not politely sampled.
 `cold-email-attack-enemies-propose-script-v1/references/golden-examples.md` holds G001–G015, and
 **G001–G007 are ALL red-beard-rants — one approved email per emphasis-dial position**: G001
 outlier-recent, G002 outlier-alltime, G003 comment, G004 signature-concept, G005 framework, G006
-icp-pain, G007 enemy-double-down. (G008–G015 are Amanda Berrientez, the measured B2B register.)
+icp-pain, G007 enemy-double-down. (G008–G015 are Amanda Barrientez, the measured B2B register.)
 That makes Red Beard **labeled ground truth**: run a model at a given emphasis and compare its
 email to a Casey-approved golden for the same creator and same emphasis. Nothing else in the
 pipeline has that. It also confirms the contract — the skill explicitly reads `offer.md` and says
