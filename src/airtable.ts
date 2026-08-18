@@ -1,8 +1,18 @@
 import Airtable, { type FieldSet } from 'pipeline-db/sdk';
 
+// Must match leads.vocab_lead_candidates_review_status in Postgres. The two
+// lanes below were live for weeks but missing from this type, so every call site
+// passed them as bare strings and a typo compiled. A misspelled status returns a
+// count of zero, and zero reads as "nothing parked", which is the exact signal
+// scripts/autopilot/checkin.ts uses to decide the pipeline has stopped working.
 export type ReviewStatus =
   | 'unreviewed'
   | 'approved'
+  // Verified but deliberately parked, and NOT tick-eligible. The way out is
+  // hold-batch.ts --release, which flips the pool to 'approved'.
+  | 'approved_hold'
+  // Score>=6 with no usable email yet. Bloodhound's recovery lane.
+  | 'needs_contact'
   | 'D100'
   | 'rejected'
   | 'sent'
@@ -264,7 +274,7 @@ export async function getVerifiablePitchableLeads(): Promise<Lead[]> {
 
 // Count rows at a given review_status (e.g. 'approved_hold') so the campaign driver
 // can measure how many leads it has parked this session against the target.
-export async function countByReviewStatus(status: string): Promise<number> {
+export async function countByReviewStatus(status: ReviewStatus): Promise<number> {
   const base = getBase();
   const records = await withRetry(
     () => base(tableName()).select({ filterByFormula: `{review_status}='${status}'`, fields: ['review_status'] }).all(),
