@@ -52,6 +52,7 @@ function hoursSince(iso: string | null): number | null {
 // Local files only, same as above: no Airtable, no network, can't itself fail.
 const SWEEP_SESSION_DIRS: Record<string, string> = {
   recommended_videos_feed: 'graph-sweep-sessions',
+  video_graph_sweep: 'video-graph-sweep-sessions',
   peer_sweep: 'peer-sweep-sessions',
   comment_sweep: 'comment-sweep-sessions',
   podcast_crossover: 'podcast-crossover-sessions',
@@ -112,7 +113,9 @@ export function sessionStartMs(path: string, mtimeMs: number): number {
 export function sessionSeedsAdvanced(text: string): number | null {
   const start = /\|\s*(\d+)\s+done\s*\|/.exec(text);
   if (!start?.[1]) return null;
-  const chunks = [...text.matchAll(/\[chunk[^\]]*\]\s+seeds\s+\d+\s*-\s*(\d+)\s+of\b/g)];
+  // `videos` as well as `seeds`: video-graph-sweep prints the identical chunk line but
+  // walks videos, and matching only `seeds` reported the pipeline's biggest lane as null.
+  const chunks = [...text.matchAll(/\[chunk[^\]]*\]\s+(?:seeds|videos)\s+\d+\s*-\s*(\d+)\s+of\b/g)];
   const end = chunks.length ? chunks[chunks.length - 1]![1] : undefined;
   if (end === undefined) return null;
   // Per-session, so a mid-cycle seed refill (which resets `done`) can't drive the
@@ -176,6 +179,7 @@ function discoveryMethodsHealth(sinceMs: number, untilMs: number): Record<string
   const work = (key: string): SweepWork =>
     sweepWorkInCycle(SWEEP_SESSION_DIRS[key]!, sinceMs, untilMs);
   const graphUpdated = sweepStateUpdatedAt('graph-sweep-state.json');
+  const videoGraphUpdated = sweepStateUpdatedAt('video-graph-sweep-state.json');
   const commentUpdated = sweepStateUpdatedAt('comment-sweep-state.json');
   const peerUpdated = sweepStateUpdatedAt('peer-sweep-state.json');
   const podcastUpdated = sweepStateUpdatedAt('podcast-crossover-state.json');
@@ -186,6 +190,15 @@ function discoveryMethodsHealth(sinceMs: number, untilMs: number): Record<string
       state_updated_at: graphUpdated,
       hours_since_update: hoursSince(graphUpdated),
       ...work('recommended_videos_feed'),
+    },
+    // Added 2026-08-18, the cycle after this lane shipped. It found 3,279 channels and 206
+    // leads on its first full day — more than any other lane — with no health entry here,
+    // so a stall would have been silent. Continuous daemon, judged like the feed above.
+    video_graph_sweep: {
+      service_active: serviceActive('video-graph-sweep.service'),
+      state_updated_at: videoGraphUpdated,
+      hours_since_update: hoursSince(videoGraphUpdated),
+      ...work('video_graph_sweep'),
     },
     comment_sweep: {
       daily_timer_active: serviceActive('comment-sweep-daily.timer'),
