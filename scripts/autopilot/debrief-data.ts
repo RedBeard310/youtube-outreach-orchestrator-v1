@@ -62,6 +62,19 @@ type SweepWork = {
   seeds_advanced: number | null;
   idle_reason: string | null;
   productive: boolean | null;
+  /**
+   * How many of the lane's MOST RECENT consecutive runs advanced no seeds, and when that
+   * run of nothing began (2026-08-19).
+   *
+   * `productive` sums the whole window, so a lane that did great work in hour one and
+   * nothing for the nine hours since reads `productive: true`. That is exactly what the
+   * video-graph sweep reported on 08-19 while it was deadlocked and still deadlocked at
+   * debrief time — 33 consecutive runs advancing nothing, the outage visible only as a
+   * one-line `idle_reason` that a reader had to interpret. A lane dying at the END of a
+   * cycle is the case that matters most, because it is still dying now.
+   */
+  idle_run_streak: number;
+  idle_since: string | null;
 };
 // Every `outreach_status` that can only be reached by verifying an email first. The
 // debrief reports "emails verified today" and used to test `=== 'email_verified'`, which
@@ -113,6 +126,21 @@ export function sessionStartMs(path: string, mtimeMs: number): number {
 export function sessionSeedsAdvanced(text: string): number | null {
   const start = /\|\s*(\d+)\s+done\s*\|/.exec(text);
   if (!start?.[1]) return null;
+
+  // PREFER THE SUMMARY, WHICH COUNTS WHAT WAS CONSUMED (2026-08-19). Every sweep ends with
+  // `<NAME> SWEEP — <walked>/<total> (seeds|videos) walked`, and that number only moves when
+  // seeds are actually checkpointed. The chunk header below is the range a chunk INTENDED to
+  // walk, printed before any of it happens — so a run that bailed on its first chunk without
+  // consuming anything still read as a full chunk of progress. That is not a rounding error:
+  // the video-graph sweep's 33 dead relaunches on 08-18/19 each claimed 20 seeds, so a lane
+  // that had been frozen for nine hours was reported as having advanced 7,486 seeds and
+  // `productive: true`. The idle-run streak beside it depends on this being honest.
+  const summaries = [...text.matchAll(/SWEEP\s+[—-]\s+(\d+)\s*\/\s*\d+\s+(?:seeds|videos)\s+walked/g)];
+  const summary = summaries.length ? summaries[summaries.length - 1]![1] : undefined;
+  if (summary !== undefined) return Math.max(0, Number(summary) - Number(start[1]));
+
+  // No summary block: the session is mid-flight (or was killed). Fall back to the chunk
+  // header, which over-reports by at most the chunk in progress.
   // `videos` as well as `seeds`: video-graph-sweep prints the identical chunk line but
   // walks videos, and matching only `seeds` reported the pipeline's biggest lane as null.
   const chunks = [...text.matchAll(/\[chunk[^\]]*\]\s+(?:seeds|videos)\s+\d+\s*-\s*(\d+)\s+of\b/g)];
@@ -124,7 +152,10 @@ export function sessionSeedsAdvanced(text: string): number | null {
 }
 
 function sweepWorkInCycle(dirName: string, sinceMs: number, untilMs: number): SweepWork {
-  const blank: SweepWork = { runs_in_cycle: 0, seeds_advanced: null, idle_reason: null, productive: null };
+  const blank: SweepWork = {
+    runs_in_cycle: 0, seeds_advanced: null, idle_reason: null, productive: null,
+    idle_run_streak: 0, idle_since: null,
+  };
   const dir = join(FINDER_REPO, 'logs', dirName);
   if (!existsSync(dir)) return blank;
   let files: Array<{ path: string; startMs: number }>;
@@ -153,12 +184,26 @@ function sweepWorkInCycle(dirName: string, sinceMs: number, untilMs: number): Sw
   };
 
   let advanced: number | null = null;
-  for (const { path } of files) {
+  const perRun: Array<{ startMs: number; advanced: number | null }> = [];
+  for (const { path, startMs } of files) {
     const text = read(path);
-    if (text === null) continue;
+    if (text === null) { perRun.push({ startMs, advanced: null }); continue; }
     const n = sessionSeedsAdvanced(text);
+    perRun.push({ startMs, advanced: n });
     if (n === null) continue;
     advanced = (advanced ?? 0) + n;
+  }
+
+  // Walk BACK from the newest run while each one advanced nothing. Only a zero counts as
+  // idle; an unparseable run stops the walk rather than being guessed at either way.
+  let idleStreak = 0;
+  let idleSince: string | null = null;
+  for (let i = perRun.length - 1; i >= 0; i--) {
+    const r = perRun[i]!;
+    if (r.advanced === 0) {
+      idleStreak += 1;
+      idleSince = new Date(r.startMs).toISOString();
+    } else break;
   }
 
   // Why it stopped, taken from the most recent run: a PAUSE/HALT/STOP line if
@@ -173,6 +218,8 @@ function sweepWorkInCycle(dirName: string, sinceMs: number, untilMs: number): Sw
     seeds_advanced: advanced,
     idle_reason: idle,
     productive: advanced === null ? null : advanced > 0,
+    idle_run_streak: idleStreak,
+    idle_since: idleSince,
   };
 }
 function discoveryMethodsHealth(sinceMs: number, untilMs: number): Record<string, unknown> {
