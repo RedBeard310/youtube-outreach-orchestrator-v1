@@ -169,7 +169,7 @@ const keys=[]; const seen=new Set();
 const add=(v)=>{v=(v||"").trim(); if(v&&!seen.has(v)){seen.add(v);keys.push(v);}};
 add(process.env.YOUTUBE_API_KEY);
 let gap=0;
-for(let i=1;i<=500;i++){const v=process.env[`YOUTUBE_API_KEY_${i}`]; if(v){gap=0;add(v);} else if(++gap>=5) break;}  // 500 = safety bound, not a target; the gap>=5 break ends the scan. Was 60, which silently hid slots 61+ once the bank passed 60 keys (2026-08-19).
+for(let i=1;i<=60;i++){const v=process.env[`YOUTUBE_API_KEY_${i}`]; if(v){gap=0;add(v);} else if(++gap>=5) break;}
 (async()=>{
   for(const k of keys){
     try{
