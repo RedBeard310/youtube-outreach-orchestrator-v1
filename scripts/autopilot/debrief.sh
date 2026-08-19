@@ -48,9 +48,16 @@ light+dark. Write:
 Then append ONE row to the run-log table in ${BRAIN}/brain/lead-gen/INDEX.md
 (| Date | Debrief links | Result | Headline |). Match the existing table format exactly.
 
-TASK 2 — Commit + PUSH the brain. casey-assistant is a pull-only mirror for the auto-sync
-watcher, so you MUST push it yourself:
-  cd ${BRAIN} && git add -A && git commit -m "lead-run debrief ${DATE}" && git push
+TASK 2 — Publish the brain. casey-assistant is a pull-only mirror for the auto-sync
+watcher, so the debrief has to be pushed from here. Run exactly this:
+  ${REPO}/scripts/autopilot/publish-brain-debrief.sh ${DATE}
+
+It commits ONLY those three files, straight onto origin/main, and pushes. Do NOT run
+\`git add -A\` / \`git commit\` / \`git push\` in that repo by hand: it is Casey's, it is
+usually checked out on a work-in-progress branch with uncommitted notes, and its local
+main is usually far behind the remote — so \`add -A\` would sweep up his unpushed work and
+the push would land your debrief on his branch and fail. The script touches no working
+tree, so none of that can happen. It is idempotent; re-run it if you are unsure.
 
 TASK 3 — Self-improvement. Review the cycle for systemic issues (repeated fatal signatures,
 low verify rate, quota waste, fade thrash, term starvation). Ship the smallest high-value
@@ -85,11 +92,15 @@ if [ -s "$OUT" ]; then
     --note "daily debrief+improve $DATE" || true
 fi
 
-# Mirror the debrief into the repo's reports/ folder (canonical home stays the brain;
-# Casey wants all reports gathered under reports/ too — 2026-07-13).
-mkdir -p "$REPO/reports"
-cp "$BRAIN/brain/lead-gen/runs/lead-run-$DATE.html" "$REPO/reports/" 2>/dev/null || true
-cp "$BRAIN/brain/lead-gen/runs/lead-run-$DATE-analysis.md" "$REPO/reports/" 2>/dev/null || true
+# Backstop: publish and mirror even if the agent skipped or half-finished task 2. Idempotent
+# (a no-op when origin/main already carries the debrief byte for byte), and it reads the
+# files from the brain worktree OR from origin/main. The old version here was a bare
+# `cp ... || true` against the worktree, which is why the 08-17 and 08-18 mirrors were
+# silently missing: both agents built their commit without leaving the files in the
+# checkout, so the copy failed and said nothing. Canonical home is still the brain;
+# Casey wants every report gathered under reports/ as well (2026-07-13).
+"$REPO/scripts/autopilot/publish-brain-debrief.sh" "$DATE" || \
+  echo "[debrief.sh] WARN: publish/mirror step reported a problem for $DATE"
 
 echo "[debrief.sh] debrief agent finished (rc=$agent_rc); cost recorded from $OUT"
 exit 0
