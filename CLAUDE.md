@@ -494,35 +494,19 @@ Key values must never be printed, echoed, logged, or committed. That applies to 
 <!-- /NOTION-ACCESS -->
 
 <!-- YOUTUBE-KEY-POOL v1 — managed block; keep identical in every repo -->
-## YouTube API Key Pool (house law — updated 2026-08-10)
+## YouTube API Key Pool (house law — updated 2026-08-19)
 
-**The pool is 39 keys, not 9.** It was rebuilt on 2026-08-10 from the Notion "YouTube API Key Database" and every key was tested against the live API first. That's roughly 390,000 quota units a day.
+**Count the pool, don't quote it.** It went 9 keys, then 39, then 52, then 66, all inside ten days, and Casey is still adding Google Cloud accounts. Any number written down here would be wrong within the week, so this block deliberately doesn't carry one. Read `YOUTUBE_API_KEY_1..N` out of the env and use however many are there. Never hard-code a key count, a slot ceiling, or a "we have N keys" assumption. Each key is worth roughly 10,000 quota units a day.
 
-**Expect it to keep growing.** Casey is adding Google Cloud accounts and wants the pool doubled or tripled within a week of 2026-08-10. So never hard-code a key count, a slot ceiling, or a "we have N keys" assumption. Read `YOUTUBE_API_KEY_1..N` out of the env and use however many are there.
+**Adding keys is one command, run on the Mac.** `casey-assistant/tools/sync-youtube-keys-from-notion.py` reads Notion, skips the Suspended rows, diffs by key value, tests each new key live, and appends the working ones with contiguous slots. Dry run by default, `--apply` writes. The Mac is the master copy of env-storage and overwrites the VPS copy every two minutes, so a VPS-only run gets silently reverted.
 
-**RapidAPI is being retired.** `RAPIDAPI_KEY` stops working within days of 2026-08-10. That is planned, not a fault, and it needs no config change: nothing anywhere pins `YOUTUBE_API_BACKEND`, so every repo runs `auto`, and `auto` already behaves as direct-keys-only when RapidAPI is missing. Don't build anything new on the mirror, and don't debug its failure as a bug. If a run dies with every direct key exhausted, the answer is more keys, not reviving RapidAPI.
+**RapidAPI is retired.** `RAPIDAPI_KEY` stopped working after 2026-08-10. That was planned, not a fault, and it needed no config change: nothing anywhere pins `YOUTUBE_API_BACKEND`, so every repo runs `auto`, and `auto` behaves as direct-keys-only when RapidAPI is missing. Don't build anything new on the mirror, and don't debug its absence as a bug. If a run dies with every direct key exhausted, the answer is more keys, not reviving RapidAPI.
 
 **Keep the slot numbering contiguous, starting at `_1`.** Several key loaders stop scanning after 5 empty slots in a row. If you retire a dead key from the middle of the pool, renumber the rest. A gap of 5 or more silently hides every key past it, and the only symptom is a smaller pool than you expected with no error raised.
 
+**A repo's own `.env` can freeze the pool.** If a repo keeps a local copy of the keys, it runs on whatever count that file was frozen at, which is how one repo ran 7 keys against a 39-key bank. The fix is to merge the shared bank by key value at load time, the way `youtube-deep-research-v1`, `youtube-lead-finder-v1`, and `youtube-email-outreach-v1` do. Copy that, don't hand-sync the file.
+
 **A dead key is normal, not an incident.** Keys go over daily quota or get their Google Cloud project suspended. Rotate past them. Match failures specifically: `quotaExceeded` and `keyInvalid` retire a key for the run, `403 forbidden` means suspended, a plain 429 rotates but keeps the key eligible, and anything else (like `commentsDisabled`) must propagate without burning a key.
-
-**A "run" is not a process (learned 2026-08-17).** Key handling used to keep its dead-key
-list in memory on the assumption of one client per run. The autonomous campaign runs
-hundreds of short processes a cycle, so that list was thrown away hundreds of times a
-day: the 08-16 cycle spent 2,091 requests re-learning which keys were spent, and 403 of
-its 411 per-minute rate limits landed on slots #1–#3 because every process opened
-rotation at index 0. Two rules follow, both now enforced in
-`youtube-lead-finder-v1/src/youtube/dead-keys.ts`:
-
-- **Key deaths belong on disk, not in a process.** They live in
-  `youtube-lead-finder-v1/logs/youtube-dead-keys.json`, keyed by a truncated SHA-256 so
-  no key value is ever written or logged. Quota deaths expire at the next **Pacific
-  midnight** (Google's actual reset); suspensions hold for `YT_BLOCKED_TTL_HOURS`
-  (48) because they need a human appeal. A 429 is never recorded. Remembered state that
-  marks the *whole* pool dead is discarded and re-probed, so a stale file can never kill
-  a run before it issues a single request.
-- **Never open rotation at index 0.** Start at a spread offset. Otherwise the whole
-  fleet's opening burst piles onto the front of the pool and the back never gets used.
 
 **Source of truth is the Notion "YouTube API Key Database."** New keys land there before they reach `.env`, so re-read it rather than assuming the pool is current. It needs no Notion connector, only the API token (see the Notion Access block). The `Select` column carries Working / Suspended, and a blank status means nobody has checked yet, not that the key is bad.
 
