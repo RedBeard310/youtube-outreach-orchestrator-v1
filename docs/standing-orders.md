@@ -21,12 +21,14 @@ everything up to "parked, ready to write" is automatic.
    0.45 qualified/seed lap 1. Standing authorization: always-on, OpenRouter
    spend included, no per-run approval. If this lane is idle, that is a
    PROBLEM to fix, not a normal state.
-2. **Comment-sweep — self-refilling seeds.** Mines commenters on
-   creator-education channels (best per-seed yield measured: 2.1/seed). Seeds
-   must never run out again: the seed-discovery engine searches YouTube for
-   creator-education keywords ("how to grow a YouTube channel", "how to write
-   a YouTube script", "how to get clients from YouTube", every variant) and
-   refills automatically. Unlimited keyword space — use it.
+2. **Comment-sweep — PAUSED by Casey 2026-08-20. Never run it again unless he
+   says so.** `comment-sweep-daily.timer` is stopped + disabled on purpose, and
+   its row was removed from the autopilot check-in's staleness watch so no
+   fix-agent resurrects it. A stale `comment-sweep-state.json` is EXPECTED, not
+   an incident. (Context: 0.54% qualified rate at 9.6¢/lead vs the feed's
+   1.4¢ — the keep-or-kill call landed on kill-for-now.) Seed discovery
+   (`discover-comment-seeds.ts`) ran as part of the same daily unit, so it is
+   paused with it.
 3. **Keyword/term search — opportunistic, not primary.** The fresh-term
    reserve drained 2026-08-12. The lane runs on whatever the autocomplete
    harvest + probe discovery refill; do NOT treat "no active terms" (finder
@@ -56,13 +58,18 @@ everything up to "parked, ready to write" is automatic.
 
 1. Is graph-sweep.service actively walking? (`systemctl status graph-sweep`;
    idle + seeds available = fix it.)
-2. Did comment-seed discovery run in the last day? (`logs/comment-seed-discovery.jsonl`)
+2. Comment-sweep must be OFF (`systemctl is-enabled comment-sweep-daily.timer`
+   → `disabled`). If anything re-enabled it, stop it and find what did.
 3. Is the backfill chain alive and past its gates? (`logs/backfill-2026-07/chain.log`)
 4. Radar fresh? (youtube-ingest.timer, every 6h; manual: `python3 scripts/youtube_ingest.py` in automator)
 5. Anything in this file contradicted by what Casey said today? → update it.
 
 ## Change log
 
+- 2026-08-20: **Comment-sweep PAUSED until further notice (Casey: "never run it
+  again unless I say").** In-flight run killed, `comment-sweep-daily.timer`
+  stopped + disabled, autopilot check-in watch row removed (it would have told
+  a fix-agent to re-enable the timer). Lane #2 above updated.
 - 2026-08-14: File created. Graph-sweep promoted to explicit #1 ("pound it"),
   refill cadence tightened 4h→1h, next lap queued; comment-sweep seed
   discovery engine commissioned; keyword lane demoted to opportunistic.
