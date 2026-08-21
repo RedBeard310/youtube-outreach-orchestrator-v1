@@ -41,6 +41,60 @@ function hoursSince(iso: string | null): number | null {
   return Number.isFinite(ms) ? Math.round((ms / 3_600_000) * 10) / 10 : null;
 }
 
+// HOW MUCH ROAD IS LEFT, not just whether the lane moved (2026-08-21).
+//
+// The two blocks above ask "is it alive" and "did it advance any seeds". Both were
+// green all through the 08-21 cycle for a lane that had collapsed 92%: the
+// recommended-videos feed walked 10,300 seeds on 08-20 and 257 on 08-21, because its
+// seed book finished and its refill only supplies the handful of channels the ICP
+// newly qualifies each hour. `seeds_advanced: 257 > 0` reads as `productive: true`,
+// so a lane running out of road is indistinguishable from a healthy one until the
+// day's lead count comes in and it is already too late to have acted.
+//
+// Every sweep state file carries `seeds` and `processed`, so remaining road is free
+// to compute, and `days_of_road` puts it in the unit that matters: at this lane's own
+// demonstrated walk rate, how long until it is a trickle. Under 1.0 means it drains
+// before the next debrief. Same rule for all four; podcast-crossover keeps `feeds`
+// with no processed list and reports nulls rather than a guess.
+type SeedBook = {
+  seeds_total: number | null;
+  seeds_walked: number | null;
+  seeds_remaining: number | null;
+  days_of_road: number | null;
+  book_drained: boolean | null;
+};
+function seedBook(stateFile: string, advancedThisCycle: number | null): SeedBook {
+  const blank: SeedBook = {
+    seeds_total: null, seeds_walked: null, seeds_remaining: null,
+    days_of_road: null, book_drained: null,
+  };
+  const p = join(FINDER_REPO, 'logs', stateFile);
+  if (!existsSync(p)) return blank;
+  let state: { seeds?: unknown; processed?: unknown };
+  try { state = JSON.parse(readFileSync(p, 'utf8')); } catch { return blank; }
+  if (!Array.isArray(state.seeds) || !Array.isArray(state.processed)) return blank;
+
+  // `processed` can hold ids the current book no longer lists (a refill that merged
+  // dropped rows, a re-lap). Count what is left in THIS book, not total - walked,
+  // which can go negative and read as a full book.
+  const done = new Set(state.processed as unknown[]);
+  const total = state.seeds.length;
+  const remaining = (state.seeds as Array<Record<string, unknown>>)
+    .filter((s) => !done.has(s?.videoId ?? s?.channelId ?? s?.id)).length;
+
+  return {
+    seeds_total: total,
+    seeds_walked: total - remaining,
+    seeds_remaining: remaining,
+    // Only meaningful against a lane that actually walked this cycle; a stopped lane
+    // has no rate, and dividing by zero would report infinite road on a dead engine.
+    days_of_road: advancedThisCycle && advancedThisCycle > 0
+      ? Math.round((remaining / advancedThisCycle) * 10) / 10
+      : null,
+    book_drained: remaining === 0,
+  };
+}
+
 // PRODUCTIVITY, not just liveness (2026-08-12). The block above only asks "is the
 // state file being touched", and a sweep that bails in its first second still
 // rewrites its state file — so all four daemons reported fresh, healthy and
@@ -230,13 +284,21 @@ function discoveryMethodsHealth(sinceMs: number, untilMs: number): Record<string
   const commentUpdated = sweepStateUpdatedAt('comment-sweep-state.json');
   const peerUpdated = sweepStateUpdatedAt('peer-sweep-state.json');
   const podcastUpdated = sweepStateUpdatedAt('podcast-crossover-state.json');
+  // Bind each lane's work to its own book so `days_of_road` is measured at the rate
+  // that lane actually walked this cycle, not a shared average.
+  const graphWork = work('recommended_videos_feed');
+  const videoGraphWork = work('video_graph_sweep');
+  const commentWork = work('comment_sweep');
+  const peerWork = work('peer_sweep');
+  const podcastWork = work('podcast_crossover');
   return {
     recommended_videos_feed: {
       service_active: serviceActive('graph-sweep.service'),
       refill_timer_active: serviceActive('graph-sweep-refill.timer'),
       state_updated_at: graphUpdated,
       hours_since_update: hoursSince(graphUpdated),
-      ...work('recommended_videos_feed'),
+      ...graphWork,
+      ...seedBook('graph-sweep-state.json', graphWork.seeds_advanced),
     },
     // Added 2026-08-18, the cycle after this lane shipped. It found 3,279 channels and 206
     // leads on its first full day — more than any other lane — with no health entry here,
@@ -245,13 +307,15 @@ function discoveryMethodsHealth(sinceMs: number, untilMs: number): Record<string
       service_active: serviceActive('video-graph-sweep.service'),
       state_updated_at: videoGraphUpdated,
       hours_since_update: hoursSince(videoGraphUpdated),
-      ...work('video_graph_sweep'),
+      ...videoGraphWork,
+      ...seedBook('video-graph-sweep-state.json', videoGraphWork.seeds_advanced),
     },
     comment_sweep: {
       daily_timer_active: serviceActive('comment-sweep-daily.timer'),
       state_updated_at: commentUpdated,
       hours_since_update: hoursSince(commentUpdated),
-      ...work('comment_sweep'),
+      ...commentWork,
+      ...seedBook('comment-sweep-state.json', commentWork.seeds_advanced),
       // Runs once/day by design — flag only past ~30h (a missed day plus slack), not
       // on every reading the way the continuous daemons below are judged.
       stale: hoursSince(commentUpdated) !== null && (hoursSince(commentUpdated) as number) > 30,
@@ -261,13 +325,15 @@ function discoveryMethodsHealth(sinceMs: number, untilMs: number): Record<string
       refill_timer_active: serviceActive('peer-sweep-refill.timer'),
       state_updated_at: peerUpdated,
       hours_since_update: hoursSince(peerUpdated),
-      ...work('peer_sweep'),
+      ...peerWork,
+      ...seedBook('peer-sweep-state.json', peerWork.seeds_advanced),
     },
     podcast_crossover: {
       daily_timer_active: serviceActive('podcast-crossover-daily.timer'),
       state_updated_at: podcastUpdated,
       hours_since_update: hoursSince(podcastUpdated),
-      ...work('podcast_crossover'),
+      ...podcastWork,
+      ...seedBook('podcast-crossover-state.json', podcastWork.seeds_advanced),
       stale: hoursSince(podcastUpdated) !== null && (hoursSince(podcastUpdated) as number) > 30,
     },
   };
