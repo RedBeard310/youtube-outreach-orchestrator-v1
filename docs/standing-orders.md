@@ -66,6 +66,20 @@ everything up to "parked, ready to write" is automatic.
 
 ## Change log
 
+- 2026-08-21: **Measurement note on lane #1, ranking left alone pending Casey.**
+  The recommended-videos feed is not idle and not broken, it is out of road:
+  `10,555 / 10,555` seeds walked, and its hourly refill correctly supplies only
+  the 7-10 channels an hour the ICP newly qualifies, so it restarted 25 times in
+  the cycle to walk 257 seeds and fell from 2,716 channels to 228 in one day. Its
+  own summary reads lap 5 at 0.019 qualified/seed against 0.033 on lap 4 and 0.45
+  on lap 1, so re-walking that book is no longer worth the walk. It still has the
+  best conversion rate (7.5%) and the cheapest lead (1.9¢) in the pipeline, just
+  at 17 leads a day. **Do NOT treat this lane's low volume as a bug to fix** — the
+  plumbing is working. Whether it stays ranked #1 is Casey's call; the ranking
+  above is unchanged. Same day: the peer lane is also fully walked
+  (`10,444 / 10,444`), and the video-graph seed floor was widened from 100k to
+  20k views (top-40 per channel) so the biggest lane has ~42,000 fresh seeds
+  instead of 417. Full detail: `brain/lead-gen/runs/lead-run-2026-08-21.html`.
 - 2026-08-20: **Comment-sweep PAUSED until further notice (Casey: "never run it
   again unless I say").** In-flight run killed, `comment-sweep-daily.timer`
   stopped + disabled, autopilot check-in watch row removed (it would have told
