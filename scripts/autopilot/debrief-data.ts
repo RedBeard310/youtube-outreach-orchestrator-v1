@@ -95,6 +95,63 @@ function seedBook(stateFile: string, advancedThisCycle: number | null): SeedBook
   };
 }
 
+// IS IT WALKING SLOWER THAN IT COULD? (2026-08-22)
+//
+// `days_of_road` above answers "does this lane have material left". It cannot answer the
+// opposite question, which is the one the 08-22 cycle turned on: the video-graph sweep was
+// handed 42,096 fresh seeds by the 08-21 seed-floor fix, had 4.5 days of road, reported
+// `productive: true` and `book_drained: false` — and still walked 8,303 seeds against
+// 11,415 the day before. Nothing in the snapshot said so. Every field was green because
+// every field was measuring seed SUPPLY, and supply had stopped being the constraint.
+//
+// A lane with road left that walks materially less than it did last cycle is throughput-
+// bound: the limit has moved off seed supply and onto walk rate, which is a completely
+// different fix (concurrency, pacing, fetch cost) from "give it more seeds". The previous
+// cycle's own snapshot is already on disk, written by this same script, so the comparison
+// costs one file read and no network.
+//
+// Deliberately compares raw seeds-per-cycle rather than a per-hour rate: both cycles are
+// the same 24h window by construction, and a derived rate would invent precision the
+// session logs do not carry.
+const WALK_RATE_DROP_PCT = -20; // below this, with road left, the lane is not supply-bound
+type WalkRate = {
+  seeds_advanced_prev: number | null;
+  walk_rate_change_pct: number | null;
+  throughput_bound: boolean | null;
+};
+export function walkRateTrend(
+  advancedThisCycle: number | null,
+  advancedPrevCycle: number | null,
+  book: Pick<SeedBook, 'book_drained' | 'days_of_road'>,
+): WalkRate {
+  const blank: WalkRate = { seeds_advanced_prev: advancedPrevCycle, walk_rate_change_pct: null, throughput_bound: null };
+  if (advancedThisCycle === null || advancedPrevCycle === null || advancedPrevCycle <= 0) return blank;
+  const pct = Math.round(((advancedThisCycle - advancedPrevCycle) / advancedPrevCycle) * 1000) / 10;
+  // A drained book explains its own slowdown — that is `book_drained`'s job, and flagging it
+  // here too would double-report the 08-21 finding as a new one every cycle. Same for a lane
+  // with under a day of road: it is about to be supply-bound whatever its rate did.
+  const hasRoad = book.book_drained === false && (book.days_of_road ?? 0) >= 1;
+  return { seeds_advanced_prev: advancedPrevCycle, walk_rate_change_pct: pct, throughput_bound: hasRoad && pct <= WALK_RATE_DROP_PCT };
+}
+
+// Last cycle's `seeds_advanced` per lane, read out of the debrief snapshot this script
+// wrote 24h ago. Returns an empty map when that file is missing or unreadable (first run
+// after a deploy, a skipped cycle) — an absent baseline reports nulls, never a false alarm.
+export function priorSeedsAdvanced(priorDate: string, logsDir: string = LOGS): Record<string, number | null> {
+  const p = join(logsDir, `autopilot-debrief-${priorDate}.json`);
+  if (!existsSync(p)) return {};
+  try {
+    const prior = JSON.parse(readFileSync(p, 'utf8')) as {
+      discovery_methods_health?: Record<string, { seeds_advanced?: number | null }>;
+    };
+    const out: Record<string, number | null> = {};
+    for (const [lane, h] of Object.entries(prior.discovery_methods_health ?? {})) {
+      out[lane] = typeof h?.seeds_advanced === 'number' ? h.seeds_advanced : null;
+    }
+    return out;
+  } catch { return {}; }
+}
+
 // PRODUCTIVITY, not just liveness (2026-08-12). The block above only asks "is the
 // state file being touched", and a sweep that bails in its first second still
 // rewrites its state file — so all four daemons reported fresh, healthy and
@@ -291,6 +348,16 @@ function discoveryMethodsHealth(sinceMs: number, untilMs: number): Record<string
   const commentWork = work('comment_sweep');
   const peerWork = work('peer_sweep');
   const podcastWork = work('podcast_crossover');
+  // The prior cycle's debrief is dated by ITS cycle-start, which is this cycle's start
+  // instant (both are PT midnight), so the lookup needs no separate date arithmetic.
+  const prior = priorSeedsAdvanced(pacificDate(new Date(sinceMs)));
+  const trend = (lane: string, w: SweepWork, b: SeedBook): WalkRate =>
+    walkRateTrend(w.seeds_advanced, prior[lane] ?? null, b);
+  const graphBook = seedBook('graph-sweep-state.json', graphWork.seeds_advanced);
+  const videoGraphBook = seedBook('video-graph-sweep-state.json', videoGraphWork.seeds_advanced);
+  const commentBook = seedBook('comment-sweep-state.json', commentWork.seeds_advanced);
+  const peerBook = seedBook('peer-sweep-state.json', peerWork.seeds_advanced);
+  const podcastBook = seedBook('podcast-crossover-state.json', podcastWork.seeds_advanced);
   return {
     recommended_videos_feed: {
       service_active: serviceActive('graph-sweep.service'),
@@ -298,7 +365,8 @@ function discoveryMethodsHealth(sinceMs: number, untilMs: number): Record<string
       state_updated_at: graphUpdated,
       hours_since_update: hoursSince(graphUpdated),
       ...graphWork,
-      ...seedBook('graph-sweep-state.json', graphWork.seeds_advanced),
+      ...graphBook,
+      ...trend('recommended_videos_feed', graphWork, graphBook),
     },
     // Added 2026-08-18, the cycle after this lane shipped. It found 3,279 channels and 206
     // leads on its first full day — more than any other lane — with no health entry here,
@@ -308,14 +376,16 @@ function discoveryMethodsHealth(sinceMs: number, untilMs: number): Record<string
       state_updated_at: videoGraphUpdated,
       hours_since_update: hoursSince(videoGraphUpdated),
       ...videoGraphWork,
-      ...seedBook('video-graph-sweep-state.json', videoGraphWork.seeds_advanced),
+      ...videoGraphBook,
+      ...trend('video_graph_sweep', videoGraphWork, videoGraphBook),
     },
     comment_sweep: {
       daily_timer_active: serviceActive('comment-sweep-daily.timer'),
       state_updated_at: commentUpdated,
       hours_since_update: hoursSince(commentUpdated),
       ...commentWork,
-      ...seedBook('comment-sweep-state.json', commentWork.seeds_advanced),
+      ...commentBook,
+      ...trend('comment_sweep', commentWork, commentBook),
       // Runs once/day by design — flag only past ~30h (a missed day plus slack), not
       // on every reading the way the continuous daemons below are judged.
       stale: hoursSince(commentUpdated) !== null && (hoursSince(commentUpdated) as number) > 30,
@@ -326,14 +396,16 @@ function discoveryMethodsHealth(sinceMs: number, untilMs: number): Record<string
       state_updated_at: peerUpdated,
       hours_since_update: hoursSince(peerUpdated),
       ...peerWork,
-      ...seedBook('peer-sweep-state.json', peerWork.seeds_advanced),
+      ...peerBook,
+      ...trend('peer_sweep', peerWork, peerBook),
     },
     podcast_crossover: {
       daily_timer_active: serviceActive('podcast-crossover-daily.timer'),
       state_updated_at: podcastUpdated,
       hours_since_update: hoursSince(podcastUpdated),
       ...podcastWork,
-      ...seedBook('podcast-crossover-state.json', podcastWork.seeds_advanced),
+      ...podcastBook,
+      ...trend('podcast_crossover', podcastWork, podcastBook),
       stale: hoursSince(podcastUpdated) !== null && (hoursSince(podcastUpdated) as number) > 30,
     },
   };

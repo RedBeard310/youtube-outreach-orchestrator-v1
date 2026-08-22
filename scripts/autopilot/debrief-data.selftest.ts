@@ -1,4 +1,4 @@
-import { isVerifiedOrBeyond, sessionSeedsAdvanced, sessionStartMs } from './debrief-data.ts';
+import { isVerifiedOrBeyond, priorSeedsAdvanced, sessionSeedsAdvanced, sessionStartMs, walkRateTrend } from './debrief-data.ts';
 let fail = 0;
 const ok = (name: string, got: unknown, want: unknown) => {
   const pass = JSON.stringify(got) === JSON.stringify(want);
@@ -36,6 +36,39 @@ ok('ready_no_data is a manual label, not evidence', isVerifiedOrBeyond('ready_no
 ok('pending does not', isVerifiedOrBeyond('pending'), false);
 ok('null does not', isVerifiedOrBeyond(null), false);
 ok('undefined does not', isVerifiedOrBeyond(undefined), false);
+
+// walkRateTrend — a lane with road left that slowed down is throughput-bound, not dry
+const ROAD = { book_drained: false, days_of_road: 4.5 };
+const DRY = { book_drained: true, days_of_road: 0 };
+ok('the 08-22 video-graph shape: road left, walked 27% less',
+  walkRateTrend(8303, 11455, ROAD),
+  { seeds_advanced_prev: 11455, walk_rate_change_pct: -27.5, throughput_bound: true });
+ok('a drained book explains its own slowdown — book_drained owns that',
+  walkRateTrend(223, 10300, DRY),
+  { seeds_advanced_prev: 10300, walk_rate_change_pct: -97.8, throughput_bound: false });
+ok('under a day of road is about to be supply-bound whatever the rate did',
+  walkRateTrend(300, 11455, { book_drained: false, days_of_road: 0.4 }),
+  { seeds_advanced_prev: 11455, walk_rate_change_pct: -97.4, throughput_bound: false });
+ok('a small dip is not a regression',
+  walkRateTrend(10000, 11455, ROAD),
+  { seeds_advanced_prev: 11455, walk_rate_change_pct: -12.7, throughput_bound: false });
+ok('speeding up is never throughput-bound',
+  walkRateTrend(14000, 11455, ROAD),
+  { seeds_advanced_prev: 11455, walk_rate_change_pct: 22.2, throughput_bound: false });
+ok('no baseline (first run after deploy) reports nulls, not an alarm',
+  walkRateTrend(8303, null, ROAD),
+  { seeds_advanced_prev: null, walk_rate_change_pct: null, throughput_bound: null });
+ok('a lane that was stopped last cycle has no rate to compare',
+  walkRateTrend(8303, 0, ROAD),
+  { seeds_advanced_prev: 0, walk_rate_change_pct: null, throughput_bound: null });
+ok('unknown seeds this cycle stays unknown',
+  walkRateTrend(null, 11455, ROAD),
+  { seeds_advanced_prev: 11455, walk_rate_change_pct: null, throughput_bound: null });
+
+// priorSeedsAdvanced — a missing baseline file must be silent, not fatal
+ok('missing prior snapshot -> empty map', priorSeedsAdvanced('1999-01-01'), {});
+ok('real prior snapshot carries the lanes',
+  priorSeedsAdvanced('2026-08-21')['video_graph_sweep'], 11415);
 
 console.log(fail === 0 ? '\nALL PASS' : `\n${fail} FAILED`);
 process.exit(fail === 0 ? 0 : 1);
