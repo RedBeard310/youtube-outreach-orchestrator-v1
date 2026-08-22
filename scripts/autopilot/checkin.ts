@@ -470,17 +470,31 @@ async function main(): Promise<void> {
       const baseline = prior.reduce((s, p) => s + p.rate, 0) / prior.length;
       if (baseline > 0 && rate < baseline * PITCHABLE_COLLAPSE_RATIO && !scoringFailedAlarm) {
         const degradation = termSupplyDegradationActive();
-        if (degradation) {
+        // termSupplyDegradationActive() only scrapes the [tier2]/[anti-starvation] log LINE out
+        // of the 2 most-recent session-log files. That line is emitted once, when the term pool
+        // first falls back — not every pass while it stays fallen back — so a session rotation
+        // (~every 2h) can push it out of the 2-file window while the pool is still in the exact
+        // same degraded state. 2026-08-22: this desynced the two term-supply checks in this same
+        // script run — section 5's `starving` (backed by recentFinderStats, structured pass data,
+        // not log text) correctly fired term_starvation with "Term-supply wall (not a code bug)"
+        // at the same timestamp this check escalated pitchable_rate_collapse to the fix-agent for
+        // the identical condition. Fall back to `starving` (already computed above, already
+        // excludes the scoring_failed cause) so a still-degraded pool can't lose its explanation
+        // just because the log line scrolled out of a 2-file window.
+        const stillStarving = starving && !scoringFailedAlarm;
+        if (degradation || stillStarving) {
           // Already explained — see termSupplyDegradationActive() above. Not fix-agent-
           // fixable: the remedy is the term pool refilling (discovery/keyword-harvest),
           // which is already automatic. Observe it instead of paging, same pattern as
           // section 5.
           const reason = degradation === 'tier2_fallback'
             ? 'tier-2 term-pool fallback (search_terms.ts, commit 37ceb96) is active in the recent session logs, which is documented to convert around ~2%'
-            : 'the anti-starvation floor found NO never-run and NO cooled proven terms at all in the recent session logs — the pass is running entirely on freshly harvested/discovery-invented probe terms, which convert lower than the proven pool until evaluate-probes promotes the winners';
+            : degradation === 'anti_starvation_exhausted'
+            ? 'the anti-starvation floor found NO never-run and NO cooled proven terms at all in the recent session logs — the pass is running entirely on freshly harvested/discovery-invented probe terms, which convert lower than the proven pool until evaluate-probes promotes the winners'
+            : `the same check-in run's term_starvation heartbeat also fired (last ${fstats.total} passes → ${fstats.pitchable} fresh pitchable) — the explaining tier2/anti-starvation log line has likely just aged out of the 2 most-recent session-log files across a session rotation, but the pool is still in the same degraded state`;
           const tdetail = `score>=6 rate is ${(rate * 100).toFixed(1)}% over the last ${pitchableYieldWindow.newLeads} new leads, vs a ${(baseline * 100).toFixed(1)}% trailing baseline — but ${reason}. Expected, not a regression; observing only.`;
-          appendFileSync(OBSERVATIONS, JSON.stringify({ ts: new Date().toISOString(), kind: 'pitchable_rate_term_supply_degraded', detail: tdetail, degradation, parked }) + '\n');
-          console.log(`[checkin ${day}] OBSERVATION pitchable_rate_term_supply_degraded (${degradation}) — ${tdetail}`);
+          appendFileSync(OBSERVATIONS, JSON.stringify({ ts: new Date().toISOString(), kind: 'pitchable_rate_term_supply_degraded', detail: tdetail, degradation: degradation ?? 'starving_fallback', parked }) + '\n');
+          console.log(`[checkin ${day}] OBSERVATION pitchable_rate_term_supply_degraded (${degradation ?? 'starving_fallback'}) — ${tdetail}`);
         } else {
           anomalies.push({
             kind: 'pitchable_rate_collapse',
