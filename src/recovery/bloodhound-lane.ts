@@ -28,6 +28,8 @@ export interface LaneState {
   lastVerifyAt?: string;
   /** PID of a detached collect child, if one might still be running. */
   collectPid?: number;
+  /** When the collect child spawned, so the pid guard expires on PID reuse. */
+  collectStartedAt?: string;
 }
 
 export const LANE_STATE_PATH = join('logs', 'bloodhound-lane-state.json');
@@ -96,6 +98,7 @@ export async function selectVerifiableIds(limit: number): Promise<string[]> {
         AND cp.kind IN ('business_email', 'personal_email', 'youtube_email')
         AND COALESCE(cp.verified, false) = false
         AND COALESCE(lc.do_not_contact, false) = false
+      ORDER BY lc.first_discovered_at ASC NULLS LAST
       LIMIT $1`,
     [limit],
   );
@@ -112,6 +115,11 @@ export interface LaneOpts {
   log: (line: Record<string, unknown>) => void;
 }
 
+function numEnv(name: string, fallback: number): number {
+  const v = Number(process.env[name]);
+  return Number.isFinite(v) && v > 0 ? v : fallback;
+}
+
 export function laneOptsFromEnv(
   emailRepoPath: string,
   dryRun: boolean,
@@ -120,10 +128,10 @@ export function laneOptsFromEnv(
   return {
     dryRun,
     emailRepoPath,
-    collectIntervalHours: Number(process.env.BLOODHOUND_COLLECT_INTERVAL_HOURS ?? 6),
-    verifyIntervalHours: Number(process.env.BLOODHOUND_VERIFY_INTERVAL_HOURS ?? 3),
-    collectBatch: Number(process.env.BLOODHOUND_COLLECT_BATCH ?? 40),
-    verifyBatch: Number(process.env.BLOODHOUND_VERIFY_BATCH ?? 200),
+    collectIntervalHours: numEnv('BLOODHOUND_COLLECT_INTERVAL_HOURS', 6),
+    verifyIntervalHours: numEnv('BLOODHOUND_VERIFY_INTERVAL_HOURS', 3),
+    collectBatch: numEnv('BLOODHOUND_COLLECT_BATCH', 40),
+    verifyBatch: numEnv('BLOODHOUND_VERIFY_BATCH', 200),
     log,
   };
 }
@@ -144,6 +152,8 @@ export async function runBloodhoundLane(opts: LaneOpts): Promise<void> {
       const ids = await selectVerifiableIds(opts.verifyBatch);
       if (ids.length === 0) {
         opts.log({ event: 'bloodhound_verify', skipped: 'no_pending_email_points' });
+        state.lastVerifyAt = new Date().toISOString();
+        if (!opts.dryRun) saveState(state);
       } else if (opts.dryRun) {
         opts.log({ event: 'bloodhound_verify', dry_run: true, leads: ids.length });
       } else {
@@ -151,17 +161,24 @@ export async function runBloodhoundLane(opts: LaneOpts): Promise<void> {
           '--lead-ids', ids.join(','), '--verify', '--verify-only',
         ]);
         opts.log({ event: 'bloodhound_verify', leads: ids.length, exit: r.exit_code });
+        // Stamp the cadence only on success; a failed child should be retried
+        // next pass, not deferred a full interval.
+        if (r.exit_code === 0) {
+          state.lastVerifyAt = new Date().toISOString();
+          saveState(state);
+        }
       }
-      state.lastVerifyAt = new Date().toISOString();
-      if (!opts.dryRun) saveState(state);
     } catch (e) {
       opts.log({ event: 'bloodhound_verify', error: e instanceof Error ? e.message : String(e) });
     }
   }
 
   // --- collect pass (free; detached so the session keeps moving) ---
+  // A collect batch of 40 leads finishes well under 2h; past that age a
+  // "living" PID is OS reuse, not our child, and the guard must expire.
+  const collectAgeMs = state.collectStartedAt ? now - Date.parse(state.collectStartedAt) : Infinity;
   if (isDue(state, 'lastCollectAt', now, opts.collectIntervalHours)) {
-    if (pidAlive(state.collectPid)) {
+    if (pidAlive(state.collectPid) && collectAgeMs < 2 * 3_600_000) {
       opts.log({ event: 'bloodhound_collect', skipped: 'previous_still_running', pid: state.collectPid });
       return;
     }
@@ -181,9 +198,16 @@ export async function runBloodhoundLane(opts: LaneOpts): Promise<void> {
         'npm', ['run', 'bloodhound', '--', '--lead-ids', ids.join(',')],
         { cwd: opts.emailRepoPath, stdio: 'ignore', detached: true },
       );
+      // Without this handler a spawn failure (ENOENT etc.) throws as an
+      // uncaught exception AFTER spawn returns, crashing the campaign's
+      // finish block. The collect pass must never take the session down.
+      child.on('error', (err) => {
+        opts.log({ event: 'bloodhound_collect', spawn_error: err.message });
+      });
       child.unref();
       state.collectPid = child.pid;
       state.lastCollectAt = new Date().toISOString();
+      state.collectStartedAt = state.lastCollectAt;
       saveState(state);
       opts.log({ event: 'bloodhound_collect', leads: ids.length, pid: child.pid });
     } catch (e) {
