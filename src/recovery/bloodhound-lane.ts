@@ -87,10 +87,12 @@ export async function selectUntouchedIds(limit: number): Promise<string[]> {
   return rows.map((r) => r.id);
 }
 
-/** needs_contact leads that have at least one UNVERIFIED email contact point. */
+/** needs_contact leads that have at least one UNVERIFIED email contact point.
+ *  GROUP BY stands in for DISTINCT because Postgres requires ORDER BY
+ *  expressions to appear in the select list under SELECT DISTINCT. */
 export async function selectVerifiableIds(limit: number): Promise<string[]> {
   const rows = await query<{ id: string }>(
-    `SELECT DISTINCT lc.id
+    `SELECT lc.id
        FROM leads.lead_candidates lc
        JOIN leads.contact_points cp ON cp.lead_id = lc.id
       WHERE lc.review_status = 'needs_contact'
@@ -98,6 +100,7 @@ export async function selectVerifiableIds(limit: number): Promise<string[]> {
         AND cp.kind IN ('business_email', 'personal_email', 'youtube_email')
         AND COALESCE(cp.verified, false) = false
         AND COALESCE(lc.do_not_contact, false) = false
+      GROUP BY lc.id, lc.first_discovered_at
       ORDER BY lc.first_discovered_at ASC NULLS LAST
       LIMIT $1`,
     [limit],
@@ -130,8 +133,9 @@ export function laneOptsFromEnv(
     emailRepoPath,
     collectIntervalHours: numEnv('BLOODHOUND_COLLECT_INTERVAL_HOURS', 6),
     verifyIntervalHours: numEnv('BLOODHOUND_VERIFY_INTERVAL_HOURS', 3),
-    collectBatch: numEnv('BLOODHOUND_COLLECT_BATCH', 40),
-    verifyBatch: numEnv('BLOODHOUND_VERIFY_BATCH', 200),
+    // Integer batches: a fractional LIMIT is a Postgres error.
+    collectBatch: Math.floor(numEnv('BLOODHOUND_COLLECT_BATCH', 40)),
+    verifyBatch: Math.floor(numEnv('BLOODHOUND_VERIFY_BATCH', 200)),
     log,
   };
 }
@@ -216,11 +220,19 @@ export async function runBloodhoundLane(opts: LaneOpts): Promise<void> {
   }
 }
 
-/** Awaited bloodhound run (used by the verify pass). */
-function runBloodhound(cwd: string, extraArgs: string[]): Promise<{ exit_code: number | null }> {
+/** Awaited bloodhound run (used by the verify pass). Watchdog-killed after
+ * VERIFY_TIMEOUT_MS so a hung CLI can never block the campaign finish block
+ * indefinitely; a kill reports a non-zero exit, which skips the cadence
+ * stamp and retries next session. */
+function runBloodhound(
+  cwd: string,
+  extraArgs: string[],
+  timeoutMs = 20 * 60_000,
+): Promise<{ exit_code: number | null }> {
   return new Promise((resolvePromise) => {
     const child = spawn('npm', ['run', 'bloodhound', '--', ...extraArgs], { cwd, stdio: 'inherit' });
-    child.on('exit', (code) => resolvePromise({ exit_code: code }));
-    child.on('error', () => resolvePromise({ exit_code: null }));
+    const watchdog = setTimeout(() => { child.kill('SIGTERM'); }, timeoutMs);
+    child.on('exit', (code) => { clearTimeout(watchdog); resolvePromise({ exit_code: code }); });
+    child.on('error', () => { clearTimeout(watchdog); resolvePromise({ exit_code: null }); });
   });
 }
