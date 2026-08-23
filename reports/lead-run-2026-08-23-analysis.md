@@ -121,7 +121,7 @@ Peer-network agreeing exactly is the tell: short sessions, no drift.
 
 **Consequences.** `days_of_road` divides by this number, so the top lane was
 reported with 2.3 days of road against a true 3.9. `walk_rate_change_pct` divides
-by it twice, and that is what produced yesterday's headline — a 27% throughput
+by it twice, and that is what produced yesterday's headline: a 27% throughput
 regression on the lane that makes 80% of our leads. Today's honest reading is
 that the lane sped up. **Yesterday's underlying ceiling argument still stands on
 its own evidence** (one process, one candidate at a time, 5 minutes per 20 seeds);
@@ -137,8 +137,8 @@ fix-agent over a `pitchable_rate_collapse` alert. False alarm: the keyword lane
 was in its documented degraded state, and the check-in detects that by grepping
 one log line inside a two-file window that the line had scrolled out of. The
 agent taught the check-in to also trust its own structured starvation signal, and
-committed it (`283a4e4`, orchestrator). It held — no further escalation in the
-remaining 21 hours. The agent bills the Max subscription, not the API.
+committed it (`283a4e4`, orchestrator). It held, with no further escalation in
+the remaining 21 hours. The agent bills the Max subscription, not the API.
 
 **Not faults:** 17 term-starvation heartbeats and 0 hard stops in the keyword
 lane (documented state since 08-14, down from 21); 14 sessions ending on time
@@ -150,7 +150,7 @@ which is off by Casey's order and stays `disabled`.
 ## 7. Shipped
 
 **`autopilot-improve: measure a cycle's seed walk from the seed book, not from
-whole overlapping session logs`** — `21b3f84`, orchestrator,
+whole overlapping session logs`**. Commit `21b3f84`, orchestrator,
 `scripts/autopilot/debrief-data.ts`.
 
 The exact number was already on disk and unused. Each lane's state file carries
@@ -192,7 +192,7 @@ one the timer generated at 07:20Z. Nothing in any `.env`.
 **The keyword lane's term treadmill tripled overnight.** Vein discovery ran 337
 times and wrote 1,578 new terms (1,525 of them probes). Those terms ran 2,090
 times, returned 57,444 channel results, qualified 73 channels, and **all 1,578
-are already paused** — invented, run once, auto-retired as saturated. Yesterday:
+are already paused**. Invented, run once, auto-retired as saturated. Yesterday:
 101 calls, 246 terms.
 
 Left alone for the same reason as yesterday. The lane returned 47 good leads at
@@ -228,8 +228,8 @@ output is this good.
 4. **Build the `needs_contact` recovery engine.** 4,241 creators found, scored,
    unreachable, up 175 today. Operation Bloodhound built 08-18; audit in brain.
 5. **Drop the video-graph seed floor to 5,000 views.** Measured 08-22 at 26%
-   better per seed. Adds ~46,000 seeds. Only after item 1 — road is not the short
-   thing.
+   better per seed. Adds ~46,000 seeds. Only after item 1, since road is not the
+   short thing.
 6. **Give the keyword harvest new seed phrases.** Carried since 08-16, unchanged
    since 07-13. Converts at 5.0% and now spends more inventing terms than running
    them.
