@@ -56,17 +56,16 @@ function hoursSince(iso: string | null): number | null {
 // demonstrated walk rate, how long until it is a trickle. Under 1.0 means it drains
 // before the next debrief. Same rule for all four; podcast-crossover keeps `feeds`
 // with no processed list and reports nulls rather than a guess.
-type SeedBook = {
+type SeedCounts = {
   seeds_total: number | null;
   seeds_walked: number | null;
   seeds_remaining: number | null;
-  days_of_road: number | null;
   book_drained: boolean | null;
 };
-function seedBook(stateFile: string, advancedThisCycle: number | null): SeedBook {
-  const blank: SeedBook = {
-    seeds_total: null, seeds_walked: null, seeds_remaining: null,
-    days_of_road: null, book_drained: null,
+type SeedBook = SeedCounts & { days_of_road: number | null };
+function seedCounts(stateFile: string): SeedCounts {
+  const blank: SeedCounts = {
+    seeds_total: null, seeds_walked: null, seeds_remaining: null, book_drained: null,
   };
   const p = join(FINDER_REPO, 'logs', stateFile);
   if (!existsSync(p)) return blank;
@@ -86,13 +85,52 @@ function seedBook(stateFile: string, advancedThisCycle: number | null): SeedBook
     seeds_total: total,
     seeds_walked: total - remaining,
     seeds_remaining: remaining,
+    book_drained: remaining === 0,
+  };
+}
+function seedBook(counts: SeedCounts, advancedThisCycle: number | null): SeedBook {
+  return {
+    ...counts,
     // Only meaningful against a lane that actually walked this cycle; a stopped lane
     // has no rate, and dividing by zero would report infinite road on a dead engine.
     days_of_road: advancedThisCycle && advancedThisCycle > 0
-      ? Math.round((remaining / advancedThisCycle) * 10) / 10
+      ? Math.round((counts.seeds_remaining! / advancedThisCycle) * 10) / 10
       : null,
-    book_drained: remaining === 0,
   };
+}
+
+// HOW MANY SEEDS DID THIS CYCLE ACTUALLY WALK? (2026-08-23)
+//
+// `sweepWorkInCycle` below sums each session log that OVERLAPS the cycle window, but it
+// sums the session's WHOLE advance, not the part inside the window. For lanes whose
+// sessions are short and land inside one cycle that is exact — peer-sweep reported 264
+// against a true 264 on 08-23. For a daemon that runs one 22-hour session it is not: the
+// video-graph sweep reported 12,647 seeds on 08-23 when it walked 7,523, because a session
+// that started at 09:30 the PREVIOUS day and ended 38 minutes into this one contributed its
+// entire 5,204-seed history to this cycle's total.
+//
+// That inflation is not cosmetic. It fed `days_of_road` (2.3 reported against a true 3.9)
+// and it fed `walk_rate_change_pct`, which is what raised the 08-22 debrief's headline
+// finding of a 27% throughput regression on the lane that produces 80% of our leads.
+//
+// The exact number was already on disk and unused: `seeds_walked` is a snapshot of the
+// lane's own state file, this script has written it into the debrief JSON since 08-22, and
+// the difference between two consecutive snapshots is precisely the seeds walked between
+// them. Prefer that. Fall back to the log sum when the delta cannot be trusted — a missing
+// baseline (first run after a deploy, a skipped cycle) or a NEGATIVE delta, which is how a
+// re-lap or a refill that drops merged rows shows up. Never guess between the two silently:
+// `seeds_advanced_source` names which one produced the number.
+export type AdvanceSource = 'book_delta' | 'session_logs' | 'none';
+export function reconcileAdvanced(
+  loggedAdvance: number | null,
+  walkedNow: number | null,
+  walkedPrevCycle: number | null,
+): { seeds_advanced: number | null; seeds_advanced_source: AdvanceSource } {
+  if (walkedNow !== null && walkedPrevCycle !== null && walkedNow >= walkedPrevCycle) {
+    return { seeds_advanced: walkedNow - walkedPrevCycle, seeds_advanced_source: 'book_delta' };
+  }
+  if (loggedAdvance === null) return { seeds_advanced: null, seeds_advanced_source: 'none' };
+  return { seeds_advanced: loggedAdvance, seeds_advanced_source: 'session_logs' };
 }
 
 // IS IT WALKING SLOWER THAN IT COULD? (2026-08-22)
@@ -123,6 +161,13 @@ export function walkRateTrend(
   advancedThisCycle: number | null,
   advancedPrevCycle: number | null,
   book: Pick<SeedBook, 'book_drained' | 'days_of_road'>,
+  // Both sides must have been measured the same way. `reconcileAdvanced` above changed how
+  // this number is derived, so on the first cycle after that change the baseline is still a
+  // session-log sum and the corrected current value would read as a fabricated drop against
+  // it. Report the percentage, which is honest arithmetic, but never escalate to
+  // `throughput_bound` off a mixed comparison. Self-heals: from the next cycle both sides
+  // are `book_delta` and the flag arms again.
+  comparableBaseline: boolean = true,
 ): WalkRate {
   const blank: WalkRate = { seeds_advanced_prev: advancedPrevCycle, walk_rate_change_pct: null, throughput_bound: null };
   if (advancedThisCycle === null || advancedPrevCycle === null || advancedPrevCycle <= 0) return blank;
@@ -131,25 +176,52 @@ export function walkRateTrend(
   // here too would double-report the 08-21 finding as a new one every cycle. Same for a lane
   // with under a day of road: it is about to be supply-bound whatever its rate did.
   const hasRoad = book.book_drained === false && (book.days_of_road ?? 0) >= 1;
-  return { seeds_advanced_prev: advancedPrevCycle, walk_rate_change_pct: pct, throughput_bound: hasRoad && pct <= WALK_RATE_DROP_PCT };
+  return {
+    seeds_advanced_prev: advancedPrevCycle,
+    walk_rate_change_pct: pct,
+    throughput_bound: comparableBaseline ? hasRoad && pct <= WALK_RATE_DROP_PCT : null,
+  };
 }
 
 // Last cycle's `seeds_advanced` per lane, read out of the debrief snapshot this script
 // wrote 24h ago. Returns an empty map when that file is missing or unreadable (first run
 // after a deploy, a skipped cycle) — an absent baseline reports nulls, never a false alarm.
-export function priorSeedsAdvanced(priorDate: string, logsDir: string = LOGS): Record<string, number | null> {
+type PriorLane = { seeds_advanced?: number | null; seeds_walked?: number | null; seeds_advanced_source?: string | null };
+function priorLanes(priorDate: string, logsDir: string): Record<string, PriorLane> {
   const p = join(logsDir, `autopilot-debrief-${priorDate}.json`);
   if (!existsSync(p)) return {};
   try {
     const prior = JSON.parse(readFileSync(p, 'utf8')) as {
-      discovery_methods_health?: Record<string, { seeds_advanced?: number | null }>;
+      discovery_methods_health?: Record<string, PriorLane>;
     };
-    const out: Record<string, number | null> = {};
-    for (const [lane, h] of Object.entries(prior.discovery_methods_health ?? {})) {
-      out[lane] = typeof h?.seeds_advanced === 'number' ? h.seeds_advanced : null;
-    }
-    return out;
+    return prior.discovery_methods_health ?? {};
   } catch { return {}; }
+}
+export function priorSeedsAdvanced(priorDate: string, logsDir: string = LOGS): Record<string, number | null> {
+  const out: Record<string, number | null> = {};
+  for (const [lane, h] of Object.entries(priorLanes(priorDate, logsDir))) {
+    out[lane] = typeof h?.seeds_advanced === 'number' ? h.seeds_advanced : null;
+  }
+  return out;
+}
+// The other half of the same snapshot: where each lane's seed book stood 24h ago, which is
+// what `reconcileAdvanced` differences against. Written into the debrief JSON since 08-22,
+// so the first cycle that can use it is 08-23.
+export function priorSeedsWalked(priorDate: string, logsDir: string = LOGS): Record<string, number | null> {
+  const out: Record<string, number | null> = {};
+  for (const [lane, h] of Object.entries(priorLanes(priorDate, logsDir))) {
+    out[lane] = typeof h?.seeds_walked === 'number' ? h.seeds_walked : null;
+  }
+  return out;
+}
+// Absent on any snapshot written before 2026-08-23, which is exactly the case that must not
+// arm `throughput_bound` — an older snapshot's number is a session-log sum by definition.
+export function priorAdvanceSource(priorDate: string, logsDir: string = LOGS): Record<string, string | null> {
+  const out: Record<string, string | null> = {};
+  for (const [lane, h] of Object.entries(priorLanes(priorDate, logsDir))) {
+    out[lane] = typeof h?.seeds_advanced_source === 'string' ? h.seeds_advanced_source : null;
+  }
+  return out;
 }
 
 // PRODUCTIVITY, not just liveness (2026-08-12). The block above only asks "is the
@@ -350,23 +422,35 @@ function discoveryMethodsHealth(sinceMs: number, untilMs: number): Record<string
   const podcastWork = work('podcast_crossover');
   // The prior cycle's debrief is dated by ITS cycle-start, which is this cycle's start
   // instant (both are PT midnight), so the lookup needs no separate date arithmetic.
-  const prior = priorSeedsAdvanced(pacificDate(new Date(sinceMs)));
-  const trend = (lane: string, w: SweepWork, b: SeedBook): WalkRate =>
-    walkRateTrend(w.seeds_advanced, prior[lane] ?? null, b);
-  const graphBook = seedBook('graph-sweep-state.json', graphWork.seeds_advanced);
-  const videoGraphBook = seedBook('video-graph-sweep-state.json', videoGraphWork.seeds_advanced);
-  const commentBook = seedBook('comment-sweep-state.json', commentWork.seeds_advanced);
-  const peerBook = seedBook('peer-sweep-state.json', peerWork.seeds_advanced);
-  const podcastBook = seedBook('podcast-crossover-state.json', podcastWork.seeds_advanced);
+  const priorDate = pacificDate(new Date(sinceMs));
+  const prior = priorSeedsAdvanced(priorDate);
+  const priorWalked = priorSeedsWalked(priorDate);
+  const priorSource = priorAdvanceSource(priorDate);
+  // Counts first, then the reconciled cycle advance, then the road that advance implies.
+  // `days_of_road` and `walk_rate_change_pct` both divide by this number, so it has to be
+  // settled before either is computed.
+  const advance = (lane: string, w: SweepWork, c: SeedCounts) =>
+    reconcileAdvanced(w.seeds_advanced, c.seeds_walked, priorWalked[lane] ?? null);
+  const trend = (lane: string, advanced: number | null, source: AdvanceSource, b: SeedBook): WalkRate =>
+    walkRateTrend(advanced, prior[lane] ?? null, b, (priorSource[lane] ?? 'session_logs') === source);
+  const lane = (key: string, stateFile: string, w: SweepWork) => {
+    const counts = seedCounts(stateFile);
+    const adv = advance(key, w, counts);
+    const book = seedBook(counts, adv.seeds_advanced);
+    return { ...w, ...adv, ...book, ...trend(key, adv.seeds_advanced, adv.seeds_advanced_source, book) };
+  };
+  const graphLane = lane('recommended_videos_feed', 'graph-sweep-state.json', graphWork);
+  const videoGraphLane = lane('video_graph_sweep', 'video-graph-sweep-state.json', videoGraphWork);
+  const commentLane = lane('comment_sweep', 'comment-sweep-state.json', commentWork);
+  const peerLane = lane('peer_sweep', 'peer-sweep-state.json', peerWork);
+  const podcastLane = lane('podcast_crossover', 'podcast-crossover-state.json', podcastWork);
   return {
     recommended_videos_feed: {
       service_active: serviceActive('graph-sweep.service'),
       refill_timer_active: serviceActive('graph-sweep-refill.timer'),
       state_updated_at: graphUpdated,
       hours_since_update: hoursSince(graphUpdated),
-      ...graphWork,
-      ...graphBook,
-      ...trend('recommended_videos_feed', graphWork, graphBook),
+      ...graphLane,
     },
     // Added 2026-08-18, the cycle after this lane shipped. It found 3,279 channels and 206
     // leads on its first full day — more than any other lane — with no health entry here,
@@ -375,17 +459,13 @@ function discoveryMethodsHealth(sinceMs: number, untilMs: number): Record<string
       service_active: serviceActive('video-graph-sweep.service'),
       state_updated_at: videoGraphUpdated,
       hours_since_update: hoursSince(videoGraphUpdated),
-      ...videoGraphWork,
-      ...videoGraphBook,
-      ...trend('video_graph_sweep', videoGraphWork, videoGraphBook),
+      ...videoGraphLane,
     },
     comment_sweep: {
       daily_timer_active: serviceActive('comment-sweep-daily.timer'),
       state_updated_at: commentUpdated,
       hours_since_update: hoursSince(commentUpdated),
-      ...commentWork,
-      ...commentBook,
-      ...trend('comment_sweep', commentWork, commentBook),
+      ...commentLane,
       // Runs once/day by design — flag only past ~30h (a missed day plus slack), not
       // on every reading the way the continuous daemons below are judged.
       stale: hoursSince(commentUpdated) !== null && (hoursSince(commentUpdated) as number) > 30,
@@ -395,17 +475,13 @@ function discoveryMethodsHealth(sinceMs: number, untilMs: number): Record<string
       refill_timer_active: serviceActive('peer-sweep-refill.timer'),
       state_updated_at: peerUpdated,
       hours_since_update: hoursSince(peerUpdated),
-      ...peerWork,
-      ...peerBook,
-      ...trend('peer_sweep', peerWork, peerBook),
+      ...peerLane,
     },
     podcast_crossover: {
       daily_timer_active: serviceActive('podcast-crossover-daily.timer'),
       state_updated_at: podcastUpdated,
       hours_since_update: hoursSince(podcastUpdated),
-      ...podcastWork,
-      ...podcastBook,
-      ...trend('podcast_crossover', podcastWork, podcastBook),
+      ...podcastLane,
       stale: hoursSince(podcastUpdated) !== null && (hoursSince(podcastUpdated) as number) > 30,
     },
   };

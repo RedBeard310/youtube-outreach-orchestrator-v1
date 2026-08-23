@@ -1,4 +1,4 @@
-import { isVerifiedOrBeyond, priorSeedsAdvanced, sessionSeedsAdvanced, sessionStartMs, walkRateTrend } from './debrief-data.ts';
+import { isVerifiedOrBeyond, priorAdvanceSource, priorSeedsAdvanced, priorSeedsWalked, reconcileAdvanced, sessionSeedsAdvanced, sessionStartMs, walkRateTrend } from './debrief-data.ts';
 let fail = 0;
 const ok = (name: string, got: unknown, want: unknown) => {
   const pass = JSON.stringify(got) === JSON.stringify(want);
@@ -69,6 +69,38 @@ ok('unknown seeds this cycle stays unknown',
 ok('missing prior snapshot -> empty map', priorSeedsAdvanced('1999-01-01'), {});
 ok('real prior snapshot carries the lanes',
   priorSeedsAdvanced('2026-08-21')['video_graph_sweep'], 11415);
+ok('prior seeds_walked read from the same snapshot',
+  priorSeedsWalked('2026-08-22')['video_graph_sweep'], 24963);
+ok('a pre-08-23 snapshot names no source, so its baseline is not comparable',
+  priorAdvanceSource('2026-08-22')['video_graph_sweep'], null);
+
+// reconcileAdvanced — the seed-book delta is exact; the log sum double-counts long sessions
+ok('book delta wins over the inflated log sum (the 08-23 video-graph case)',
+  reconcileAdvanced(12647, 32486, 24963),
+  { seeds_advanced: 7523, seeds_advanced_source: 'book_delta' });
+ok('short contained sessions agree either way (peer-sweep 08-23)',
+  reconcileAdvanced(264, 10937, 10673),
+  { seeds_advanced: 264, seeds_advanced_source: 'book_delta' });
+ok('no baseline falls back to the session logs',
+  reconcileAdvanced(8303, 24963, null),
+  { seeds_advanced: 8303, seeds_advanced_source: 'session_logs' });
+ok('a re-lap resets the book, so a negative delta falls back',
+  reconcileAdvanced(9100, 300, 10779),
+  { seeds_advanced: 9100, seeds_advanced_source: 'session_logs' });
+ok('an unreadable state file with no logs either reports nothing',
+  reconcileAdvanced(null, null, null),
+  { seeds_advanced: null, seeds_advanced_source: 'none' });
+ok('a lane that walked nothing reports zero, not a fallback',
+  reconcileAdvanced(0, 10937, 10937),
+  { seeds_advanced: 0, seeds_advanced_source: 'book_delta' });
+
+// walkRateTrend — a baseline measured the other way must not arm the alarm
+ok('mixed-source baseline reports the percentage but never escalates',
+  walkRateTrend(7523, 12647, ROAD, false),
+  { seeds_advanced_prev: 12647, walk_rate_change_pct: -40.5, throughput_bound: null });
+ok('same-source baseline arms the alarm again',
+  walkRateTrend(7523, 12647, ROAD, true),
+  { seeds_advanced_prev: 12647, walk_rate_change_pct: -40.5, throughput_bound: true });
 
 console.log(fail === 0 ? '\nALL PASS' : `\n${fail} FAILED`);
 process.exit(fail === 0 ? 0 : 1);
