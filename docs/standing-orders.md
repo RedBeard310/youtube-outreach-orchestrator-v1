@@ -66,6 +66,22 @@ everything up to "parked, ready to write" is automatic.
 
 ## Change log
 
+- 2026-08-23: **The 08-22 "video-graph sweep is throughput-bound, down 27%" finding
+  is WITHDRAWN as a regression — the number was double-counted.** `seeds_advanced`
+  in `scripts/autopilot/debrief-data.ts` summed every session log that *overlapped*
+  the 24h window, but summed each session's WHOLE advance. Fine for short sessions
+  (peer-sweep reported 264 against a true 264); wrong for a daemon running one
+  22-24h session, which is why video-graph reported **12,647 against a true 7,523**.
+  It also fed `days_of_road` (**2.3 reported, 3.9 true**). The lane actually walked
+  ~36% MORE than the day before. **Fixed** in orchestrator `21b3f84`: a cycle's walk
+  is now the seed-book delta between two consecutive daily snapshots, with the log
+  sum kept only as a fallback, and `seeds_advanced_source` names which was used.
+  **The ceiling argument still stands** on its own evidence (one process, one
+  candidate at a time, 5 min per 20 seeds) — recommendation #1 is unchanged, just
+  less urgent. Same day: the lane sped up because each seed hands it LESS work
+  (new channels per chunk 69.0 → 61.6), and good leads per seed fell 13%, so
+  **treat a rising walk rate on this lane as evidence the book is thinning.**
+  Full detail: `brain/lead-gen/runs/lead-run-2026-08-23.html`.
 - 2026-08-21: **Measurement note on lane #1, ranking left alone pending Casey.**
   The recommended-videos feed is not idle and not broken, it is out of road:
   `10,555 / 10,555` seeds walked, and its hourly refill correctly supplies only
