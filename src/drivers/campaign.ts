@@ -23,6 +23,7 @@ import { join, resolve } from 'node:path';
 import { driveLeadFinder } from './lead-finder.ts';
 import { runChild, runChildCapture } from '../run.ts';
 import { countByReviewStatus, getVerifiablePitchableLeads } from '../airtable.ts';
+import { laneOptsFromEnv, runBloodhoundLane } from '../recovery/bloodhound-lane.ts';
 import { writeTickLog } from '../logger.ts';
 
 export interface CampaignOpts {
@@ -702,6 +703,12 @@ export async function driveCampaign(opts: CampaignOpts): Promise<void> {
   console.log(`\n[campaign] final verify sweep…`);
   await verifyPending(opts, seen);
   await promoteSeen(opts, seen);
+  // Recovery lane (2026-08-23): cadence-gated Bloodhound passes over the
+  // needs_contact pool that promoteSeen's auto-sweep just topped up. Verify
+  // flips discovered-but-unverified emails into approved_hold; collect is a
+  // detached free batch over untouched leads. Cadence state in
+  // logs/bloodhound-lane-state.json; both no-op when not due.
+  await runBloodhoundLane(laneOptsFromEnv(emailRepo(), opts.dryRun, log));
   await evaluateProbes(opts);
   // Last, because it is the only step that can be skipped without costing this session
   // anything: sweep any rows stranded at scoring_failed back through the (now verified
