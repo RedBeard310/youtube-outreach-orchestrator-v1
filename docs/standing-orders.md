@@ -50,10 +50,11 @@ everything up to "parked, ready to write" is automatic.
 
 ## Parked pools waiting on Casey (don't touch without his word)
 
-- `needs_contact` (~2,600): recovery engine unbuilt — HIS green light needed.
-  Biggest known volume lever.
-- `approved_hold` (~2,200): fires only via manual `npm run send`.
-
+- `needs_contact` (4,345): recovery engine **BUILT AND RUNNING** since Casey
+  merged it 2026-08-23 (`1bea933`). No longer the biggest unbuilt lever — it is
+  now a live lane inside the campaign's finish block. It parks recovered leads
+  into `approved_hold` like any other, so it feeds the pool below, not a new one.
+- `approved_hold` (3,394): fires only via manual `npm run send`.
 ## Session checklist (every session, ~2 minutes)
 
 1. Is graph-sweep.service actively walking? (`systemctl status graph-sweep`;
@@ -66,6 +67,22 @@ everything up to "parked, ready to write" is automatic.
 
 ## Change log
 
+- 2026-08-24: **The `needs_contact` recovery lane is live, and it made the day.**
+  Casey merged it 08-23 21:27Z (`1bea933`). Its first night produced roughly
+  **77 of the 189 parked leads** — the best parking day since 07-09 — off a pool
+  nobody had worked since 08-18. Recovered parks cost no LLM at all, which is why
+  cost per park fell to **4.2c** from 7.5c. **Read `verified = false` on a contact
+  point carefully: it is also the resting state of an address already checked and
+  found dead.** The lane's own selector read it as "still to check", so pass two
+  re-selected 84 of the same 91 leads three hours later, spent 34 ZeroBounce
+  credits and flipped nothing — ~270 wasted credits a day left alone, plus a
+  duplicate ownership note on 83 rows. **Fixed** in orchestrator `d6af815` (skip
+  anything carrying `verified_at` or an `[ownership:` note; live pool 85 → 2, no
+  backfill needed) and email-repo `5efd7a7` (an ownership rejection now stamps
+  `verified_at` and appends its note once). The lane's engine is the FREE collect
+  pass, not the paid verify pass — 2,996 untouched leads at 40 per 6h is about 19
+  days of road, and raising that batch is the next lever on this lane.
+  Full detail: `brain/lead-gen/runs/lead-run-2026-08-24.html`.
 - 2026-08-23: **The 08-22 "video-graph sweep is throughput-bound, down 27%" finding
   is WITHDRAWN as a regression — the number was double-counted.** `seeds_advanced`
   in `scripts/autopilot/debrief-data.ts` summed every session log that *overlapped*
