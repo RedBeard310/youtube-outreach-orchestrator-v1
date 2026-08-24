@@ -1,6 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { isDue, laneOptsFromEnv, type LaneState } from '../src/recovery/bloodhound-lane.ts';
+import {
+  isDue,
+  laneOptsFromEnv,
+  VERIFIABLE_IDS_SQL,
+  type LaneState,
+} from '../src/recovery/bloodhound-lane.ts';
 
 // The recovery lane runs inside the campaign's fade pivot, which fires many
 // times a day. The cadence gate is what keeps it from re-spawning Bloodhound
@@ -61,4 +66,20 @@ test('laneOptsFromEnv: malformed env numbers fall back to defaults, never NaN', 
   } finally {
     process.env = saved;
   }
+});
+
+// 2026-08-24: the lane's first night re-selected 84 of the same 91 leads three
+// hours apart and spent 34 ZeroBounce credits to flip nothing, because
+// `verified = false` is the resting state of a CHECKED-AND-DEAD address, not
+// just an unchecked one. Both exclusions below are load-bearing on money.
+test('verify selector excludes contact points already ruled on', () => {
+  // ZeroBounce returned a verdict.
+  assert.match(VERIFIABLE_IDS_SQL, /cp\.verified_at IS NULL/);
+  // The identity gate rejected the address before any credit was spent. This
+  // one also covers rows written before verify.ts began stamping verified_at,
+  // so the fix needs no backfill.
+  assert.match(VERIFIABLE_IDS_SQL, /notes[^)]*\)\s*NOT LIKE '%\[ownership:%'/);
+  // And the original guard is still there.
+  assert.match(VERIFIABLE_IDS_SQL, /COALESCE\(cp\.verified, false\) = false/);
+  assert.match(VERIFIABLE_IDS_SQL, /COALESCE\(lc\.do_not_contact, false\) = false/);
 });

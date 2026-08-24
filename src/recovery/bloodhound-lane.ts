@@ -87,24 +87,46 @@ export async function selectUntouchedIds(limit: number): Promise<string[]> {
   return rows.map((r) => r.id);
 }
 
-/** needs_contact leads that have at least one UNVERIFIED email contact point.
+/** needs_contact leads that have at least one email contact point NOBODY HAS
+ *  RULED ON YET.
+ *
+ *  `verified = false` is not "still to check" — it is also the resting state of
+ *  every address that has already been checked and failed, because Bloodhound
+ *  writes `verified = false` both when ZeroBounce says undeliverable and when
+ *  the identity gate rejects the address as somebody else's. Selecting on it
+ *  alone re-hands the same dead addresses to the tool every cadence, which is
+ *  exactly what happened on the lane's first night (2026-08-24): pass one
+ *  checked 42 addresses and flipped 7, pass two three hours later re-selected
+ *  84 of the same 91 leads, spent 34 more ZeroBounce credits and flipped 0.
+ *  Left alone that is ~270 wasted credits a day, forever, and an ownership note
+ *  re-appended to the same rows on every pass (83 rows had already collected
+ *  more than one after two passes).
+ *
+ *  So exclude anything already ruled on, by either of the two marks Bloodhound
+ *  writes: `verified_at` (ZeroBounce returned a verdict) and an `[ownership:`
+ *  note (the identity gate rejected it before a credit was spent). The note
+ *  test is what makes this self-healing on rows that pre-date the companion
+ *  fix in youtube-email-outreach-v1, which now stamps `verified_at` on the
+ *  ownership branch too. No backfill needed.
+ *
  *  GROUP BY stands in for DISTINCT because Postgres requires ORDER BY
  *  expressions to appear in the select list under SELECT DISTINCT. */
-export async function selectVerifiableIds(limit: number): Promise<string[]> {
-  const rows = await query<{ id: string }>(
-    `SELECT lc.id
+export const VERIFIABLE_IDS_SQL = `SELECT lc.id
        FROM leads.lead_candidates lc
        JOIN leads.contact_points cp ON cp.lead_id = lc.id
       WHERE lc.review_status = 'needs_contact'
         AND lc.outreach_status = 'no_email_found'
         AND cp.kind IN ('business_email', 'personal_email', 'youtube_email')
         AND COALESCE(cp.verified, false) = false
+        AND cp.verified_at IS NULL
+        AND COALESCE(cp.notes, '') NOT LIKE '%[ownership:%'
         AND COALESCE(lc.do_not_contact, false) = false
       GROUP BY lc.id, lc.first_discovered_at
       ORDER BY lc.first_discovered_at ASC NULLS LAST
-      LIMIT $1`,
-    [limit],
-  );
+      LIMIT $1`;
+
+export async function selectVerifiableIds(limit: number): Promise<string[]> {
+  const rows = await query<{ id: string }>(VERIFIABLE_IDS_SQL, [limit]);
   return rows.map((r) => r.id);
 }
 
