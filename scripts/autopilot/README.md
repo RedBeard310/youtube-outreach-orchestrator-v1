@@ -37,6 +37,13 @@ headless `claude -p` run reports `total_cost_usd`; the wrappers append it to
 - **Halt flag** `logs/autopilot-halt.flag`: written on a critical condition (hard $ ceiling,
   repeated un-startable campaign, or an agent deciding something is unsafe). The loop stops
   and stays stopped; Casey sees the file next session. No external notifications by design.
+- **One halt heals itself: OpenRouter running out of credits** (added 2026-08-25). The hourly
+  check-in reads the flag, and if it says the OpenRouter account is out of credits, probes the
+  credits endpoint (free). Once the balance is back above `AUTOPILOT_MIN_CREDIT_MARGIN_USD`
+  (default $5, a margin rather than any non-zero balance so a near-empty account can't flap the
+  flag hourly), it deletes the flag and restarts the campaign loop. Topping up the account is
+  now the only step. **Every other halt still waits for a human** — the check-in only clears one
+  it can positively verify, so a hard-$-ceiling or migration-freeze halt is left exactly alone.
 - **Anomaly detection** (`checkin.ts`): fatal error signatures in session logs
   (module-not-found / missing-skill / bad-backend / finder hard-wall / find-ENOENT) and
   "finding-but-not-parking" (approved_hold flat ≥100min while the finder keeps exiting 0 —

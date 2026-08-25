@@ -16,7 +16,7 @@
 // across consecutive check-ins while the finder keeps exiting cleanly).
 
 import 'dotenv/config';
-import { appendFileSync, existsSync, openSync, readdirSync, readFileSync, writeFileSync, statSync } from 'node:fs';
+import { appendFileSync, existsSync, openSync, readdirSync, readFileSync, unlinkSync, writeFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawn, execSync } from 'node:child_process';
 import { summarizeToday, pacificDate } from './burn-ledger.js';
@@ -24,7 +24,10 @@ import { countByReviewStatus } from '../../src/airtable.ts';
 
 const REPO = '/home/casey/repos/youtube-outreach-orchestrator-v1';
 const LOGS = join(REPO, 'logs');
-const HALT_FLAG = join(LOGS, 'autopilot-halt.flag');
+// Overridable so this path can be exercised without arming the real one. The
+// finder's src/lib/run-gate.ts already honours the same variable, so the two
+// halves of the halt contract now agree about where the flag lives.
+const HALT_FLAG = process.env.AUTOPILOT_HALT_FLAG || join(LOGS, 'autopilot-halt.flag');
 const ATTENTION = join(LOGS, 'autopilot-attention.jsonl');
 const OBSERVATIONS = join(LOGS, 'autopilot-observations.jsonl');
 const PARKED_HIST = join(LOGS, 'autopilot-parked-history.jsonl');
@@ -288,12 +291,90 @@ function kickKeywordHarvest(reason: string): boolean {
   }
 }
 
+/**
+ * Clear a halt whose cause we can PROVE has gone away, and restart the loop.
+ *
+ * WHY (2026-08-25). The halt flag is one-way: something writes it, everything
+ * stops, and only a human deleting a file ever starts anything again. On 08-25
+ * the OpenRouter account ran out of credits at 00:49Z, the flag went up, and the
+ * campaign loop plus three sweeps parked themselves correctly — but the moment
+ * Casey tops the account up, nothing notices. The pipeline would sit dark until
+ * he remembered a file on a VPS, hours or a day after paying to fix the actual
+ * problem.
+ *
+ * Deliberately narrow, in both directions:
+ *
+ * - ONLY the OpenRouter-credits halt. Every other halt (the Anthropic hard
+ *   ceiling, rapid finder failures, a migration freeze) means something a probe
+ *   cannot check, so those still wait for a human. Anything this function does
+ *   not positively recognise is left alone.
+ * - The check is the credits endpoint, which spends nothing. It needs a real
+ *   margin, not a non-zero balance: an account left at $0.30 would clear the
+ *   flag, 402 within minutes, and re-halt, flapping every hour.
+ *
+ * Clearing the flag alone revives the sweeps, which re-read it each cycle. The
+ * campaign loop exits(0) on a halt and Restart=on-failure does not cover a clean
+ * exit, so it needs the explicit restart.
+ */
+async function tryAutoClearHalt(day: string): Promise<boolean> {
+  const MIN_CREDIT_MARGIN_USD = Number(process.env.AUTOPILOT_MIN_CREDIT_MARGIN_USD ?? 5);
+
+  let reason = '';
+  try { reason = readFileSync(HALT_FLAG, 'utf8'); } catch { return false; }
+  if (!/OpenRouter account out of credits/i.test(reason)) return false;
+
+  const key = process.env.OPENROUTER_API_KEY?.trim();
+  if (!key) return false;
+
+  let remaining: number;
+  try {
+    const res = await fetch('https://openrouter.ai/api/v1/credits', {
+      headers: { authorization: `Bearer ${key}` },
+      signal: AbortSignal.timeout(20_000),
+    });
+    if (!res.ok) return false;
+    const body = (await res.json()) as { data?: { total_credits?: number; total_usage?: number } };
+    const granted = Number(body.data?.total_credits);
+    const used = Number(body.data?.total_usage);
+    if (!Number.isFinite(granted) || !Number.isFinite(used)) return false;
+    remaining = granted - used;
+  } catch {
+    return false; // a probe we could not complete is not proof of anything
+  }
+
+  if (remaining < MIN_CREDIT_MARGIN_USD) {
+    console.log(`[checkin ${day}] halt stands — OpenRouter still at $${remaining.toFixed(2)} (need $${MIN_CREDIT_MARGIN_USD})`);
+    return false;
+  }
+
+  unlinkSync(HALT_FLAG);
+  appendFileSync(OBSERVATIONS, `${JSON.stringify({
+    ts: new Date().toISOString(), kind: 'halt_auto_cleared',
+    detail: `OpenRouter credits restored ($${remaining.toFixed(2)} available) — halt flag removed and the campaign loop restarted`,
+  })}\n`);
+  console.log(`[checkin ${day}] OpenRouter credits restored ($${remaining.toFixed(2)}) — halt cleared, restarting the campaign loop`);
+  try {
+    execSync('sudo -n systemctl restart autopilot-campaign.service', { stdio: 'pipe', timeout: 60_000 });
+  } catch (err) {
+    console.warn(`[checkin ${day}] halt cleared but the campaign restart failed: ${(err as Error).message}`);
+  }
+  return true;
+}
+
 async function main(): Promise<void> {
   const burn = summarizeToday();
   const day = pacificDate();
 
   // 1) Halt flag already up → loop is stopping; nothing for the agent to do.
+  //    Unless its stated cause has provably cleared (see tryAutoClearHalt).
   if (existsSync(HALT_FLAG)) {
+    if (await tryAutoClearHalt(day)) {
+      // Exit clean rather than falling through: the day's session logs still
+      // carry the fatal signature of the outage we just recovered from, and
+      // escalating a resolved cause would spend a paid fix-agent for nothing.
+      // The next hourly tick check-ins normally.
+      process.exit(0);
+    }
     console.log(`[checkin ${day}] HALT flag present — loop stopping. burn=$${burn.total_usd.toFixed(2)}`);
     process.exit(5);
   }
