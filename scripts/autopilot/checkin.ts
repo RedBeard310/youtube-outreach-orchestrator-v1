@@ -21,6 +21,11 @@ import { join } from 'node:path';
 import { spawn, execSync } from 'node:child_process';
 import { summarizeToday, pacificDate } from './burn-ledger.js';
 import { countByReviewStatus } from '../../src/airtable.ts';
+import {
+  laneOptsFromEnv,
+  runBloodhoundLane,
+  runRecoveryDuringOpenRouterHalt,
+} from '../../src/recovery/bloodhound-lane.ts';
 
 const REPO = '/home/casey/repos/youtube-outreach-orchestrator-v1';
 const LOGS = join(REPO, 'logs');
@@ -374,6 +379,23 @@ async function main(): Promise<void> {
       // escalating a resolved cause would spend a paid fix-agent for nothing.
       // The next hourly tick check-ins normally.
       process.exit(0);
+    }
+    let haltReason = '';
+    try { haltReason = readFileSync(HALT_FLAG, 'utf8'); } catch { /* flag disappeared */ }
+    try {
+      await runRecoveryDuringOpenRouterHalt(haltReason, async () => {
+        const emailRepo = process.env.EMAIL_OUTREACH_REPO_PATH;
+        if (!emailRepo) throw new Error('EMAIL_OUTREACH_REPO_PATH is not set');
+        await runBloodhoundLane(laneOptsFromEnv(emailRepo, false, (line) => {
+          appendFileSync(OBSERVATIONS, JSON.stringify({
+            ...line,
+            ts: new Date().toISOString(),
+            kind: 'bloodhound_during_openrouter_halt',
+          }) + '\n');
+        }));
+      });
+    } catch (e) {
+      console.warn(`[checkin ${day}] halted Bloodhound pass failed: ${e instanceof Error ? e.message : String(e)}`);
     }
     console.log(`[checkin ${day}] HALT flag present — loop stopping. burn=$${burn.total_usd.toFixed(2)}`);
     process.exit(5);

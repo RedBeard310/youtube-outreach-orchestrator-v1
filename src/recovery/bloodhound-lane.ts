@@ -140,6 +140,19 @@ export interface LaneOpts {
   log: (line: Record<string, unknown>) => void;
 }
 
+/**
+ * Keep the recovery lane moving during the one halt it doesn't depend on.
+ * Generic halt reasons still mean a full stop.
+ */
+export async function runRecoveryDuringOpenRouterHalt(
+  haltReason: string,
+  runLane: () => Promise<void>,
+): Promise<boolean> {
+  if (!haltReason.startsWith('HALT — OpenRouter account out of credits (')) return false;
+  await runLane();
+  return true;
+}
+
 function numEnv(name: string, fallback: number): number {
   const v = Number(process.env[name]);
   return Number.isFinite(v) && v > 0 ? v : fallback;
