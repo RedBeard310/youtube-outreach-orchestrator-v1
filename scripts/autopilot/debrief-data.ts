@@ -680,6 +680,81 @@ function netNewChannelsWritten(sinceMs: number): { total: number; passes_with_wr
   return { total, passes_with_writes: passesWithWrites };
 }
 
+/**
+ * The account that actually pays for this pipeline, and how long it has left.
+ *
+ * WHY (2026-08-25). `burn_today` meters Anthropic, which has been $0.00 since the
+ * zero-Anthropic migration on 08-01 — it is a gauge on a tank nobody draws from.
+ * Every real LLM dollar goes to OpenRouter, and NOTHING watched that: not the
+ * hourly check-in, not this snapshot, not any lane's health. So on 08-25 the
+ * account simply ran out at 00:49Z with no warning at any point beforehand, and
+ * every discovery lane went dark. The balance had been walking down at $6-8/day
+ * in plain sight of a system that never looked at it.
+ *
+ * Two numbers, both cheap. Spend comes from the finder's own per-day spend logs,
+ * already on disk. Balance comes from the credits endpoint, which is free to
+ * call. `days_of_runway` is the one that matters: at a week's notice, topping up
+ * is a calendar item rather than an outage.
+ *
+ * Everything here fails soft to null. A debrief must still be written when the
+ * network is down, and a missing number must never read as a zero balance.
+ */
+async function openRouterHealth(sinceISO: string, untilISO: string): Promise<Record<string, unknown>> {
+  // Spend: the two day-files that can overlap a PT-midnight-to-PT-midnight window.
+  let usd = 0;
+  let calls = 0;
+  const byTask: Record<string, { usd: number; calls: number }> = {};
+  for (const day of [sinceISO.slice(0, 10), untilISO.slice(0, 10)]) {
+    const p = join(FINDER_REPO, 'logs', `llm-spend-${day}.jsonl`);
+    if (!existsSync(p)) continue;
+    for (const line of readFileSync(p, 'utf8').split('\n')) {
+      if (!line.trim()) continue;
+      let r: { ts?: string; usd?: number; cost?: number; task?: string; model?: string };
+      try { r = JSON.parse(line); } catch { continue; }
+      if (typeof r.ts !== 'string' || r.ts < sinceISO || r.ts >= untilISO) continue;
+      const c = Number(r.usd ?? r.cost ?? 0);
+      if (!Number.isFinite(c)) continue;
+      usd += c; calls += 1;
+      const k = r.task ?? r.model ?? 'unknown';
+      byTask[k] ??= { usd: 0, calls: 0 };
+      byTask[k].usd += c; byTask[k].calls += 1;
+    }
+  }
+
+  let remaining: number | null = null;
+  const key = process.env.OPENROUTER_API_KEY?.trim();
+  if (key) {
+    try {
+      const res = await fetch('https://openrouter.ai/api/v1/credits', {
+        headers: { authorization: `Bearer ${key}` },
+        signal: AbortSignal.timeout(20_000),
+      });
+      if (res.ok) {
+        const body = (await res.json()) as { data?: { total_credits?: number; total_usage?: number } };
+        const granted = Number(body.data?.total_credits);
+        const used = Number(body.data?.total_usage);
+        if (Number.isFinite(granted) && Number.isFinite(used)) remaining = granted - used;
+      }
+    } catch { /* fail soft — a debrief still gets written with the network down */ }
+  }
+
+  return {
+    spend_usd: Number(usd.toFixed(4)),
+    calls,
+    by_task: Object.fromEntries(
+      Object.entries(byTask)
+        .sort((a, b) => b[1].usd - a[1].usd)
+        .map(([k, v]) => [k, { usd: Number(v.usd.toFixed(4)), calls: v.calls }]),
+    ),
+    balance_usd: remaining,
+    // Today's spend is the only burn rate we can measure without keeping history,
+    // and it reads LOW on a day the account died early — which biases runway
+    // optimistic exactly when it matters. Read it as a ceiling, not a forecast.
+    days_of_runway: remaining !== null && usd > 0 ? Number((remaining / usd).toFixed(1)) : null,
+    depleted: remaining !== null && remaining <= 0,
+  };
+}
+
 async function main(): Promise<void> {
   const now = new Date();
   const date = pacificDate(now);
@@ -842,6 +917,7 @@ async function main(): Promise<void> {
       soft: burn.soft_usd,
       hard: burn.hard_usd,
     },
+    openrouter_today: await openRouterHealth(sinceISO, untilISO),
     supply_health: supplyHealth,
     fatal_signatures_today: fatalSignaturesToday(sinceMs),
     references: {
