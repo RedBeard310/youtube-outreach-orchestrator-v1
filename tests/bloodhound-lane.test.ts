@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   isDue,
   laneOptsFromEnv,
+  runRecoveryDuringOpenRouterHalt,
   VERIFIABLE_IDS_SQL,
   type LaneState,
 } from '../src/recovery/bloodhound-lane.ts';
@@ -82,4 +83,37 @@ test('verify selector excludes contact points already ruled on', () => {
   // And the original guard is still there.
   assert.match(VERIFIABLE_IDS_SQL, /COALESCE\(cp\.verified, false\) = false/);
   assert.match(VERIFIABLE_IDS_SQL, /COALESCE\(lc\.do_not_contact, false\) = false/);
+});
+
+test('OpenRouter credit halt still runs the independent recovery lane', async () => {
+  let runs = 0;
+  const ran = await runRecoveryDuringOpenRouterHalt(
+    'HALT — OpenRouter account out of credits (2026-08-25T00:49:00Z)',
+    async () => { runs += 1; },
+  );
+
+  assert.equal(ran, true);
+  assert.equal(runs, 1);
+});
+
+test('generic halt does not bypass the full-stop guardrail', async () => {
+  let runs = 0;
+  const ran = await runRecoveryDuringOpenRouterHalt(
+    'migration freeze',
+    async () => { runs += 1; },
+  );
+
+  assert.equal(ran, false);
+  assert.equal(runs, 0);
+});
+
+test('generic halt that quotes the credit message remains a full stop', async () => {
+  let runs = 0;
+  const ran = await runRecoveryDuringOpenRouterHalt(
+    'HALT: migration freeze while investigating "OpenRouter account out of credits"',
+    async () => { runs += 1; },
+  );
+
+  assert.equal(ran, false);
+  assert.equal(runs, 0);
 });
