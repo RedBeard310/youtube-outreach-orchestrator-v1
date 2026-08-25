@@ -118,7 +118,7 @@
     <div class="strip" id="strip"></div>
     <div class="legend">
       <span><span class="dot" style="background:var(--teal)"></span>good leads found that hour (score ≥ 6)</span>
-      <span><span class="dot" style="background:var(--red)"></span>zero — the six hours after the account emptied</span>
+      <span><span class="dot" style="background:var(--red)"></span>zero, the six hours after the account emptied</span>
       <span><span class="dot" style="background:var(--ink-soft);opacity:.35"></span>all channels written that hour, to scale</span>
     </div>
   </div>
@@ -168,7 +168,7 @@
     <table>
       <thead><tr><th>Issue</th><th>Mechanism</th><th>Status</th></tr></thead>
       <tbody class="fix">
-        <tr><td>OpenRouter account empty</td><td>$810 granted, $810.20 spent. Every LLM call returns 402</td><td class="down"><b>Open — only Casey can fix it.</b> Add credits; nothing else is needed</td></tr>
+        <tr><td>OpenRouter account empty</td><td>$810 granted, $810.20 spent. Every LLM call returns 402</td><td class="down"><b>Open. Only Casey can fix it.</b> Add credits; nothing else is needed</td></tr>
         <tr><td>Sweeps grind on when the scorer dies</td><td>Key-pool exhaustion stops a sweep; an LLM failure was a silent per-channel <code>continue</code></td><td class="up">Fixed in all five sweeps: a scorer outage now stops the run without consuming seeds (finder <code>a419e55</code>)</td></tr>
         <tr><td>Halt flag never seen by the long-lived sweep</td><td>Checked once at start-up; that process had been up 6h before the flag was written</td><td class="up">Fixed: video-graph re-checks every chunk</td></tr>
         <tr><td>The bleeding lane, live</td><td>Still walking when this debrief started, 20 more seeds gone</td><td class="up">Stopped by hand. Restarted onto the new code, read the flag, slept. <b>7,303 seeds preserved</b></td></tr>
@@ -191,7 +191,7 @@
   </ol>
 
   <div class="foot">
-    <b>Status:</b> the pipeline is stopped and waiting on credits. That is the correct state, and it is safe to leave: nothing is spending, nothing is looping, and no lead data was lost. The seed book is intact at 7,303 for video-graph. <b>Everything is parked, nothing is sent</b> — <code>approved_hold</code> is a deliberate holding lane. Today's +54 takes the pool to <b>3,451</b>, alongside <b>4,451</b> in <code>needs_contact</code>. Anthropic spend $0.00; OpenRouter spend $5.34 across 6,930 calls, which is low only because the day ended six hours early.
+    <b>Status:</b> the pipeline is stopped and waiting on credits. That is the correct state, and it is safe to leave: nothing is spending, nothing is looping, and no lead data was lost. The seed book is intact at 7,303 for video-graph. <b>Everything is parked, nothing is sent.</b> <code>approved_hold</code> is a deliberate holding lane. Today's +54 takes the pool to <b>3,451</b>, alongside <b>4,451</b> in <code>needs_contact</code>. Anthropic spend $0.00; OpenRouter spend $5.34 across 6,930 calls, which is low only because the day ended six hours early.
   </div>
 
 </div>
