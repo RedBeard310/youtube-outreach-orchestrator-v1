@@ -1,0 +1,222 @@
+<title>Lead Run Debrief — 2026-08-25</title>
+<style>
+  :root {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+      --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+      --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+    --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+    --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 40px 22px 80px; }
+  .eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); font-weight: 600; }
+  h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.12; margin: 10px 0 6px; text-wrap: balance; letter-spacing: -.02em; }
+  h2 { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); margin: 44px 0 16px; font-weight: 700; }
+  h3 { font-size: 18px; margin: 0 0 6px; letter-spacing: -.01em; }
+  p { margin: 0 0 14px; }
+  .lede { font-size: 18px; color: var(--ink-soft); max-width: 68ch; }
+  .tag { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--red-soft); color: var(--red); letter-spacing: .02em; }
+  .tag.amber { background: var(--amber-soft); color: var(--amber); }
+  .grid { display: grid; gap: 14px; }
+  .stats { grid-template-columns: repeat(4, 1fr); margin-top: 26px; }
+  @media (max-width: 720px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; box-shadow: var(--shadow); }
+  .stat .n { font-size: 30px; font-weight: 750; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .stat .l { font-size: 12.5px; color: var(--ink-soft); margin-top: 3px; }
+  .stat .s { font-size: 12px; margin-top: 8px; font-weight: 600; }
+  .up { color: var(--good); } .down { color: var(--red); } .warn { color: var(--amber); }
+  .accent-red { border-left: 3px solid var(--red); }
+  .accent-teal { border-left: 3px solid var(--teal); }
+  .accent-amber { border-left: 3px solid var(--amber); }
+
+  .strip { display: flex; align-items: flex-end; gap: 3px; height: 130px; padding: 14px 14px 10px; overflow-x: auto; }
+  .col { flex: 1 0 14px; min-width: 12px; display: flex; flex-direction: column; justify-content: flex-end; height: 100%; }
+  .bar { border-radius: 2px 2px 0 0; background: var(--teal); opacity: .92; }
+  .bar.zero { background: var(--red); height: 4px !important; }
+  .ghost { border-radius: 2px 2px 0 0; background: var(--ink-soft); opacity: .18; margin-bottom: 2px; }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-soft); padding: 0 14px 14px; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+
+  .q { border-radius: 14px; padding: 20px 22px; margin-bottom: 14px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); }
+  .q .ask { font-size: 17px; font-weight: 700; color: var(--ink); margin-bottom: 10px; display: flex; gap: 10px; align-items: baseline; }
+  .q .ask .qn { color: var(--red); font-weight: 800; flex: 0 0 auto; }
+  .q p { color: var(--ink-soft); }
+  .q b { color: var(--ink); }
+  .pill { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink); background: var(--panel-2); padding: 1px 7px; border-radius: 6px; border: 1px solid var(--line); white-space: nowrap; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+  th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .fix td:first-child { color: var(--good); font-weight: 650; }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); box-shadow: var(--shadow); margin-bottom: 14px; }
+  ol.recs { padding-left: 0; list-style: none; counter-reset: r; margin: 0; }
+  ol.recs li { counter-increment: r; position: relative; padding: 14px 16px 14px 52px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 10px; box-shadow: var(--shadow); }
+  ol.recs li::before { content: counter(r); position: absolute; left: 14px; top: 14px; width: 26px; height: 26px; border-radius: 8px; background: var(--teal-soft); color: var(--teal); font-weight: 800; font-size: 14px; display: grid; place-items: center; }
+  ol.recs b { color: var(--ink); }
+  .foot { margin-top: 46px; padding: 16px 18px; border-radius: 12px; background: var(--amber-soft); border: 1px solid var(--line); font-size: 14px; color: var(--ink-soft); }
+  .foot b { color: var(--ink); }
+  .muted { color: var(--ink-soft); font-size: 13.5px; }
+  code { background: var(--panel-2); border: 1px solid var(--line); border-radius: 5px; padding: 0 5px; font-size: .9em; }
+</style>
+
+<div class="wrap">
+
+  <div class="eyebrow">Lead Run Debrief · YouTube outreach</div>
+  <h1>2026-08-25 — the pipeline ran out of money at 00:49 and half of it kept running anyway</h1>
+  <p class="lede">The OpenRouter account hit zero overnight. Every lane that thinks for a living stopped, which is correct. The biggest lane didn't, and spent the next six and a half hours walking through its seed list at no yield while every health check reported it healthy.</p>
+  <div style="margin-top:14px">
+    <span class="tag">HALTED 00:49Z — NEEDS CREDITS</span>
+    <span class="tag amber" style="margin-left:6px">STOPS ITSELF NOW</span>
+  </div>
+
+  <div class="grid stats">
+    <div class="card stat accent-teal">
+      <div class="n">+54</div>
+      <div class="l">parked → <code>approved_hold</code></div>
+      <div class="s down">vs +189 yesterday</div>
+    </div>
+    <div class="card stat accent-red">
+      <div class="n">6h 11m</div>
+      <div class="l">of the cycle with zero good leads</div>
+      <div class="s down">59 in the same hours a day earlier</div>
+    </div>
+    <div class="card stat accent-red">
+      <div class="n">~7,200</div>
+      <div class="l">seeds spent after the account died</div>
+      <div class="s down">0 leads, never re-walked</div>
+    </div>
+    <div class="card stat accent-amber">
+      <div class="n">−$0.20</div>
+      <div class="l">OpenRouter balance</div>
+      <div class="s warn">$810 granted, $810.20 spent</div>
+    </div>
+  </div>
+
+  <h2>The shape of the day</h2>
+  <div class="card" style="padding:0">
+    <div class="strip" id="strip"></div>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--teal)"></span>good leads found that hour (score ≥ 6)</span>
+      <span><span class="dot" style="background:var(--red)"></span>zero — the six hours after the account emptied</span>
+      <span><span class="dot" style="background:var(--ink-soft);opacity:.35"></span>all channels written that hour, to scale</span>
+    </div>
+  </div>
+  <p class="muted">Each column is one hour, 07:00Z through 06:00Z. Note that the grey keeps going after the teal stops. The pipeline was still writing 100 to 130 rows an hour with nothing good in any of them, which is exactly why nothing noticed.</p>
+
+  <h2>The three questions</h2>
+
+  <div class="q accent-red">
+    <div class="ask"><span class="qn">Q1</span><span>Why did everything stop at 00:49?</span></div>
+    <p><b>The OpenRouter account ran out of credits.</b> Every thinking step in this pipeline runs through it: scoring a channel, working out who hosts it, filtering candidates, inventing new search terms. All of it started answering <span class="pill">HTTP 402</span>, which means "you have spent everything you paid for." Lifetime numbers off the account: <b>$810 granted, $810.20 used.</b> Not a bug, not a key problem, not a config problem. The tank is empty.</p>
+    <p>What happened next was mostly right. Two finder passes failed identically, which tripped the campaign's own hard-wall stop. The hourly check-in spotted the failure signature at <b>00:51Z</b>, diagnosed it correctly, wrote a halt flag that names the cause and the fix, and stopped the loop. The graph sweep and the peer sweep both read that flag and put themselves to sleep. That is the system doing what it was built to do.</p>
+    <p><b>What was missing is any warning beforehand.</b> The daily debrief meters Anthropic spend, which has read $0.00 every single day since the pipeline moved off Anthropic on 08-01. It is a fuel gauge on a tank nobody draws from. The account that actually pays for the work was watched by nothing at all, and it had been walking down at $6 to $8 a day in plain sight.</p>
+  </div>
+
+  <div class="q accent-red">
+    <div class="ask"><span class="qn">Q2</span><span>Why did the biggest lane keep going for another six hours and produce nothing?</span></div>
+    <p>Because a dead scorer and a weird channel looked identical to it. The video-graph sweep already stops itself hard when the <em>YouTube</em> key pool runs out, and the comment in the code explains why: without it, the sweep "consumes its seeds and drains to a false complete with zero yield." An LLM failure got no such treatment. It counted the channel as failed and moved to the next one, silently, forever.</p>
+    <p>The evidence is unambiguous. In its session log, the last good lead landed in <b>chunk 121</b>. It ran to <b>chunk 481</b>. That is <span class="pill">360 chunks ≈ 7,200 seeds</span> with <b>zero</b> good leads, while its own <code>llm_calls</code> counter sat frozen at <b>728</b> the entire way. Roughly 17 candidates cleared triage every chunk and every one of them failed to score.</p>
+    <p><b>The seeds are the real loss.</b> A walked seed is checkpointed and never walked again. The lane went into the outage with about 14,500 seeds left and came out with 7,303, so it spent close to half its remaining road on nothing. It also had a start-up halt check, which never fired: this is the one long-lived process in the pipeline, and it had been up since 18:46 the previous evening, so its check was six hours stale by the time the flag was written.</p>
+  </div>
+
+  <div class="q accent-amber">
+    <div class="ask"><span class="qn">Q3</span><span>Was the day thin only because of the outage?</span></div>
+    <p>No, and this is the part worth carrying forward. <b>All 163 good leads landed before 00:49.</b> Compare like for like: the same 17.8 hours a day earlier produced <b>226</b>. So the day was already <b>28% down</b> before the account died. The outage cost the last quarter of the cycle. Something else cost the rest.</p>
+    <p><b>Two of the five seed books are finished and the third is nearly there.</b> The recommended-videos feed has <b>1 seed left</b> of 11,496. Peer-network has <b>zero</b> left of 11,361 and its refill is blocked behind the halt. Video-graph has 7,303, about half a day. Every one of these lanes is seeded by our own qualified leads, roughly 160 a day, while consuming more than 11,000 a day. A lane fed by its own output cannot outrun itself, and that ceiling arrives this week rather than eventually.</p>
+    <p>The keyword finder is no longer carrying anything either: <b>214 passes produced 16 good leads</b>, about one per fourteen passes, against 136 from video-graph alone. And the health snapshot read the whole thing as an improvement, because <code>seeds_advanced</code> for video-graph came out <b>53.1% higher</b> than the day before. It walked faster because it had stopped doing the expensive part.</p>
+  </div>
+
+  <h2>Where the leads came from</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Lane</th><th class="num">Channels</th><th class="num">Score ≥ 6</th><th class="num">Rate</th><th>Book</th></tr></thead>
+      <tbody>
+        <tr><td><b>Video-graph sweep</b></td><td class="num">3,223</td><td class="num"><b>136</b></td><td class="num">4.2%</td><td class="warn">7,303 seeds left, ~0.6 days</td></tr>
+        <tr><td>Keyword search</td><td class="num">391</td><td class="num">16</td><td class="num">4.1%</td><td>214 passes for 16 leads</td></tr>
+        <tr><td>Recommended-videos feed</td><td class="num">121</td><td class="num">6</td><td class="num">5.0%</td><td class="down">1 seed left of 11,496</td></tr>
+        <tr><td>Peer network</td><td class="num">187</td><td class="num">4</td><td class="num">2.1%</td><td class="down">drained, refill blocked</td></tr>
+        <tr><td>Guest-link mining</td><td class="num">3</td><td class="num">1</td><td class="num">—</td><td>trickle</td></tr>
+        <tr><td>Comment sweep</td><td class="num">0</td><td class="num">0</td><td class="num">—</td><td>paused by Casey 08-20</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="muted">Video-graph made <b>83%</b> of the day's good leads for a fourth straight cycle. Per seed it ran at 0.0222 before the outage, against 0.0250 yesterday, so the slow thinning noted on 08-23 and 08-24 continues at about the same rate. The 0.0102 you get from the raw daily totals is an artefact of the dead hours and should not be read as a collapse.</p>
+
+  <h2>What broke → what's fixed</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Issue</th><th>Mechanism</th><th>Status</th></tr></thead>
+      <tbody class="fix">
+        <tr><td>OpenRouter account empty</td><td>$810 granted, $810.20 spent. Every LLM call returns 402</td><td class="down"><b>Open — only Casey can fix it.</b> Add credits; nothing else is needed</td></tr>
+        <tr><td>Sweeps grind on when the scorer dies</td><td>Key-pool exhaustion stops a sweep; an LLM failure was a silent per-channel <code>continue</code></td><td class="up">Fixed in all five sweeps: a scorer outage now stops the run without consuming seeds (finder <code>a419e55</code>)</td></tr>
+        <tr><td>Halt flag never seen by the long-lived sweep</td><td>Checked once at start-up; that process had been up 6h before the flag was written</td><td class="up">Fixed: video-graph re-checks every chunk</td></tr>
+        <tr><td>The bleeding lane, live</td><td>Still walking when this debrief started, 20 more seeds gone</td><td class="up">Stopped by hand. Restarted onto the new code, read the flag, slept. <b>7,303 seeds preserved</b></td></tr>
+        <tr><td>Nothing watches the account that pays for everything</td><td><code>burn_today</code> meters Anthropic, which is $0.00 by design since 08-01</td><td class="up">Fixed: the debrief now carries OpenRouter spend, live balance and days of runway (orchestrator <code>a28b270</code>)</td></tr>
+        <tr><td>A halt never clears itself</td><td>Topping up the account would have changed nothing until someone deleted a file on the VPS</td><td class="up">Fixed: the check-in clears <em>this one</em> halt once the balance is provably back, and restarts the loop (orchestrator <code>3beb817</code>)</td></tr>
+        <tr><td><code>peer-sweep-refill</code> stuck in systemd <code>failed</code></td><td>Exit 10 means "I gated myself, come back later". It was propagated as a fault</td><td class="up">Fixed: a deliberate self-gate logs and exits clean. State cleared</td></tr>
+        <tr><td>Health monitor read the outage as a speed-up</td><td><code>seeds_advanced</code> +53.1%, <code>productive: true</code>, on a lane making zero leads</td><td class="warn">Open. Every field measures seed supply, and supply was never the problem today</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Recommended next — ranked</h2>
+  <ol class="recs">
+    <li><b>Add OpenRouter credits.</b> Nothing else on this list can happen first. At the current $5 to $8 a day, $200 buys roughly a month. Once the balance is back the pipeline now restarts itself within the hour: the check-in verifies the balance, deletes the halt flag and restarts the campaign loop, and the sweeps wake up on their own.</li>
+    <li><b>Find a seed source that isn't our own output.</b> This has been carried for four days and it stops being theoretical this week. Two of five books are finished, the third has half a day left, and the arithmetic doesn't work: the rail-walking lanes consume more than 11,000 seeds a day and are fed by the ~160 good leads we produce. Dropping the video-graph view floor from 20k to 5k buys roughly 46,000 more seeds and about a week, which is a reprieve rather than a fix.</li>
+    <li><b>Turn the <code>needs_contact</code> recovery lane up.</b> Still the best value in the pipeline and it sidesteps the seed problem entirely, because it re-works supply that was already paid for. It made roughly 77 of 08-24's 189 parks off a pool nobody had touched. The pool is now <b>4,451</b> and the expensive half is bounded, so raising the free collection batch adds output without adding spend. Casey's call, since it sets scraping intensity.</li>
+    <li><b>Decide about the keyword lane.</b> 214 passes for 16 good leads, while spending about $1.20 a day inventing terms that get retired after one run. It is not broken, it is finished. Either give it new seed phrases (carried since 08-16) or retire it and put the money into the lanes that work.</li>
+    <li><b>Teach the health monitor to watch output, not just supply.</b> Today every field on a dead lane was green, and the one number that moved, walk rate, moved the wrong way for the right reason. The same shape has now appeared three times (08-21, 08-22, 08-25). A lane that walks seeds while producing zero leads for an hour should say so.</li>
+    <li><b>Decide the <code>approved_hold</code> outlet.</b> 3,451 parked, 0 ever sent, plus 4,451 in <code>needs_contact</code>. That is <b>7,902 creators found and never contacted.</b> Carried since 08-20 and growing every day the finder runs.</li>
+  </ol>
+
+  <div class="foot">
+    <b>Status:</b> the pipeline is stopped and waiting on credits. That is the correct state, and it is safe to leave: nothing is spending, nothing is looping, and no lead data was lost. The seed book is intact at 7,303 for video-graph. <b>Everything is parked, nothing is sent</b> — <code>approved_hold</code> is a deliberate holding lane. Today's +54 takes the pool to <b>3,451</b>, alongside <b>4,451</b> in <code>needs_contact</code>. Anthropic spend $0.00; OpenRouter spend $5.34 across 6,930 calls, which is low only because the day ended six hours early.
+  </div>
+
+</div>
+
+<script>
+  // Per hour, 07:00Z 08-24 through 06:00Z 08-25 (leads.lead_candidates, created_at).
+  var good  = [9,15,14,9,3,5,12,5,8,9,11,4,7,6,16,15,11,4,0,0,0,0,0,0];
+  var total = [180,178,209,186,139,154,214,144,184,165,214,177,209,202,230,190,178,126,91,73,122,126,132,102];
+  var gMax = Math.max.apply(null, good), tMax = Math.max.apply(null, total);
+  var strip = document.getElementById('strip');
+  good.forEach(function (v, i) {
+    var col = document.createElement('div');
+    col.className = 'col';
+    col.title = v + ' good leads of ' + total[i] + ' channels';
+
+    var ghost = document.createElement('div');
+    ghost.className = 'ghost';
+    ghost.style.height = Math.max(2, Math.round((total[i] / tMax) * 28)) + '%';
+
+    var bar = document.createElement('div');
+    bar.className = 'bar' + (v === 0 ? ' zero' : '');
+    bar.style.height = Math.max(4, Math.round((v / gMax) * 68)) + '%';
+
+    col.appendChild(ghost);
+    col.appendChild(bar);
+    strip.appendChild(col);
+  });
+</script>
