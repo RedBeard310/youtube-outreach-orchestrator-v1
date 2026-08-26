@@ -405,7 +405,59 @@ function sweepWorkInCycle(dirName: string, sinceMs: number, untilMs: number): Sw
     idle_since: idleSince,
   };
 }
-function discoveryMethodsHealth(sinceMs: number, untilMs: number): Record<string, unknown> {
+// A lane's health key is not always its `discovered_via` key: the peer daemon reports as
+// `peer_sweep` here and tags its rows `peer-comment:`, which classifies as `peer_network`.
+// Everything else is spelled the same. Kept explicit so a rename on either side is a
+// compile error rather than a lane that silently reports zero output forever.
+const LANE_DISCOVERY_KEY: Readonly<Record<string, string>> = {
+  recommended_videos_feed: 'recommended_videos_feed',
+  video_graph_sweep: 'video_graph_sweep',
+  comment_sweep: 'comment_sweep',
+  peer_sweep: 'peer_network',
+  podcast_crossover: 'podcast_crossover',
+};
+/**
+ * What the lane actually PRODUCED this cycle, beside what it consumed (2026-08-26).
+ *
+ * Every other field in this block measures seed supply, and supply has not been the
+ * problem on any of the three days this blind spot bit. The same shape has now shown up
+ * four times: 08-21, 08-22, 08-25 (a lane walking 7,200 seeds at zero yield with a dead
+ * scorer, reporting `productive: true` and a walk rate 53% UP, because it had stopped
+ * doing the expensive part), and 08-26 (peer-sweep: 219 seeds walked, 198 channels
+ * written, ONE lead scoring >= 6, every health field green).
+ *
+ * `productive` answers "did this lane move?". These answer "did it make anything?", which
+ * is the question the last four debriefs actually needed. `yield_dead` is the alarm: the
+ * lane did real work — at least `minChannels` channels written, so a quiet lane is never
+ * accused — and got nothing above the approval bar for it.
+ *
+ * Deliberately NOT a comparison against a prior cycle. A lane thinning slowly is a
+ * business fact for the debrief to weigh; a lane at zero after real work is a fault, and
+ * conflating the two is how 08-25 read an outage as a speed-up.
+ */
+export function laneYield(
+  channels: number | undefined,
+  pitchable: number | undefined,
+  seedsAdvanced: number | null,
+  minChannels = 50,
+): { channels_in_cycle: number; pitchable_in_cycle: number; pitchable_rate_pct: number | null; pitchable_per_seed: number | null; yield_dead: boolean } {
+  const ch = channels ?? 0;
+  const p = pitchable ?? 0;
+  return {
+    channels_in_cycle: ch,
+    pitchable_in_cycle: p,
+    pitchable_rate_pct: ch > 0 ? Math.round((1000 * p) / ch) / 10 : null,
+    pitchable_per_seed:
+      seedsAdvanced !== null && seedsAdvanced > 0 ? Math.round((10000 * p) / seedsAdvanced) / 10000 : null,
+    yield_dead: ch >= minChannels && p === 0,
+  };
+}
+function discoveryMethodsHealth(
+  sinceMs: number,
+  untilMs: number,
+  byMethod: Record<string, number>,
+  byMethodPitchable: Record<string, number>,
+): Record<string, unknown> {
   const work = (key: string): SweepWork =>
     sweepWorkInCycle(SWEEP_SESSION_DIRS[key]!, sinceMs, untilMs);
   const graphUpdated = sweepStateUpdatedAt('graph-sweep-state.json');
@@ -437,7 +489,14 @@ function discoveryMethodsHealth(sinceMs: number, untilMs: number): Record<string
     const counts = seedCounts(stateFile);
     const adv = advance(key, w, counts);
     const book = seedBook(counts, adv.seeds_advanced);
-    return { ...w, ...adv, ...book, ...trend(key, adv.seeds_advanced, adv.seeds_advanced_source, book) };
+    const dk = LANE_DISCOVERY_KEY[key] ?? key;
+    return {
+      ...w,
+      ...adv,
+      ...book,
+      ...trend(key, adv.seeds_advanced, adv.seeds_advanced_source, book),
+      ...laneYield(byMethod[dk], byMethodPitchable[dk], adv.seeds_advanced),
+    };
   };
   const graphLane = lane('recommended_videos_feed', 'graph-sweep-state.json', graphWork);
   const videoGraphLane = lane('video_graph_sweep', 'video-graph-sweep-state.json', videoGraphWork);
@@ -892,7 +951,7 @@ async function main(): Promise<void> {
       by_discovery_method: byMethod,
       by_discovery_method_pitchable: byMethodPitchable,
     },
-    discovery_methods_health: discoveryMethodsHealth(sinceMs, Date.parse(untilISO)),
+    discovery_methods_health: discoveryMethodsHealth(sinceMs, Date.parse(untilISO), byMethod, byMethodPitchable),
     campaign: {
       sessions_started: count('start'),
       sessions_done: count('done'),

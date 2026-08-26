@@ -1,4 +1,4 @@
-import { isVerifiedOrBeyond, priorAdvanceSource, priorSeedsAdvanced, priorSeedsWalked, reconcileAdvanced, sessionSeedsAdvanced, sessionStartMs, walkRateTrend } from './debrief-data.ts';
+import { isVerifiedOrBeyond, laneYield, priorAdvanceSource, priorSeedsAdvanced, priorSeedsWalked, reconcileAdvanced, sessionSeedsAdvanced, sessionStartMs, walkRateTrend } from './debrief-data.ts';
 let fail = 0;
 const ok = (name: string, got: unknown, want: unknown) => {
   const pass = JSON.stringify(got) === JSON.stringify(want);
@@ -101,6 +101,26 @@ ok('mixed-source baseline reports the percentage but never escalates',
 ok('same-source baseline arms the alarm again',
   walkRateTrend(7523, 12647, ROAD, true),
   { seeds_advanced_prev: 12647, walk_rate_change_pct: -40.5, throughput_bound: true });
+
+// laneYield — what a lane PRODUCED, beside what it consumed
+ok('the 08-26 peer-sweep case: real work, one lead, near-dead but not dead',
+  laneYield(198, 1, 219),
+  { channels_in_cycle: 198, pitchable_in_cycle: 1, pitchable_rate_pct: 0.5, pitchable_per_seed: 0.0046, yield_dead: false });
+ok('the 08-25 shape: thousands of channels, nothing above the bar -> the alarm fires',
+  laneYield(3223, 0, 7200),
+  { channels_in_cycle: 3223, pitchable_in_cycle: 0, pitchable_rate_pct: 0, pitchable_per_seed: 0, yield_dead: true });
+ok('a healthy lane never trips it',
+  laneYield(3135, 168, 6222),
+  { channels_in_cycle: 3135, pitchable_in_cycle: 168, pitchable_rate_pct: 5.4, pitchable_per_seed: 0.027, yield_dead: false });
+ok('a quiet lane is not accused — below the work floor, zero is just quiet',
+  laneYield(3, 0, 10),
+  { channels_in_cycle: 3, pitchable_in_cycle: 0, pitchable_rate_pct: 0, pitchable_per_seed: 0, yield_dead: false });
+ok('a lane that wrote nothing at all reports nothing, not a divide-by-zero',
+  laneYield(undefined, undefined, null),
+  { channels_in_cycle: 0, pitchable_in_cycle: 0, pitchable_rate_pct: null, pitchable_per_seed: null, yield_dead: false });
+ok('unknown seed advance still gives the channel-side rate',
+  laneYield(106, 6, null),
+  { channels_in_cycle: 106, pitchable_in_cycle: 6, pitchable_rate_pct: 5.7, pitchable_per_seed: null, yield_dead: false });
 
 console.log(fail === 0 ? '\nALL PASS' : `\n${fail} FAILED`);
 process.exit(fail === 0 ? 0 : 1);

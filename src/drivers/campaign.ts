@@ -172,9 +172,64 @@ async function promoteSeen(opts: CampaignOpts, seen: Set<string>): Promise<void>
   log({ event: 'promote', exit: r.exit_code, pool_size: seen.size });
 }
 
+// How many probes did a discover-veins run actually write? Reads the terminal lines
+// scripts/discover-veins.ts prints. Returns null when none is present, which is the
+// fail-open case (see the backoff comment below). The dry-marker skip and the
+// nothing-to-write path both count as a genuine zero: the run happened and produced
+// no terms, which is exactly the signal the backoff is measuring.
+export function parseDiscoverProbes(stdout: string): number | null {
+  const done = [...stdout.matchAll(/\[discover\] done\. (\d+) probes written/g)];
+  if (done.length) return Number(done[done.length - 1][1]);
+  if (/\[discover\] nothing to write\./.test(stdout)) return 0;
+  if (/\[discover\] skip "/.test(stdout)) return 0;
+  return null;
+}
+function discoverYieldStatePath(): string {
+  return join('logs', 'discover-yield-state.json');
+}
+function readDiscoverYield(): HarvestYieldSample[] {
+  try {
+    const s = JSON.parse(readFileSync(discoverYieldStatePath(), 'utf8')) as { runs?: HarvestYieldSample[] };
+    return Array.isArray(s.runs) ? s.runs.filter(r => r && Number.isFinite(r.probes)) : [];
+  } catch { return []; }
+}
+function recordDiscoverYield(probes: number): void {
+  try {
+    mkdirSync('logs', { recursive: true });
+    const runs = [...readDiscoverYield(), { ts: new Date().toISOString(), probes }].slice(-20);
+    writeFileSync(discoverYieldStatePath(), JSON.stringify({ runs }) + '\n');
+  } catch { /* best-effort; a missing sample only means we discover again next fade */ }
+}
+
 // Ask the finder to invent + write a batch of probe veins (adaptive discovery).
 // In frontier mode it explores un-mined verticals instead of re-mining the
 // saturated core (the 2026-07-09 lesson: re-mining yields ~0 net-new terms).
+//
+// LOW-YIELD BACKOFF (2026-08-26). This is the same guard harvestKeywords() got on
+// 08-09, for the same failure, measured on the 08-25→26 cycle:
+//
+//   • 306 restock invocations, 272 of which fired the DeepSeek call (40 candidates each).
+//   • 197 of those 272 wrote NOTHING. All 272 together wrote 126 probes — 0.46 per call.
+//   • Median 58.4s each, 5.15 hours total, against a 17.6-hour pass loop. 29% of the
+//     campaign's whole wall-clock, in a cycle where all 11 finished sessions ended on
+//     their TIME BUDGET, so it came straight out of finder passes.
+//   • It did not even prevent the starvation it exists for: the reservoir still read
+//     STOCK-UP on all 13 sessions with discovery running flat out.
+//
+// discover-veins.ts already has its own dry-marker ("skip — went dry at N terms"), but
+// it re-arms the moment the term table grows, and the 74 discovers that DID write grew
+// it by 1-3 terms apiece. The guard was defeated by its own output: it caught 34 of 306.
+// Measuring yield over the last N runs is immune to that, because 1-3 probes is still a
+// low yield however many times the table ticks upward.
+//
+// Self-clearing, exactly like the harvest guard: after the window one discover always
+// runs, and a single good yield (>= DISCOVER_LOW_YIELD_MIN_PROBES) clears the streak and
+// restores full cadence. Yield here is genuinely revivable — promoting probes, seeding a
+// niche, or editing the discovery skill / models.json all make new ground judgeable.
+//
+// Fail-open on supply: a run whose output can't be parsed records NO sample, so it
+// neither starts nor extends a streak. Worst case is the status quo, never a silently
+// disabled discovery. Escape hatch: DISCOVER_LOW_YIELD_BACKOFF_HOURS=0 disables it.
 async function discover(opts: CampaignOpts, focus?: string): Promise<void> {
   const args = ['tsx', 'scripts/discover-veins.ts', '--count', String(opts.discoveryCount), '--apply'];
   if (opts.frontier) args.push('--frontier');
@@ -183,9 +238,29 @@ async function discover(opts: CampaignOpts, focus?: string): Promise<void> {
     console.log(`[campaign] DRY RUN — would discover veins: npx ${args.join(' ')}`);
     return;
   }
+  const lowYield = harvestLowYieldBackoff(readDiscoverYield(), Date.now(), {
+    samples: Number(process.env.DISCOVER_LOW_YIELD_SAMPLES ?? 5),
+    minProbes: Number(process.env.DISCOVER_LOW_YIELD_MIN_PROBES ?? 3),
+    backoffH: Number(process.env.DISCOVER_LOW_YIELD_BACKOFF_HOURS ?? 2),
+  });
+  if (lowYield.skip) {
+    console.log(
+      `[campaign] vein discovery skipped — last ${lowYield.streak} runs each wrote < ` +
+        `${process.env.DISCOVER_LOW_YIELD_MIN_PROBES ?? 3} probes (the generator is reconverging on its ` +
+        `own priors); backing off ${process.env.DISCOVER_LOW_YIELD_BACKOFF_HOURS ?? 2}h, ` +
+        `${lowYield.sinceH.toFixed(1)}h elapsed. Time goes to finder passes instead. Remedy is ` +
+        `supply-side: promote probes, seed a niche, or edit the discovery skill / models.json.`,
+    );
+    log({ event: 'discover', skipped: true, reason: 'low_yield_backoff', streak: lowYield.streak, since_hours: Number(lowYield.sinceH.toFixed(2)) });
+    return;
+  }
   console.log(`[campaign] restocking — inventing ${opts.discoveryCount} probe veins${opts.frontier ? ' [FRONTIER]' : focus ? ` (focus: ${focus})` : ''}…`);
-  const r = await runChild('npx', args, finderRepo());
-  log({ event: 'discover', frontier: opts.frontier, focus: focus ?? null, exit: r.exit_code });
+  // runChildCapture tees to the terminal, so the session log is byte-identical to before;
+  // we just also get the stdout needed to read the yield.
+  const r = await runChildCapture('npx', args, finderRepo());
+  const probes = parseDiscoverProbes(r.stdout);
+  if (probes !== null) recordDiscoverYield(probes);
+  log({ event: 'discover', skipped: false, frontier: opts.frontier, focus: focus ?? null, exit: r.exit_code, probes_written: probes });
 }
 
 // Industrialised Keyword Layer (2026-07-14). Mine REAL search strings from YouTube +
