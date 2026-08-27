@@ -1,0 +1,225 @@
+<title>Lead Run Debrief — 2026-08-27</title>
+<style>
+  :root {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+      --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+      --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+    --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+    --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 40px 22px 80px; }
+  .eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); font-weight: 600; }
+  h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.12; margin: 10px 0 6px; text-wrap: balance; letter-spacing: -.02em; }
+  h2 { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); margin: 44px 0 16px; font-weight: 700; }
+  h3 { font-size: 18px; margin: 0 0 6px; letter-spacing: -.01em; }
+  p { margin: 0 0 14px; }
+  .lede { font-size: 18px; color: var(--ink-soft); max-width: 68ch; }
+  .tag { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--red-soft); color: var(--red); letter-spacing: .02em; }
+  .tag.amber { background: var(--amber-soft); color: var(--amber); }
+  .tag.good { background: #1f8a5b1a; color: var(--good); }
+  .grid { display: grid; gap: 14px; }
+  .stats { grid-template-columns: repeat(4, 1fr); margin-top: 26px; }
+  @media (max-width: 720px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; box-shadow: var(--shadow); }
+  .stat .n { font-size: 30px; font-weight: 750; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .stat .l { font-size: 12.5px; color: var(--ink-soft); margin-top: 3px; }
+  .stat .s { font-size: 12px; margin-top: 8px; font-weight: 600; }
+  .up { color: var(--good); } .down { color: var(--red); } .warn { color: var(--amber); }
+  .accent-red { border-left: 3px solid var(--red); }
+  .accent-teal { border-left: 3px solid var(--teal); }
+  .accent-amber { border-left: 3px solid var(--amber); }
+  .accent-good { border-left: 3px solid var(--good); }
+
+  .strip { display: flex; align-items: flex-end; gap: 3px; height: 130px; padding: 14px 14px 10px; overflow-x: auto; }
+  .col { flex: 1 0 14px; min-width: 12px; display: flex; flex-direction: column; justify-content: flex-end; height: 100%; }
+  .bar { border-radius: 2px 2px 0 0; background: var(--teal); opacity: .92; }
+  .bar.zero { background: var(--red); height: 4px !important; }
+  .ghost { border-radius: 2px 2px 0 0; background: var(--ink-soft); opacity: .18; margin-bottom: 2px; }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-soft); padding: 0 14px 14px; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+
+  .q { border-radius: 14px; padding: 20px 22px; margin-bottom: 14px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); }
+  .q .ask { font-size: 17px; font-weight: 700; color: var(--ink); margin-bottom: 10px; display: flex; gap: 10px; align-items: baseline; }
+  .q .ask .qn { color: var(--red); font-weight: 800; flex: 0 0 auto; }
+  .q p { color: var(--ink-soft); }
+  .q b { color: var(--ink); }
+  .pill { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink); background: var(--panel-2); padding: 1px 7px; border-radius: 6px; border: 1px solid var(--line); white-space: nowrap; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+  th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .fix td:first-child { color: var(--good); font-weight: 650; }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); box-shadow: var(--shadow); margin-bottom: 14px; }
+  ol.recs { padding-left: 0; list-style: none; counter-reset: r; margin: 0; }
+  ol.recs li { counter-increment: r; position: relative; padding: 14px 16px 14px 52px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 10px; box-shadow: var(--shadow); }
+  ol.recs li::before { content: counter(r); position: absolute; left: 14px; top: 14px; width: 26px; height: 26px; border-radius: 8px; background: var(--teal-soft); color: var(--teal); font-weight: 800; font-size: 14px; display: grid; place-items: center; }
+  ol.recs b { color: var(--ink); }
+  .foot { margin-top: 46px; padding: 16px 18px; border-radius: 12px; background: var(--amber-soft); border: 1px solid var(--line); font-size: 14px; color: var(--ink-soft); }
+  .foot b { color: var(--ink); }
+  .muted { color: var(--ink-soft); font-size: 13.5px; }
+  code { background: var(--panel-2); border: 1px solid var(--line); border-radius: 5px; padding: 0 5px; font-size: .9em; }
+</style>
+
+<div class="wrap">
+
+  <div class="eyebrow">Lead Run Debrief · YouTube outreach</div>
+  <h1>2026-08-27 — the biggest lane ran out of seeds, and the recovery lane was walking in place</h1>
+  <p class="lede">A full 24 hours, no outage, no crashes, and the best raw discovery day of the month: 5,122 channels written. But the video-graph sweep ate the last of its seed list and everything its refill produced, so all three walking lanes now live hand to mouth. And the recovery lane, which nobody had reason to doubt, turned out to have been re-running the same 40 leads every six hours since the day it went live.</p>
+  <div style="margin-top:14px">
+    <span class="tag">ALL SEED LISTS AT ZERO</span>
+    <span class="tag amber" style="margin-left:6px">RECOVERY LANE STALLED, FIXED TODAY</span>
+    <span class="tag good" style="margin-left:6px">0 FATAL ERRORS</span>
+  </div>
+
+  <div class="grid stats">
+    <div class="card stat accent-good">
+      <div class="n">+74</div>
+      <div class="l">parked → <code>approved_hold</code></div>
+      <div class="s up">vs +70 yesterday, pool now 3,594</div>
+    </div>
+    <div class="card stat accent-teal">
+      <div class="n">215</div>
+      <div class="l">creators worth contacting</div>
+      <div class="s up">200 yesterday, from 32% more channels</div>
+    </div>
+    <div class="card stat accent-red">
+      <div class="n">0</div>
+      <div class="l">seeds banked, all three walking lanes</div>
+      <div class="s down">video-graph joined the other two today</div>
+    </div>
+    <div class="card stat accent-amber">
+      <div class="n">0</div>
+      <div class="l">contact points recovered in 24h</div>
+      <div class="s warn">160 leads dispatched, same 40 as always</div>
+    </div>
+  </div>
+
+  <h2>The shape of the day</h2>
+  <div class="card" style="padding:0">
+    <div class="strip" id="strip"></div>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--teal)"></span>good leads found that hour (score ≥ 6)</span>
+      <span><span class="dot" style="background:var(--ink-soft);opacity:.35"></span>all channels written that hour, to scale</span>
+    </div>
+  </div>
+  <p class="muted">Each column is one hour, 07:00Z through 06:00Z. Every hour produced work, which is the first fully uninterrupted cycle since 08-24. Channel volume is flat and high all day. The good-lead line is flatter than usual and lower in the middle of the day, which is the story below: the machine ran harder and got less back.</p>
+
+  <h2>The three questions</h2>
+
+  <div class="q accent-good">
+    <div class="ask"><span class="qn">Q1</span><span>Yesterday's fix freed up a third of the day. What did that time buy?</span></div>
+    <p><b>Twice as many finder passes, and not one extra lead.</b> The backoff worked exactly as designed: of 580 chances to invent search terms it skipped <b>545</b>, and of 580 chances to harvest keywords it skipped <b>576</b>. Finder passes went from <b>288 to 565</b>, up 96%, in the same wall-clock.</p>
+    <p>Yield per pass did not move. It was <span class="pill">0.083</span> fresh good leads per pass yesterday and <span class="pill">0.083</span> today, to three decimal places. Twice the passes, twice the leads, same rate. So the keyword lane was never short of time. It is short of terms.</p>
+    <p>The 15 term-invention calls that did run wrote <b>3 probes between them</b>: thirteen wrote nothing, one wrote one, one wrote two. The reservoir opened <code>STOCK-UP</code> on all 16 sessions and the starvation reading fired 22 times. This lane is mined out, and today's number is the cleanest proof of it we have had: we handed it double the run time and it returned the same rate.</p>
+  </div>
+
+  <div class="q accent-red">
+    <div class="ask"><span class="qn">Q2</span><span>What happens now the biggest lane has finished its seed list?</span></div>
+    <p>It already started. Video-graph walked <b>8,084</b> seeds this cycle. That is the <b>6,721</b> it had banked plus every one of the <b>1,363</b> its refill produced, and it ended the day at zero. The arithmetic is not close: it burns about six seeds for every one it makes.</p>
+    <p>The cost showed up in the same cycle. Per seed it made <span class="pill">0.0193</span> good leads against <b>0.0269</b> yesterday, down 28%, while it spent 30% more seeds. Its hit rate fell from 5.4% to <b>4.1%</b>. It still made <b>156 of the day's 215</b> good leads, so it is carrying the pipeline, just less efficiently than a week ago.</p>
+    <p>The other two finished lanes show the settled state. Peer-network walked 200 refill seeds for <b>5</b> good leads. The recommended-videos feed walked 202 for <b>7</b>. Both are asking a creator we found this morning to introduce us to people we already have. <b>Yesterday's day-and-a-bit of warning is spent.</b></p>
+  </div>
+
+  <div class="q accent-amber">
+    <div class="ask"><span class="qn">Q3</span><span>The recovery lane made 77 leads on its first night. What has it made since?</span></div>
+    <p><b>Almost nothing, and the reason is a one-line selector.</b> Contact points written: 46 on 08-23, 2 on 08-24, 0 on 08-25, 1 on 08-26, <b>0 today</b>. Meanwhile the lane dispatched four collection passes a day at 40 leads each. The pool of leads it has never touched sat at <b>3,315</b> the whole time and did not move once.</p>
+    <p>The selector only let a lead leave the queue by producing a contact point. So every lead the collector failed on stayed at the front and came back six hours later. It has been re-running one fixed batch of the 40 oldest leads about sixteen times.</p>
+    <p>That batch is the worst forty in the pool. <b>27 of them have no website recorded at all</b>, so 9 of the 11 collection methods skip on sight. Of the 13 that do have a site, the ones checked today have dead DNS, a bot wall, or a redirect to somebody else's domain. Running all eight of a sample produced <b>0</b> contact points. Running eight leads from the middle of the same pool produced <b>7 points from 2 leads</b>. The pool is fine. The queue was stuck.</p>
+    <p>This is the same mistake as the verify selector on 08-24, one lane over: reading <em>no result yet</em> as <em>not tried yet</em>. Fixed today, described below.</p>
+  </div>
+
+  <h2>Where the leads came from</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Lane</th><th class="num">Channels</th><th class="num">Score ≥ 6</th><th class="num">Rate</th><th class="num">Per seed</th><th>Seed list</th></tr></thead>
+      <tbody>
+        <tr><td><b>Video-graph sweep</b></td><td class="num">3,788</td><td class="num"><b>156</b></td><td class="num">4.1%</td><td class="num">0.0193</td><td class="down">finished. Walked 8,084, banked 0, refill made 1,363</td></tr>
+        <tr><td>Keyword search</td><td class="num">850</td><td class="num">47</td><td class="num">5.5%</td><td class="num">—</td><td class="warn">565 passes for 47 leads, 0.083 per pass</td></tr>
+        <tr><td>Peer network</td><td class="num">266</td><td class="num">5</td><td class="num">1.9%</td><td class="num">0.0250</td><td class="down">finished 08-26. Refill only, 200 seeds</td></tr>
+        <tr><td>Recommended-videos feed</td><td class="num">217</td><td class="num">7</td><td class="num">3.2%</td><td class="num">0.0347</td><td class="down">finished 08-26. Refill only, 202 seeds</td></tr>
+        <tr><td>Guest-link mining</td><td class="num">1</td><td class="num">0</td><td class="num">—</td><td class="num">—</td><td>trickle, effectively idle</td></tr>
+        <tr><td>Podcast crossover</td><td class="num">0</td><td class="num">0</td><td class="num">—</td><td class="num">—</td><td>ran once, produced nothing, as usual</td></tr>
+        <tr><td>Comment sweep</td><td class="num">0</td><td class="num">0</td><td class="num">—</td><td class="num">—</td><td>paused by Casey 08-20, working as intended</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="muted">Of the 215 good leads, <b>71</b> came with a verified email, so a third are reachable by the send path and 141 went to <code>needs_contact</code>. Biggest niches: 60 uncategorised, then coaching and consulting at 36, health and wellness clinics at 32, real estate at 21 and transformation coaching at 21. Scoring ran clean: <b>0</b> failures across 5,122 channels, the third clean day running.</p>
+
+  <h2>What broke → what's fixed</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Issue</th><th>Mechanism</th><th>Status</th></tr></thead>
+      <tbody class="fix">
+        <tr><td>The recovery lane produced nothing for four days</td><td>The collect selector only released a lead once it produced a contact point, so failed leads never left the front of the queue. Same 40 leads, 16 times, 27 of them with no website for 9 of the 11 methods to use</td><td class="up">Fixed: the queue now carries a position and walks the whole book, with website-carrying leads first (orchestrator <code>f74bf4f</code>)</td></tr>
+        <tr><td>Nobody could have seen it</td><td>The collection job runs detached so it cannot eat the session's time budget, and it was detached onto <code>/dev/null</code>. It failed silently every six hours</td><td class="up">Fixed by the same change: it writes to <code>logs/bloodhound-collect.log</code>, and the campaign log now records the queue position and lap count</td></tr>
+        <tr><td>Term invention was eating a third of the day</td><td>272 generator calls, 197 writing nothing, 5h 9m of a 17h 36m loop</td><td class="up">Fixed 08-26 and confirmed today: 545 of 580 calls skipped, finder passes up 96%</td></tr>
+        <tr><td>Video-graph finished its seed list</td><td>Walked its last 6,721 banked seeds plus all 1,363 its refill made. Per-seed yield down 28% in one cycle</td><td class="down"><b>Open, structural, and now live.</b> All three walking lanes are hand to mouth</td></tr>
+        <tr><td>The keyword lane cannot be helped with time</td><td>Double the passes returned exactly the same 0.083 leads per pass. 16 of 16 sessions opened <code>STOCK-UP</code>, 22 starvation readings, 3 probes written all day</td><td class="warn">Open. Supply-side. It needs new seed phrases or it needs retiring</td></tr>
+        <tr><td>Cost per lead rose</td><td>$7.44 against $6.01, for 7% more good leads. Video-graph spent 30% more seeds for 7% fewer leads and it is 79% of the bill</td><td class="warn">Open, and a symptom of the seed problem rather than its own fault</td></tr>
+        <tr><td>One session hit a hard stop</td><td><code>term_supply_exhausted</code> at 04:50Z, run 11. The loop rested and carried on</td><td class="up">Working as designed. 16 of 16 sessions finished, 15 on their time budget</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="muted">Clean day otherwise: <b>0</b> fatal errors, <b>0</b> crashes, <b>0</b> quota stops, <b>$0</b> Anthropic. OpenRouter spent <b>$7.44</b> across 10,984 calls, which is <b>3.5¢</b> per creator worth contacting and <b>10.1¢</b> per lead parked. Both are up on yesterday's 3.0¢ and 8.6¢.</p>
+
+  <h2>Recommended next — ranked</h2>
+  <ol class="recs">
+    <li><b>Find a seed source that is not our own output.</b> Carried for six days, and the warning window closed today. All three walking lanes are at zero banked seeds and living on a refill fed by the 215 good leads we find each day, against the 8,486 seeds they walk. Video-graph already shows the cost: 28% less yield per seed in one cycle. Dropping its view floor from 20k to 5k buys roughly 46,000 seeds and about a week, which is time to build the real answer rather than the answer itself.</li>
+    <li><b>Watch the recovery lane for 24 hours.</b> Today's fix should turn 160 dispatched leads a day from 0 contact points into something. The sample says roughly 0.9 points per lead on the workable part of the pool. If that holds it is around 140 points a day off <b>4,724</b> creators we already paid to find, and it needs no new seeds at all. This is the one lever the seed wall does not touch.</li>
+    <li><b>Decide the <code>approved_hold</code> outlet.</b> 3,594 parked, none ever sent, plus 4,724 in <code>needs_contact</code>. That is <b>8,318 creators found and never contacted</b>, up 213 today. Carried since 08-20, and it grows every day the finder runs.</li>
+    <li><b>Decide about the keyword lane.</b> Today settled the open question about it: the problem is not run time, because doubling the run time changed nothing. 565 passes for 47 leads. Either give it new seed phrases, carried since 08-16, or retire it and spend the quota elsewhere.</li>
+    <li><b>Add a low-balance warning.</b> <b>$465.26</b> left, about 62 days at today's rate, down from 80 days yesterday because the daily spend rose. Still housekeeping rather than an alarm, but the runway is shortening while the yield per dollar falls.</li>
+  </ol>
+
+  <div class="foot">
+    <b>Status:</b> running, unattended, no human touches this cycle. <b>Everything is parked, nothing is sent.</b> <code>approved_hold</code> is a deliberate holding lane. Today's +74 takes the pool to <b>3,594</b>, alongside <b>4,724</b> in <code>needs_contact</code>. Anthropic spend $0.00; OpenRouter spend $7.44 across 10,984 calls, balance <b>$465.26</b>, about 62 days at this rate.
+  </div>
+
+</div>
+
+<script>
+  // Per hour, 07:00Z 08-26 through 06:00Z 08-27 (leads.lead_candidates, created_at).
+  var good  = [12,11,11,4,7,10,8,8,13,9,11,16,7,4,9,12,7,6,2,6,10,11,10,11];
+  var total = [195,143,229,203,206,208,262,259,238,250,249,230,171,169,295,227,214,199,144,100,217,255,263,196];
+  var gMax = Math.max.apply(null, good), tMax = Math.max.apply(null, total);
+  var strip = document.getElementById('strip');
+  good.forEach(function (v, i) {
+    var col = document.createElement('div');
+    col.className = 'col';
+    col.title = v + ' good leads of ' + total[i] + ' channels';
+
+    var ghost = document.createElement('div');
+    ghost.className = 'ghost';
+    ghost.style.height = Math.max(2, Math.round((total[i] / tMax) * 28)) + '%';
+
+    var bar = document.createElement('div');
+    bar.className = 'bar' + (v === 0 ? ' zero' : '');
+    bar.style.height = Math.max(4, Math.round((v / gMax) * 68)) + '%';
+
+    col.appendChild(ghost);
+    col.appendChild(bar);
+    strip.appendChild(col);
+  });
+</script>
