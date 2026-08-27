@@ -255,16 +255,21 @@ export async function updateLead(id: string, fields: Partial<FieldSet>): Promise
 // Score>=6 leads still eligible for the verify step of an approved_hold run:
 // review_status='unreviewed' AND not yet carrying a resolved email outcome. These
 // are what the campaign driver hands to `--stop-after verify` (find + ZeroBounce)
-// before promotion. Excludes leads already verified/failed so repeated calls
-// during a run don't re-verify the same rows.
-export async function getVerifiablePitchableLeads(): Promise<Lead[]> {
-  const base = getBase();
-  const formula = `AND(
+// before promotion. A failed lead can already have a verified email and an unrelated
+// later-stage failure. It cannot do useful work in a verify-only run, so leave it
+// to the regular retry path instead of selecting it on every campaign pass.
+export function verifiablePitchableFormula(): string {
+  return `AND(
     {review_status}='unreviewed',
     {signal_score}>=6,
-    OR({outreach_status}='', {outreach_status}='pending', {outreach_status}='email_found', {outreach_status}='failed'),
+    OR({outreach_status}='', {outreach_status}='pending', {outreach_status}='email_found'),
     ${NOT_SUPPRESSED}
   )`;
+}
+
+export async function getVerifiablePitchableLeads(): Promise<Lead[]> {
+  const base = getBase();
+  const formula = verifiablePitchableFormula();
   const records = await withRetry(
     () => base(tableName()).select({ filterByFormula: formula }).all(),
     'getVerifiablePitchableLeads',
