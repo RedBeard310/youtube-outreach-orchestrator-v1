@@ -5,6 +5,7 @@ import {
   laneOptsFromEnv,
   runRecoveryDuringOpenRouterHalt,
   VERIFIABLE_IDS_SQL,
+  COLLECT_IDS_SQL,
   type LaneState,
 } from '../src/recovery/bloodhound-lane.ts';
 
@@ -116,4 +117,40 @@ test('generic halt that quotes the credit message remains a full stop', async ()
 
   assert.equal(ran, false);
   assert.equal(runs, 0);
+});
+
+// --- collect lap cursor (2026-08-27) ------------------------------------
+// The collect pass used to re-select the same 40 leads every 6 hours, because
+// the only way out of the pool was to gain a contact point. These lock the
+// cursor walk that replaced it.
+
+test('COLLECT_IDS_SQL: a null cursor selects the whole pool (fresh lap)', () => {
+  assert.match(COLLECT_IDS_SQL, /\$2::int IS NULL/);
+});
+
+test('COLLECT_IDS_SQL: the cursor is one ascending 3-tuple comparison', () => {
+  assert.match(COLLECT_IDS_SQL, /\(tier, disc, id\) > \(\$2::int, \$3::timestamptz, \$4::text\)/);
+  assert.match(COLLECT_IDS_SQL, /ORDER BY tier, disc, id/);
+});
+
+test('COLLECT_IDS_SQL: link-carrying leads sort first (9 of 11 methods need a site)', () => {
+  assert.match(COLLECT_IDS_SQL, /CASE WHEN COALESCE\(lc\.external_links, ''\) NOT IN \('', '\[\]'\) THEN 0 ELSE 1 END AS tier/);
+});
+
+test('COLLECT_IDS_SQL: keeps the pool guards it inherited', () => {
+  assert.match(COLLECT_IDS_SQL, /review_status = 'needs_contact'/);
+  assert.match(COLLECT_IDS_SQL, /outreach_status = 'no_email_found'/);
+  assert.match(COLLECT_IDS_SQL, /signal_score >= 6/);
+  assert.match(COLLECT_IDS_SQL, /COALESCE\(lc\.do_not_contact, false\) = false/);
+  assert.match(COLLECT_IDS_SQL, /NOT EXISTS \(SELECT 1 FROM leads\.contact_points cp WHERE cp\.lead_id = lc\.id\)/);
+});
+
+test('COLLECT_IDS_SQL: a null first_discovered_at still sorts, never drops out', () => {
+  assert.match(COLLECT_IDS_SQL, /COALESCE\(lc\.first_discovered_at, 'infinity'::timestamptz\)/);
+});
+
+test('LaneState carries a cursor and a lap count', () => {
+  const s: LaneState = { collectCursor: { tier: 0, disc: '2026-05-22T17:31:37.050Z', id: 'recX' }, collectLaps: 2 };
+  assert.equal(s.collectCursor?.tier, 0);
+  assert.equal(s.collectLaps, 2);
 });
