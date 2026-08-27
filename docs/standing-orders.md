@@ -67,6 +67,20 @@ everything up to "parked, ready to write" is automatic.
 
 ## Change log
 
+- 2026-08-27: **The `needs_contact` recovery lane was live but stalled, and the
+  entry above ("BUILT AND RUNNING") was true only of the first night.** It
+  dispatched 4 collect passes a day at 40 leads each from 08-23 onward and wrote
+  46 contact points on 08-23, 2 on 08-24, 0 on 08-25, 1 on 08-26 and 0 on 08-27.
+  The untouched pool sat at 3,315 the whole time. The collect selector released a
+  lead only by succeeding, so every lead the collector failed on stayed at the
+  head of the queue: it re-ran one fixed batch of the 40 oldest leads about
+  sixteen times, and 27 of that forty carry no website for 9 of the 11 methods to
+  use. Nobody saw it because the detached child ran on `stdio: 'ignore'`. **Fixed**
+  in orchestrator `f74bf4f`: the queue carries a cursor, walks the whole book,
+  puts website-carrying leads first, and logs to `logs/bloodhound-collect.log`.
+  **Read a lane's OUTPUT, not its dispatch count** — this is the second selector
+  in a week (after `d6af815`) that read "no result yet" as "not tried yet".
+
 - 2026-08-24: **The `needs_contact` recovery lane is live, and it made the day.**
   Casey merged it 08-23 21:27Z (`1bea933`). Its first night produced roughly
   **77 of the 189 parked leads** — the best parking day since 07-09 — off a pool
