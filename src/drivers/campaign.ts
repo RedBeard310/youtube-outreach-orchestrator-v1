@@ -487,12 +487,75 @@ async function harvestKeywords(opts: CampaignOpts, intervalOverrideH?: number): 
 // At the end of a run, promote the probe winners (qr>=threshold) to the fresh tier
 // and retire the losers — so discovered veins that converted come back with the
 // good terms and duds stop wasting quota. Was manual on 2026-07-09; now automatic.
-async function evaluateProbes(opts: CampaignOpts): Promise<void> {
+//
+// CADENCE FLOOR (2026-08-28). This is the same guard harvestKeywords() got on 08-09
+// and discover() got on 08-26, for the same failure, measured on the 08-27→28 cycle:
+//
+//   • The mid-run trigger is a FADE COUNT (every 3 fades), and 589 of 591 finder
+//     passes faded, so it fired 205 times in 24h.
+//   • Each invocation is a full scan of the probe set — 22,945 rows — and takes a
+//     measured 31s. 205 × 31s = 1h 46m out of a 20.5h pass loop: 8.6% of the
+//     campaign's entire wall-clock, in a cycle where all 14 finished sessions
+//     ended on their TIME BUDGET, so it came straight out of finder passes.
+//   • It bought almost nothing. Across those 205 runs it promoted 4 terms and
+//     paused 71; 140 of the 205 changed nothing at all. Nor could it: discover()
+//     is now backed off on every fade, so no new probes are being written, and a
+//     verdict only becomes available when a probe crosses the 20-candidate sample
+//     floor — which happens on finder-pass timescales, not on fade timescales.
+//
+// So the trigger is gated on TIME as well as fades. The mid-run intent (#3, from
+// 2026-07-10: winners must re-enter the active tier in the SAME session, not at
+// run-end) survives intact — sessions run ~1.5h, so a 30-minute floor still allows
+// 2–3 evaluations per session against the pre-2026-07-10 behaviour of one at the end.
+// The finish-block call passes no floor and therefore ALWAYS runs, so every session
+// still ends with a full evaluation regardless of when the last mid-run one fired.
+// Escape hatch: PROBE_EVAL_MIN_INTERVAL_MINUTES=0 restores fade-only triggering.
+function probeEvalStatePath(): string {
+  return join('logs', 'probe-eval-state.json');
+}
+function minutesSinceLastProbeEval(): number {
+  try {
+    const s = JSON.parse(readFileSync(probeEvalStatePath(), 'utf8')) as { last?: string };
+    const t = s.last ? Date.parse(s.last) : NaN;
+    return Number.isFinite(t) ? (Date.now() - t) / 60_000 : Infinity;
+  } catch {
+    return Infinity; // no state yet → due
+  }
+}
+function markProbeEval(): void {
+  try {
+    mkdirSync('logs', { recursive: true });
+    writeFileSync(probeEvalStatePath(), JSON.stringify({ last: new Date().toISOString() }) + '\n');
+  } catch { /* best-effort; a lost stamp only means we evaluate again on the next fade */ }
+}
+// Fail-open by construction: a missing/corrupt stamp reads as Infinity (due), and an
+// interval of 0 disables the floor entirely. The worst case is the status quo, never
+// a silently skipped evaluation.
+export function probeEvalDue(sinceMin: number, intervalMin: number): boolean {
+  if (!(intervalMin > 0)) return true;
+  // Infinity (never ran) and NaN (unreadable stamp) must both read as DUE. A bare
+  // `NaN >= interval` is false, which would skip the evaluation forever on a corrupt
+  // state file — the exact fail-closed shape that stalled the recovery lane on 08-27.
+  if (!Number.isFinite(sinceMin)) return true;
+  return sinceMin >= intervalMin;
+}
+async function evaluateProbes(opts: CampaignOpts, minIntervalMin = 0): Promise<void> {
   if (opts.dryRun) {
     console.log('[campaign] DRY RUN — would run evaluate-probes.ts --apply');
     return;
   }
+  const sinceMin = minutesSinceLastProbeEval();
+  if (!probeEvalDue(sinceMin, minIntervalMin)) {
+    console.log(
+      `[campaign] probe evaluation skipped — ran ${sinceMin.toFixed(0)}m ago, floor is ${minIntervalMin}m. ` +
+        'A full probe scan is ~31s over ~23k rows and verdicts only change on finder-pass timescales, ' +
+        'so the time goes to finder passes instead. The end-of-session evaluation still runs unconditionally.',
+    );
+    log({ event: 'evaluate_probes', skipped: true, reason: 'min_interval', since_min: Number(sinceMin.toFixed(1)), floor_min: minIntervalMin });
+    return;
+  }
   console.log('[campaign] evaluating probes (promote winners / retire losers)…');
+  markProbeEval();
   const r = await runChild('npx', ['tsx', 'scripts/evaluate-probes.ts', '--apply'], finderRepo());
   log({ event: 'evaluate_probes', exit: r.exit_code });
 }
@@ -748,9 +811,10 @@ export async function driveCampaign(opts: CampaignOpts): Promise<void> {
       // run evaluate-probes so veins the day's discovery already validated re-enter
       // the fresh/active tier the SAME session instead of auto-pausing unused. On
       // 2026-07-10 winners sat paused until run-end and never got mined live.
+      // Gated on TIME as well as fades since 2026-08-28 — see evaluateProbes().
       if (++fadeCount >= probeEvalEveryFades) {
         fadeCount = 0;
-        await evaluateProbes(opts);
+        await evaluateProbes(opts, Number(process.env.PROBE_EVAL_MIN_INTERVAL_MINUTES ?? 30));
       }
     }
 
