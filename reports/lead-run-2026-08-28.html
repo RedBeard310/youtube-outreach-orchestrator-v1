@@ -1,0 +1,223 @@
+<title>Lead Run Debrief — 2026-08-28</title>
+<style>
+  :root {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+      --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+      --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+    --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+    --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 40px 22px 80px; }
+  .eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); font-weight: 600; }
+  h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.12; margin: 10px 0 6px; text-wrap: balance; letter-spacing: -.02em; }
+  h2 { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); margin: 44px 0 16px; font-weight: 700; }
+  h3 { font-size: 18px; margin: 0 0 6px; letter-spacing: -.01em; }
+  p { margin: 0 0 14px; }
+  .lede { font-size: 18px; color: var(--ink-soft); max-width: 68ch; }
+  .tag { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--red-soft); color: var(--red); letter-spacing: .02em; }
+  .tag.amber { background: var(--amber-soft); color: var(--amber); }
+  .tag.good { background: #1f8a5b1a; color: var(--good); }
+  .grid { display: grid; gap: 14px; }
+  .stats { grid-template-columns: repeat(4, 1fr); margin-top: 26px; }
+  @media (max-width: 720px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; box-shadow: var(--shadow); }
+  .stat .n { font-size: 30px; font-weight: 750; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .stat .l { font-size: 12.5px; color: var(--ink-soft); margin-top: 3px; }
+  .stat .s { font-size: 12px; margin-top: 8px; font-weight: 600; }
+  .up { color: var(--good); } .down { color: var(--red); } .warn { color: var(--amber); }
+  .accent-red { border-left: 3px solid var(--red); }
+  .accent-teal { border-left: 3px solid var(--teal); }
+  .accent-amber { border-left: 3px solid var(--amber); }
+  .accent-good { border-left: 3px solid var(--good); }
+
+  .strip { display: flex; align-items: flex-end; gap: 3px; height: 130px; padding: 14px 14px 10px; overflow-x: auto; }
+  .col { flex: 1 0 14px; min-width: 12px; display: flex; flex-direction: column; justify-content: flex-end; height: 100%; }
+  .bar { border-radius: 2px 2px 0 0; background: var(--teal); opacity: .92; }
+  .bar.zero { background: var(--red); height: 4px !important; }
+  .ghost { border-radius: 2px 2px 0 0; background: var(--ink-soft); opacity: .18; margin-bottom: 2px; }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-soft); padding: 0 14px 14px; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+
+  .q { border-radius: 14px; padding: 20px 22px; margin-bottom: 14px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); }
+  .q .ask { font-size: 17px; font-weight: 700; color: var(--ink); margin-bottom: 10px; display: flex; gap: 10px; align-items: baseline; }
+  .q .ask .qn { color: var(--red); font-weight: 800; flex: 0 0 auto; }
+  .q p { color: var(--ink-soft); }
+  .q b { color: var(--ink); }
+  .pill { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink); background: var(--panel-2); padding: 1px 7px; border-radius: 6px; border: 1px solid var(--line); white-space: nowrap; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+  th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .fix td:first-child { color: var(--good); font-weight: 650; }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); box-shadow: var(--shadow); margin-bottom: 14px; }
+  ol.recs { padding-left: 0; list-style: none; counter-reset: r; margin: 0; }
+  ol.recs li { counter-increment: r; position: relative; padding: 14px 16px 14px 52px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 10px; box-shadow: var(--shadow); }
+  ol.recs li::before { content: counter(r); position: absolute; left: 14px; top: 14px; width: 26px; height: 26px; border-radius: 8px; background: var(--teal-soft); color: var(--teal); font-weight: 800; font-size: 14px; display: grid; place-items: center; }
+  ol.recs b { color: var(--ink); }
+  .foot { margin-top: 46px; padding: 16px 18px; border-radius: 12px; background: var(--amber-soft); border: 1px solid var(--line); font-size: 14px; color: var(--ink-soft); }
+  .foot b { color: var(--ink); }
+  .muted { color: var(--ink-soft); font-size: 13.5px; }
+  code { background: var(--panel-2); border: 1px solid var(--line); border-radius: 5px; padding: 0 5px; font-size: .9em; }
+</style>
+
+<div class="wrap">
+
+  <div class="eyebrow">Lead Run Debrief · YouTube outreach</div>
+  <h1>2026-08-28: the recovery lane woke up, and the biggest lane started a lap it can't pay for</h1>
+  <p class="lede">Yesterday's one-line fix to the recovery lane worked, and it worked at exactly the size the sample predicted: 112 contact points off creators we already own, against zero the day before. Discovery went the other way. The feed lane finished its fifth walk of the same seed list at lunchtime and immediately began a sixth, which is running at a third of the fifth lap's yield and eating three quarters of the day's seeds. Total good leads fell 38%.</p>
+  <div style="margin-top:14px">
+    <span class="tag good">RECOVERY LANE FIXED AND CONFIRMED</span>
+    <span class="tag" style="margin-left:6px">FEED LANE LAP 6 AT 37% OF LAP 5</span>
+    <span class="tag good" style="margin-left:6px">0 FATAL ERRORS</span>
+  </div>
+
+  <div class="grid stats">
+    <div class="card stat accent-good">
+      <div class="n">112</div>
+      <div class="l">contact points recovered</div>
+      <div class="s up">0 yesterday, 44 of 120 leads produced one</div>
+    </div>
+    <div class="card stat accent-red">
+      <div class="n">134</div>
+      <div class="l">creators worth contacting</div>
+      <div class="s down">215 yesterday, from 32% fewer channels</div>
+    </div>
+    <div class="card stat accent-teal">
+      <div class="n">+65</div>
+      <div class="l">parked → <code>approved_hold</code></div>
+      <div class="s warn">vs +74 yesterday, pool now 3,659</div>
+    </div>
+    <div class="card stat accent-amber">
+      <div class="n">0.0078</div>
+      <div class="l">good leads per seed, feed lane lap 6</div>
+      <div class="s down">lap 5 ran at 0.021, lap 4 at 0.033</div>
+    </div>
+  </div>
+
+  <h2>The shape of the day</h2>
+  <div class="card" style="padding:0">
+    <div class="strip" id="strip"></div>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--teal)"></span>good leads found that hour (score ≥ 6)</span>
+      <span><span class="dot" style="background:var(--ink-soft);opacity:.35"></span>all channels written that hour, to scale</span>
+    </div>
+  </div>
+  <p class="muted">Each column is one hour, 07:00Z through 06:00Z. The visible scar is 14:00 and 15:00, two hours at <b>50</b> channels each against a typical 150, with zero good leads in the second. That is the feed lane finishing lap 5 at 15:12 and sitting idle until lap 6 started at 16:10. The recovery from 16:00 onward is lap 6 warming up, and it never gets back to the morning's level.</p>
+
+  <h2>The three questions</h2>
+
+  <div class="q accent-good">
+    <div class="ask"><span class="qn">Q1</span><span>Yesterday's recovery-lane fix predicted about 0.9 contact points per lead. What did it actually do?</span></div>
+    <p><b>0.93 per lead, which is the prediction to two decimal places.</b> Three collect passes dispatched 40 leads each. <b>44 of the 120</b> produced something, and together they wrote <b>112 contact points</b>. The four days before the fix wrote 46, 2, 0 and 1.</p>
+    <p>The queue is genuinely moving now. Its cursor sat on the 40 oldest leads for four days; it has since walked forward to leads first discovered on <b>2026-07-12</b>, and it is still inside its first lap of the pool. Nothing is being re-run.</p>
+    <p><b>Points are not yet emails, and that is the thing to watch.</b> Collection and verification are separate steps: seven verify passes picked up <b>32</b> recovered leads over the cycle. The <code>needs_contact</code> pool grew from 4,724 to <b>4,796</b> while <b>88</b> new leads arrived in it, so roughly <b>16</b> left it. That is the first outflow the numbers show, and it is small. Tomorrow's cycle is the one that says whether points convert into parked leads at any useful rate.</p>
+  </div>
+
+  <div class="q accent-red">
+    <div class="ask"><span class="qn">Q2</span><span>Why did good leads fall 38% on a day with no errors and no outage?</span></div>
+    <p><b>The primary lane restarted a lap, and each lap is worth about a third of the one before it.</b> The recommended-videos feed walked its 11,938-seed book for the fifth time and finished at 15:12. Lap 6 began at 16:10 and has walked <b>6,898</b> of those same seeds since. By the sweep's own counter it has found <b>54</b> good creators doing it.</p>
+    <p>That is <span class="pill">0.0078</span> per seed. Lap 5 ran at <b>0.021</b>. Lap 4 ran at <b>0.033</b>. Lap 1, back in July, ran at <b>0.45</b>. Each re-walk of the same list finds the neighbours of neighbours we already took, so the sixth pass is turning up <b>1.7%</b> of what the first did.</p>
+    <p>The cost of that is not spread evenly. The feed lane consumed <b>6,974 of the 9,510 seeds</b> walked today, which is <b>73%</b>, and <b>45%</b> of the day's model spend, and returned <b>40%</b> of the good leads. The video-graph lane, which walks fresh seeds its own refill made rather than re-walking an old book, did <b>0.0187</b> per seed on 2,402 seeds. It is 2.4 times more efficient per seed than the lane the standing orders call primary.</p>
+  </div>
+
+  <div class="q accent-amber">
+    <div class="ask"><span class="qn">Q3</span><span>Yesterday said the keyword lane should be given new phrases or retired. Which is it?</span></div>
+    <p><b>Neither yet, because on cost it is the best lane we have.</b> Its per-pass yield did fall, from 0.083 to <span class="pill">0.056</span> fresh good leads, and all 15 sessions still opened <code>STOCK-UP</code> with 22 starvation readings, so the term drought is real and unchanged.</p>
+    <p>But 591 passes produced <b>33 of the day's 134</b> good leads, which is <b>25% of the output for 18% of the model bill</b>. That works out at <b>2.6¢</b> per good lead against the feed lane's 3.9¢ and the video-graph lane's 3.4¢. Retiring it would delete the cheapest quarter of the day.</p>
+    <p>The reason it looks bad on a per-pass measure and good on a per-dollar one is that a finder pass is cheap and a graph seed is not. The honest read is that the keyword lane is not the problem, and it should stay until something replaces the volume.</p>
+  </div>
+
+  <h2>Where the leads came from</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Lane</th><th class="num">Channels</th><th class="num">Score ≥ 6</th><th class="num">Rate</th><th class="num">Seeds</th><th class="num">Per seed</th><th class="num">¢ / lead</th></tr></thead>
+      <tbody>
+        <tr><td><b>Recommended-videos feed</b></td><td class="num">1,521</td><td class="num"><b>53</b></td><td class="num">3.5%</td><td class="num">6,974</td><td class="num down">0.0076</td><td class="num">3.9</td></tr>
+        <tr><td>Video-graph sweep</td><td class="num">1,109</td><td class="num">45</td><td class="num">4.1%</td><td class="num">2,402</td><td class="num">0.0187</td><td class="num">3.4</td></tr>
+        <tr><td>Keyword search</td><td class="num">733</td><td class="num">33</td><td class="num">4.5%</td><td class="num">591 passes</td><td class="num">0.056/pass</td><td class="num up">2.6</td></tr>
+        <tr><td>Peer network</td><td class="num">135</td><td class="num">3</td><td class="num">2.2%</td><td class="num">134</td><td class="num">0.0224</td><td class="num">2.3</td></tr>
+        <tr><td>Guest-link mining</td><td class="num">2</td><td class="num">0</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td></tr>
+        <tr><td>Podcast crossover</td><td class="num">0</td><td class="num">0</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td></tr>
+        <tr><td>Comment sweep</td><td class="num">0</td><td class="num">0</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="muted">Comment sweep has been off since Casey paused it on 08-20, and podcast crossover ran once and found nothing, as it always does. Of the 134 good leads, <b>46</b> came with a verified email, so 34% are reachable by the send path. Biggest niches: 30 uncategorised, real estate at 29, coaching and consulting at 21, then health clinics and transformation coaching at 10 each. Scoring ran clean again: <b>0</b> failures across 3,500 channels, four clean days running.</p>
+
+  <h2>What broke → what's fixed</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Issue</th><th>Mechanism</th><th>Status</th></tr></thead>
+      <tbody class="fix">
+        <tr><td>The recovery lane produced nothing for four days</td><td>The collect selector released a lead only by succeeding, so failures stayed at the head of the queue and the same 40 leads re-ran sixteen times</td><td class="up">Fixed 08-27, <b>confirmed today</b>: 112 contact points from 44 of 120 leads, cursor now out at 2026-07-12 discoveries</td></tr>
+        <tr><td>Probe evaluation ate 8.6% of the loop's wall-clock</td><td>Triggered on a fade count, and 589 of 591 passes faded, so it fired <b>205 times</b>. Each run is a 31-second scan of 22,945 probe rows. 1h 46m of a 20.5h loop, in a cycle where all 14 sessions ended on their 90-minute budget. It promoted 4 terms and paused 71 all day; 140 of the 205 runs changed nothing</td><td class="up">Fixed today: the trigger now has a 30-minute floor as well as a fade count. The end-of-session evaluation still always runs</td></tr>
+        <tr><td>The feed lane's sixth lap yields a third of its fifth</td><td>0.0078 per seed against 0.021 on lap 5 and 0.033 on lap 4. It took 73% of the day's seeds and 45% of the spend for 40% of the leads</td><td class="down"><b>Open, structural, and Casey's call.</b> The standing orders make this lane primary with standing authorization, so nothing here changed its behaviour</td></tr>
+        <tr><td>Two of the three graph books are finished</td><td>Video-graph and peer-network both sit at zero banked seeds and walk only what their refill makes. Video-graph is down to 2,402 seeds a day from 8,084</td><td class="warn">Open, carried seven days. The refill is fed by the leads we find, so it shrinks as yield falls</td></tr>
+        <tr><td>The term drought is unchanged</td><td>15 of 15 sessions opened <code>STOCK-UP</code>, 22 starvation readings, and every one of 604 term-invention and 604 keyword-harvest calls was skipped by its backoff</td><td class="warn">Open. The backoffs are working as designed; the supply behind them is still empty</td></tr>
+        <tr><td>Two hours produced almost nothing</td><td>14:00 and 15:00Z, 50 channels each. The feed lane finished lap 5 at 15:12 and did not start lap 6 until 16:10</td><td class="warn">Open and minor. A 58-minute gap between laps, worth roughly 200 channels</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="muted">Clean day otherwise: <b>0</b> fatal errors, <b>0</b> crashes, <b>0</b> quota stops, <b>0</b> hard stops, <b>$0</b> Anthropic. 14 of 15 sessions finished, all 14 on their time budget. OpenRouter spent <b>$4.62</b> across 6,794 calls, which is <b>3.4¢</b> per creator worth contacting and <b>7.1¢</b> per lead parked. Both are better than yesterday's 3.5¢ and 10.1¢, because spend fell faster than output did.</p>
+
+  <h2>Recommended next — ranked</h2>
+  <ol class="recs">
+    <li><b>Decide whether the feed lane should keep re-walking the same book.</b> This is the one decision that changes tomorrow's numbers, and it is yours because the standing orders make this lane primary. Lap 6 is at 0.0078 good leads per seed, a third of lap 5 and 1.7% of lap 1, and it is spending 73% of our seeds and 45% of our model bill to get there. The cheapest option is a rule: when a finished lap yields under some floor, walk only the seeds added since the last lap instead of starting a full new one. That keeps the lane running, which the standing orders require, and stops it re-asking 11,938 creators a question they already answered.</li>
+    <li><b>Watch whether recovered contact points become parked leads.</b> Collection is fixed and proven at 0.93 points per lead. What is unproven is the step after it: 32 leads went to email verification and the <code>needs_contact</code> pool only shed about 16. If that ratio holds it is a slow lane, and the bottleneck has moved from the queue to verification. One more cycle settles it, and no new seeds are needed either way.</li>
+    <li><b>Find a seed source that is not our own output.</b> Carried seven days. All three graph lanes are now fed only by the leads the pipeline itself finds, so the supply shrinks whenever yield does, which is the loop we are in. Dropping the feed lane's view floor from 20k to 5k is still the fastest way to buy about a week of road while a real answer gets built.</li>
+    <li><b>Keep the keyword lane.</b> Yesterday's open question resolves against retiring it. It made 25% of the day's good leads for 18% of the bill, at 2.6¢ each, cheaper than either graph lane. It is starved, not broken, and the starvation is a term-supply problem the backoffs already handle gracefully.</li>
+    <li><b>Decide the outlet for the parked pools.</b> <b>3,659</b> in <code>approved_hold</code> and <b>4,796</b> in <code>needs_contact</code>. That is <b>8,455 creators found and never contacted</b>, up 137 today. Carried since 08-20, and it grows every day the finder runs. Money is not the constraint: the balance is <b>$432.49</b>, about 94 days at today's rate, up from 62 days yesterday because spend fell.</li>
+  </ol>
+
+  <div class="foot">
+    <b>Status:</b> running, unattended, no human touches this cycle. <b>Everything is parked, nothing is sent.</b> <code>approved_hold</code> is a deliberate holding lane. Today's +65 takes the pool to <b>3,659</b>, alongside <b>4,796</b> in <code>needs_contact</code>. Anthropic spend $0.00; OpenRouter spend $4.62 across 6,794 calls, balance <b>$432.49</b>, about 94 days at this rate.
+  </div>
+
+</div>
+
+<script>
+  // Per hour, 07:00Z 08-27 through 06:00Z 08-28 (leads.lead_candidates, first_discovered_at).
+  var good  = [6,8,6,2,5,12,7,3,0,3,2,7,4,2,2,13,8,9,9,2,5,4,7,8];
+  var total = [153,93,132,177,164,175,211,50,50,110,115,142,197,107,153,223,218,190,205,139,132,91,120,153];
+  var gMax = Math.max.apply(null, good), tMax = Math.max.apply(null, total);
+  var strip = document.getElementById('strip');
+  good.forEach(function (v, i) {
+    var col = document.createElement('div');
+    col.className = 'col';
+    col.title = v + ' good leads of ' + total[i] + ' channels';
+
+    var ghost = document.createElement('div');
+    ghost.className = 'ghost';
+    ghost.style.height = Math.max(2, Math.round((total[i] / tMax) * 28)) + '%';
+
+    var bar = document.createElement('div');
+    bar.className = 'bar' + (v === 0 ? ' zero' : '');
+    bar.style.height = Math.max(4, Math.round((v / gMax) * 68)) + '%';
+
+    col.appendChild(ghost);
+    col.appendChild(bar);
+    strip.appendChild(col);
+  });
+</script>

@@ -16,11 +16,19 @@ everything up to "parked, ready to write" is automatic.
 
 1. **Recommended-videos feed (graph-sweep) — PRIMARY. Pound it hard.**
    Casey 2026-08-14: this is the new #1, hit it as hard as we can every day.
-   It self-feeds (every qualified lead becomes a seed) and re-walking the
-   whole seed book (a new "lap") is proven at ~80% of first-lap precision —
-   0.45 qualified/seed lap 1. Standing authorization: always-on, OpenRouter
-   spend included, no per-run approval. If this lane is idle, that is a
-   PROBLEM to fix, not a normal state.
+   It self-feeds (every qualified lead becomes a seed). Standing authorization:
+   always-on, OpenRouter spend included, no per-run approval. If this lane is
+   idle, that is a PROBLEM to fix, not a normal state.
+   **The "~80% of first-lap precision" claim written here on 08-14 is dead.**
+   Measured lap yields from the sweep's own counter: lap 1 **0.45**/seed,
+   lap 4 **0.033**, lap 5 **0.021**, lap 6 (started 08-27 16:10Z) **0.0078** =
+   **1.7% of lap 1**. Re-walking the same 11,938-seed book now costs 73% of the
+   day's seeds and 45% of the model bill for 40% of the leads, while video-graph
+   walking FRESH refill seeds does 0.0187/seed. Do NOT quote the 80% figure and
+   do NOT treat a low-yield lap as a bug to debug. **Whether to keep starting
+   full new laps is Casey's call** (this entry is why the autopilot has not
+   changed it); the proposed rule is to walk only seeds added since the last lap
+   once a finished lap falls below a yield floor. Carried as debrief rec #1.
 2. **Comment-sweep — PAUSED by Casey 2026-08-20. Never run it again unless he
    says so.** `comment-sweep-daily.timer` is stopped + disabled on purpose, and
    its row was removed from the autopilot check-in's staleness watch so no
@@ -67,6 +75,26 @@ everything up to "parked, ready to write" is automatic.
 
 ## Change log
 
+- 2026-08-28: **The 08-27 recovery-lane fix is CONFIRMED WORKING. Do not
+  re-debug it.** Three collect passes dispatched 40 leads each; 44 of the 120
+  produced something, for **112 contact points = 0.93/lead**, against the ~0.9 a
+  hand-run sample predicted and against 46/2/0/1 on the four days before. The
+  keyset cursor has walked out from the forty oldest leads to 2026-07-12
+  discoveries and `laps` is still 0, so nothing is being re-run. **The open
+  question has moved one step downstream:** a contact point is a candidate
+  address, not a verified one. 32 recovered leads reached email verification in
+  the cycle and `needs_contact` shed only ~16 against 88 arrivals. Watch the
+  collect → verify → `approved_hold` conversion for one more cycle before
+  spending anything on the collector itself.
+- 2026-08-28: **The graph-sweep lap-precision figure in lane priority #1 was
+  corrected in place** (it said ~80% of first lap; lap 6 measures 1.7%). Nothing
+  about the lane's priority or its standing authorization changed.
+- 2026-08-28: **The mid-run `evaluate-probes` step is now time-gated as well as
+  fade-gated.** It fired 205× in the cycle (589 of 591 passes faded) at a
+  measured 31s per 22,945-row scan = 1h46m of a 20.49h loop, and 140 of those
+  205 runs changed nothing. `PROBE_EVAL_MIN_INTERVAL_MINUTES` defaults to 30; 0
+  restores fade-only. The end-of-session evaluation still always runs, so no
+  session ends without a full one.
 - 2026-08-27: **The `needs_contact` recovery lane was live but stalled, and the
   entry above ("BUILT AND RUNNING") was true only of the first night.** It
   dispatched 4 collect passes a day at 40 leads each from 08-23 onward and wrote
