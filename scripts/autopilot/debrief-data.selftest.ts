@@ -84,9 +84,25 @@ ok('short contained sessions agree either way (peer-sweep 08-23)',
 ok('no baseline falls back to the session logs',
   reconcileAdvanced(8303, 24963, null),
   { seeds_advanced: 8303, seeds_advanced_source: 'session_logs' });
-ok('a re-lap resets the book, so a negative delta falls back',
+ok('a re-lap with no book totals still falls back (pre-08-29 snapshots)',
   reconcileAdvanced(9100, 300, 10779),
   { seeds_advanced: 9100, seeds_advanced_source: 'session_logs' });
+// lap rollover — the exact answer for the case the fallback used to guess at
+ok('lap rollover is computed, not guessed (the 08-29 feed case: 6019, not 13199)',
+  reconcileAdvanced(13199, 979, 6898, 12180, 11938),
+  { seeds_advanced: 6019, seeds_advanced_source: 'lap_rollover' });
+ok('a rollover off a fully-walked book is just the new lap',
+  reconcileAdvanced(9999, 202, 11892, 11990, 11892),
+  { seeds_advanced: 202, seeds_advanced_source: 'lap_rollover' });
+ok('a SHRUNKEN book is not a rollover and still falls back',
+  reconcileAdvanced(9100, 300, 10779, 9000, 10800),
+  { seeds_advanced: 9100, seeds_advanced_source: 'session_logs' });
+ok('a rollover with no session-log sum still answers',
+  reconcileAdvanced(null, 500, 6898, 12180, 11938),
+  { seeds_advanced: 5540, seeds_advanced_source: 'lap_rollover' });
+ok('book delta still wins when the walk counter moved forward',
+  reconcileAdvanced(12647, 32486, 24963, 40000, 39000),
+  { seeds_advanced: 7523, seeds_advanced_source: 'book_delta' });
 ok('an unreadable state file with no logs either reports nothing',
   reconcileAdvanced(null, null, null),
   { seeds_advanced: null, seeds_advanced_source: 'none' });

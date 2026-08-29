@@ -636,6 +636,93 @@ async function main(): Promise<void> {
     // it, and no fix-agent may re-enable it. See docs/standing-orders.md.
     { method: 'podcast_crossover', timer: 'podcast-crossover-daily.timer', stateFile: 'podcast-crossover-state.json', maxAgeH: 30 },
   ];
+  // 7b) Sweep-daemon PROGRESS (2026-08-29). Section 7 asks "is the state file being
+  // touched". That is liveness, and liveness is not work: a sweep that starts, hits a stop
+  // condition and exits in two seconds still rewrites its state file, so it reads fresh
+  // forever while walking nothing.
+  //
+  // The video-graph sweep spent the 08-28 cycle proving it. It crossed its $50 LIFETIME
+  // cost cap at 10:31Z (`[video-sweep] STOP: spent $50.00 >= $50 cumulative cap.`), its
+  // relaunch loop treats that as "SWEEP COMPLETE" and exits 0, and systemd correctly does
+  // not restart a clean exit. Every relaunch after that lived ~2 seconds. The pipeline's
+  // second-cheapest lane (2.7c per qualified lead, 1,424 seeds still in its book) was dead
+  // for 21 hours and NOTHING said so: its state file was 0 hours old, `productive` read
+  // true because the lane had worked earlier in the window, and the one honest field
+  // (`idle_run_streak: 23`) sat in a debrief JSON nobody reads until the next morning.
+  //
+  // So compare the lane's own progress counter against itself over time. Zero movement with
+  // seeds still in the book is a stall whatever caused it — cost cap, deadlock, blocked
+  // rails, a dead scorer.
+  //
+  // OBSERVATION ONLY, never exit 7. Every stall cause seen in the field so far is a spend or
+  // infra decision (raise a cap, rotate an IP, wait for quota), and a `claude -p` agent
+  // cannot make Casey's spend calls. Same reasoning as the term-supply wall in section 5. If
+  // a stall ever shows up that IS a code bug, promote it there rather than widening this.
+  const SWEEP_PROGRESS_HIST = join(LOGS, 'autopilot-sweep-progress.jsonl');
+  const SWEEP_STALL_HOURS = Number(process.env.AUTOPILOT_SWEEP_STALL_HOURS ?? 4);
+  function sweepProgress(stateFile: string): { done: number; total: number } | null {
+    const p = join(FINDER_REPO, 'logs', stateFile);
+    if (!existsSync(p)) return null;
+    try {
+      const s = JSON.parse(readFileSync(p, 'utf8')) as { stats?: { seeds_done?: number }; seeds?: unknown[] };
+      const done = s.stats?.seeds_done;
+      const total = Array.isArray(s.seeds) ? s.seeds.length : undefined;
+      if (typeof done !== 'number' || typeof total !== 'number') return null;
+      return { done, total };
+    } catch { return null; }
+  }
+  // The stop line the lane last printed, so the observation names the cause instead of
+  // reporting a mystery. Newest session log only; absent is fine.
+  function lastStopLine(dirName: string): string | null {
+    const dir = join(FINDER_REPO, 'logs', dirName);
+    if (!existsSync(dir)) return null;
+    try {
+      const newest = readdirSync(dir).filter((f) => f.endsWith('.log')).sort().pop();
+      if (!newest) return null;
+      const text = readFileSync(join(dir, newest), 'utf8').slice(-20000);
+      return /^\[[^\]]+\]\s+(PAUSE|STOP|HALTED)\b.*$/m.exec(text)?.[0]?.trim() ?? null;
+    } catch { return null; }
+  }
+  type ProgressPoint = { ts: string; lane: string; done: number; total: number };
+  const progressNow: ProgressPoint[] = [];
+  const progressLanes: Array<{ lane: string; stateFile: string; sessionDir: string }> = [
+    { lane: 'recommended_videos_feed', stateFile: 'graph-sweep-state.json', sessionDir: 'graph-sweep-sessions' },
+    { lane: 'video_graph_sweep', stateFile: 'video-graph-sweep-state.json', sessionDir: 'video-graph-sweep-sessions' },
+    { lane: 'peer_sweep', stateFile: 'peer-sweep-state.json', sessionDir: 'peer-sweep-sessions' },
+    // comment_sweep deliberately absent, same reason as section 7: Casey paused it 08-20.
+  ];
+  for (const l of progressLanes) {
+    const p = sweepProgress(l.stateFile);
+    if (p) progressNow.push({ ts: new Date().toISOString(), lane: l.lane, done: p.done, total: p.total });
+  }
+  for (const point of progressNow) appendFileSync(SWEEP_PROGRESS_HIST, JSON.stringify(point) + '\n');
+  if (existsSync(SWEEP_PROGRESS_HIST)) {
+    let hist: ProgressPoint[] = [];
+    try {
+      hist = readFileSync(SWEEP_PROGRESS_HIST, 'utf8').split('\n').filter((x) => x.trim())
+        .map((x) => { try { return JSON.parse(x) as ProgressPoint; } catch { return null; } })
+        .filter((x): x is ProgressPoint => x !== null && typeof x.done === 'number');
+    } catch { /* unreadable history is not an incident */ }
+    const cutoff = Date.now() - SWEEP_STALL_HOURS * 3_600_000;
+    for (const point of progressNow) {
+      // A book rollover resets `seeds_done`, so compare only against points that are not
+      // ahead of us — otherwise the lap boundary itself would read as a stall.
+      const older = hist.filter((h) => h.lane === point.lane && Date.parse(h.ts) <= cutoff && h.done <= point.done);
+      const baseline = older.length ? older[older.length - 1]! : null;
+      if (!baseline) continue;
+      const remaining = point.total - point.done;
+      if (point.done !== baseline.done || remaining <= 0) continue;
+      const why = lastStopLine(progressLanes.find((l) => l.lane === point.lane)!.sessionDir);
+      const detail = `${point.lane} has walked 0 seeds in ${SWEEP_STALL_HOURS}h ` +
+        `(still ${point.done}/${point.total}, ${remaining} left in its book) while its state file keeps updating — ` +
+        `a lane that relaunches and exits immediately looks alive to every freshness check. ` +
+        `Last stop line: ${why ?? '(none in the newest session log)'}. ` +
+        `Not fix-agent-fixable: the remedies are a spend or infra call (raise the lane's cost cap, rotate egress IP, wait out quota).`;
+      appendFileSync(OBSERVATIONS, JSON.stringify({ ts: new Date().toISOString(), kind: 'sweep_stalled', lane: point.lane, done: point.done, total: point.total, stop_line: why, detail }) + '\n');
+      console.log(`[checkin ${day}] OBSERVATION sweep_stalled — ${detail}`);
+    }
+  }
+
   for (const c of sweepChecks) {
     const enabled = isEnabled(c.timer);
     if (enabled === false) {

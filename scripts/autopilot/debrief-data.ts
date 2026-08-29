@@ -120,14 +120,51 @@ function seedBook(counts: SeedCounts, advancedThisCycle: number | null): SeedBoo
 // baseline (first run after a deploy, a skipped cycle) or a NEGATIVE delta, which is how a
 // re-lap or a refill that drops merged rows shows up. Never guess between the two silently:
 // `seeds_advanced_source` names which one produced the number.
-export type AdvanceSource = 'book_delta' | 'session_logs' | 'none';
+//
+// A LAP ROLLOVER IS NOT AN UNKNOWN (2026-08-29)
+//
+// The fallback above says "a NEGATIVE delta is how a re-lap shows up", and then hands the
+// answer to the session-log sum it was written to replace. On the feed lane that is now the
+// common case, not the rare one: it re-laps every second day, so it fell back on 08-28 AND
+// 08-29. The 08-29 fallback reported 13,199 seeds against a true 6,019 — a 2.2x over-report
+// on the lane that produced 116 of the day's 163 leads, which pushed its yield to
+// 0.0088/seed (it was 0.0193), its road to 0.8 days (1.9), and its walk rate to +89% (-13%).
+// Every one of those numbers went into a debrief as fact.
+//
+// But a rollover is fully determined by the snapshot already on disk. The lane walked the
+// rest of the old book, then started the new one: `(prev_total - prev_walked) + walked_now`.
+// Both terms have been in the debrief JSON since 08-22.
+//
+// The signature that separates a rollover from a book that SHRANK (a refill dropping merged
+// rows, the other way `walked` goes backwards) is the total: a new lap carries the old seeds
+// plus whatever was added, so `total_now >= total_prev`. A shrunken book fails that test and
+// still falls through to the log sum, which is the right answer for a case we cannot compute.
+//
+// Limit, stated because it is invisible otherwise: this assumes ONE rollover per cycle. Two
+// laps inside 24h would under-count by a whole book. At ~6k seeds/day against a ~12k book
+// that cannot happen on this lane today, and if the lane ever gets that fast the fix is to
+// carry a lap counter in the snapshot rather than to infer one.
+export type AdvanceSource = 'book_delta' | 'lap_rollover' | 'session_logs' | 'none';
 export function reconcileAdvanced(
   loggedAdvance: number | null,
   walkedNow: number | null,
   walkedPrevCycle: number | null,
+  totalNow: number | null = null,
+  totalPrevCycle: number | null = null,
 ): { seeds_advanced: number | null; seeds_advanced_source: AdvanceSource } {
   if (walkedNow !== null && walkedPrevCycle !== null && walkedNow >= walkedPrevCycle) {
     return { seeds_advanced: walkedNow - walkedPrevCycle, seeds_advanced_source: 'book_delta' };
+  }
+  // Only reachable when the walk counter went BACKWARDS, i.e. the book was replaced.
+  if (
+    walkedNow !== null && walkedPrevCycle !== null &&
+    totalNow !== null && totalPrevCycle !== null &&
+    totalNow >= totalPrevCycle && walkedPrevCycle <= totalPrevCycle
+  ) {
+    return {
+      seeds_advanced: (totalPrevCycle - walkedPrevCycle) + walkedNow,
+      seeds_advanced_source: 'lap_rollover',
+    };
   }
   if (loggedAdvance === null) return { seeds_advanced: null, seeds_advanced_source: 'none' };
   return { seeds_advanced: loggedAdvance, seeds_advanced_source: 'session_logs' };
@@ -186,7 +223,7 @@ export function walkRateTrend(
 // Last cycle's `seeds_advanced` per lane, read out of the debrief snapshot this script
 // wrote 24h ago. Returns an empty map when that file is missing or unreadable (first run
 // after a deploy, a skipped cycle) — an absent baseline reports nulls, never a false alarm.
-type PriorLane = { seeds_advanced?: number | null; seeds_walked?: number | null; seeds_advanced_source?: string | null };
+type PriorLane = { seeds_advanced?: number | null; seeds_walked?: number | null; seeds_total?: number | null; seeds_advanced_source?: string | null };
 function priorLanes(priorDate: string, logsDir: string): Record<string, PriorLane> {
   const p = join(logsDir, `autopilot-debrief-${priorDate}.json`);
   if (!existsSync(p)) return {};
@@ -211,6 +248,15 @@ export function priorSeedsWalked(priorDate: string, logsDir: string = LOGS): Rec
   const out: Record<string, number | null> = {};
   for (const [lane, h] of Object.entries(priorLanes(priorDate, logsDir))) {
     out[lane] = typeof h?.seeds_walked === 'number' ? h.seeds_walked : null;
+  }
+  return out;
+}
+// The third field `reconcileAdvanced` needs, and the one that tells a lap rollover apart
+// from a book that shrank. Also written into the debrief JSON since 08-22.
+export function priorSeedsTotal(priorDate: string, logsDir: string = LOGS): Record<string, number | null> {
+  const out: Record<string, number | null> = {};
+  for (const [lane, h] of Object.entries(priorLanes(priorDate, logsDir))) {
+    out[lane] = typeof h?.seeds_total === 'number' ? h.seeds_total : null;
   }
   return out;
 }
@@ -477,12 +523,16 @@ function discoveryMethodsHealth(
   const priorDate = pacificDate(new Date(sinceMs));
   const prior = priorSeedsAdvanced(priorDate);
   const priorWalked = priorSeedsWalked(priorDate);
+  const priorTotal = priorSeedsTotal(priorDate);
   const priorSource = priorAdvanceSource(priorDate);
   // Counts first, then the reconciled cycle advance, then the road that advance implies.
   // `days_of_road` and `walk_rate_change_pct` both divide by this number, so it has to be
   // settled before either is computed.
   const advance = (lane: string, w: SweepWork, c: SeedCounts) =>
-    reconcileAdvanced(w.seeds_advanced, c.seeds_walked, priorWalked[lane] ?? null);
+    reconcileAdvanced(
+      w.seeds_advanced, c.seeds_walked, priorWalked[lane] ?? null,
+      c.seeds_total, priorTotal[lane] ?? null,
+    );
   const trend = (lane: string, advanced: number | null, source: AdvanceSource, b: SeedBook): WalkRate =>
     walkRateTrend(advanced, prior[lane] ?? null, b, (priorSource[lane] ?? 'session_logs') === source);
   const lane = (key: string, stateFile: string, w: SweepWork) => {
