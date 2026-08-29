@@ -20,15 +20,22 @@ everything up to "parked, ready to write" is automatic.
    always-on, OpenRouter spend included, no per-run approval. If this lane is
    idle, that is a PROBLEM to fix, not a normal state.
    **The "~80% of first-lap precision" claim written here on 08-14 is dead.**
-   Measured lap yields from the sweep's own counter: lap 1 **0.45**/seed,
-   lap 4 **0.033**, lap 5 **0.021**, lap 6 (started 08-27 16:10Z) **0.0078** =
-   **1.7% of lap 1**. Re-walking the same 11,938-seed book now costs 73% of the
-   day's seeds and 45% of the model bill for 40% of the leads, while video-graph
-   walking FRESH refill seeds does 0.0187/seed. Do NOT quote the 80% figure and
-   do NOT treat a low-yield lap as a bug to debug. **Whether to keep starting
-   full new laps is Casey's call** (this entry is why the autopilot has not
-   changed it); the proposed rule is to walk only seeds added since the last lap
-   once a finished lap falls below a yield floor. Carried as debrief rec #1.
+   CLOSED lap yields from the sweep's own counter: lap 1 **0.45**/seed,
+   lap 4 **0.033**, lap 5 **0.021**, lap 6 **0.014** at **$0.034/lead** =
+   **3.1% of lap 1**. Lap 7 opened 08-29 05:11Z.
+   **Only quote a CLOSED lap.** Lap 6 read 0.0078 mid-lap and closed at 0.014,
+   so it nearly doubled in its second half; a half-finished lap is not the lap's
+   rate, and the 0.0078 figure that stood here on 08-28 was that mistake.
+   Do NOT quote the 80% figure and do NOT treat a low-yield lap as a bug to
+   debug. **Whether to keep starting full new laps is Casey's call** (this entry
+   is why the autopilot has not changed it); the proposed rule is to walk only
+   seeds added since the last lap once a finished lap falls below a yield floor.
+   Carried as debrief rec #2.
+   **The "2.4x less efficient than video-graph" line does not survive 08-29.**
+   On corrected seeds the feed ran at 0.0193/seed (3.3c/lead) against
+   video-graph's 0.0161 (3.5c) and peer's 0.0231 (3.3c). All three graph lanes
+   now cost within a penny of each other per lead. The decay argument stands on
+   its own; the "much worse than the alternatives" argument does not.
 2. **Comment-sweep — PAUSED by Casey 2026-08-20. Never run it again unless he
    says so.** `comment-sweep-daily.timer` is stopped + disabled on purpose, and
    its row was removed from the autopilot check-in's staleness watch so no
@@ -75,6 +82,54 @@ everything up to "parked, ready to write" is automatic.
 
 ## Change log
 
+- 2026-08-29: **The video-graph sweep is STOPPED on a lifetime cost cap and
+  needs Casey's word to come back. Do NOT debug it as a broken lane.** It
+  crossed `VIDEO_SWEEP_MAX_USD` (default $50) at 2026-08-28T10:31Z, exited with
+  the success code, and its loop treats that as "book finished" and stops for
+  good. Something relaunched it hourly for 21 hours; every run died in ~2s.
+  **1,424 of 73,181 seeds are still unwalked**, on the lane with the cheapest
+  lead in the pipeline (**$50 / 1,877 qualified = 2.7c**). The cap counts
+  LIFETIME dollars out of `logs/video-graph-sweep-state.json`, so waiting never
+  releases it; the sibling feed lane caps PER LAP (`lapUsd()` in
+  `graph-sweep.ts`) and therefore self-releases. To restart: raise
+  `VIDEO_SWEEP_MAX_USD` in `video-graph-sweep-loop.sh`'s environment, then
+  `sudo systemctl start video-graph-sweep`. The durable version is to make its
+  cap per-lap like the feed lane's. Nothing was changed unattended because it is
+  a spend decision. Carried as debrief rec #1.
+- 2026-08-29: **"Recently updated" is not "working" — read a lane's own progress
+  counter.** The stall above was invisible for 21 hours because a sweep that
+  starts and quits in two seconds still rewrites its state file:
+  `hours_since_update` read 0.8, `productive` read `true` (it had worked earlier
+  in the window), and only `idle_run_streak: 23` was honest. `checkin.ts` now
+  has a **`sweep_stalled`** heartbeat (section 7b) that diffs each lane's own
+  `seeds_done` against itself over `AUTOPILOT_SWEEP_STALL_HOURS` (4) and names
+  the cause from the lane's last stop line. **Observation only, never the paid
+  fix-agent** — every stall cause seen so far is a spend or infra call. This is
+  the third time in a fortnight a liveness signal was mistaken for a work
+  signal (after 08-12 and 08-27): **read a lane's OUTPUT, not its heartbeat.**
+- 2026-08-29: **A lap rollover no longer falls back to the inflating log sum.**
+  `reconcileAdvanced` in `scripts/autopilot/debrief-data.ts` differences two
+  daily seed-book snapshots and fell back to summing session logs whenever that
+  delta went negative — which is exactly what closing one lap and opening the
+  next does. On 08-29 that reported **13,199 seeds against a true 6,019** on the
+  lane that made 116 of the day's 163 leads, and it fed `pitchable_per_seed`
+  (0.0088 reported, **0.0193** true), `days_of_road` (0.8, true **1.9**) and
+  `walk_rate_change_pct` (+89%, true **-12.7%**). A rollover is now computed
+  exactly as `(prev_total - prev_walked) + walked_now`, named
+  `seeds_advanced_source: "lap_rollover"`; a book that SHRANK still falls back,
+  because that case cannot be computed. Same bug class as the 08-23 double-count
+  it was written to replace.
+- 2026-08-29: **A three-seed trickle is a finished lap.** `refill-graph-sweep.sh`
+  only started a new lap when `extend-seeds.ts` printed the literal "nothing to
+  add", and the hourly refill adds the two or three channels the ICP newly
+  qualified, so a finished book gets chased down a handful of seeds at a time.
+  Measured: **232, 17, 4, 3 seeds across four hourly restarts** (00:11Z-04:14Z)
+  = ~23 seeds in four hours against a normal ~250/h, escaping only at 05:11Z
+  when the trickle happened to be empty. Anything under `RELAP_DRAIN_FLOOR` (50)
+  fresh seeds now counts as drained and relaps; `RELAP_UNWALKED_TOLERANCE` lets
+  the relap step over the trickle (safe: a relap re-opens the whole book,
+  including it). Cooldown and economic gates untouched, and the cooldown-hold
+  branch now still restarts the walker so a held relap cannot strand seeds.
 - 2026-08-28: **The 08-27 recovery-lane fix is CONFIRMED WORKING. Do not
   re-debug it.** Three collect passes dispatched 40 leads each; 44 of the 120
   produced something, for **112 contact points = 0.93/lead**, against the ~0.9 a
