@@ -71,7 +71,7 @@ export function readFinderQuotaUsedPct(): number | null {
     const raw = readFileSync(join(finderRepo(), 'logs', 'quota-state.json'), 'utf8');
     const snap = JSON.parse(raw) as { ts?: string } & Record<
       string,
-      { used_pct?: number; remaining?: number }
+      { used_pct?: number; remaining?: number; limit?: number }
     >;
     // STALENESS GUARD: a snapshot older than QUOTA_STALE_MINUTES is meaningless —
     // e.g. last night's 99.9% still on disk at 00:07 after the midnight quota reset,
@@ -93,11 +93,33 @@ export function readFinderQuotaUsedPct(): number | null {
     // Buckets with real headroom still govern normally, so this stays correct
     // if RapidAPI is ever revived.
     const buckets = Object.values(snap).filter(
-      (v): v is { used_pct?: number; remaining?: number } =>
+      (v): v is { used_pct?: number; remaining?: number; limit?: number } =>
         Boolean(v) && typeof v === 'object',
     );
     if (buckets.some((b) => typeof b.remaining === 'number' && b.remaining < 0)) {
       return null; // retired/expired plan → governor inactive
+    }
+    // FREE-TIER GUARD (2026-08-30): the guard above assumes a retired plan
+    // announces itself with a negative bucket. It does not have to. The RapidAPI
+    // account has since lapsed onto a FREE tier that answers with well-formed
+    // positive numbers on a plan of 1,000 requests / 100 searches PER DAY, so one
+    // stray fallback run spending 950 requests wrote used_pct 95.2 — read by this
+    // governor and by all five sweeps as "YouTube quota is 95% gone". It is not:
+    // the direct key pool that actually funds a run had reset at Pacific midnight
+    // and sat at 65 of 66 keys live. The discriminator is PLAN SIZE, not the
+    // percentage — this pipeline spends more than a thousand requests in a normal
+    // hour, so a plan that small is the fallback lane's free tier, never our
+    // capacity. The paid plan metered 110,000 requests, so it stays above the
+    // floor and still governs if RapidAPI is ever revived.
+    // Mirrors quotaUsedPct() in youtube-lead-finder-v1/src/lib/run-gate.ts —
+    // the campaign governor and the sweeps must agree about what "out of quota"
+    // means, and on 2026-08-11 and again on 2026-08-30 they did not.
+    const minPlan = Number(process.env.QUOTA_MIN_PLAN_LIMIT ?? 5000);
+    const limits = buckets
+      .map((b) => b.limit)
+      .filter((n): n is number => typeof n === 'number' && Number.isFinite(n) && n > 0);
+    if (limits.length && Number.isFinite(minPlan) && Math.max(...limits) < minPlan) {
+      return null; // free tier of a fallback backend → governor inactive
     }
     const pcts = buckets
       .map((v) => v.used_pct)

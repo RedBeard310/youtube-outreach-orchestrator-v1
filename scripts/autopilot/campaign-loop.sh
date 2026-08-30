@@ -52,16 +52,34 @@ FINDER_REPO="${LEAD_FINDER_REPO_PATH:-/home/casey/repos/youtube-lead-finder-v1}"
 log() { echo "[campaign-loop $(date -u +%FT%TZ)] $*"; }
 
 # Worst fresh quota used_pct across buckets, or -1 if missing/stale/unreadable.
+#
+# This is the THIRD copy of the same read (campaign.ts and the finder's
+# src/lib/run-gate.ts hold the other two) and it was the weakest: it carried only
+# the staleness guard, never the retired-backend guard, and none of the three had
+# the free-tier guard until 2026-08-30. All three must agree about what "out of
+# quota" means, because they govern the same YouTube pool.
+#
+# RETIRED-BACKEND GUARD: a negative `remaining` means the plan is GONE, not low.
+# FREE-TIER GUARD: the snapshot meters RapidAPI, which has lapsed onto a free tier
+# of 1,000 requests / 100 searches a day. One stray fallback run spends 950 of them
+# and reports 95% used, which stopped the campaign and all five sweeps on
+# 2026-08-30 while the direct key pool sat at 65 of 66 keys live. A plan whose
+# largest bucket is under MIN_PLAN (5,000) is not metering this pipeline's day.
 quota_used_pct() {
   node -e '
     const fs=require("fs");
     const f=process.argv[1], staleMin=Number(process.argv[2]);
+    const minPlan=Number(process.env.QUOTA_MIN_PLAN_LIMIT||5000);
     try {
       const q=JSON.parse(fs.readFileSync(f,"utf8"));
       const ageMin=(Date.now()-Date.parse(q.ts))/60000;
       if (!isFinite(ageMin) || ageMin>staleMin) { console.log("-1"); process.exit(0); }
+      const b=Object.keys(q).map(k=>q[k]).filter(v=>v&&typeof v==="object");
+      if (b.some(v=>typeof v.remaining==="number"&&v.remaining<0)) { console.log("-1"); process.exit(0); }
+      const lim=b.map(v=>Number(v.limit)).filter(n=>isFinite(n)&&n>0);
+      if (lim.length && Math.max(...lim)<minPlan) { console.log("-1"); process.exit(0); }
       let m=-1;
-      for (const k of Object.keys(q)) if (q[k] && typeof q[k]==="object" && "used_pct" in q[k]) m=Math.max(m,Number(q[k].used_pct)||0);
+      for (const v of b) if ("used_pct" in v) m=Math.max(m,Number(v.used_pct)||0);
       console.log(String(m));
     } catch { console.log("-1"); }
   ' "$FINDER_REPO/logs/quota-state.json" "$STALE_MIN" 2>/dev/null || echo "-1"
