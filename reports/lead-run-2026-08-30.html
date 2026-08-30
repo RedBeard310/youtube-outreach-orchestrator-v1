@@ -1,0 +1,233 @@
+<title>Lead Run Debrief — 2026-08-30</title>
+<style>
+  :root {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+      --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+      --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+    --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+    --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 40px 22px 80px; }
+  .eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); font-weight: 600; }
+  h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.12; margin: 10px 0 6px; text-wrap: balance; letter-spacing: -.02em; }
+  h2 { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); margin: 44px 0 16px; font-weight: 700; }
+  h3 { font-size: 18px; margin: 0 0 6px; letter-spacing: -.01em; }
+  p { margin: 0 0 14px; }
+  .lede { font-size: 18px; color: var(--ink-soft); max-width: 68ch; }
+  .tag { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--red-soft); color: var(--red); letter-spacing: .02em; }
+  .tag.amber { background: var(--amber-soft); color: var(--amber); }
+  .tag.good { background: #1f8a5b1a; color: var(--good); }
+  .grid { display: grid; gap: 14px; }
+  .stats { grid-template-columns: repeat(4, 1fr); margin-top: 26px; }
+  @media (max-width: 720px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; box-shadow: var(--shadow); }
+  .stat .n { font-size: 30px; font-weight: 750; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .stat .l { font-size: 12.5px; color: var(--ink-soft); margin-top: 3px; }
+  .stat .s { font-size: 12px; margin-top: 8px; font-weight: 600; }
+  .up { color: var(--good); } .down { color: var(--red); } .warn { color: var(--amber); }
+  .accent-red { border-left: 3px solid var(--red); }
+  .accent-teal { border-left: 3px solid var(--teal); }
+  .accent-amber { border-left: 3px solid var(--amber); }
+  .accent-good { border-left: 3px solid var(--good); }
+
+  .strip { display: flex; align-items: flex-end; gap: 3px; height: 130px; padding: 14px 14px 10px; overflow-x: auto; }
+  .col { flex: 1 0 14px; min-width: 12px; display: flex; flex-direction: column; justify-content: flex-end; height: 100%; }
+  .bar { border-radius: 2px 2px 0 0; background: var(--teal); opacity: .92; }
+  .bar.zero { background: var(--red); height: 4px !important; }
+  .ghost { border-radius: 2px 2px 0 0; background: var(--ink-soft); opacity: .18; margin-bottom: 2px; }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-soft); padding: 0 14px 14px; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+
+  .q { border-radius: 14px; padding: 20px 22px; margin-bottom: 14px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); }
+  .q .ask { font-size: 17px; font-weight: 700; color: var(--ink); margin-bottom: 10px; display: flex; gap: 10px; align-items: baseline; }
+  .q .ask .qn { color: var(--red); font-weight: 800; flex: 0 0 auto; }
+  .q p { color: var(--ink-soft); }
+  .q b { color: var(--ink); }
+  .pill { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink); background: var(--panel-2); padding: 1px 7px; border-radius: 6px; border: 1px solid var(--line); white-space: nowrap; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+  th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .fix td:first-child { color: var(--good); font-weight: 650; }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); box-shadow: var(--shadow); margin-bottom: 14px; }
+  ol.recs { padding-left: 0; list-style: none; counter-reset: r; margin: 0; }
+  ol.recs li { counter-increment: r; position: relative; padding: 14px 16px 14px 52px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 10px; box-shadow: var(--shadow); }
+  ol.recs li::before { content: counter(r); position: absolute; left: 14px; top: 14px; width: 26px; height: 26px; border-radius: 8px; background: var(--teal-soft); color: var(--teal); font-weight: 800; font-size: 14px; display: grid; place-items: center; }
+  ol.recs b { color: var(--ink); }
+  .foot { margin-top: 46px; padding: 16px 18px; border-radius: 12px; background: var(--amber-soft); border: 1px solid var(--line); font-size: 14px; color: var(--ink-soft); }
+  .foot b { color: var(--ink); }
+  .muted { color: var(--ink-soft); font-size: 13.5px; }
+  code { background: var(--panel-2); border: 1px solid var(--line); border-radius: 5px; padding: 0 5px; font-size: .9em; }
+</style>
+
+<div class="wrap">
+
+  <div class="eyebrow">Lead Run Debrief · YouTube outreach</div>
+  <h1>2026-08-30: the file holding every YouTube key was emptied at 4:58am, and the pipeline is still dark</h1>
+  <p class="lede">Output was the weakest in a week even before that: 97 creators worth contacting against 163 yesterday. Then at 04:58Z the shared file that holds all 66 YouTube keys was overwritten with nothing. Every run after that loaded zero keys, fell through to a backup service that has quietly lapsed onto a free plan of 1,000 requests a day, burned that plan, and wrote "95% of quota used" into the file every discovery lane reads before it starts. So all of them stopped. The last hour of the cycle found zero channels, and nothing has run since. The keys themselves are fine. They reset at midnight and 65 of 66 are alive right now.</p>
+  <div style="margin-top:14px">
+    <span class="tag">KEY FILE EMPTIED AT 04:58Z, STILL EMPTY</span>
+    <span class="tag" style="margin-left:6px">ALL DISCOVERY STOPPED, 0 CHANNELS IN THE FINAL HOUR</span>
+    <span class="tag amber" style="margin-left:6px">97 GOOD LEADS, LOWEST IN A WEEK</span>
+    <span class="tag good" style="margin-left:6px">0 FATAL ERRORS, $0 ANTHROPIC</span>
+  </div>
+
+  <div class="grid stats">
+    <div class="card stat accent-amber">
+      <div class="n">97</div>
+      <div class="l">creators worth contacting</div>
+      <div class="s down">163 yesterday, from a similar 3,026 channels</div>
+    </div>
+    <div class="card stat accent-amber">
+      <div class="n">+54</div>
+      <div class="l">parked → <code>approved_hold</code></div>
+      <div class="s down">vs +78 yesterday, pool now 3,788</div>
+    </div>
+    <div class="card stat accent-red">
+      <div class="n">0</div>
+      <div class="l">channels found in the final hour</div>
+      <div class="s down">first empty hour since the lanes went always-on</div>
+    </div>
+    <div class="card stat accent-red">
+      <div class="n">2</div>
+      <div class="l">of 5 discovery lanes still able to run</div>
+      <div class="s down">and both are paused as of right now</div>
+    </div>
+  </div>
+
+  <h2>The shape of the day</h2>
+  <div class="card" style="padding:0">
+    <div class="strip" id="strip"></div>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--teal)"></span>good leads found that hour (score ≥ 6)</span>
+      <span><span class="dot" style="background:var(--ink-soft);opacity:.35"></span>all channels written that hour, to scale</span>
+    </div>
+  </div>
+  <p class="muted">Each column is one hour, 07:00Z through 06:00Z. Twenty-two ordinary hours running about 130 channels each, then a cliff at the end: <b>60 channels in the 05:00Z hour and zero in the 06:00Z hour</b>. The cliff lines up exactly with the key file being emptied at 04:58Z. What it does not explain is the flat middle. Good leads ran at 3 to 7 an hour all day against a normal 8 to 12, which is the separate decay problem in Q3.</p>
+
+  <h2>The three questions</h2>
+
+  <div class="q accent-red">
+    <div class="ask"><span class="qn">Q1</span><span>Why is every discovery lane stopped right now?</span></div>
+    <p><b>The shared file that holds all 66 YouTube API keys was overwritten with an empty file at 04:58:11Z, and it is still empty.</b> That file is <code>~/env-storage/.env</code>, and it is the one place a key is ever added. Casey's Mac copies its own version over the server's every two minutes, and one of those copies wrote nothing.</p>
+    <p>Every process that started after that read no keys. You can watch it happen in the logs: sweeps up to 05:22Z print <b>"66 direct keys"</b>, and every sweep from 05:36Z on prints <b>"0 direct keys"</b>. There is no error in between. That line reads like a normal startup.</p>
+    <p><b>Then it got worse, because of what the pipeline does with no keys.</b> It falls back to RapidAPI, which we retired on 08-10. Retired does not mean gone: the account has lapsed onto a <b>free plan of 1,000 requests and 100 searches per day</b>, and it answers normally. So the runs used it, spent about 950 of those 1,000 requests, and the meter that watches it wrote <span class="pill">95.2% used</span> into a shared file.</p>
+    <p><b>Every discovery lane reads that file before it starts, and treats it as the YouTube quota.</b> All five pause above 70%. So they paused, and stayed paused: eight straight runs of the main lane, once every fifteen minutes from 05:36Z to now, each one printing "PAUSE: quota at 95.1%" and quitting.</p>
+    <p>The number is about the wrong pool. It measures a backup service's free tier. The real pool, the 66 direct keys, resets at midnight Pacific and <b>65 of the 66 are alive at this moment</b>. The pipeline stopped itself on a reading that had nothing to do with its own capacity.</p>
+    <p><b>Two fixes shipped, and neither can fix the empty file.</b> The lanes will no longer stop on a plan too small to be metering our day, and a run that loads zero keys now refuses to start instead of quietly burning the free tier and poisoning that reading for everything else. Details in the table below. <b>Restoring the key file is a Mac-side job and it needs you.</b></p>
+  </div>
+
+  <div class="q accent-amber">
+    <div class="ask"><span class="qn">Q2</span><span>Is the video-graph lane still switched off?</span></div>
+    <p><b>Yes, for the whole cycle, all 30 of its runs, on the same $50 lifetime spending cap as yesterday.</b> Every one of those runs printed the same line and quit in about two seconds. It produced nothing today, against 8 good leads yesterday and 45 the day before.</p>
+    <p>Nothing new is wrong with it. Yesterday's fix made the stop message honest, and it now says plainly that the cap is lifetime, that waiting does not release it, and what the lane costs. <b>1,933 seeds are still unwalked</b>, at <span class="pill">2.7¢</span> per good lead, which is the cheapest in the pipeline.</p>
+    <p>One reporting note worth knowing. The automated snapshot lists this lane's reason for sitting idle as the quota pause from Q1. That is wrong: the lane's own logs say the cost cap, on every run, including runs from before the key file emptied. The quota pause is real for the other lanes and not for this one.</p>
+    <p><b>This is a spending decision and it has been waiting two days.</b> One environment variable and a service start brings it back.</p>
+  </div>
+
+  <div class="q accent-amber">
+    <div class="ask"><span class="qn">Q3</span><span>Take the outage out. Was the rest of the day any good?</span></div>
+    <p><b>No, and the reason is the one carried from yesterday: the main lane is deep into a book it has already walked six times.</b> The recommended-videos feed walked <b>10,346 seeds</b> today, more than any day this week, and got <b>64 good leads</b> for them.</p>
+    <p>That is a mid-lap reading and yesterday's debrief established why those flatter or steepen before the lap closes, so treat it as a direction, not a rate. The direction is down. Lap 6 <em>closed</em> at <span class="pill">0.014</span> good leads per seed. Lap 7 is running at <span class="pill">0.006</span>, and it has <b>855 seeds left</b>, so it will close within hours of the keys coming back. Lap 1 ran at 0.45.</p>
+    <p><b>The keyword lane tells the same story from a different angle.</b> It ran <b>716 finder passes</b> and <b>715 of them faded</b>, meaning almost every pass came back under the threshold that says a pass was worth running. It got <b>31 good leads across all 716</b>. Every session opened short on terms, and the term-starvation reading fired <b>23</b> times.</p>
+    <p>So both of the lanes that were actually running are scraping. That is not a fault to fix, it is the supply question in the recommendations: <b>every lane is now fed only by leads the pipeline itself found</b>, so when yield falls, so does the seed supply, and each lap is worse than the last.</p>
+  </div>
+
+  <h2>Where the leads came from</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Lane</th><th class="num">Channels</th><th class="num">Score ≥ 6</th><th class="num">Rate</th><th class="num">Seeds</th><th class="num">Per seed</th><th class="num">¢ / lead</th></tr></thead>
+      <tbody>
+        <tr><td><b>Recommended-videos feed</b></td><td class="num">2,401</td><td class="num"><b>64</b></td><td class="num">2.7%</td><td class="num">10,346</td><td class="num down">0.0062</td><td class="num">5.8</td></tr>
+        <tr><td>Keyword search</td><td class="num">515</td><td class="num">31</td><td class="num">6.0%</td><td class="num">716 passes</td><td class="num down">0.043/pass</td><td class="num up">2.5</td></tr>
+        <tr><td>Peer network</td><td class="num">108</td><td class="num">2</td><td class="num">1.9%</td><td class="num">83</td><td class="num">0.0241</td><td class="num up">1.8</td></tr>
+        <tr><td>Video-graph sweep <span class="tag" style="font-size:10px;padding:1px 7px">OFF ALL CYCLE</span></td><td class="num">0</td><td class="num">0</td><td class="num">—</td><td class="num">0</td><td class="num">—</td><td class="num">—</td></tr>
+        <tr><td>Guest-link mining</td><td class="num">2</td><td class="num">0</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td></tr>
+        <tr><td>Podcast crossover</td><td class="num">0</td><td class="num">0</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td></tr>
+        <tr><td>Comment sweep</td><td class="num">0</td><td class="num">0</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="muted">Comment sweep has been off since Casey paused it on 08-20, and podcast crossover ran once and found nothing, as it always does. Of the 97 good leads, <b>43</b> came with a verified email, so 44% are reachable by the send path, up from 36% yesterday, which is the one number that improved. Biggest niches: 34 uncategorised, coaching and consulting at 21, real estate at 10, health clinics and transformation coaching at 7 each. Scoring ran clean for a sixth day: <b>0</b> failures across 3,026 channels.</p>
+
+  <h2>The recovery lane, third cycle</h2>
+  <p class="muted">Collection slowed with everything else: <b>107 contact points from 38 leads</b>, against 131 from 62 yesterday. The outflow problem sharpened. The <code>needs_contact</code> pool went 4,881 → <b>4,921</b> while <b>51</b> newly discovered leads arrived in it, so only about <b>11</b> left, down from roughly 20 yesterday and 16 the day before. <b>Three cycles now say the same thing.</b> Collection works. Turning a candidate address into a verified one does not, and that is the step to work on.</p>
+
+  <h2>What broke → what's fixed</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Issue</th><th>Mechanism</th><th>Status</th></tr></thead>
+      <tbody class="fix">
+        <tr><td>The shared key file is empty, and the whole pipeline is stopped on it</td><td>Overwritten with 0 bytes at 04:58:11Z by the two-minute Mac sync. Every process from 05:36Z on loads no keys. The direct pool itself is healthy: 65 of 66 keys live after the midnight reset</td><td class="down"><b>Open, and it needs you.</b> The file is Casey's to restore and no code here may touch it. Everything resumes on its own the moment a good copy lands</td></tr>
+        <tr><td>A retired backup service's free tier was pausing every discovery lane</td><td>RapidAPI has lapsed onto 1,000 requests a day and answers normally. One fallback run spends 950 of them and writes 95.2% used. All five lanes read that as the YouTube quota and pause at 70%. The 08-11 guard only catches a plan that reports a negative balance, and this one reports perfectly good numbers</td><td class="up">Fixed today in all three places that read it, which had drifted apart again. A plan whose largest bucket is under 5,000 is not metering our day and no longer governs. Verified live against the real file, and against a real paid plan to be sure it still stops us when it should</td></tr>
+        <tr><td>Loading zero keys looked like a normal startup</td><td>The line printed "auto (0 direct keys, RapidAPI fallback available)" and the run continued: spending the free tier, poisoning the quota reading for every other lane, and saying nothing was wrong. That is how a broken key file cost a day instead of a log line</td><td class="up">Fixed today: a run with no keys refuses to start, names the empty file, and exits in a way the loops already treat as "sleep and try again". No seeds are lost and nothing needs restarting by hand</td></tr>
+        <tr><td>The video-graph lane is still off, second day</td><td>$50 lifetime cap, all 30 runs this cycle, 1,933 seeds unwalked at 2.7¢ per good lead</td><td class="warn">Open. Yesterday's honest stop message is working. Raising the cap is Casey's spending call</td></tr>
+        <tr><td>The main lane's yield keeps falling</td><td>Lap 7 running at 0.006 good leads per seed against lap 6's closed 0.014 and lap 1's 0.45. It walked 10,346 seeds for 64 leads, and has 855 left</td><td class="warn">Open. Not a bug. It is a book we have walked seven times</td></tr>
+        <tr><td>Almost every finder pass faded</td><td>715 fades on 716 passes, 31 good leads across all of them, 23 term-starvation readings, every session opening short on terms</td><td class="warn">Open, carried nine days. The backoffs work and cost nothing. The supply behind them is still empty</td></tr>
+        <tr><td>Yesterday's two fixes, checked</td><td>The lap-rollover seed count and the trickle-relap rule both held. Today's 10,346 seeds is a clean snapshot difference with no fallback, and the lane relapped without spending five hours chasing three seeds at a time</td><td class="up">Confirmed working</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="muted">Clean otherwise: <b>0</b> fatal errors, <b>0</b> crashes, <b>0</b> hard stops, <b>$0</b> Anthropic. All 15 sessions started and finished, 14 on their time budget. The <b>1</b> quota stop was the free-tier misreading from Q1, so it should not recur. OpenRouter spent <b>$4.58</b> across 6,737 calls, which is <b>4.7¢</b> per creator worth contacting and <b>8.5¢</b> per lead parked.</p>
+
+  <h2>Recommended next — ranked</h2>
+  <ol class="recs">
+    <li><b>Put the YouTube keys back in the shared file.</b> Nothing else on this list matters until this is done, because nothing is running. The file is <code>~/env-storage/.env</code> on the server, it is 0 bytes, and the Mac's copy of it is the master. Two things to check before you copy it over: that the Mac's own file still has the keys, and that the slots are numbered <code>_1</code> upward with no gaps, because several loaders stop scanning after five empty slots in a row. The pipeline restarts itself the moment a good copy lands. No service needs touching.</li>
+    <li><b>Decide whether to raise the video-graph lane's $50 cap.</b> Carried from yesterday, unchanged. It has produced nothing for two full cycles. It has cost $50 for 1,877 good leads, which is 2.7¢ each and the cheapest lead in the pipeline, and 1,933 seeds are still in its book. The better version of the fix is to make its cap refresh per lap, the way the sibling lane's does, so it can never lock itself out again.</li>
+    <li><b>Find a seed source that is not our own output.</b> Carried nine days and it is now the thing behind two separate problems, not one. The main lane is on lap 7 of the same book at 0.006 good leads per seed, and 715 of 716 finder passes faded for want of terms. Both lanes are fed only by leads the pipeline already found, so falling yield shrinks tomorrow's supply. Dropping the feed lane's view floor from 20k to 5k still buys about a week of road, and it is the cheapest option on the table.</li>
+    <li><b>Work on the recovery lane's verification step, not its collection step.</b> Three cycles agree: collection produces (107 points from 38 leads today) and the pool barely moves (about 11 out against 51 in). More candidate addresses will not help while they do not convert to verified ones.</li>
+    <li><b>Decide the outlet for the parked pools.</b> <b>3,788</b> in <code>approved_hold</code> and <b>4,921</b> in <code>needs_contact</code>. That is <b>8,709 creators found and never contacted</b>, up 94 today. Carried since 08-20. Money is not the constraint: the balance is <b>$381.99</b>, about 83 days at today's rate.</li>
+  </ol>
+
+  <div class="foot">
+    <b>Status:</b> the loop is running and was left running on purpose, but it cannot find anything until the key file is restored. Halting it would have blocked it from healing itself the moment that file returns. <b>Everything is parked, nothing is sent.</b> <code>approved_hold</code> is a deliberate holding lane. Today's +54 takes the pool to <b>3,788</b>, alongside <b>4,921</b> in <code>needs_contact</code>. Anthropic spend $0.00; OpenRouter spend $4.58 across 6,737 calls, balance <b>$381.99</b>, about 83 days at this rate. The video-graph lane is stopped on its cost cap and will stay stopped until that cap is raised.
+  </div>
+
+</div>
+
+<script>
+  // Per hour, 07:00Z 08-29 through 06:00Z 08-30 (leads.lead_candidates, first_discovered_at).
+  var good  = [5,3,1,1,6,5,6,7,3,3,1,3,5,8,5,2,5,5,7,7,6,2,1,0];
+  var total = [98,137,85,61,114,118,156,106,122,113,108,126,123,181,201,140,180,156,164,150,172,155,60,0];
+  var gMax = Math.max.apply(null, good), tMax = Math.max.apply(null, total);
+  var strip = document.getElementById('strip');
+  good.forEach(function (v, i) {
+    var col = document.createElement('div');
+    col.className = 'col';
+    col.title = v + ' good leads of ' + total[i] + ' channels';
+
+    var ghost = document.createElement('div');
+    ghost.className = 'ghost';
+    ghost.style.height = Math.max(2, Math.round((total[i] / tMax) * 28)) + '%';
+
+    var bar = document.createElement('div');
+    bar.className = 'bar' + (v === 0 ? ' zero' : '');
+    bar.style.height = Math.max(4, Math.round((v / gMax) * 68)) + '%';
+
+    col.appendChild(ghost);
+    col.appendChild(bar);
+    strip.appendChild(col);
+  });
+</script>

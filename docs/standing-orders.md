@@ -70,8 +70,56 @@ everything up to "parked, ready to write" is automatic.
   now a live lane inside the campaign's finish block. It parks recovered leads
   into `approved_hold` like any other, so it feeds the pool below, not a new one.
 - `approved_hold` (3,394): fires only via manual `npm run send`.
+## BLOCKING as of 2026-08-30: the shared key bank is empty
+
+**`~/env-storage/.env` was overwritten with 0 bytes at 2026-08-30T04:58:11Z and
+the whole pipeline is stopped on it.** Check this FIRST, before anything else in
+the checklist below:
+
+```
+stat -c '%s %y' ~/env-storage/.env      # 0 bytes = still broken
+grep -c '^YOUTUBE_API_KEY' ~/env-storage/.env
+```
+
+- **The keys themselves are fine.** `youtube-lead-finder-v1/logs/youtube-dead-keys.json`
+  held 1 live entry of 27 on the morning of 08-30, and that one was a `blocked`
+  (suspended project), not a quota death. 65 of 66 keys were alive.
+- **Restoring it is Casey's, on the Mac.** The Mac's copy is the master and it
+  overwrites the VPS copy every two minutes, so a VPS-side edit is pointless and
+  no agent may touch a `.env` anyway. When a good copy lands, everything resumes
+  by itself — no service needs restarting.
+- **Check the slot numbering when it comes back.** Slots must run `_1` upward
+  with no gap of five or more, because several key loaders stop scanning there
+  and the only symptom is a silently smaller pool.
+- **Do not diagnose this as "the lanes are broken".** The sweeps pausing and the
+  finder finding nothing are both downstream of the empty file.
+
+## RapidAPI is NOT gone — it lapsed onto a free tier (found 2026-08-30)
+
+CLAUDE.md says RapidAPI was retired on 2026-08-10 and that a keyless run simply
+halts. **Both halves are wrong and the correction matters.** The account answers
+normally on a **free tier of 1,000 requests and 100 searches per day**, so a run
+with no direct keys falls through to it, spends ~950 of the 1,000, and
+`quota-guard.ts` writes `used_pct: 95.2` into `logs/quota-state.json`.
+
+**All five sweeps and both campaign governors read that file as the YouTube
+quota and pause above 70%.** So a 1,000-request free plan can shut down the
+entire pipeline while the real 66-key pool sits untouched. That is what happened
+on 08-30. Both pre-existing guards passed it: staleness passed because a
+fallback run had just rewritten the file, and the 08-11 retired-backend guard
+only catches `remaining < 0` while a live free tier answers `remaining: 48`.
+
+Fixed the same day in all three copies of that read (finder `19e7dd6`,
+orchestrator in `bdd675d`): a snapshot whose largest bucket limit is under
+`QUOTA_MIN_PLAN_LIMIT` (5,000) no longer governs, and `auto` with zero direct
+keys now refuses to start at all rather than burn the free tier silently.
+**If you ever see a lane paused at ~95% quota while the key pool is healthy,
+this is the shape to check first.**
+
 ## Session checklist (every session, ~2 minutes)
 
+0. **Is `~/env-storage/.env` non-empty?** See the blocking entry above. Nothing
+   else on this list can pass while it is 0 bytes.
 1. Is graph-sweep.service actively walking? (`systemctl status graph-sweep`;
    idle + seeds available = fix it.)
 2. Comment-sweep must be OFF (`systemctl is-enabled comment-sweep-daily.timer`
@@ -82,6 +130,20 @@ everything up to "parked, ready to write" is automatic.
 
 ## Change log
 
+- 2026-08-30: **The shared env bank went to 0 bytes at 04:58:11Z and stopped the
+  whole pipeline.** Full entry above, under "BLOCKING". The cycle's final hour
+  found **zero channels**, the first empty hour since the lanes went always-on.
+  Two durable fixes shipped so this shape degrades instead of stopping: the
+  free-tier quota guard (all three governor copies) and an empty-key-pool guard
+  that throws `YOUTUBE_KEY_POOL_EMPTY` instead of silently running on the
+  fallback. Neither can restore the file; that is Casey's, on the Mac.
+  **Also learned: RapidAPI is not retired, it is on a free tier** — see the
+  section above, and treat the CLAUDE.md line saying a keyless run "halts" as
+  out of date.
+  **Lap 7 of the feed lane is tracking 0.006/seed** (mid-lap, 855 seeds left)
+  against lap 6's CLOSED 0.014 and lap 1's 0.45. Quote the close, not this.
+  Video-graph produced nothing for a second straight cycle, still on the $50
+  lifetime cap, now **1,933 seeds unwalked** at 2.7¢/lead.
 - 2026-08-29: **The video-graph sweep is STOPPED on a lifetime cost cap and
   needs Casey's word to come back. Do NOT debug it as a broken lane.** It
   crossed `VIDEO_SWEEP_MAX_USD` (default $50) at 2026-08-28T10:31Z, exited with
