@@ -1,0 +1,234 @@
+<title>Lead Run Debrief — 2026-08-31</title>
+<style>
+  :root {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+      --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+      --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+    --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+    --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 40px 22px 80px; }
+  .eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); font-weight: 600; }
+  h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.12; margin: 10px 0 6px; text-wrap: balance; letter-spacing: -.02em; }
+  h2 { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); margin: 44px 0 16px; font-weight: 700; }
+  h3 { font-size: 18px; margin: 0 0 6px; letter-spacing: -.01em; }
+  p { margin: 0 0 14px; }
+  .lede { font-size: 18px; color: var(--ink-soft); max-width: 68ch; }
+  .tag { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--red-soft); color: var(--red); letter-spacing: .02em; }
+  .tag.amber { background: var(--amber-soft); color: var(--amber); }
+  .tag.good { background: #1f8a5b1a; color: var(--good); }
+  .grid { display: grid; gap: 14px; }
+  .stats { grid-template-columns: repeat(4, 1fr); margin-top: 26px; }
+  @media (max-width: 720px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; box-shadow: var(--shadow); }
+  .stat .n { font-size: 30px; font-weight: 750; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .stat .l { font-size: 12.5px; color: var(--ink-soft); margin-top: 3px; }
+  .stat .s { font-size: 12px; margin-top: 8px; font-weight: 600; }
+  .up { color: var(--good); } .down { color: var(--red); } .warn { color: var(--amber); }
+  .accent-red { border-left: 3px solid var(--red); }
+  .accent-teal { border-left: 3px solid var(--teal); }
+  .accent-amber { border-left: 3px solid var(--amber); }
+  .accent-good { border-left: 3px solid var(--good); }
+
+  .strip { display: flex; align-items: flex-end; gap: 2px; height: 130px; padding: 14px 14px 10px; overflow-x: auto; }
+  .col { flex: 1 0 9px; min-width: 8px; display: flex; flex-direction: column; justify-content: flex-end; height: 100%; }
+  .bar { border-radius: 2px 2px 0 0; background: var(--teal); opacity: .92; }
+  .bar.zero { background: var(--red); height: 4px !important; }
+  .ghost { border-radius: 2px 2px 0 0; background: var(--ink-soft); opacity: .18; margin-bottom: 2px; }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-soft); padding: 0 14px 14px; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+
+  .q { border-radius: 14px; padding: 20px 22px; margin-bottom: 14px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); }
+  .q .ask { font-size: 17px; font-weight: 700; color: var(--ink); margin-bottom: 10px; display: flex; gap: 10px; align-items: baseline; }
+  .q .ask .qn { color: var(--red); font-weight: 800; flex: 0 0 auto; }
+  .q p { color: var(--ink-soft); }
+  .q b { color: var(--ink); }
+  .pill { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink); background: var(--panel-2); padding: 1px 7px; border-radius: 6px; border: 1px solid var(--line); white-space: nowrap; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+  th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .fix td:first-child { color: var(--good); font-weight: 650; }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); box-shadow: var(--shadow); margin-bottom: 14px; }
+  ol.recs { padding-left: 0; list-style: none; counter-reset: r; margin: 0; }
+  ol.recs li { counter-increment: r; position: relative; padding: 14px 16px 14px 52px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 10px; box-shadow: var(--shadow); }
+  ol.recs li::before { content: counter(r); position: absolute; left: 14px; top: 14px; width: 26px; height: 26px; border-radius: 8px; background: var(--teal-soft); color: var(--teal); font-weight: 800; font-size: 14px; display: grid; place-items: center; }
+  ol.recs b { color: var(--ink); }
+  .foot { margin-top: 46px; padding: 16px 18px; border-radius: 12px; background: var(--amber-soft); border: 1px solid var(--line); font-size: 14px; color: var(--ink-soft); }
+  .foot b { color: var(--ink); }
+  .muted { color: var(--ink-soft); font-size: 13.5px; }
+  code { background: var(--panel-2); border: 1px solid var(--line); border-radius: 5px; padding: 0 5px; font-size: .9em; }
+</style>
+
+<div class="wrap">
+
+  <div class="eyebrow">Lead Run Debrief · YouTube outreach</div>
+  <h1>2026-08-31: the key file fixed itself in the night, and nothing was watching for that</h1>
+  <p class="lede">Yesterday the shared file holding all 66 YouTube keys was emptied, so a safety check stopped the pipeline and wrote a note saying a human had to put the keys back. The keys came back on their own, from a later copy off your Mac. But the note stayed on the floor, and the note is what everything reads before it starts. So the campaign loop and all five discovery lanes stayed switched off for <b>22 hours and 44 minutes</b> after the thing that stopped them was already fixed. This cycle found <b>zero</b> creators. It is now running again, and the gap it fell through is closed.</p>
+  <div style="margin-top:14px">
+    <span class="tag">0 CREATORS FOUND, THE FIRST EMPTY CYCLE</span>
+    <span class="tag" style="margin-left:6px">22H44M STOPPED, MOSTLY AFTER THE FIX</span>
+    <span class="tag amber" style="margin-left:6px">REAL SPEND $42.79, RUNWAY 8 DAYS</span>
+    <span class="tag good" style="margin-left:6px">RUNNING AGAIN SINCE 07:24Z</span>
+  </div>
+
+  <div class="grid stats">
+    <div class="card stat accent-red">
+      <div class="n">0</div>
+      <div class="l">creators worth contacting</div>
+      <div class="s down">97 yesterday, 163 the day before</div>
+    </div>
+    <div class="card stat accent-red">
+      <div class="n">22h44m</div>
+      <div class="l">everything switched off</div>
+      <div class="s down">about 22h of it after the cause was gone</div>
+    </div>
+    <div class="card stat accent-amber">
+      <div class="n">+5</div>
+      <div class="l">parked → <code>approved_hold</code></div>
+      <div class="s down">all five before the stop, pool now 3,793</div>
+    </div>
+    <div class="card stat accent-good">
+      <div class="n">224</div>
+      <div class="l">leads enriched anyway</div>
+      <div class="s up">104 yesterday, the one lane that kept working</div>
+    </div>
+  </div>
+
+  <h2>The shape of the day</h2>
+  <div class="card" style="padding:0">
+    <div class="strip" id="strip"></div>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--teal)"></span>good leads found that hour (score ≥ 6)</span>
+      <span><span class="dot" style="background:var(--ink-soft);opacity:.35"></span>all channels written that hour, to scale</span>
+      <span><span class="dot" style="background:var(--red)"></span>nothing found</span>
+    </div>
+  </div>
+  <p class="muted">Two cycles, 48 hours, ending 06:00Z today. The left half is yesterday running normally and then falling off a cliff when the key file was emptied. The right half is this cycle: <b>24 consecutive empty hours</b>. There is no shape to read here and no decline to analyse. The machine was switched off for all but the first hour and a half of it.</p>
+
+  <h2>The three questions</h2>
+
+  <div class="q accent-red">
+    <div class="ask"><span class="qn">Q1</span><span>Why did an outage that fixed itself still cost a whole day?</span></div>
+    <p><b>Because stopping and starting were not the same kind of decision.</b> Stopping is automatic. Starting was a person deleting a file.</p>
+    <p>Here is the sequence. Yesterday at 04:58Z your Mac's two-minute copy overwrote <code>~/env-storage/.env</code> with an empty file, so every process loaded zero YouTube keys. The campaign failed twice in a row, and at 08:10Z the hourly health check spent a repair agent on it. That agent did the right thing: it worked out that the problem was an emptied secrets file, that it is <b>not allowed to write secrets files</b>, that the backup copies on disk were from July and would restore a smaller, older set of keys, and that guessing on an authentication path was the one thing it had been told not to do. So it wrote a note explaining all of that to <code>logs/autopilot-halt.flag</code> and stopped. At 08:40Z the campaign loop read that note and exited.</p>
+    <p><b>The keys came back by themselves.</b> A later copy from your Mac carried a full file, and the bank holds <b>66 keys</b> right now, numbered <code>_1</code> through <code>_66</code> with no gaps. The note in the file even said this would happen, and that everything would resume on its own once it did.</p>
+    <p>It did not resume, because nothing re-checks. <b>Twenty hourly health checks in a row read that note and stood down</b>, which is exactly what they are built to do. All five discovery lanes did the same thing: they relaunched on their timers, read the note, and quit in about two seconds. <span class="pill">253</span> relaunches across the four lanes that log it, and <b>not one seed walked</b>.</p>
+    <p><b>This gap was half-closed already, which is the part worth knowing.</b> On 08-25 the OpenRouter account ran dry, everything stopped correctly, and nothing noticed the top-up. The fix then was a self-clearing check, but it was written to recognise that one cause and no other. An emptied key bank was not on the list, so the machinery to recover existed and simply did not apply. Fixed today by making the list a list. Details in the table below.</p>
+  </div>
+
+  <div class="q accent-good">
+    <div class="ask"><span class="qn">Q2</span><span>Was anything at all getting done?</span></div>
+    <p><b>Yes, and more than usual. The enrichment backfill produced 224 finished leads against 104 the day before.</b> That lane takes creators already sitting in <code>approved_hold</code> and builds the research bundle an email gets written from. It does not need YouTube keys, and it does not read the stop note, so it ran flat out for 24 hours with nothing competing for the machine.</p>
+    <p>So the day was not empty of work. It was empty of <em>finding</em>. Every creator enriched today was one we already had.</p>
+    <p>The parking number tells the same story. <b>+5</b> into <code>approved_hold</code>, taking the pool to <b>3,793</b>, and all five landed at 08:09Z in the last session before the stop. The <code>needs_contact</code> pool moved the other way, <b>4,921 down to 4,916</b>, which is those same five leads being promoted out of it once an address checked out. Nothing arrived to replace them, because nothing was found.</p>
+    <p>Worth saying plainly: this lane running during a stop is correct, not a leak. It is the one part of the pipeline that has a backlog deep enough to work through without any new supply. It also turns out to be where the money goes, which is Q3.</p>
+  </div>
+
+  <div class="q accent-amber">
+    <div class="ask"><span class="qn">Q3</span><span>How is a stopped pipeline spending $42 a day?</span></div>
+    <p><b>Because the spending number in these reports has never been the account's spending number.</b> It sums one repo's own log, the lead finder's. Every other repo draws on the same OpenRouter account and keeps no log at all.</p>
+    <p>Today made that impossible to miss. The finder recorded <b>one call</b> costing <span class="pill">$0.0079</span>. The account actually spent <span class="pill">$42.79</span>. The difference is the enrichment backfill from Q2: <b>224 bundles, fifteen model calls each</b>, none of it counted.</p>
+    <p><b>The consequence was a runway figure of 42,965 days.</b> Balance divided by a spending number that was missing 99.98% of the spending. The real figure, using the account's own meter, is <span class="pill">8 days</span> on a <span class="pill">$339.19</span> balance.</p>
+    <p>This is the same blind spot that emptied the account without warning on 08-25. The fix then was to watch the balance. That is not enough on its own, because a balance only becomes alarming once you know how fast it is falling, and the falling rate was the part being measured wrong. Fixed today by reading the provider's own meter instead of trusting each repo to report itself.</p>
+    <p class="muted">Reconstructed from the archived daily snapshots, the account has been running at <b>$13 to $37 a day</b> all week while these reports showed $4 to $7. Some of that gap is the provider settling costs a little after the fact, but most of it is enrichment that was never in the figure.</p>
+  </div>
+
+  <h2>Where the leads came from</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Lane</th><th class="num">Runs</th><th class="num">Seeds walked</th><th class="num">Channels</th><th class="num">Score ≥ 6</th><th>State</th></tr></thead>
+      <tbody>
+        <tr><td><b>Recommended-videos feed</b></td><td class="num">122</td><td class="num down">0</td><td class="num">0</td><td class="num">0</td><td>Stopped on the note. 948 seeds still in its book</td></tr>
+        <tr><td>Video-graph sweep</td><td class="num">124</td><td class="num down">0</td><td class="num">0</td><td class="num">0</td><td>Stopped on the note, and separately on its own $50 lifetime cap. 1,940 seeds unwalked</td></tr>
+        <tr><td>Keyword search</td><td class="num">3</td><td class="num">—</td><td class="num">0</td><td class="num">0</td><td>Two hard stops and one quota stop, then the loop exited</td></tr>
+        <tr><td>Peer network</td><td class="num">6</td><td class="num down">0</td><td class="num">0</td><td class="num">0</td><td>Stopped on the note. 10 seeds left</td></tr>
+        <tr><td>Podcast crossover</td><td class="num">1</td><td class="num">—</td><td class="num">0</td><td class="num">0</td><td>Stopped on the note</td></tr>
+        <tr><td>Comment sweep</td><td class="num">0</td><td class="num">—</td><td class="num">0</td><td class="num">0</td><td>Off since you paused it on 08-20</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="muted">Every zero in this table has one cause, which is why there is no per-lane analysis to give. <b>0</b> channels written, <b>0</b> scored, so no niche breakdown and no scoring-failure rate. The campaign loop managed three finder runs in the 90 minutes before it exited, all of them stopping short. The video-graph lane is the one lane that would still be stopped after the note was cleared, because its $50 lifetime cost cap is a separate switch and remains your call.</p>
+
+  <h2>The recovery lane</h2>
+  <p class="muted">No collection ran. The contact-recovery pass fires from the hourly health check, and that check exits as soon as it sees the stop note, before it reaches the recovery step. So the three-cycle finding stands unchanged and untested: collection works, turning a candidate address into a verified one does not. The pool sits at <b>4,916</b>. The <b>5</b> that left it this cycle are the five that parked.</p>
+
+  <h2>What broke → what's fixed</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Issue</th><th>Mechanism</th><th>Status</th></tr></thead>
+      <tbody class="fix">
+        <tr><td>A stop stayed in force for 22 hours after its cause was repaired</td><td>The self-clearing check added on 08-25 recognised one cause, an empty OpenRouter account, and nothing else. An emptied key bank was not on its list, so twenty hourly checks read the note and correctly stood down while the key bank sat full</td><td class="up">Fixed. The check now works from a list of causes it can both recognise and disprove, and the empty key bank is on it. Its test reads the shared file, counts key names only and never a value, and needs at least five before it will clear. Verified live: it matched the real note, counted 66 keys, cleared it, and restarted the loop, which launched a session at 07:24:04Z</td></tr>
+        <tr><td>A cycle spent entirely stopped was invisible in the report data</td><td>The snapshot these debriefs are built from had no field for a stop at all. It showed up only as stray text inside each lane's idle reason, which reads like five separate lane failures instead of one file</td><td class="up">Fixed. The hourly check now writes a free heartbeat for every hour a stop is in force, and the snapshot counts them, so a stop stays countable even after the note is gone. That matters most for an overnight recovery, where the note is cleared before the report runs</td></tr>
+        <tr><td>Reported spending was missing almost all the spending</td><td>The figure sums the lead finder's own log. The enrichment backfill runs fifteen model calls per lead on the same account and keeps no log, and is not stopped by the note. Today: $0.0079 reported, $42.79 actually spent, runway shown as 42,965 days</td><td class="up">Fixed. The report now samples the provider's own cumulative meter once a cycle and takes the difference, which counts every repo whether or not it reports itself, and uses that rate for the runway. The finder figure stays, labelled with what it covers. Verified against the archived 08-30 snapshot: $42.79 over 24.2 hours, runway 8 days</td></tr>
+        <tr><td>The video-graph lane is off, fourth day</td><td>$50 lifetime cost cap, unchanged. 1,940 seeds unwalked at 2.7¢ per good lead, the cheapest in the pipeline</td><td class="warn">Open. Clearing the note does not restart this one. Raising the cap is your spending call</td></tr>
+        <tr><td>Nothing tells you a stop is in force</td><td>There is no alert path by design. The only way you learn about one is this report, which runs once a day. Yesterday's stop began after yesterday's report had already been written, so the first time it could surface was today</td><td class="warn">Open, and partly better. Self-clearing now covers the two causes that have actually happened. A cause it cannot disprove still waits silently for you</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="muted">Otherwise clean, in the narrow sense that nothing crashed: <b>0</b> fatal error signatures inside the cycle, <b>0</b> Anthropic spend, and the one flagged failure yesterday at 08:09Z was correctly classified before the stop. Two hard stops and one quota stop, all from the same empty key bank. The pipeline is running now and the keyword harvest is finding new terms again, which is independent proof the keys work.</p>
+
+  <h2>Recommended next — ranked</h2>
+  <ol class="recs">
+    <li><b>Decide how long 8 days of runway is comfortable.</b> This is the one genuinely new fact and it is a money decision, so it goes first. The balance is <b>$339.19</b> and the account is really spending about <b>$42 a day</b>, not the $4 to $7 these reports have been showing all week. Nothing is wrong with the spending itself, it is enrichment doing real work at roughly the expected cost per lead. What was wrong was the number you were shown. Top up, or throttle the backfill, but do it knowing the real rate.</li>
+    <li><b>Check why your Mac wrote an empty key file, because the fix only covers the recovery.</b> Today's change means the pipeline restarts itself the next time this happens. It does not stop it happening. The file is <code>~/env-storage/.env</code>, the Mac's copy is the master, and it overwrote the server's with 0 bytes at 04:58:11Z on 08-30. A sync that can write nothing at all is worth understanding once.</li>
+    <li><b>Decide whether to raise the video-graph lane's $50 cap.</b> Carried four days. It has produced nothing since 08-28, it has cost $50 for 1,877 good leads at 2.7¢ each, and <b>1,940 seeds</b> are still in its book. The durable version is to make the cap refresh per lap the way the sibling lane's does, so it cannot lock itself out permanently.</li>
+    <li><b>Find a seed source that is not our own output.</b> Carried ten days, untested today because nothing ran. Before the stop, the main lane was on lap 7 of a book it has walked six times at 0.006 good leads per seed against 0.45 on lap 1, and almost every finder pass was fading for want of terms. Expect that to be waiting tomorrow exactly as it was left.</li>
+    <li><b>Decide the outlet for the parked pools.</b> <b>3,793</b> in <code>approved_hold</code> and <b>4,916</b> in <code>needs_contact</code>, which is <b>8,709 creators found and never contacted</b>. Unchanged today, and it is the only number in this report a lost cycle did not touch.</li>
+  </ol>
+
+  <div class="foot">
+    <b>Status:</b> running again since 07:24:04Z, restarted by the fix that was shipped for this. The key bank holds <b>66</b> keys. <b>Everything is parked, nothing is sent.</b> <code>approved_hold</code> is a deliberate holding lane. Today's +5 takes it to <b>3,793</b>, alongside <b>4,916</b> in <code>needs_contact</code>. Anthropic spend $0.00. OpenRouter spend <b>$42.79</b> on the account, of which $0.0079 was the finder, balance <b>$339.19</b>, about <b>8 days</b> at the real rate. The video-graph lane stays stopped on its cost cap until that cap is raised.
+  </div>
+
+</div>
+
+<script>
+  // Per hour, 07:00Z 08-29 through 06:00Z 08-31 (leads.lead_candidates, first_discovered_at).
+  // Left 24 = the 08-30 cycle. Right 24 = this cycle, empty end to end.
+  var good  = [5,3,1,1,6,5,6,7,3,3,1,3,5,8,5,2,5,5,7,7,6,2,1,0,
+               0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];
+  var total = [98,137,85,61,114,118,156,106,122,113,108,126,123,181,201,140,180,156,164,150,172,155,60,0,
+               0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];
+  var gMax = Math.max.apply(null, good) || 1, tMax = Math.max.apply(null, total) || 1;
+  var strip = document.getElementById('strip');
+  good.forEach(function (v, i) {
+    var col = document.createElement('div');
+    col.className = 'col';
+    col.title = v + ' good leads of ' + total[i] + ' channels';
+
+    var ghost = document.createElement('div');
+    ghost.className = 'ghost';
+    ghost.style.height = Math.max(2, Math.round((total[i] / tMax) * 28)) + '%';
+
+    var bar = document.createElement('div');
+    bar.className = 'bar' + (v === 0 ? ' zero' : '');
+    bar.style.height = Math.max(4, Math.round((v / gMax) * 68)) + '%';
+
+    col.appendChild(ghost);
+    col.appendChild(bar);
+    strip.appendChild(col);
+  });
+</script>
