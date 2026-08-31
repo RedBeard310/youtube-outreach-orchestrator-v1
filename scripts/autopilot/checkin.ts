@@ -18,6 +18,7 @@
 import 'dotenv/config';
 import { appendFileSync, existsSync, openSync, readdirSync, readFileSync, unlinkSync, writeFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import { homedir } from 'node:os';
 import { spawn, execSync } from 'node:child_process';
 import { summarizeToday, pacificDate } from './burn-ledger.js';
 import { countByReviewStatus } from '../../src/airtable.ts';
@@ -297,67 +298,157 @@ function kickKeywordHarvest(reason: string): boolean {
 }
 
 /**
+ * A halt cause this check-in can positively recognise AND positively disprove.
+ *
+ * `matches` decides whether a halt is this cause at all; it must be specific
+ * enough that no other halt text can trip it. `probe` returns a human-readable
+ * reason to clear, or null to leave the halt standing. A probe that cannot
+ * complete returns null: an unanswered question is not proof of a fix.
+ */
+type HaltRecovery = {
+  kind: string;
+  matches: (reason: string) => boolean;
+  probe: (day: string) => Promise<string | null>;
+};
+
+/** How much OpenRouter headroom counts as "topped up" (not merely non-zero). */
+const MIN_CREDIT_MARGIN_USD = Number(process.env.AUTOPILOT_MIN_CREDIT_MARGIN_USD ?? 5);
+
+/**
+ * How many direct YouTube keys must be back in the shared bank before an
+ * empty-bank halt is treated as over. The pool has run 9 → 39 → 52 → 66 keys and
+ * keeps growing, so this is a floor, never a count: never hard-code a pool size
+ * (CLAUDE.md, "YouTube API Key Pool"). A handful is enough to run on; the point
+ * is only to tell "the file came back" from "the file is still truncated".
+ */
+const MIN_YOUTUBE_KEYS = Number(process.env.AUTOPILOT_MIN_YOUTUBE_KEYS ?? 5);
+
+/** The shared env bank, in the order every other repo looks for it. */
+const SHARED_ENV_CANDIDATES = [
+  process.env.SHARED_ENV_FILE,
+  join(homedir(), 'Claude', 'env-storage', '.env'),
+  join(homedir(), 'env-storage', '.env'),
+].filter((p): p is string => Boolean(p));
+
+/**
+ * Count direct YouTube key slots in the shared bank WITHOUT reading a value into
+ * anything that could be logged. Only the left-hand side of each assignment is
+ * ever inspected, and only its shape.
+ */
+function countSharedYoutubeKeys(): number | null {
+  const file = SHARED_ENV_CANDIDATES.find((p) => existsSync(p));
+  if (!file) return null;
+  let text: string;
+  try { text = readFileSync(file, 'utf8'); } catch { return null; }
+  let n = 0;
+  for (const line of text.split('\n')) {
+    const eq = line.indexOf('=');
+    if (eq <= 0) continue;
+    const name = line.slice(0, eq).trim();
+    const value = line.slice(eq + 1).trim();
+    if (!/^YOUTUBE_API_KEY(_\d+)?$/.test(name)) continue;
+    if (value.length > 0) n += 1;
+  }
+  return n;
+}
+
+const HALT_RECOVERIES: HaltRecovery[] = [
+  {
+    // 2026-08-25: the OpenRouter account ran dry at 00:49Z and everything parked
+    // correctly — but nothing noticed when Casey topped it up.
+    kind: 'openrouter_credits',
+    matches: (reason) => /OpenRouter account out of credits/i.test(reason),
+    probe: async (day) => {
+      const key = process.env.OPENROUTER_API_KEY?.trim();
+      if (!key) return null;
+      let remaining: number;
+      try {
+        const res = await fetch('https://openrouter.ai/api/v1/credits', {
+          headers: { authorization: `Bearer ${key}` },
+          signal: AbortSignal.timeout(20_000),
+        });
+        if (!res.ok) return null;
+        const body = (await res.json()) as { data?: { total_credits?: number; total_usage?: number } };
+        const granted = Number(body.data?.total_credits);
+        const used = Number(body.data?.total_usage);
+        if (!Number.isFinite(granted) || !Number.isFinite(used)) return null;
+        remaining = granted - used;
+      } catch {
+        return null; // a probe we could not complete is not proof of anything
+      }
+      if (remaining < MIN_CREDIT_MARGIN_USD) {
+        console.log(`[checkin ${day}] halt stands — OpenRouter still at $${remaining.toFixed(2)} (need $${MIN_CREDIT_MARGIN_USD})`);
+        return null;
+      }
+      return `OpenRouter credits restored ($${remaining.toFixed(2)} available)`;
+    },
+  },
+  {
+    // 2026-08-30: the Mac's 2-minute env sync wrote ~/env-storage/.env as 0 bytes,
+    // so every repo resolved 0 direct YouTube keys and the campaign hard-stopped
+    // twice in a row. The fix-agent halted correctly — restoring a secrets file is
+    // not its call. But the bank refilled itself on a later sync and NOTHING
+    // noticed: 20 consecutive hourly check-ins read the flag and stood down, and
+    // the whole pipeline sat dark ~22h past its own repair.
+    //
+    // Safe to auto-clear because the precondition is checkable from disk, costs
+    // nothing, and reads only key NAMES — never a value.
+    kind: 'youtube_key_bank_empty',
+    matches: (reason) =>
+      /\b0\s+direct\s+(youtube\s+)?keys\b/i.test(reason) ||
+      /env-storage\/\.env\s+is\s+a?\s*0-byte/i.test(reason) ||
+      /(key\s+bank|key\s+pool)\s+(is\s+)?empty/i.test(reason),
+    probe: async (day) => {
+      const keys = countSharedYoutubeKeys();
+      if (keys === null) return null; // no bank on disk at all — still broken
+      if (keys < MIN_YOUTUBE_KEYS) {
+        console.log(`[checkin ${day}] halt stands — shared env bank still holds ${keys} YouTube keys (need ${MIN_YOUTUBE_KEYS})`);
+        return null;
+      }
+      return `shared env bank repopulated (${keys} direct YouTube keys present)`;
+    },
+  },
+];
+
+/**
  * Clear a halt whose cause we can PROVE has gone away, and restart the loop.
  *
- * WHY (2026-08-25). The halt flag is one-way: something writes it, everything
- * stops, and only a human deleting a file ever starts anything again. On 08-25
- * the OpenRouter account ran out of credits at 00:49Z, the flag went up, and the
- * campaign loop plus three sweeps parked themselves correctly — but the moment
- * Casey tops the account up, nothing notices. The pipeline would sit dark until
- * he remembered a file on a VPS, hours or a day after paying to fix the actual
- * problem.
+ * WHY (2026-08-25, extended 2026-08-31). The halt flag is one-way: something
+ * writes it, everything stops, and only a human deleting a file ever starts
+ * anything again. Twice now the cause has repaired itself — an account top-up,
+ * then a re-synced key bank — while the pipeline stayed dark for the rest of the
+ * day because no code was watching for the repair.
  *
  * Deliberately narrow, in both directions:
  *
- * - ONLY the OpenRouter-credits halt. Every other halt (the Anthropic hard
- *   ceiling, rapid finder failures, a migration freeze) means something a probe
- *   cannot check, so those still wait for a human. Anything this function does
- *   not positively recognise is left alone.
- * - The check is the credits endpoint, which spends nothing. It needs a real
- *   margin, not a non-zero balance: an account left at $0.30 would clear the
- *   flag, 402 within minutes, and re-halt, flapping every hour.
+ * - ONLY the causes listed in HALT_RECOVERIES. Every other halt (the Anthropic
+ *   hard ceiling, rapid finder failures, a migration freeze) means something a
+ *   probe cannot check, so those still wait for a human. Anything not positively
+ *   recognised here is left alone.
+ * - Each probe must be free and must demand a real margin, not a bare non-zero.
+ *   An account left at $0.30, or a bank holding one stale key, would clear the
+ *   flag, fail within minutes, and re-halt — flapping every hour.
  *
  * Clearing the flag alone revives the sweeps, which re-read it each cycle. The
  * campaign loop exits(0) on a halt and Restart=on-failure does not cover a clean
  * exit, so it needs the explicit restart.
  */
 async function tryAutoClearHalt(day: string): Promise<boolean> {
-  const MIN_CREDIT_MARGIN_USD = Number(process.env.AUTOPILOT_MIN_CREDIT_MARGIN_USD ?? 5);
-
   let reason = '';
   try { reason = readFileSync(HALT_FLAG, 'utf8'); } catch { return false; }
-  if (!/OpenRouter account out of credits/i.test(reason)) return false;
 
-  const key = process.env.OPENROUTER_API_KEY?.trim();
-  if (!key) return false;
+  const recovery = HALT_RECOVERIES.find((r) => r.matches(reason));
+  if (!recovery) return false;
 
-  let remaining: number;
-  try {
-    const res = await fetch('https://openrouter.ai/api/v1/credits', {
-      headers: { authorization: `Bearer ${key}` },
-      signal: AbortSignal.timeout(20_000),
-    });
-    if (!res.ok) return false;
-    const body = (await res.json()) as { data?: { total_credits?: number; total_usage?: number } };
-    const granted = Number(body.data?.total_credits);
-    const used = Number(body.data?.total_usage);
-    if (!Number.isFinite(granted) || !Number.isFinite(used)) return false;
-    remaining = granted - used;
-  } catch {
-    return false; // a probe we could not complete is not proof of anything
-  }
-
-  if (remaining < MIN_CREDIT_MARGIN_USD) {
-    console.log(`[checkin ${day}] halt stands — OpenRouter still at $${remaining.toFixed(2)} (need $${MIN_CREDIT_MARGIN_USD})`);
-    return false;
-  }
+  const cleared = await recovery.probe(day);
+  if (!cleared) return false;
 
   unlinkSync(HALT_FLAG);
   appendFileSync(OBSERVATIONS, `${JSON.stringify({
-    ts: new Date().toISOString(), kind: 'halt_auto_cleared',
-    detail: `OpenRouter credits restored ($${remaining.toFixed(2)} available) — halt flag removed and the campaign loop restarted`,
+    ts: new Date().toISOString(), kind: 'halt_auto_cleared', cause: recovery.kind,
+    detail: `${cleared} — halt flag removed and the campaign loop restarted`,
   })}\n`);
-  console.log(`[checkin ${day}] OpenRouter credits restored ($${remaining.toFixed(2)}) — halt cleared, restarting the campaign loop`);
+  console.log(`[checkin ${day}] ${cleared} — halt cleared, restarting the campaign loop`);
   try {
     execSync('sudo -n systemctl restart autopilot-campaign.service', { stdio: 'pipe', timeout: 60_000 });
   } catch (err) {
