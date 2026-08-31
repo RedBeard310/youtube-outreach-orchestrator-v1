@@ -7,7 +7,7 @@
 
 import 'dotenv/config';
 import { execSync } from 'node:child_process';
-import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { countByReviewStatus, getLeadsDiscoveredSince, type Lead } from '../../src/airtable.ts';
 import { discoveryReportKey } from '../../src/discovery-method.ts';
@@ -886,6 +886,7 @@ async function openRouterHealth(sinceISO: string, untilISO: string): Promise<Rec
   }
 
   let remaining: number | null = null;
+  let totalUsage: number | null = null;
   const key = process.env.OPENROUTER_API_KEY?.trim();
   if (key) {
     try {
@@ -897,24 +898,71 @@ async function openRouterHealth(sinceISO: string, untilISO: string): Promise<Rec
         const body = (await res.json()) as { data?: { total_credits?: number; total_usage?: number } };
         const granted = Number(body.data?.total_credits);
         const used = Number(body.data?.total_usage);
-        if (Number.isFinite(granted) && Number.isFinite(used)) remaining = granted - used;
+        if (Number.isFinite(granted) && Number.isFinite(used)) { remaining = granted - used; totalUsage = used; }
       }
     } catch { /* fail soft — a debrief still gets written with the network down */ }
   }
 
+  // ACCOUNT-WIDE burn, from the provider's own meter (2026-08-31).
+  //
+  // `spend_usd` above sums the FINDER's spend log and nothing else, so it only
+  // ever describes one of several repos drawing on this account. The gap is not
+  // small: the enrichment backfill runs quick-research, whose models.json routes
+  // 15 tasks to OpenRouter, writes no spend log at all, and is not gated by the
+  // halt flag. On 08-31 the whole pipeline was halted, the finder logged ONE call
+  // for $0.0079, the backfill quietly enriched 224 bundles, and the account
+  // actually spent $42.79. Runway was reported as 42,965 days. It was about 8.
+  //
+  // total_usage is the provider's own cumulative meter, so it counts every repo,
+  // metered or not. Sampling it once per cycle and diffing gives ground truth
+  // that no repo can forget to report. First run has no prior sample and returns
+  // null rather than guessing.
+  let accountSpend: number | null = null;
+  let sampleHours: number | null = null;
+  const SAMPLE = join(LOGS, 'openrouter-usage-samples.jsonl');
+  if (totalUsage !== null) {
+    try {
+      const prior = existsSync(SAMPLE)
+        ? (readJsonl(SAMPLE) as Array<{ ts?: unknown; total_usage?: unknown }>)
+            .filter((r) => typeof r.ts === 'string' && typeof r.total_usage === 'number')
+            .pop()
+        : undefined;
+      if (prior) {
+        const dt = Date.now() - Date.parse(prior.ts as string);
+        if (dt > 0) {
+          accountSpend = Number((totalUsage - (prior.total_usage as number)).toFixed(4));
+          sampleHours = Number((dt / 3_600_000).toFixed(2));
+        }
+      }
+      appendFileSync(SAMPLE, JSON.stringify({ ts: new Date().toISOString(), total_usage: totalUsage }) + '\n');
+    } catch { /* sampling is best-effort; never fail a debrief over it */ }
+  }
+  // Per-day rate, so an off-cadence debrief run can't read as a cheap day.
+  const accountPerDay = accountSpend !== null && sampleHours && sampleHours > 0
+    ? Number(((accountSpend * 24) / sampleHours).toFixed(2))
+    : null;
+
   return {
     spend_usd: Number(usd.toFixed(4)),
     calls,
+    // Named so this can't be mistaken for the account's burn. It is one repo's log.
+    spend_scope: 'youtube-lead-finder-v1 spend log only — other repos on this account (notably the enrichment backfill) write no log and are NOT included',
     by_task: Object.fromEntries(
       Object.entries(byTask)
         .sort((a, b) => b[1].usd - a[1].usd)
         .map(([k, v]) => [k, { usd: Number(v.usd.toFixed(4)), calls: v.calls }]),
     ),
+    // Provider-side truth: every repo, metered or not.
+    account_spend_usd: accountSpend,
+    account_spend_per_day_usd: accountPerDay,
+    account_sample_hours: sampleHours,
     balance_usd: remaining,
-    // Today's spend is the only burn rate we can measure without keeping history,
-    // and it reads LOW on a day the account died early — which biases runway
-    // optimistic exactly when it matters. Read it as a ceiling, not a forecast.
-    days_of_runway: remaining !== null && usd > 0 ? Number((remaining / usd).toFixed(1)) : null,
+    // Prefer the account rate. The finder-log rate reads LOW whenever another repo
+    // is doing the spending, which is exactly when an optimistic runway is worst.
+    days_of_runway: remaining !== null && accountPerDay !== null && accountPerDay > 0
+      ? Number((remaining / accountPerDay).toFixed(1))
+      : remaining !== null && usd > 0 ? Number((remaining / usd).toFixed(1)) : null,
+    runway_basis: accountPerDay !== null && accountPerDay > 0 ? 'account' : 'finder_log',
     depleted: remaining !== null && remaining <= 0,
   };
 }
