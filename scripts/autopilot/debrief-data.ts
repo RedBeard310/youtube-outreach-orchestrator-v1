@@ -736,6 +736,61 @@ function readObservations(): Obs[] {
     .sort((a, b) => a.ts.localeCompare(b.ts));
 }
 
+// Halt state, and how much of the cycle the pipeline spent stopped.
+//
+// WHY THIS EXISTS (2026-08-31): on 08-30 the shared env bank was truncated to 0 bytes, a
+// fix-agent correctly halted rather than guess at a secrets file, and the halt flag stopped
+// the campaign loop AND all five discovery lanes for 22h44m — including ~22h AFTER the bank
+// had already refilled itself. That was the entire story of the cycle, and this snapshot,
+// the feed a debrief agent is told to treat as authoritative, said nothing about it: the
+// halt appeared only as incidental text inside each lane's `idle_reason`. A reader could
+// have called it five independent lane failures instead of one flag.
+//
+// `hours_halted_in_cycle` counts the hourly `halt_standing` heartbeats the check-in writes,
+// so a halt stays countable even once the flag is gone — which is exactly the case a
+// midnight-boundary debrief hits after an overnight recovery.
+function haltHealth(sinceMs: number, untilMs: number) {
+  const f = join(LOGS, 'autopilot-observations.jsonl');
+  const rows = existsSync(f)
+    ? (readJsonl(f) as Array<Record<string, unknown>>).filter((o) => typeof o.ts === 'string')
+    : [];
+  const inWindow = rows.filter((o) => {
+    const t = Date.parse(o.ts as string);
+    return Number.isFinite(t) && t >= sinceMs && t < untilMs;
+  });
+
+  const standing = inWindow.filter((o) => o.kind === 'halt_standing');
+  const cleared = inWindow
+    .filter((o) => o.kind === 'halt_auto_cleared')
+    .map((o) => ({ ts: o.ts as string, cause: (o.cause as string) ?? null, detail: (o.detail as string) ?? null }));
+
+  const flag = join(LOGS, 'autopilot-halt.flag');
+  let activeNow = false;
+  let writtenISO: string | null = null;
+  let reason: string | null = null;
+  if (existsSync(flag)) {
+    activeNow = true;
+    try { writtenISO = new Date(statSync(flag).mtimeMs).toISOString(); } catch { /* raced */ }
+    try {
+      reason = readFileSync(flag, 'utf8').split('\n').find((l) => l.trim())?.trim().slice(0, 300) ?? null;
+    } catch { /* raced */ }
+  } else if (standing.length) {
+    writtenISO = (standing[0].halt_written_iso as string) ?? null;
+    reason = (standing[standing.length - 1].reason as string) ?? null;
+  }
+
+  return {
+    active_now: activeNow,
+    halt_written_iso: writtenISO,
+    reason,
+    // One heartbeat per hourly check-in, so this doubles as "hours the loop was down".
+    hours_halted_in_cycle: standing.length,
+    heartbeats_first: standing.length ? (standing[0].ts as string) : null,
+    heartbeats_last: standing.length ? (standing[standing.length - 1].ts as string) : null,
+    auto_clears_in_cycle: cleared,
+  };
+}
+
 // Start of the CURRENT unbroken run of `kind` observations, walking backward from the latest
 // through any gap ≤ maxGapH. The check-in logs these sparsely (only on a starving+blocked
 // hour), so tolerate day-level gaps; a genuine multi-day recovery (no observation for >2d)
@@ -1028,6 +1083,7 @@ async function main(): Promise<void> {
     },
     openrouter_today: await openRouterHealth(sinceISO, untilISO),
     supply_health: supplyHealth,
+    halt: haltHealth(sinceMs, Date.parse(untilISO)),
     fatal_signatures_today: fatalSignaturesToday(sinceMs),
     references: {
       prior_debrief_html: '/home/casey/repos/casey-assistant/brain/lead-gen/runs/lead-run-2026-07-10.html',

@@ -35,7 +35,10 @@ const LOGS = join(REPO, 'logs');
 // halves of the halt contract now agree about where the flag lives.
 const HALT_FLAG = process.env.AUTOPILOT_HALT_FLAG || join(LOGS, 'autopilot-halt.flag');
 const ATTENTION = join(LOGS, 'autopilot-attention.jsonl');
-const OBSERVATIONS = join(LOGS, 'autopilot-observations.jsonl');
+// Overridable for the same reason HALT_FLAG is: so the halt paths can be exercised
+// against a scratch file instead of appending test rows to the real observation stream
+// that the debrief then reports as fact.
+const OBSERVATIONS = process.env.AUTOPILOT_OBSERVATIONS || join(LOGS, 'autopilot-observations.jsonl');
 const PARKED_HIST = join(LOGS, 'autopilot-parked-history.jsonl');
 
 // How long approved_hold may stay flat (while the finder is working) before we treat it
@@ -473,6 +476,24 @@ async function main(): Promise<void> {
     }
     let haltReason = '';
     try { haltReason = readFileSync(HALT_FLAG, 'utf8'); } catch { /* flag disappeared */ }
+
+    // Heartbeat, so a standing halt is reconstructable after the fact (2026-08-31).
+    // The 08-30 halt stopped the campaign loop and all five discovery lanes for a
+    // whole cycle, yet the "authoritative" debrief JSON carried no halt field at
+    // all and this branch only ever printed to a journal nobody reads. One free
+    // line per hour makes "how much of the cycle was dark, and why" countable.
+    try {
+      const writtenMs = statSync(HALT_FLAG).mtimeMs;
+      appendFileSync(OBSERVATIONS, `${JSON.stringify({
+        ts: new Date().toISOString(),
+        kind: 'halt_standing',
+        halt_written_iso: new Date(writtenMs).toISOString(),
+        age_hours: Math.round((10 * (Date.now() - writtenMs)) / 3_600_000) / 10,
+        reason: haltReason.split('\n').find((l) => l.trim())?.trim().slice(0, 300) ?? '(empty flag)',
+        detail: 'halt flag present — campaign loop and all discovery lanes are stopped; no auto-clear recognises this cause',
+      })}\n`);
+    } catch { /* flag vanished between checks — nothing to record */ }
+
     try {
       await runRecoveryDuringOpenRouterHalt(haltReason, async () => {
         const emailRepo = process.env.EMAIL_OUTREACH_REPO_PATH;
