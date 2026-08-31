@@ -740,6 +740,43 @@ async function main(): Promise<void> {
       return updated ? (Date.now() - Date.parse(updated)) / 3_600_000 : null;
     } catch { return null; }
   }
+  function sweepStateUpdatedMs(stateFile: string): number | null {
+    const p = join(FINDER_REPO, 'logs', stateFile);
+    if (!existsSync(p)) return null;
+    try {
+      const updated = (JSON.parse(readFileSync(p, 'utf8')) as { updated?: string }).updated;
+      const ms = updated ? Date.parse(updated) : NaN;
+      return Number.isFinite(ms) ? ms : null;
+    } catch { return null; }
+  }
+  // A halt that clears leaves sweep-daemon staleness behind for one more tick:
+  // the refill timer runs on its own schedule (up to daily for podcast_crossover)
+  // and has no idea a halt lifted, so it can't catch up before the next hourly
+  // check-in reads the same staleness and re-diagnoses an already-fixed problem.
+  // 2026-08-31: the 08-30 halt (empty YouTube key bank) cleared itself at 07:24
+  // via tryAutoClearHalt, but this check still escalated peer_sweep and
+  // podcast_crossover an hour later for staleness the halt fully explains.
+  //
+  // If the most recent 'halt_auto_cleared' observation is newer than the lane's
+  // own last update, every hour of the staleness is accounted for by time the
+  // halt was up — note it and give the timer its next scheduled tick before
+  // treating this as a real problem, instead of paging the fix-agent to
+  // re-discover the same halt.
+  function haltClearedSince(stateUpdatedMs: number): string | null {
+    if (!existsSync(OBSERVATIONS)) return null;
+    try {
+      const lines = readFileSync(OBSERVATIONS, 'utf8').split('\n').filter((x) => x.trim());
+      for (let i = lines.length - 1; i >= 0; i--) {
+        let rec: { kind?: string; ts?: string };
+        try { rec = JSON.parse(lines[i]!); } catch { continue; }
+        if (rec.kind !== 'halt_auto_cleared') continue;
+        const clearedMs = rec.ts ? Date.parse(rec.ts) : NaN;
+        if (!Number.isFinite(clearedMs)) return null;
+        return clearedMs > stateUpdatedMs ? rec.ts! : null;
+      }
+    } catch { /* unreadable history is not an incident */ }
+    return null;
+  }
   const sweepChecks: Array<{ method: string; timer: string; stateFile: string; maxAgeH: number }> = [
     { method: 'recommended_videos_feed', timer: 'graph-sweep-refill.timer', stateFile: 'graph-sweep-state.json', maxAgeH: 8 },
     { method: 'peer_sweep', timer: 'peer-sweep-refill.timer', stateFile: 'peer-sweep-state.json', maxAgeH: 8 },
@@ -843,6 +880,15 @@ async function main(): Promise<void> {
     }
     const ageH = sweepStateAgeHours(c.stateFile);
     if (ageH !== null && ageH > c.maxAgeH) {
+      const updatedMs = sweepStateUpdatedMs(c.stateFile);
+      const clearedAt = updatedMs !== null ? haltClearedSince(updatedMs) : null;
+      if (clearedAt) {
+        appendFileSync(OBSERVATIONS, JSON.stringify({
+          ts: new Date().toISOString(), kind: 'sweep_daemon_stale_benign', lane: c.method,
+          detail: `${c.method}'s state file is ${ageH.toFixed(1)}h old, but a halt covering that whole window cleared at ${clearedAt} and ${c.timer} hasn't had its next scheduled tick yet — not escalating, will re-check next cycle.`,
+        }) + '\n');
+        continue;
+      }
       anomalies.push({ kind: 'sweep_daemon_stale', detail: `${c.method}'s state file hasn't updated in ${ageH.toFixed(1)}h (expected within ~${c.maxAgeH}h). Check: systemctl status ${c.timer}, and the unit this timer drives, for an error.` });
     }
   }
