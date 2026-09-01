@@ -1,0 +1,237 @@
+<title>Lead Run Debrief — 2026-09-01</title>
+<style>
+  :root {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+      --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+      --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+    --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+    --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 40px 22px 80px; }
+  .eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); font-weight: 600; }
+  h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.12; margin: 10px 0 6px; text-wrap: balance; letter-spacing: -.02em; }
+  h2 { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); margin: 44px 0 16px; font-weight: 700; }
+  h3 { font-size: 18px; margin: 0 0 6px; letter-spacing: -.01em; }
+  p { margin: 0 0 14px; }
+  .lede { font-size: 18px; color: var(--ink-soft); max-width: 68ch; }
+  .tag { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--red-soft); color: var(--red); letter-spacing: .02em; }
+  .tag.amber { background: var(--amber-soft); color: var(--amber); }
+  .tag.good { background: #1f8a5b1a; color: var(--good); }
+  .grid { display: grid; gap: 14px; }
+  .stats { grid-template-columns: repeat(4, 1fr); margin-top: 26px; }
+  @media (max-width: 720px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; box-shadow: var(--shadow); }
+  .stat .n { font-size: 30px; font-weight: 750; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .stat .l { font-size: 12.5px; color: var(--ink-soft); margin-top: 3px; }
+  .stat .s { font-size: 12px; margin-top: 8px; font-weight: 600; }
+  .up { color: var(--good); } .down { color: var(--red); } .warn { color: var(--amber); }
+  .accent-red { border-left: 3px solid var(--red); }
+  .accent-teal { border-left: 3px solid var(--teal); }
+  .accent-amber { border-left: 3px solid var(--amber); }
+  .accent-good { border-left: 3px solid var(--good); }
+
+  .strip { display: flex; align-items: flex-end; gap: 2px; height: 130px; padding: 14px 14px 10px; overflow-x: auto; }
+  .col { flex: 1 0 9px; min-width: 8px; display: flex; flex-direction: column; justify-content: flex-end; height: 100%; }
+  .bar { border-radius: 2px 2px 0 0; background: var(--teal); opacity: .92; }
+  .bar.zero { background: var(--red); height: 4px !important; }
+  .ghost { border-radius: 2px 2px 0 0; background: var(--ink-soft); opacity: .18; margin-bottom: 2px; }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-soft); padding: 0 14px 14px; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+
+  .q { border-radius: 14px; padding: 20px 22px; margin-bottom: 14px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); }
+  .q .ask { font-size: 17px; font-weight: 700; color: var(--ink); margin-bottom: 10px; display: flex; gap: 10px; align-items: baseline; }
+  .q .ask .qn { color: var(--red); font-weight: 800; flex: 0 0 auto; }
+  .q p { color: var(--ink-soft); }
+  .q b { color: var(--ink); }
+  .pill { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink); background: var(--panel-2); padding: 1px 7px; border-radius: 6px; border: 1px solid var(--line); white-space: nowrap; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+  th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .fix td:first-child { color: var(--good); font-weight: 650; }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); box-shadow: var(--shadow); margin-bottom: 14px; }
+  ol.recs { padding-left: 0; list-style: none; counter-reset: r; margin: 0; }
+  ol.recs li { counter-increment: r; position: relative; padding: 14px 16px 14px 52px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 10px; box-shadow: var(--shadow); }
+  ol.recs li::before { content: counter(r); position: absolute; left: 14px; top: 14px; width: 26px; height: 26px; border-radius: 8px; background: var(--teal-soft); color: var(--teal); font-weight: 800; font-size: 14px; display: grid; place-items: center; }
+  ol.recs b { color: var(--ink); }
+  .foot { margin-top: 46px; padding: 16px 18px; border-radius: 12px; background: var(--amber-soft); border: 1px solid var(--line); font-size: 14px; color: var(--ink-soft); }
+  .foot b { color: var(--ink); }
+  .muted { color: var(--ink-soft); font-size: 13.5px; }
+  code { background: var(--panel-2); border: 1px solid var(--line); border-radius: 5px; padding: 0 5px; font-size: .9em; }
+</style>
+
+<div class="wrap">
+
+  <div class="eyebrow">Lead Run Debrief · YouTube outreach</div>
+  <h1>2026-09-01: back to full output, and now you can see what it is actually finding</h1>
+  <p class="lede">Yesterday's fix worked. The pipeline ran for the full 24 hours with nothing stopped, and found <b>3,146</b> channels and <b>127</b> creators worth contacting, its best day since 08-24. Two things sit underneath that. Nearly two thirds of it came from one lane walking the same list of seeds for the eighth time, and it has about six hours of that list left before it starts a ninth. And about <b>one in six</b> of the creators it called good today is a tarot reader or an astrologer, which nobody has ever measured before.</p>
+  <div style="margin-top:14px">
+    <span class="tag good">FIRST CLEAN 24 HOURS, 0 STOPPED</span>
+    <span class="tag good" style="margin-left:6px">127 GOOD LEADS, +63 PARKED</span>
+    <span class="tag amber" style="margin-left:6px">17% OF THEM ARE TAROT CHANNELS</span>
+    <span class="tag amber" style="margin-left:6px">RUNWAY 18 DAYS AT $17/DAY</span>
+  </div>
+
+  <div class="grid stats">
+    <div class="card stat accent-good">
+      <div class="n">127</div>
+      <div class="l">creators worth contacting</div>
+      <div class="s up">0 yesterday, 97 on 08-30</div>
+    </div>
+    <div class="card stat accent-good">
+      <div class="n">+63</div>
+      <div class="l">parked → <code>approved_hold</code></div>
+      <div class="s up">pool now 3,860, best gain in a week</div>
+    </div>
+    <div class="card stat accent-good">
+      <div class="n">24 / 24</div>
+      <div class="l">hours that produced something</div>
+      <div class="s up">no dead hour all cycle</div>
+    </div>
+    <div class="card stat accent-amber">
+      <div class="n">22</div>
+      <div class="l">of the 127 are tarot or astrology</div>
+      <div class="s warn">running 8% to 21% daily since 08-19</div>
+    </div>
+  </div>
+
+  <h2>The shape of the day</h2>
+  <div class="card" style="padding:0">
+    <div class="strip" id="strip"></div>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--teal)"></span>good leads found that hour (score ≥ 6)</span>
+      <span><span class="dot" style="background:var(--ink-soft);opacity:.35"></span>all channels written that hour, to scale</span>
+      <span><span class="dot" style="background:var(--red)"></span>nothing found</span>
+    </div>
+  </div>
+  <p class="muted">Two cycles, 48 hours, ending 06:00Z today. The flat red left half is yesterday, switched off. The right half is this cycle, and the thing to notice is that it has no holes in it. <b>Every one of the 24 hours produced channels and good leads</b>, between 86 and 249 channels an hour, between 2 and 11 good ones. That is the first time in ten days the machine has run a full day without a stall, a dry patch or an overnight hole. The output is steady rather than spiky because it is coming from a lane that walks a fixed list at a fixed rate, which is also the problem in Q2.</p>
+
+  <h2>The three questions</h2>
+
+  <div class="q accent-good">
+    <div class="ask"><span class="qn">Q1</span><span>Did yesterday's self-restart fix actually hold?</span></div>
+    <p><b>Yes, and this cycle is the proof.</b> Yesterday the pipeline sat switched off for 22 hours after the thing that stopped it had already repaired itself, because stopping was automatic and starting was not. The fix made the restart automatic too, for causes it can positively check.</p>
+    <p>It fired at <b>07:24:03Z</b>, right at the start of this cycle. It read the stop note, counted <b>66</b> YouTube keys in the shared file, deleted the note and restarted the campaign loop, which launched its first session one second later. From that point the pipeline ran continuously: <span class="pill">17</span> campaign sessions, <span class="pill">565</span> finder runs, all five lanes live, <b>zero hours stopped</b>.</p>
+    <p><b>Nothing crashed and nothing cost you anything in Claude credit.</b> Zero fatal error signatures, zero quota stops, and <span class="pill">$0.00</span> of Anthropic spend, because the hourly health check found nothing that needed a repair agent. Three finder runs hit a hard wall and the loop shrugged them off, which is what it is built to do.</p>
+    <p class="muted">The health checks did keep talking, they just did it for free. Across the cycle they logged <b>25</b> notes about the video-graph lane walking nothing, <b>20</b> about the finder running out of search terms, and <b>8</b> automatic attempts to go fetch more terms. All observations, no paid agent, which is the design working.</p>
+  </div>
+
+  <div class="q accent-amber">
+    <div class="ask"><span class="qn">Q2</span><span>Where is the supply actually coming from, and how much is left?</span></div>
+    <p><b>Almost two thirds of today came from one lane, and that lane is re-reading a list it has already read seven times.</b> The recommended-videos lane found <b>81</b> of the 127. It works by taking a channel we already like and following YouTube's "watch next" rail off its videos, so its raw material is our own past output.</p>
+    <p>Yesterday morning it finished its seventh full pass over that list of <b>12,307</b> seeds and immediately opened an eighth. The passes are getting thinner every time. Pass one returned <b>0.45</b> good leads per seed. Pass seven returned <b>0.007</b>, which is about one and a half percent of where it started. It walked <b>10,717</b> seeds today for those 81 leads and has <b>2,538</b> left, roughly six hours, at which point it will start a ninth pass over the same ground.</p>
+    <p><b>It keeps going because it is still cheap, and that is a deliberate rule rather than an oversight.</b> Pass seven cost <span class="pill">5.0¢</span> per good lead. The rule that decides whether to start another pass is a price ceiling of <b>25¢</b>, not a yield floor, and it is set that way on purpose: an earlier pass looked dead on yield while being the cheapest source in the whole pipeline. So the lane will keep re-lapping for a while yet. Cheap is not the same as growing, though. It is finding fewer new creators every pass, and it cannot find any creator that is not already adjacent to something we own.</p>
+    <p><b>The other four lanes are, between them, contributing very little.</b> Keyword search found 44, and it did that on <b>three active search terms</b>, having exhausted every fresh, never-run and cooled-off term it has. Its hit rate was actually the best of any lane at <b>5.4%</b>, so the terms are not bad, there just are not any. The peer-network lane has now walked every seed it has and refills at about <b>16 seeds every two hours</b>. Podcast crossover ran once and found nothing. Comment sweep is off because you paused it.</p>
+    <p class="muted">Cost per good lead, from the finder's own log: keyword search <b>2.4¢</b>, peer network <b>2.4¢</b>, recommended videos <b>4.1¢</b>. All three are cheap. The constraint is not money, it is that only one of them has any material left to work through.</p>
+  </div>
+
+  <div class="q accent-red">
+    <div class="ask"><span class="qn">Q3</span><span>Are these actually the kind of businesses you sell to?</span></div>
+    <p><b>A meaningful share of them are not, and this report has never said so.</b> Of the <b>127</b> creators scored good enough to contact today, <span class="pill">22</span> are tarot readers, astrologers, psychics or channellers. That is <b>17%</b> of the day.</p>
+    <p>They are not a fluke of today either. Going back two weeks, the daily share runs between <b>8%</b> and <b>21%</b>, and across those two weeks it is <b>352 of 2,790</b> good leads, or roughly <b>one in eight</b>. It has never appeared in a debrief because no report has ever counted it.</p>
+    <p><b>Half of them are not even sitting in an obvious bucket.</b> Twelve landed in the catch-all category, which is where you would look for them. But eight were filed under <b>Coaching &amp; Consulting</b>, which is half of that category for the day, and two more under Transformation &amp; Performance Coaching. On a category report they look like exactly the kind of lead you want.</p>
+    <p><b>Why the scorer lets them through is defensible.</b> A tarot reader with 20,000 subscribers really does sell a service to individuals, really does book calls, and really is trying to turn views into clients. The scorer is asking "is this a service business that could hire a YouTube strategist," and by that test they pass. The test you actually sell against is high-ticket business-to-business: lawyers, financial advisors, agencies, clinics, consultants. That is a narrower question and nothing in the pipeline asks it.</p>
+    <p>They have been accumulating. <b>351</b> of the <b>3,860</b> creators in <code>approved_hold</code> and <b>334</b> of the <b>4,980</b> in <code>needs_contact</code> match, so about <b>685</b> of the 8,840 you have found and never contacted. The share in the standing pools (<b>7.8%</b>) is lower than the share arriving daily (<b>12.6%</b>), which means it is getting worse, not settling.</p>
+    <p class="muted">One caveat on these numbers, stated plainly: they come from matching words like tarot, astrology, oracle, psychic and numerology against each channel's name and description. That will catch a few false positives and will miss anything that avoids those words. Treat 17% as close, not exact. <b>Nothing has been excluded or changed</b>, because your standing instruction is to filter liberally and to ask before adding a new exclusion category rather than assume one. This is the asking.</p>
+  </div>
+
+  <h2>Where the leads came from</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Lane</th><th class="num">Runs</th><th class="num">Seeds walked</th><th class="num">Channels</th><th class="num">Score ≥ 6</th><th class="num">Hit rate</th><th>State</th></tr></thead>
+      <tbody>
+        <tr><td><b>Recommended-videos feed</b></td><td class="num">3</td><td class="num">10,717</td><td class="num">2,214</td><td class="num"><b>81</b></td><td class="num">3.7%</td><td>Running. On pass 8 of the same 12,307 seeds, <b>2,538 left</b>, about 6 hours</td></tr>
+        <tr><td>Keyword search</td><td class="num">565</td><td class="num">—</td><td class="num">811</td><td class="num">44</td><td class="num up">5.4%</td><td>Running on <b>3 active terms</b>. Best hit rate, no material</td></tr>
+        <tr><td>Peer network</td><td class="num">12</td><td class="num">123</td><td class="num">119</td><td class="num">2</td><td class="num">1.7%</td><td>Book fully walked. Refills about 16 seeds every 2 hours</td></tr>
+        <tr><td>Guest-link mining</td><td class="num">—</td><td class="num">—</td><td class="num">2</td><td class="num">0</td><td class="num">0%</td><td>Runs inside the peer lane</td></tr>
+        <tr><td>Video-graph sweep</td><td class="num warn">28</td><td class="num down">0</td><td class="num">0</td><td class="num">0</td><td class="num">—</td><td>Dead on its $50 lifetime cap since 08-28. <b>3,390 seeds unwalked</b></td></tr>
+        <tr><td>Podcast crossover</td><td class="num">1</td><td class="num">—</td><td class="num">0</td><td class="num">0</td><td class="num">—</td><td>Ran once, found nothing, as it usually does</td></tr>
+        <tr><td>Comment sweep</td><td class="num">0</td><td class="num">—</td><td class="num">0</td><td class="num">0</td><td class="num">—</td><td>Off since you paused it on 08-20</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="muted">Of the 127 good leads, <b>49</b> had an email address that checked out and went straight to <code>approved_hold</code>, a verify rate of <b>39%</b>. The other <b>78</b> went to <code>needs_contact</code> to wait for the recovery lane. Top categories: Real Estate 18, Coaching &amp; Consulting 16, Transformation Coaching 15, Health &amp; Wellness Clinics 12, and 46 in the catch-all, which is the bucket Q3 is about. Scoring failed on <b>zero</b> leads.</p>
+
+  <h2>The recovery lane</h2>
+  <p class="muted"><code>approved_hold</code> gained <b>63</b>, but only <b>49</b> of those were newly found today. <code>needs_contact</code> took in <b>78</b> new leads and grew by <b>64</b>. Both gaps are exactly <b>14</b>, which is what it looks like when 14 leads already sitting in <code>needs_contact</code> got a working email address and moved across. That is consistent with the recovery lane working, though the two matching numbers are the evidence rather than a direct count, so treat it as likely rather than confirmed. The pool now stands at <b>4,980</b>.</p>
+
+  <h2>What broke → what's fixed</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Issue</th><th>Mechanism</th><th>Status</th></tr></thead>
+      <tbody class="fix">
+        <tr><td>A lane that cannot run was relaunched 28 times in one day</td><td>The video-graph lane crossed its $50 lifetime spending cap on 08-28. Its own log says the lane is dead until that cap is raised and that waiting will not release it. The hourly timer that tops it up was not listening: every hour it rebuilt a 69,690-row seed list out of the database, stopped and started the service, and rewrote the lane's state file. That last part is the real damage, because a freshly written state file is exactly what makes a dead lane look alive to every check that watches it</td><td class="up">Fixed today in the finder repo (<code>a6d07f3</code>). The top-up now reads the lane's own spending counter and its own cap before doing anything, and rests when the lane is capped. It clears itself: the cap is worked out the same way the walker works it out, so raising it by any route releases the skip on the very next tick with nothing else to remember. Verified live four ways: it skipped at the real $50, left the state file untouched to the nanosecond, fell through correctly at a raised cap of $75 and $100, and falls through rather than skipping if it cannot read either number</td></tr>
+        <tr><td>The pipeline restarted itself after a 22-hour stop</td><td>Yesterday's fix, on its first real cycle</td><td class="up">Held. Fired at 07:24:03Z, counted 66 keys, cleared the note, restarted the loop. Zero hours stopped since</td></tr>
+        <tr><td>The real spending figure, on its first full cycle</td><td>Yesterday's other fix, reading the provider's own meter instead of one repo's log</td><td class="up">Held. <b>$17.46 a day</b> against a $321.85 balance, so <b>18 days</b> of runway. Yesterday's $42.79 was enrichment running alone on an idle machine; with the rest of the pipeline competing for the box it settles lower</td></tr>
+        <tr><td>About one in six good leads is a tarot or astrology channel</td><td>The scorer asks whether a channel is a service business that could hire a strategist. A tarot reader passes that test honestly. It does not ask whether the business is high-ticket business-to-business, which is the thing you sell against. Eight of today's 22 were filed under Coaching &amp; Consulting, where they look correct on any category report</td><td class="warn">Open, and deliberately untouched. Adding a new exclusion category is your call, not the pipeline's</td></tr>
+        <tr><td>One lane carries the pipeline, and it is walking its own output</td><td>81 of 127 leads came from the recommended-videos lane, on pass 8 of 12,307 seeds. Yield per seed has fallen from 0.45 on pass 1 to 0.007 on pass 7. Keyword search is down to 3 active terms, the peer lane has walked everything it has</td><td class="warn">Open, carried eleven days. Not a bug, and no code fixes it</td></tr>
+        <tr><td>The video-graph lane is off, fifth day</td><td>$50 lifetime cap. <b>3,390 seeds</b> unwalked at 2.7¢ per good lead over its life, the cheapest ground in the pipeline and the only lane whose seeds are not our own output</td><td class="warn">Open. Today's fix stops the pointless relaunching. It does not restart the lane, because raising the cap is your spending call</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="muted">Otherwise a clean cycle: <b>0</b> fatal error signatures, <b>0</b> quota stops, <b>0</b> scoring failures, <b>$0.00</b> Anthropic spend, <b>0</b> hours stopped. Three finder hard walls and 14 sessions ending on their time budget, all normal. The one thing that did not get better is search-term supply, which the health check flagged 20 times and tried to refill 8 times.</p>
+
+  <h2>Recommended next — ranked</h2>
+  <ol class="recs">
+    <li><b>Decide what to do about the tarot and astrology channels.</b> This goes first because it is new information and it is cheap to act on. Roughly one in eight of everything found over the last two weeks is one, the share is rising, and about <b>685</b> of them are already sitting in your two parked pools. Three options. Exclude the category outright, which is one line in the finder's exclusion list. Leave it, if you would happily send them a script pitch. Or look at ten of them first and decide from the actual channels: the ones today included World Channelled Messages Tarot, Robert Phoenix - The 11th House and Elliot Oracle. Nothing has been changed either way, because your standing rule is to ask before adding an exclusion.</li>
+    <li><b>Decide whether to raise the video-graph lane's $50 cap.</b> Carried five days. It has <b>3,390 seeds</b> left, it costs <b>2.7¢</b> per good lead, and it is the only lane whose raw material is not recycled from our own past results. Given Q2, that last point is worth more than the money. As of today it at least stops thrashing while it waits. The durable version, once you decide, is to make the cap refresh per pass the way the sibling lane's does, so it cannot lock itself out permanently again.</li>
+    <li><b>Find a source of search terms that is not our own output.</b> Carried eleven days and now the binding limit on everything. Keyword search has the best hit rate of any lane at 5.4% and it is running on <b>three terms</b>. The recommended-videos lane is on pass 8 of its own book at 1.5% of its original yield. Both are the same problem wearing different clothes: the pipeline can only look at things adjacent to what it already has.</li>
+    <li><b>Top up OpenRouter within about two weeks.</b> <b>18 days</b> of runway, $321.85 at $17.46 a day. Not urgent, and now measured off the account's own meter rather than one repo's log, so the number is trustworthy for the first time. Most of that spend is the enrichment backfill doing real work.</li>
+    <li><b>Decide the outlet for the parked pools.</b> <b>3,860</b> in <code>approved_hold</code> and <b>4,980</b> in <code>needs_contact</code>, which is <b>8,840 creators found and never contacted</b>, up 131 today. The oldest open question here, and every good cycle makes it larger.</li>
+  </ol>
+
+  <div class="foot">
+    <b>Status:</b> running, and it has now run clean for a full 24 hours. <b>Everything is parked, nothing is sent.</b> <code>approved_hold</code> is a deliberate holding lane. Today's +63 takes it to <b>3,860</b>, alongside <b>4,980</b> in <code>needs_contact</code>. Anthropic spend $0.00. OpenRouter <b>$17.46</b> a day on the account, balance <b>$321.85</b>, about <b>18 days</b>. The video-graph lane stays stopped on its cost cap until you raise it, and as of today it waits quietly instead of relaunching every hour.
+  </div>
+
+</div>
+
+<script>
+  // Per hour, 07:00Z 08-30 through 06:00Z 09-01 (leads.lead_candidates, first_discovered_at).
+  // Left 24 = the 08-31 cycle, stopped end to end. Right 24 = this cycle.
+  var good  = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+               7,7,9,11,3,3,5,2,3,9,6,2,3,9,5,9,2,4,10,2,4,5,4,3];
+  var total = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+               103,165,249,170,116,87,141,101,86,148,150,107,128,100,132,150,122,160,142,142,109,122,115,101];
+  var gMax = Math.max.apply(null, good) || 1, tMax = Math.max.apply(null, total) || 1;
+  var strip = document.getElementById('strip');
+  good.forEach(function (v, i) {
+    var col = document.createElement('div');
+    col.className = 'col';
+    col.title = v + ' good leads of ' + total[i] + ' channels';
+
+    var ghost = document.createElement('div');
+    ghost.className = 'ghost';
+    ghost.style.height = Math.max(2, Math.round((total[i] / tMax) * 28)) + '%';
+
+    var bar = document.createElement('div');
+    bar.className = 'bar' + (v === 0 ? ' zero' : '');
+    bar.style.height = Math.max(4, Math.round((v / gMax) * 68)) + '%';
+
+    col.appendChild(ghost);
+    col.appendChild(bar);
+    strip.appendChild(col);
+  });
+</script>
