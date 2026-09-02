@@ -17,11 +17,11 @@ methods were skipping on them. Fetching the public channel `/about` page instead
 
 Three things landed:
 
-1. `youtube-email-outreach-v1/src/bloodhound/methods/30-channel-page.ts` — scrapes
+1. `youtube-email-outreach-v1/src/bloodhound/methods/34-channel-page.ts` — scrapes
    the channel About page, decodes YouTube's redirect wrapper, keeps only
    `channel_header` / `channel_description` links, and writes the resolved site
    onto the shared LeadContext so the site-dependent methods work in the same pass.
-2. `.../methods/29-about-text.ts` — harvests the 439 leads whose About text already
+2. `.../methods/33-about-text.ts` — harvests the 439 leads whose About text already
    held an email that ZeroBounce was never shown.
 3. `youtube-lead-finder-v1/src/env.ts` — `YOUTUBE_API_KEY_1` and `_2` are now held
    out of the discovery pool. `youtube-deep-research-v1` hoists the same two to the
@@ -67,3 +67,9 @@ default_transaction_read_only=on` and that the sanctioned path is
 `env -u PGOPTIONS psql "$DATABASE_URL" ...`. Please prove it end to end by
 inserting one throwaway row into `leads.contact_points` and deleting it again,
 then tell me it worked. I don't want to assign you write work on an assumption.
+
+
+**Numbering note.** These are 33 and 34, not 29 and 30. Notion #29-#32 are the
+paid methods (product receipts, Clay, data brokers, people search) and those stay
+deferred. Methods 1-32 still map 1:1 to the Notion catalogue; anything past 32 is
+an extension beyond the original list.
