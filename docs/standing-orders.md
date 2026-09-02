@@ -133,6 +133,31 @@ this is the shape to check first.**
 
 ## Change log
 
+- 2026-09-02: **ENRICHMENT WAS DEAD AND NOTHING SAID SO. Check this first if the
+  approved_hold pool stops growing.** Every backfill batch was failing instantly
+  on `ENRICHMENT_REPO_PATH is not set`. The variable lived only in
+  `youtube-email-outreach-v1`'s `.env`, which Casey deleted on 2026-09-01, and
+  the shared bank carries keys only, so it resolved to nothing. **The chain
+  looked completely healthy while completing zero work**, because the error
+  throws once per lead, the chain counts that as a failed lead, and the batch
+  still exits 0. Last good batch was 2026-09-01T23:13Z; by 04:00Z on 09-02 every
+  batch read `done=0 failed=24`. Fixed by giving the variable a committed default
+  in `src/env.ts`, which is what the file already does for `AIRTABLE_BASE_ID` and
+  `AIRTABLE_ENRICHMENT_BASE_ID` after the same deletion broke those. **A path is
+  configuration, not a secret, so it belongs in code**, and a repo `.env` is not
+  a durable home for anything. Verified by enriching one real lead end to end.
+  This is the fourth time in a fortnight a liveness signal was mistaken for a
+  work signal (08-12, 08-27, 08-29, now this): **read a lane's OUTPUT, not its
+  heartbeat.** Watch: `grep "batch finished" logs/backfill-2026-07/chain.log | tail`,
+  and treat a run of `done=0` as an outage no matter what the chain says.
+  **This, not the recovery lane, is the binding gate on the backlog.** A lead the
+  recovery lane recovers lands in `approved_hold` with no enrichment bundle, and
+  the ABC test requires one. 145 `approved_hold` leads with a valid email have no
+  bundle, which is why the eligible count sat at exactly 2,800 all session while
+  leads were being recovered. Expect ~$0.14 of OpenRouter per lead (DeepSeek
+  v3.2, measured across eight 08-31 batches at $0.05 to $0.25), so roughly $20 to
+  clear the 145, plus the recovery lane's ongoing inflow.
+
 - 2026-09-02: **A quarter of the recovery backlog was invisible to the lane, and
   the fix that let it in had to land first.** Both selectors in
   `src/recovery/bloodhound-lane.ts` read `outreach_status = 'no_email_found'`
