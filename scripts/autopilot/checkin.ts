@@ -80,14 +80,6 @@ const FATAL_PATTERNS = [
   /FAILED: ENOENT/,
 ];
 
-function newestCampaignJsonl(): string | null {
-  const files = readdirSync(LOGS)
-    .filter((f) => /^campaign-\d{4}-\d{2}-\d{2}\.jsonl$/.test(f))
-    .map((f) => join(LOGS, f))
-    .sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs);
-  return files[0] ?? null;
-}
-
 function readEvents(file: string): Array<Record<string, unknown>> {
   const out: Array<Record<string, unknown>> = [];
   for (const raw of readFileSync(file, 'utf8').split('\n')) {
@@ -97,10 +89,30 @@ function readEvents(file: string): Array<Record<string, unknown>> {
   return out;
 }
 
+// finder_run events from the two most-recent campaign-*.jsonl files, newest-first, capped at
+// `cap`. Both callers below used to read only the single newest file (via a now-removed
+// newestCampaignJsonl() helper) — fine most of the day, but right after a UTC midnight file
+// rotation that file can hold fewer finder_run events than the caller's window wants, so
+// "total" undercounts and a hard-wall/starvation condition that is still active (carried over
+// from before midnight) reads as healthy purely because the day rolled over. 2026-09-02: this
+// let a genuine, already-self-healing YouTube-quota hard-wall get misdiagnosed as a
+// scoring-rubric regression (pitchable_rate_collapse) because recentFinderStats's `starving`
+// fallback undercounted right after midnight. recentFinderYield (below) already reads the
+// 2 most-recent files for the same reason — this mirrors that fix.
+function recentFinderRuns(cap: number): Array<Record<string, unknown>> {
+  const files = readdirSync(LOGS)
+    .filter((f) => /^campaign-\d{4}-\d{2}-\d{2}\.jsonl$/.test(f))
+    .map((f) => join(LOGS, f))
+    .sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs)
+    .slice(0, 2);
+  const runs: Array<Record<string, unknown>> = [];
+  for (const f of files) runs.push(...readEvents(f).filter((e) => e.event === 'finder_run'));
+  runs.sort((a, b) => Date.parse(String(b.ts ?? 0)) - Date.parse(String(a.ts ?? 0)));
+  return runs.slice(0, cap);
+}
+
 function recentFinderOkCount(): { ok: number; total: number } {
-  const jf = newestCampaignJsonl();
-  if (!jf) return { ok: 0, total: 0 };
-  const runs = readEvents(jf).filter((e) => e.event === 'finder_run').slice(-6);
+  const runs = recentFinderRuns(6);
   return { ok: runs.filter((e) => e.exit === 0).length, total: runs.length };
 }
 
@@ -109,9 +121,7 @@ function recentFinderOkCount(): { ok: number; total: number } {
 // (aborting on "No active terms") or exiting 0 with ~0 fresh pitchable across a run of
 // passes, while approved_hold stays legitimately flat (nothing to park).
 function recentFinderStats(n: number): { total: number; failed: number; zeroYield: number; pitchable: number } {
-  const jf = newestCampaignJsonl();
-  if (!jf) return { total: 0, failed: 0, zeroYield: 0, pitchable: 0 };
-  const runs = readEvents(jf).filter((e) => e.event === 'finder_run').slice(-n);
+  const runs = recentFinderRuns(n);
   let failed = 0, zeroYield = 0, pitchable = 0;
   for (const r of runs) {
     const exit = r.exit;
