@@ -72,7 +72,16 @@ everything up to "parked, ready to write" is automatic.
   not because the lane is broken.** Its verify half is drained (queue depth 1 of
   a 200 batch) and 374 leads are already recovered. Collect throughput is the
   whole bottleneck, and it was widened on 2026-09-02 (entry in the change log).
-- `approved_hold` (3,394): fires only via manual `npm run send`.
+  **It FELL for the first time on the cycle ending 2026-09-02T07:00Z**, 4,980 to
+  **4,888**, taking in 37 and still ending 92 smaller. That is the first fall on
+  record and it put more leads into `approved_hold` than a whole day of fresh
+  finding did. Treat it as one observation, not a trend: the 92 is arithmetic on
+  two pool sizes, and the lane's own logs show seven verify passes of 1 to 10
+  leads that cannot account for it. If it falls again, recovery is the bigger
+  lever than discovery and the collect batch is worth widening a second time.
+- `approved_hold` (**4,036** at 2026-09-02, was 3,394): fires only via manual
+  `npm run send`. **3,835 of them already carry an enrichment bundle**, so only
+  201 are waiting on enrichment. That backlog is nearly clear.
 ## BLOCKING as of 2026-08-30: the shared key bank is empty
 
 **`~/env-storage/.env` was overwritten with 0 bytes at 2026-08-30T04:58:11Z and
@@ -132,6 +141,39 @@ this is the shape to check first.**
 5. Anything in this file contradicted by what Casey said today? → update it.
 
 ## Change log
+
+- 2026-09-02 (debrief): **A guard written in absolute leads cannot see an outage
+  on a machine that works inflow.** The enrichment chain's mass-failure guard
+  fires above 100 failed leads. The VPS side works new arrivals, so its batches
+  are 2 to 55, and the 09-01/02 `ENRICHMENT_REPO_PATH` outage produced **28
+  zero-work batches out of 48** that the guard was structurally incapable of
+  seeing. Every batch exited 0, so the hard-wall guard missed it too. **The
+  damage was not lost time, it was the retry accounting:** each launched ids file
+  counts against `MAX_ATTEMPTS=3` and the chain relaunched instantly, so a lead
+  could burn all three attempts in 90 seconds and be permanently dropped from the
+  pool. Excluded ran 67 to 105. Fixed in `53a6950`: `done=0` with two or more
+  failures is infrastructure by definition, because this pool is ordered
+  best-first out of leads that already passed find and verify, so "every one
+  failed" is never a statement about the leads. Refunds attempts, backs off 10
+  min per repeat to a 1h ceiling, self-clears on any batch that completes work.
+  The 22 outage ids files were refunded: excluded **105 back to 30**, 75 leads
+  returned to the pool. **Watch line stays the same** (`grep "batch finished"
+  logs/backfill-2026-07/chain.log | tail`), plus `grep "ZERO PROGRESS"` on the
+  same file, which is now the loud version of it.
+
+- 2026-09-02 (debrief): **A contact point nobody can rule on is immortal.** Lead
+  `rec0kCDPB850ZLDV2` had been in every single Bloodhound verify batch since
+  08-18. It carries a `business_email` whose value is the literal string
+  `REDACTED FOR PRIVACY`, scraped off a privacy-protected WHOIS record. ZeroBounce
+  never returns a verdict on a value like that, so `verified_at` stays null, and
+  `VERIFIABLE_IDS_SQL` selects on exactly that null. On a verify queue only 38
+  leads deep, one such row is 3% of it, forever. Individual methods do screen
+  their emails (RDAP calls `isJunkEmail`) but a screen per method is a screen the
+  next method forgets. The guard now sits at `saveContactPoints`, the single
+  insert point (email repo `e8d0858`), and tests **shape rather than a blocklist
+  of bad words**, so `Data Protected`, `not disclosed` and the next registrar's
+  wording all fail it. Orchestrator `7900f17` adds the matching SQL predicate,
+  which retires the rows already stored with no backfill. Queue 38 to 37.
 
 - 2026-09-02: **The YouTube keys are not being banned. Many of them share a
   Google Cloud project, so they share one 10,000-unit quota.** The 09-02 handoff
