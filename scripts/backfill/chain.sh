@@ -119,6 +119,7 @@ done
 log "no batch running — chain taking over"
 
 consec_fail=0
+zero_streak=0
 while true; do
   if [ -f "$HALT" ]; then
     log "halt flag present — stopping"
@@ -268,6 +269,46 @@ for(let i=1;i<=500;i++){const v=process.env[`YOUTUBE_API_KEY_${i}`]; if(v){gap=0
     sleep 3600
     continue
   fi
+
+  # Zero-progress guard (2026-09-02): the mass-failure guard above is written in
+  # absolute leads and only fires above 100, so it is blind to the shape this
+  # chain actually fails in. The VPS side works INFLOW — batches of 2 to 55 — so
+  # a total outage produces batches of 24 that fail 24 and the guard never sees
+  # them. On 2026-09-01/02 that let a dead ENRICHMENT_REPO_PATH run 28 zero-work
+  # batches back-to-back (58% of the cycle's batches, 290 lead-attempts burned in
+  # bursts of ~30 seconds), and because each launched ids file counts as an
+  # attempt and MAX_ATTEMPTS is 3, leads were PERMANENTLY excluded from the pool
+  # for an outage that had nothing to do with them (excluded went 67 -> 105).
+  # Every batch exited 0, so the hard-wall guard never saw it either.
+  #
+  # done=0 with two or more failures is an infrastructure statement, not a lead
+  # statement: this pool is ordered best-first out of leads that already passed
+  # find and verify, so "every single one failed" is never about the leads. Both
+  # failure texts in that cycle confirm it (`ENRICHMENT_REPO_PATH is not set`,
+  # `Enrichment exited with code 1`). Refund the attempts and back off, escalating
+  # 10m per consecutive trip to a 1h ceiling. Self-clearing: one batch that
+  # completes any work at all resets the streak, so the fix needs no intervention
+  # when the cause is repaired (on 09-02 that was 04:32Z).
+  #
+  # Batches of one are exempt so a single genuinely-broken lead still ages out of
+  # the pool normally, and the refund stops after BACKFILL_ZERO_REFUND_MAX
+  # consecutive trips so a small pool of poison leads cannot refund itself into
+  # an immortal loop -- past that point the cooldown continues but attempts count.
+  if [ "$done_n" -eq 0 ] && [ "$failed_n" -ge 2 ]; then
+    zero_streak=$((zero_streak + 1))
+    if [ "$zero_streak" -le "${BACKFILL_ZERO_REFUND_MAX:-6}" ]; then
+      mv "$file" "${file%.txt}.infra" 2>/dev/null
+      refund_note="attempts refunded"
+    else
+      refund_note="attempts NOT refunded (streak past ${BACKFILL_ZERO_REFUND_MAX:-6}; leads may be genuinely broken)"
+    fi
+    backoff=$((zero_streak * 600))
+    [ "$backoff" -gt 3600 ] && backoff=3600
+    log "ZERO PROGRESS ($failed_n failed, 0 done, streak $zero_streak) — infra outage assumed: $refund_note, cooling down ${backoff}s"
+    sleep "$backoff"
+    continue
+  fi
+  zero_streak=0
 
   if [ "$rc" -ne 0 ]; then
     consec_fail=$((consec_fail + 1))
