@@ -65,10 +65,13 @@ everything up to "parked, ready to write" is automatic.
 
 ## Parked pools waiting on Casey (don't touch without his word)
 
-- `needs_contact` (4,345): recovery engine **BUILT AND RUNNING** since Casey
-  merged it 2026-08-23 (`1bea933`). No longer the biggest unbuilt lever — it is
-  now a live lane inside the campaign's finish block. It parks recovered leads
-  into `approved_hold` like any other, so it feeds the pool below, not a new one.
+- `needs_contact` (4,951 at 2026-09-02): recovery engine **BUILT AND RUNNING**
+  since Casey merged it 2026-08-23 (`1bea933`). Live lane inside the campaign's
+  finish block; recovered leads park into `approved_hold`, so it feeds the pool
+  below rather than a new one. **The pool grew because arrivals outrun the lane,
+  not because the lane is broken.** Its verify half is drained (queue depth 1 of
+  a 200 batch) and 374 leads are already recovered. Collect throughput is the
+  whole bottleneck, and it was widened on 2026-09-02 (entry in the change log).
 - `approved_hold` (3,394): fires only via manual `npm run send`.
 ## BLOCKING as of 2026-08-30: the shared key bank is empty
 
@@ -129,6 +132,60 @@ this is the shape to check first.**
 5. Anything in this file contradicted by what Casey said today? → update it.
 
 ## Change log
+
+- 2026-09-02: **A quarter of the recovery backlog was invisible to the lane, and
+  the fix that let it in had to land first.** Both selectors in
+  `src/recovery/bloodhound-lane.ts` read `outreach_status = 'no_email_found'`
+  alone, so the 1,181 `needs_contact` leads sitting at `email_invalid` were never
+  handed to the collector at all. Nothing downstream required that: the email
+  repo's hold-guard gates on `review_status` and the score bar, never on
+  `outreach_status`. Both selectors now work both lanes.
+  **The blocker was a silent one.** `verifyAndFlip` wrote
+  `email_address = COALESCE(NULLIF(email_address, ''), $1)`, which is harmless on
+  a `no_email_found` row (the column is empty) and a guaranteed bounce on an
+  `email_invalid` one: it keeps the address ZeroBounce already called
+  undeliverable, stamps `email_verification_result = 'valid'` over the top, and
+  flips the lead into `approved_hold`, which is the pool the ABC test selects
+  from on `email_address`. Fixed in the email repo as `promoteVerifiedEmailSql`.
+  Verified live on three real leads that each carried a dead address: all three
+  came out carrying the newly recovered address, not the dead one.
+  **Measured, not assumed: `email_invalid` leads are the BETTER half of the
+  backlog.** A 20-lead probe returned 31 contact points from 9 leads, 1.55 per
+  lead against the 0.95 the `no_email_found` pool has averaged over 17 logged
+  passes. Somebody already found a scrapeable site on those leads.
+  **Collect batch 40 -> 150.** "Raising that batch is the next lever" has been
+  the note on this lane since 08-24. Sized off the measured 18.5s per lead at
+  concurrency 8, so 150 leads is about 46 minutes of detached child. Four passes
+  a day becomes 600 leads instead of 160, which walks the widened 4,444-lead book
+  in about a week instead of a month. The stale-PID guard was a flat 2h written
+  against the 40-lead batch, so it now scales with the batch (`staleCollectAfterMs`);
+  a flat number there goes wrong in the dangerous direction, spawning a second
+  child on top of a live one.
+  **Found by running it: the collector harvests suppression and legal desks.**
+  The probe verified `removalrequest@noellerandall.com` and flipped that lead into
+  `approved_hold` on it, one `npm run send` from mailing an opt-out mailbox. These
+  come off a site's `/privacy-policy/` and `/terms-and-conditions/` pages, which
+  is where the scraper reliably finds an address when the rest of the site
+  publishes none, and they sit on the creator's own domain so the ownership gate
+  waves them through. `isJunkEmail` now rejects the suppression shape and the
+  legal desks (`dmca`, `copyright`, `infringe`, `takedown`, `compliance`). The
+  rule is narrow on purpose: `removals@` and `remove@` stay legal, because a
+  removals firm is a real lead in this book. A scan of the whole book found
+  exactly one affected row, the probe's own, uncontacted; it was reverted.
+  **Two things in the 09-02 handoff do not survive measurement.** Its item 2
+  calls the 613 non-`valid` `approved_hold` rows cheap re-verify wins. 587 of
+  them are `risky`, which is not an unverified state: `normalizeStatus` maps
+  ZeroBounce's role-based `do_not_mail` and `catch-all` onto it deliberately, as
+  a documented last-resort tier. A 10-address re-check returned 8 role-based
+  `do_not_mail`, 1 catch-all and 1 valid, so the honest estimate is ~59 leads for
+  ~587 credits, and the real question is whether to mail role addresses at all.
+  **That is Casey's deliverability call, not an engineering task.** Its item 3
+  says the 410 rows with no `host_first_name` are blocked. They are not blocked
+  here: `src/writer/host-name.ts` already resolves a missing host to a business
+  greeting ("Hey to the good folks at ..."), and many of those 410 are companies
+  with no host to find. The constraint is the ABC test's own templates in
+  `automator`, and the cheap fix is a business-greeting fallback there, not a
+  host-ID run over this pipeline.
 
 - 2026-08-30: **The shared env bank went to 0 bytes at 04:58:11Z and stopped the
   whole pipeline.** Full entry above, under "BLOCKING". The cycle's final hour

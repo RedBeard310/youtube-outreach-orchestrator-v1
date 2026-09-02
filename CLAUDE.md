@@ -241,7 +241,20 @@ The interactive playbook path (`casey-assistant/brain/lead-gen/youtube-run-playb
 - **Crash resilience (orchestrator).** DNS/network errors (`ENOTFOUND` etc.) are retryable in `withRetry`; the floating verify promise has a `.catch` + a global `unhandledRejection` guard — a network blip can no longer hard-crash a multi-hour run (it did on 07-10).
 - **Verify concurrency default 4 → 8** (`APPROVED_CONCURRENCY`): keeps the verify lane ahead of 2 concurrent finders so the pitchable pool doesn't back up.
 
-**Biggest remaining lever (not built): the `needs_contact` recovery engine.** 2,173 found-and-scored creators with no verifiable email are parked there; recovering even 40% (~870 leads) likely out-yields a day of fresh finding. Deferred by Casey — a separate build in `youtube-email-outreach-v1` when greenlit.
+**The `needs_contact` recovery engine is BUILT AND RUNNING.** Casey merged it 2026-08-23
+(`1bea933`). It is the Bloodhound lane in `src/recovery/bloodhound-lane.ts`, dispatched from
+the campaign's finish block: a free collect pass that walks the parked pool looking for
+contact points, and a ZeroBounce verify pass that flips whatever it can into
+`approved_hold`. The line that used to sit here said the engine was unbuilt and the pool
+held 2,173. Both were out of date, and a session reading it on 2026-09-02 planned a rebuild
+of something that already existed. Read the lane's own state (`logs/bloodhound-lane-state.json`,
+`logs/bloodhound-collect.log`) before believing any number written down about it.
+
+The pool is 4,951 at 2026-09-02, up from 3,290 when the lane shipped, because arrivals have
+outrun the lane's throughput, not because the lane is broken. Its verify half is fully
+drained (queue depth 1 of a 200 batch) and 374 leads have already been recovered into
+`approved_hold`. The bottleneck is entirely the collect pass, which is why its batch went
+from 40 to 150 on 2026-09-02.
 
 ## Autopilot — the daily autonomous loop (since 2026-07-12)
 
