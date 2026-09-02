@@ -229,13 +229,25 @@ export async function selectUntouchedIds(limit: number): Promise<string[]> {
  *  contact_points with points nobody ever checks. See the note there.
  *
  *  GROUP BY stands in for DISTINCT because Postgres requires ORDER BY
- *  expressions to appear in the select list under SELECT DISTINCT. */
+ *  expressions to appear in the select list under SELECT DISTINCT.
+ *
+ *  The email-shape test was added 2026-09-02. Both of the "already ruled on"
+ *  marks above assume the verifier CAN rule on a value, and on a value that is
+ *  not an email it never does — so the row keeps both marks empty forever and
+ *  the lead is re-selected every pass for good. `rec0kCDPB850ZLDV2` carries a
+ *  `business_email` of `REDACTED FOR PRIVACY`, scraped off a privacy-protected
+ *  WHOIS record, and had appeared in every verify batch since 08-18 (all seven
+ *  of the 09-01/02 cycle). On a queue that is ~38 leads deep, one immortal row
+ *  is 3% of it. The companion fix in youtube-email-outreach-v1's
+ *  `saveContactPoints` stops new ones being written; this predicate is what
+ *  makes the rows already in the table stop coming back, with no backfill. */
 export const VERIFIABLE_IDS_SQL = `SELECT lc.id
        FROM leads.lead_candidates lc
        JOIN leads.contact_points cp ON cp.lead_id = lc.id
       WHERE lc.review_status = 'needs_contact'
         AND lc.outreach_status = ANY(ARRAY['no_email_found', 'email_invalid'])
         AND cp.kind IN ('business_email', 'personal_email', 'youtube_email')
+        AND cp.value ~ '^[^@[:space:]]+@[^@[:space:]]+\\.[^@[:space:]]+$'
         AND COALESCE(cp.verified, false) = false
         AND cp.verified_at IS NULL
         AND COALESCE(cp.notes, '') NOT LIKE '%[ownership:%'
