@@ -110,6 +110,8 @@ for (const [name, value] of Object.entries(process.env)) {
   [ "$code" = "200" ]
 }
 
+SELF_MTIME="$(stat -c %Y "$0" 2>/dev/null || echo 0)"
+
 log "chain started (pid $$, batch size ${BACKFILL_BATCH_SIZE:-500})"
 
 # Let any already-running batch finish before taking over.
@@ -124,6 +126,23 @@ while true; do
   if [ -f "$HALT" ]; then
     log "halt flag present — stopping"
     exit 0
+  fi
+
+  # Self-reload (2026-09-02, copied from scripts/autopilot/campaign-loop.sh).
+  # Bash does not re-read an edited script mid-run, so a committed fix to THIS
+  # file does nothing until the loop process restarts. This chain has been up
+  # for over a week at a stretch, so "it will pick it up eventually" means never.
+  # That is the 2026-07-13 shape exactly: a back-off fix sat dormant ~9h through
+  # continued thrash until an incidental restart happened to load it. Re-exec
+  # when the file changes on disk AND still parses, so an autopilot-improve
+  # commit self-deploys at the next batch boundary rather than needing a
+  # `systemctl restart` that would kill whatever batch is in flight. `exec` keeps
+  # the same PID so systemd sees no restart, and re-running the `exec 9>` line
+  # above re-takes the single-instance lock on the same process.
+  now_mtime="$(stat -c %Y "$0" 2>/dev/null || echo 0)"
+  if [ "$now_mtime" != "$SELF_MTIME" ] && bash -n "$0" 2>/dev/null; then
+    log "chain.sh updated on disk (mtime $SELF_MTIME → $now_mtime) — re-exec'ing to load it"
+    exec "$0" "$@"
   fi
 
   # Orphan sweep (2026-08-08): a killed batch strands npm-exec'd enrichment
