@@ -133,6 +133,27 @@ this is the shape to check first.**
 
 ## Change log
 
+- 2026-09-02: **The YouTube keys are not being banned. Many of them share a
+  Google Cloud project, so they share one 10,000-unit quota.** The 09-02 handoff
+  read `logs/youtube-dead-keys.json`, saw 39 keys rejected within minutes of the
+  07:00 UTC quota reset, reasoned that no key can spend 10,000 units in a
+  fraction of a second, and concluded Google had zeroed them, leaving ~26 usable
+  keys. The first half of that reasoning is right and the conclusion is wrong.
+  **Map the dead keys back to their slot numbers and they die in contiguous
+  blocks:** 24-30 together, 31-40 together, 13-16, 46-49, 42-43, and 54-66 all in
+  the same instant. Slot order is our own bookkeeping from the order the Notion
+  sync appends them, so it is invisible to Google and no ban wave could align to
+  it. What it does align to is the account each batch was created under. When a
+  project's 10,000 units are gone, every key in that project answers
+  `quotaExceeded` on its very first call, and the rotation walks the whole block
+  in about a second. That is the pattern, exactly.
+  **The number to plan against is projects, not keys.** 39 of the 66 keys sit in
+  6 project groups, so they supply about 60,000 units a day between them, not
+  390,000. Whole-pool daily quota is roughly 270,000 units. **So buying more keys
+  the same way buys nothing** and this is the thing to check before spending: a
+  new key adds quota only if it comes from a Google Cloud project we do not
+  already have. Verify a batch by watching whether its slots die together.
+
 - 2026-09-02: **ENRICHMENT WAS DEAD AND NOTHING SAID SO. Check this first if the
   approved_hold pool stops growing.** Every backfill batch was failing instantly
   on `ENRICHMENT_REPO_PATH is not set`. The variable lived only in
