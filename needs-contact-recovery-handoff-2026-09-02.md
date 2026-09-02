@@ -66,21 +66,44 @@ templates open with a first name. This is a host-identification job, not an emai
 
 They need the deep-research bundle before any email can be written for them.
 
-## The YouTube API key situation, measured rather than assumed
+## The YouTube API key situation, measured
 
-Casey believes a bunch of the newer keys were banned. I probed all 66 keys in
-`~/env-storage/.env` on 2026-09-02 at about 20:45 Pacific with a 1-unit `videos.list` call:
+The env bank holds 66 YouTube keys. The pool is much smaller than that number suggests,
+and the API's own error text hides it. Google does not answer "banned" when it kills a
+key's YouTube Data API access. It zeroes the key's daily quota, so every call comes back
+403 `quotaExceeded`, worded exactly like a key that legitimately spent its 10,000 units.
 
-- **14 keys answered normally.**
-- **51 returned `quotaExceeded`.** Not banned. Their daily 10,000 units were spent, and they
-  reset at midnight Pacific.
-- **1 key is actually dead: `YOUTUBE_API_KEY_38`, reason `forbidden`.** Replace or remove it.
+The finder's own dead-key log separates them, because it records WHEN each key died:
 
-So the pool is roughly 650,000 units a day and the constraint is spend rate inside a day,
-not a ban wave. Before buying more keys, find what is burning 51 keys' worth of quota, and
-check whether the work can move to cached bundles or the RapidAPI mirror that
-`src/youtube/backend.ts` already falls through to. If the answer really is "we need more
-keys," say so with the per-day unit math behind it.
+| Category | Keys | Evidence |
+|---|---|---|
+| Quota zeroed by Google (dead) | 39 | rejected instantly at the start of a fresh quota day |
+| Genuinely exhausted by real use | 21 | died one at a time, spread across the day |
+| Suspended outright | 1 | `#38`, `CONSUMER_SUSPENDED` |
+| Never touched, healthy | 5 | `#4 #6 #7 #10 #11` |
+
+The instant-rejection reading is not a guess. The quota day resets at 07:00 UTC. On
+2026-09-01, `logs/youtube-dead-keys.json` shows 16 keys marked quota-dead inside a
+0.7-second window at 07:17:23, then 13 more inside 0.6 seconds at 07:44:46, plus smaller
+bursts of 4, 4, and 2. No key can spend 10,000 units in a fraction of a second. Those keys
+returned `quotaExceeded` on their first call of the day, which only happens when the daily
+quota is 0. The 21 that died alone, minutes or hours apart, are the ones doing real work.
+
+Dead slots: `#13 #14 #15 #16 #24 #25 #26 #27 #28 #29 #30 #31 #32 #33 #34 #35 #36 #37 #39
+#40 #42 #43 #46 #47 #48 #49 #54 #55 #56 #57 #58 #59 #60 #61 #62 #63 #64 #65 #66`, plus
+`#38` suspended.
+
+**So the usable pool is about 26 keys, near 260,000 units a day, not 660,000.** Casey was
+right that the newer keys are dying. Note the pattern in the slot numbers: the dead ones
+cluster in the high ranges that were added most recently, which points at whatever
+provisioning method produced them rather than at usage.
+
+Two things follow. First, confirm the split cheaply: probe every key in the first minutes
+after 00:00 Pacific. Anything that says `quotaExceeded` then is zeroed, full stop. Second,
+before buying more keys, cut consumption. `search.list` costs 100 units per call against
+1 unit for most reads, so a handful of search-heavy paths can drain a real key in minutes.
+The RapidAPI mirror that `src/youtube/backend.ts` already falls through to is the other
+lever.
 
 ## Rules that apply to this work
 

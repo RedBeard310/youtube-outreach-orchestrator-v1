@@ -84,6 +84,13 @@ function collectLogFd(): number | 'ignore' {
   }
 }
 
+/** How long a detached collect child may live before a matching PID is assumed
+ *  to be OS reuse. Scales with the batch so the guard cannot drift out of date
+ *  behind a changed batch size; never shorter than the original flat 2h. */
+export function staleCollectAfterMs(collectBatch: number): number {
+  return Math.max(2 * 3_600_000, collectBatch * 90_000);
+}
+
 function pidAlive(pid: number | undefined): boolean {
   if (!pid) return false;
   try {
@@ -120,6 +127,23 @@ function pidAlive(pid: number | undefined): boolean {
  *    id    = tiebreak, so a batch boundary can never skip or repeat a lead
  *      that shares a timestamp with its neighbour.
  *
+ *  BOTH FAILURE MODES ARE THE SAME JOB (2026-09-02). This selector read
+ *  `outreach_status = 'no_email_found'` only, so 1,181 of the 4,951 leads in the
+ *  lane -- every one whose discovered address came back `email_invalid` -- were
+ *  never handed to the collector at all. Nothing downstream required that:
+ *  `canAttemptRecovery` and `HOLD_FLIP_WHERE` in the email repo's hold-guard
+ *  both gate on `review_status = 'needs_contact'` and the score bar, never on
+ *  `outreach_status`. It was just a narrow selector, and it hid a quarter of the
+ *  backlog for ten days. An `email_invalid` lead is if anything the better
+ *  prospect of the two: somebody already found a site worth scraping there, and
+ *  411 of the 1,181 carry external links, so they enter at tier 0.
+ *
+ *  What that widening required first: `verifyAndFlip` used to write
+ *  `email_address = COALESCE(NULLIF(email_address, ''), $1)`, which on an
+ *  `email_invalid` row keeps the dead address and stamps 'valid' over it. Fixed
+ *  in the email repo the same day (`promoteVerifiedEmailSql`). Do not narrow one
+ *  without narrowing the other.
+ *
  *  A short batch means the lap is done: the caller clears the cursor and the
  *  next pass starts a fresh lap over whatever is still uncollected. That is
  *  deliberate rather than terminal — a re-walk is worth something once sites
@@ -133,7 +157,7 @@ export const COLLECT_IDS_SQL = `WITH pool AS (
               COALESCE(lc.first_discovered_at, 'infinity'::timestamptz) AS disc
          FROM leads.lead_candidates lc
         WHERE lc.review_status = 'needs_contact'
-          AND lc.outreach_status = 'no_email_found'
+          AND lc.outreach_status = ANY(ARRAY['no_email_found', 'email_invalid'])
           AND lc.signal_score >= 6
           AND COALESCE(lc.do_not_contact, false) = false
           AND NOT EXISTS (SELECT 1 FROM leads.contact_points cp WHERE cp.lead_id = lc.id)
@@ -200,13 +224,17 @@ export async function selectUntouchedIds(limit: number): Promise<string[]> {
  *  fix in youtube-email-outreach-v1, which now stamps `verified_at` on the
  *  ownership branch too. No backfill needed.
  *
+ *  The lane list matches COLLECT_IDS_SQL's: a lead the collector worked must be
+ *  a lead the verifier can rule on, or a widened collect pass just fills
+ *  contact_points with points nobody ever checks. See the note there.
+ *
  *  GROUP BY stands in for DISTINCT because Postgres requires ORDER BY
  *  expressions to appear in the select list under SELECT DISTINCT. */
 export const VERIFIABLE_IDS_SQL = `SELECT lc.id
        FROM leads.lead_candidates lc
        JOIN leads.contact_points cp ON cp.lead_id = lc.id
       WHERE lc.review_status = 'needs_contact'
-        AND lc.outreach_status = 'no_email_found'
+        AND lc.outreach_status = ANY(ARRAY['no_email_found', 'email_invalid'])
         AND cp.kind IN ('business_email', 'personal_email', 'youtube_email')
         AND COALESCE(cp.verified, false) = false
         AND cp.verified_at IS NULL
@@ -260,7 +288,22 @@ export function laneOptsFromEnv(
     collectIntervalHours: numEnv('BLOODHOUND_COLLECT_INTERVAL_HOURS', 6),
     verifyIntervalHours: numEnv('BLOODHOUND_VERIFY_INTERVAL_HOURS', 3),
     // Integer batches: a fractional LIMIT is a Postgres error.
-    collectBatch: Math.floor(numEnv('BLOODHOUND_COLLECT_BATCH', 40)),
+    //
+    // COLLECT BATCH 40 -> 150 (2026-09-02). 40 was the lane's opening guess and
+    // "raising that batch is the next lever" has been the standing note on it
+    // since 08-24. The measurement that sizes it: 17 logged passes at 40 leads,
+    // the last of them 23:54:44 -> 00:07:02 on 09-01, is 18.5s per lead at
+    // concurrency 8, so 150 leads is about 46 minutes of detached child. Four
+    // passes a day is then 600 leads instead of 160, which walks the widened
+    // 4,444-lead book in about a week instead of a month.
+    //
+    // Nothing else in the chain minds. Collection is free (no LLM, no metered
+    // API); Brave only assists leads with no resolvable site and already
+    // degrades to a plain skip when its free tier rate-limits; concurrency is
+    // unchanged, so per-site politeness is unchanged; and the downstream
+    // ZeroBounce spend is ~0.5 credits per collected lead, or ~2,200 for the
+    // whole book against a 4,015-credit balance.
+    collectBatch: Math.floor(numEnv('BLOODHOUND_COLLECT_BATCH', 150)),
     verifyBatch: Math.floor(numEnv('BLOODHOUND_VERIFY_BATCH', 200)),
     log,
   };
@@ -304,11 +347,14 @@ export async function runBloodhoundLane(opts: LaneOpts): Promise<void> {
   }
 
   // --- collect pass (free; detached so the session keeps moving) ---
-  // A collect batch of 40 leads finishes well under 2h; past that age a
-  // "living" PID is OS reuse, not our child, and the guard must expire.
+  // Past some age a "living" PID is OS reuse, not our child, and the guard has
+  // to expire or the lane stops forever. That window was a flat 2h, written
+  // against a 40-lead batch. A flat number silently becomes wrong the moment
+  // the batch moves, so derive it: 90s per lead is roughly five times the
+  // measured 18.5s, floored at the original 2h so a small batch is unaffected.
   const collectAgeMs = state.collectStartedAt ? now - Date.parse(state.collectStartedAt) : Infinity;
   if (isDue(state, 'lastCollectAt', now, opts.collectIntervalHours)) {
-    if (pidAlive(state.collectPid) && collectAgeMs < 2 * 3_600_000) {
+    if (pidAlive(state.collectPid) && collectAgeMs < staleCollectAfterMs(opts.collectBatch)) {
       opts.log({ event: 'bloodhound_collect', skipped: 'previous_still_running', pid: state.collectPid });
       return;
     }

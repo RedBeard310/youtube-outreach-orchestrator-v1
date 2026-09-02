@@ -4,6 +4,7 @@ import {
   isDue,
   laneOptsFromEnv,
   runRecoveryDuringOpenRouterHalt,
+  staleCollectAfterMs,
   VERIFIABLE_IDS_SQL,
   COLLECT_IDS_SQL,
   type LaneState,
@@ -62,7 +63,7 @@ test('laneOptsFromEnv: malformed env numbers fall back to defaults, never NaN', 
     assert.equal(Number.isNaN(opts.verifyIntervalHours), false);
     assert.equal(opts.collectIntervalHours, 6);
     assert.equal(opts.verifyIntervalHours, 3);
-    assert.equal(opts.collectBatch, 40);
+    assert.equal(opts.collectBatch, 150);
     // Negative batches must fall back too; a negative LIMIT errors in Postgres.
     assert.equal(opts.verifyBatch, 200);
   } finally {
@@ -139,7 +140,6 @@ test('COLLECT_IDS_SQL: link-carrying leads sort first (9 of 11 methods need a si
 
 test('COLLECT_IDS_SQL: keeps the pool guards it inherited', () => {
   assert.match(COLLECT_IDS_SQL, /review_status = 'needs_contact'/);
-  assert.match(COLLECT_IDS_SQL, /outreach_status = 'no_email_found'/);
   assert.match(COLLECT_IDS_SQL, /signal_score >= 6/);
   assert.match(COLLECT_IDS_SQL, /COALESCE\(lc\.do_not_contact, false\) = false/);
   assert.match(COLLECT_IDS_SQL, /NOT EXISTS \(SELECT 1 FROM leads\.contact_points cp WHERE cp\.lead_id = lc\.id\)/);
@@ -153,4 +153,45 @@ test('LaneState carries a cursor and a lap count', () => {
   const s: LaneState = { collectCursor: { tier: 0, disc: '2026-05-22T17:31:37.050Z', id: 'recX' }, collectLaps: 2 };
   assert.equal(s.collectCursor?.tier, 0);
   assert.equal(s.collectLaps, 2);
+});
+
+// Both ways a lead can arrive in needs_contact are the same recovery job. The
+// selectors read 'no_email_found' alone until 2026-09-02, which hid the 1,181
+// email_invalid leads -- a quarter of the backlog -- from the collector for ten
+// days. Nothing downstream needed that: the email repo's hold-guard gates on
+// review_status and the score bar, never on outreach_status.
+test('both selectors work no_email_found AND email_invalid', () => {
+  const lanes = /outreach_status = ANY\(ARRAY\['no_email_found', 'email_invalid'\]\)/;
+  assert.match(COLLECT_IDS_SQL, lanes);
+  assert.match(VERIFIABLE_IDS_SQL, lanes);
+});
+
+// A widened collect pass that the verifier cannot follow just fills
+// contact_points with addresses nobody ever rules on.
+test('the two selectors agree on which lanes they work', () => {
+  const lanesOf = (sql: string): string[] =>
+    [...sql.matchAll(/outreach_status = ANY\(ARRAY\[([^\]]*)\]\)/g)].map((m) => m[1]!.trim());
+  assert.deepEqual(lanesOf(COLLECT_IDS_SQL), lanesOf(VERIFIABLE_IDS_SQL));
+});
+
+// The stale-PID window was a flat 2h written against a 40-lead batch. A flat
+// number is wrong the moment the batch moves, and the failure is silent in the
+// bad direction: a live child gets a second one spawned on top of it.
+test('staleCollectAfterMs: scales with the batch', () => {
+  assert.equal(staleCollectAfterMs(150), 150 * 90_000);
+  assert.ok(staleCollectAfterMs(400) > staleCollectAfterMs(150));
+});
+
+test('staleCollectAfterMs: never drops below the original 2h floor', () => {
+  assert.equal(staleCollectAfterMs(40), 2 * 3600_000);
+  assert.equal(staleCollectAfterMs(1), 2 * 3600_000);
+});
+
+// The window has to outlast the batch it guards by a real margin. Measured cost
+// is 18.5s per lead at concurrency 8; the guard budgets 90s.
+test('staleCollectAfterMs: outlasts the measured cost of its own batch', () => {
+  const measuredMsPerLead = 18_500;
+  for (const batch of [40, 150, 400]) {
+    assert.ok(staleCollectAfterMs(batch) > batch * measuredMsPerLead * 3);
+  }
 });
