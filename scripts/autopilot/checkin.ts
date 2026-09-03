@@ -759,6 +759,23 @@ async function main(): Promise<void> {
       return Number.isFinite(ms) ? ms : null;
     } catch { return null; }
   }
+  /**
+   * Read a sweep loop's "asleep until the YouTube quota refills" marker, if one is
+   * live right now. Returns null when there is no marker, when it is unreadable,
+   * or when its own `until` has already passed — a marker left behind by a killed
+   * loop must never excuse a real stall, so an expired one counts as no marker.
+   */
+  function readQuotaRestMarker(restFile: string | undefined): { since: string; until: string } | null {
+    if (!restFile) return null;
+    const p = join(FINDER_REPO, 'logs', restFile);
+    if (!existsSync(p)) return null;
+    try {
+      const m = JSON.parse(readFileSync(p, 'utf8')) as { since?: string; until?: string };
+      const untilMs = m.until ? Date.parse(m.until) : NaN;
+      if (!Number.isFinite(untilMs) || untilMs <= Date.now()) return null;
+      return { since: m.since ?? 'unknown', until: m.until! };
+    } catch { return null; }
+  }
   // A halt that clears leaves sweep-daemon staleness behind for one more tick:
   // the refill timer runs on its own schedule (up to daily for podcast_crossover)
   // and has no idea a halt lifted, so it can't catch up before the next hourly
@@ -787,8 +804,11 @@ async function main(): Promise<void> {
     } catch { /* unreadable history is not an incident */ }
     return null;
   }
-  const sweepChecks: Array<{ method: string; timer: string; stateFile: string; maxAgeH: number }> = [
-    { method: 'recommended_videos_feed', timer: 'graph-sweep-refill.timer', stateFile: 'graph-sweep-state.json', maxAgeH: 8 },
+  // restFile: the marker a sweep loop writes while it sleeps out a drained YouTube
+  // key pool (see the resting check below). Absent for lanes whose loop has no such
+  // sleep, and absence simply means the check does not apply.
+  const sweepChecks: Array<{ method: string; timer: string; stateFile: string; maxAgeH: number; restFile?: string }> = [
+    { method: 'recommended_videos_feed', timer: 'graph-sweep-refill.timer', stateFile: 'graph-sweep-state.json', maxAgeH: 8, restFile: 'graph-sweep-quota-rest.json' },
     { method: 'peer_sweep', timer: 'peer-sweep-refill.timer', stateFile: 'peer-sweep-state.json', maxAgeH: 8 },
     // comment_sweep deliberately absent: Casey paused the lane 2026-08-20 ("never run
     // it again unless I say"). Its timer is stopped+disabled ON PURPOSE — do not flag
@@ -890,6 +910,25 @@ async function main(): Promise<void> {
     }
     const ageH = sweepStateAgeHours(c.stateFile);
     if (ageH !== null && ageH > c.maxAgeH) {
+      // A lane resting out a drained YouTube key pool is NOT a stalled daemon
+      // (2026-09-03). Quota is a daily allowance that refills at midnight PT and
+      // at no other moment, so the sweep loops now sleep to the reset instead of
+      // relaunching every 15 minutes into a locked door. That sleep can outlast
+      // maxAgeH, and escalating it would spend a fix-agent on a lane waiting for
+      // a clock — something no agent can hurry, and the same reasoning that keeps
+      // the term-supply wall out of this list.
+      //
+      // The marker is written when the sleep starts and deleted when it ends, and
+      // it is only honoured while its own `until` is still in the future, so a
+      // crashed loop that left one behind cannot hide a genuine stall.
+      const rest = readQuotaRestMarker(c.restFile);
+      if (rest) {
+        appendFileSync(OBSERVATIONS, JSON.stringify({
+          ts: new Date().toISOString(), kind: 'sweep_daemon_resting_on_quota', lane: c.method,
+          detail: `${c.method}'s state file is ${ageH.toFixed(1)}h old because the lane is deliberately asleep: the YouTube key pool ran out of daily quota at ${rest.since} and the loop is waiting for the midnight-PT refill at ${rest.until}. Not escalating — a fix-agent cannot refill a daily quota. If this repeats daily, the pool is undersized and the answer is more keys.`,
+        }) + '\n');
+        continue;
+      }
       const updatedMs = sweepStateUpdatedMs(c.stateFile);
       const clearedAt = updatedMs !== null ? haltClearedSince(updatedMs) : null;
       if (clearedAt) {
