@@ -980,6 +980,35 @@ async function main(): Promise<void> {
         }) + '\n');
         continue;
       }
+      // A lane whose seed book is FULLY WALKED is not a stalled daemon (2026-09-04).
+      //
+      // The checks above all excuse a lane that has work but cannot do it: quota is
+      // out, a halt just cleared, the finder is near-dry. None of them covers the
+      // simplest case, which is a lane with no work left at all. A drained book means
+      // the lane legitimately stops touching its state file, forever, until some
+      // other lane qualifies a fresh score>=6 seed to refill it.
+      //
+      // peer_sweep proved it on 2026-09-04: seeds_done 12529 of 12529, state file
+      // 8.8h then 13.8h old, and it paged the fix-agent three times for $2.04 — the
+      // first non-zero Anthropic day in eight. That was about to become a permanent
+      // hourly charge, because the video-graph book drained the same cycle and the
+      // recommended-videos book had ~0.6 days left. No fix-agent can refill a seed
+      // book; only another lane's output can, which makes this the same class as the
+      // quota rest above.
+      //
+      // Read from the lane's OWN counter rather than a marker file, so there is
+      // nothing to leave behind: the moment a refill lands, seeds_done < total again
+      // and a genuine stall escalates normally on the next tick.
+      const book = sweepProgress(c.stateFile);
+      if (book && book.total > 0 && book.done >= book.total) {
+        appendFileSync(OBSERVATIONS, JSON.stringify({
+          ts: new Date().toISOString(), kind: 'sweep_daemon_book_drained', lane: c.method,
+          done: book.done, total: book.total,
+          detail: `${c.method}'s state file is ${ageH.toFixed(1)}h old because its seed book is fully walked (${book.done}/${book.total}, 0 remaining) — the lane has no work left, so it correctly stops writing progress. Not escalating: a fix-agent cannot refill a seed book, only another lane qualifying fresh score>=6 seeds can. If this persists, the discovery circuit has run down and the answer is more YouTube quota, wider niches, or a new discovery method.`,
+        }) + '\n');
+        console.log(`[checkin ${day}] OBSERVATION sweep_daemon_book_drained — ${c.method} ${book.done}/${book.total}, book empty`);
+        continue;
+      }
       const poolExhausted = keyPoolQuotaExhausted();
       if (poolExhausted) {
         appendFileSync(OBSERVATIONS, JSON.stringify({
@@ -1008,6 +1037,70 @@ async function main(): Promise<void> {
       }
       anomalies.push({ kind: 'sweep_daemon_stale', detail: `${c.method}'s state file hasn't updated in ${ageH.toFixed(1)}h (expected within ~${c.maxAgeH}h). Check: systemctl status ${c.timer}, and the unit this timer drives, for an error.` });
     }
+  }
+
+  // 7c) Recovery-lane website resolution (2026-09-04). The Bloodhound lane is the
+  // pipeline's biggest producer — it parked 591 of the 627 leads on 2026-09-03,
+  // sixteen times what fresh finding managed — and NOTHING watched it.
+  //
+  // It resolves each creator's own website first, because 9 of its 10 collection
+  // methods need one. Both Brave Search keys hit their $5/month cap and started
+  // answering `402 Usage limit exceeded`, the search helper swallowed that status,
+  // and the no-site rate climbed 9% -> 93% across six passes while the log read
+  // completely normal. The cycle parked 71 instead of 627 and the first anyone knew
+  // was the next morning's debrief.
+  //
+  // The email repo's fix makes a refusing key loud. This makes it MEASURED: the
+  // symptom is a rate, and a rate is visible even when a brand-new failure mode
+  // produces no warning line at all. That is the durable half — it catches the next
+  // cause of the same collapse, not just this one.
+  //
+  // OBSERVATION ONLY, never exit 7. The remedy is a plan top-up or new keys, which
+  // is Casey's spend call, exactly like the term-supply wall in section 5 and the
+  // drained books above.
+  const COLLECT_LOG = join(LOGS, 'bloodhound-collect.log');
+  const NO_SITE_ALARM_PCT = Number(process.env.AUTOPILOT_NO_SITE_ALARM_PCT ?? 70);
+  if (existsSync(COLLECT_LOG)) {
+    try {
+      // Per-lead lines look like: [recXXXX] "Name" site=(none) +0 pts, 9 skipped, 2 err
+      // and each pass ends with:  Collected N contact points from M/K leads.
+      // Read the tail only: passes are ~150 leads, so 400 lines covers the last one
+      // with room to spare, and the file grows for the life of the lane.
+      const lines = readFileSync(COLLECT_LOG, 'utf8').split('\n').slice(-400);
+      let end = -1;
+      for (let i = lines.length - 1; i >= 0; i--) {
+        if (/^Collected \d+ contact points from \d+\/\d+ leads\./.test(lines[i]!.trim())) { end = i; break; }
+      }
+      // Only judge a COMPLETED pass. A pass still running has a partial sample, and
+      // the front of a batch is not representative of the batch.
+      if (end >= 0) {
+        let start = 0;
+        for (let i = end - 1; i >= 0; i--) {
+          if (/^Collected \d+ contact points from \d+\/\d+ leads\./.test(lines[i]!.trim())) { start = i + 1; break; }
+        }
+        const pass = lines.slice(start, end);
+        const withSite = pass.filter((l) => l.includes(' site='));
+        const noSite = withSite.filter((l) => l.includes('site=(none)'));
+        const summary = lines[end]!.trim();
+        const MIN_SAMPLE = 30;
+        if (withSite.length >= MIN_SAMPLE) {
+          const pct = (noSite.length / withSite.length) * 100;
+          if (pct >= NO_SITE_ALARM_PCT) {
+            const braveRefused = pass.some((l) => l.includes('Brave Search API key')) ||
+              lines.slice(start).some((l) => l.includes('Brave Search API key'));
+            const cause = braveRefused
+              ? 'The lane logged a Brave Search refusal, so the search plan is the cause: raise its cap or add BRAVE_SEARCH_API_KEY[_N] keys.'
+              : 'No Brave refusal line was logged, so this is either a new failure mode in website resolution or a genuinely site-less slice of the backlog. Check the collect log before assuming the backlog.';
+            appendFileSync(OBSERVATIONS, JSON.stringify({
+              ts: new Date().toISOString(), kind: 'bloodhound_site_resolution_collapsed',
+              no_site: noSite.length, sampled: withSite.length, pct: Number(pct.toFixed(1)), summary,
+              detail: `The recovery lane's last completed collect pass resolved NO website for ${noSite.length} of ${withSite.length} leads (${pct.toFixed(0)}%, alarm at ${NO_SITE_ALARM_PCT}%). 9 of its 10 collection methods need a website, so its yield collapses and the verify half starves on an empty queue — this is what took 2026-09-04 from 627 parked to 71. Pass summary: "${summary}". ${cause} Not escalating — the remedy is a spend call a fix-agent cannot make.`,
+            }) + '\n');
+            console.log(`[checkin ${day}] OBSERVATION bloodhound_site_resolution_collapsed — ${noSite.length}/${withSite.length} (${pct.toFixed(0)}%) leads resolved no website`);
+          }
+        }
+      }
+    } catch { /* an unreadable collect log is not an incident */ }
   }
 
   const softNote = burn.over_soft ? ` [OVER SOFT $${burn.soft_usd}]` : '';

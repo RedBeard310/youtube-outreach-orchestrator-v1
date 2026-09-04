@@ -85,6 +85,42 @@ quota_used_pct() {
   ' "$FINDER_REPO/logs/quota-state.json" "$STALE_MIN" 2>/dev/null || echo "-1"
 }
 
+# SLEEP TO THE MIDNIGHT-PT REFILL, don't retry every 30 minutes (2026-09-04).
+#
+# quota_used_pct() above reads a snapshot that meters RAPIDAPI, retired 2026-08-10.
+# It correctly returns -1 now, which means "no signal", so this loop has no idea
+# whether the DIRECT key pool is drained. With no signal it launches, the finder
+# hard-walls, and the hard_stop branch sleeps a flat QUOTA_WAIT.
+#
+# A YouTube key's allowance is DAILY and refills at midnight Pacific and at no other
+# moment. On 2026-09-04 the pool drained at ~13:00Z and this loop hard-walled 32
+# times, one or two EVERY hour through to 06:51Z — 18 hours of sessions that each
+# paid for a reservoir check, a keyword harvest and a discovery model call before
+# the finder told them what the previous 31 already had.
+#
+# Yesterday's fix taught the two SWEEP loops to sleep to the refill and to write a
+# rest marker while they do. Read THEIR marker rather than re-deriving exhaustion a
+# fourth time: this file already notes it holds the third copy of the quota read,
+# and all copies must agree about what "out of quota" means because they govern the
+# same pool. Reusing the marker makes agreement structural instead of hoped-for.
+#
+# Honoured only while its own `until` is still ahead, so a marker left behind by a
+# killed sweep cannot park this loop indefinitely. No marker (no sweep running) =>
+# unchanged 30-minute behaviour, which is the safe direction to fail.
+sweep_rest_until_epoch() {
+  local f until_iso best=0 e
+  for f in "$FINDER_REPO"/logs/graph-sweep-quota-rest.json \
+           "$FINDER_REPO"/logs/video-graph-sweep-quota-rest.json; do
+    [ -f "$f" ] || continue
+    until_iso="$(sed -n 's/.*"until"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$f" | head -1)"
+    [ -z "$until_iso" ] && continue
+    e="$(date -u -d "$until_iso" +%s 2>/dev/null)" || continue
+    # Only a marker whose wake time is still in the future describes a live rest.
+    [ "$e" -gt "$(date -u +%s)" ] && [ "$e" -gt "$best" ] && best="$e"
+  done
+  echo "$best"
+}
+
 # Newest campaign jsonl (UTC-dated file; pick most-recently-modified to be robust).
 newest_campaign_jsonl() { ls -t "$REPO"/logs/campaign-*.jsonl 2>/dev/null | head -1; }
 
@@ -181,8 +217,19 @@ while true; do
   log "session done (rc=$rc, ${dur}s, stop=$reason)"
   case "$reason" in
     quota_stop|hard_stop)
-      log "quota/hard-wall stop — sleeping ${QUOTA_WAIT}s before retry"
-      sleep "$QUOTA_WAIT" ;;
+      # If a sweep loop is already asleep on a drained key pool, this loop faces the
+      # same locked door and the same clock. Wait for the refill, not 30 minutes.
+      rest_until="$(sweep_rest_until_epoch)"
+      if [ "$rest_until" -gt 0 ]; then
+        wait=$(( rest_until - $(date -u +%s) ))
+        [ "$wait" -lt "$QUOTA_WAIT" ] && wait="$QUOTA_WAIT"
+        [ "$wait" -gt 86400 ] && wait=86400
+        log "quota/hard-wall stop, and a sweep is resting on a drained YouTube key pool until $(date -u -d "@$rest_until" +%FT%TZ) — sleeping ${wait}s to the refill instead of ${QUOTA_WAIT}s"
+        sleep "$wait"
+      else
+        log "quota/hard-wall stop — sleeping ${QUOTA_WAIT}s before retry"
+        sleep "$QUOTA_WAIT"
+      fi ;;
     *)
       sleep "$CLEAN_PAUSE" ;;
   esac

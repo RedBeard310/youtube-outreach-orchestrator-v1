@@ -256,6 +256,27 @@ drained (queue depth 1 of a 200 batch) and 374 leads have already been recovered
 `approved_hold`. The bottleneck is entirely the collect pass, which is why its batch went
 from 40 to 150 on 2026-09-02.
 
+**The whole lane rests on Brave Search, and Brave is metered** (learned the hard way
+2026-09-04). The collect pass resolves each creator's own website first, via
+`searchBrave()` in `youtube-email-outreach-v1/src/bloodhound/db.ts`, because **9 of its
+10 collection methods need one**. Both `BRAVE_SEARCH_API_KEY[_N]` keys sit on a plan with
+a **$5/month spending cap**; when it is reached they answer `402 Usage limit exceeded` and
+website resolution simply stops. Widening the collect batch 40 → 150 on 2026-09-02 burned
+that cap inside two days, and the next cycle parked **71 leads instead of 627**.
+
+Read this before diagnosing a quiet recovery lane:
+
+- **A `site=(none)` line is ambiguous by design.** It means "no website resolved", which is
+  a creator without a site AND a dead search plan. Count the rate: under ~15% is normal,
+  over 70% means resolution is down. The hourly check-in now measures this and records
+  `bloodhound_site_resolution_collapsed`, and the search helper prints one loud line naming
+  the HTTP status when every key refuses. Neither existed before 2026-09-04, which is why
+  a 93% failure rate ran a full day unseen.
+- **Collect throughput and Brave headroom are the same lever.** Any future widening of the
+  collect batch spends Brave proportionally. Raise the cap first, or the extra batch size
+  buys nothing.
+- **`npm run send` is unaffected either way.** This lane only fills `approved_hold`.
+
 ## Autopilot — the daily autonomous loop (since 2026-07-12)
 
 On the always-on Linux VPS the campaign no longer needs hand-running. `scripts/autopilot/`
