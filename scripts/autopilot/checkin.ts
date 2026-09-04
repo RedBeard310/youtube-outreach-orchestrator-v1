@@ -804,6 +804,48 @@ async function main(): Promise<void> {
     } catch { /* unreadable history is not an incident */ }
     return null;
   }
+  // Fallback for lanes with NO restFile of their own (peer_sweep, podcast_crossover):
+  // those are timer-triggered one-shots, not perpetual loops, so they never get a
+  // chance to write a "sleeping until reset" marker — a --extend that finds nothing
+  // new just exits quietly. But "nothing new to extend with" IS explained by the same
+  // key-pool exhaustion when the whole pool is dead for the same daily-quota reason,
+  // because every OTHER lane that would qualify fresh score>=6 seeds is blocked too.
+  // Read the finder's own dead-key ledger directly rather than re-deriving it: if
+  // (near-)all configured keys are dead with reason 'quota' and none has expired yet,
+  // nothing anywhere can produce new candidates until the midnight-PT reset, so a
+  // lane with nothing to extend is not stalled, it is starved the same as everything
+  // upstream of it. (2026-09-04, surfaced by peer_sweep going 2 straight refill
+  // cycles with "no new seeds yet" the same night 64/66 keys were quota-dead.)
+  const HOME_DIR = homedir();
+  function keyPoolQuotaExhausted(): { deadCount: number; totalKeys: number; resetsAt: string } | null {
+    try {
+      const envPath = join(HOME_DIR, 'env-storage', '.env');
+      if (!existsSync(envPath)) return null;
+      const envText = readFileSync(envPath, 'utf8');
+      const totalKeys = (envText.match(/^YOUTUBE_API_KEY(_\d+)?=/gm) ?? []).length;
+      if (totalKeys === 0) return null;
+
+      const deadPath = join(FINDER_REPO, 'logs', 'youtube-dead-keys.json');
+      if (!existsSync(deadPath)) return null;
+      const dead = (JSON.parse(readFileSync(deadPath, 'utf8')) as {
+        dead?: Record<string, { reason?: string; expires_at?: string }>;
+      }).dead ?? {};
+      const now = Date.now();
+      let deadCount = 0;
+      let soonestReset = Infinity;
+      for (const entry of Object.values(dead)) {
+        if (entry.reason !== 'quota') continue;
+        const expMs = entry.expires_at ? Date.parse(entry.expires_at) : NaN;
+        if (!Number.isFinite(expMs) || expMs <= now) continue; // already reset, doesn't count
+        deadCount += 1;
+        if (expMs < soonestReset) soonestReset = expMs;
+      }
+      // 90%+ of the configured pool dead on quota, none of it expired yet — the
+      // remaining slice is noise (a key or two mid-rotation), not real headroom.
+      if (deadCount / totalKeys < 0.9) return null;
+      return { deadCount, totalKeys, resetsAt: new Date(soonestReset).toISOString() };
+    } catch { return null; }
+  }
   // restFile: the marker a sweep loop writes while it sleeps out a drained YouTube
   // key pool (see the resting check below). Absent for lanes whose loop has no such
   // sleep, and absence simply means the check does not apply.
@@ -935,6 +977,14 @@ async function main(): Promise<void> {
         appendFileSync(OBSERVATIONS, JSON.stringify({
           ts: new Date().toISOString(), kind: 'sweep_daemon_stale_benign', lane: c.method,
           detail: `${c.method}'s state file is ${ageH.toFixed(1)}h old, but a halt covering that whole window cleared at ${clearedAt} and ${c.timer} hasn't had its next scheduled tick yet — not escalating, will re-check next cycle.`,
+        }) + '\n');
+        continue;
+      }
+      const poolExhausted = keyPoolQuotaExhausted();
+      if (poolExhausted) {
+        appendFileSync(OBSERVATIONS, JSON.stringify({
+          ts: new Date().toISOString(), kind: 'sweep_daemon_resting_on_quota', lane: c.method,
+          detail: `${c.method}'s state file is ${ageH.toFixed(1)}h old, but ${poolExhausted.deadCount}/${poolExhausted.totalKeys} configured YouTube keys are quota-dead right now (resets ${poolExhausted.resetsAt}) — every lane that would feed it fresh score>=6 seeds is starved for the same reason. Not escalating — a fix-agent cannot refill a daily quota. If this repeats daily, the pool is undersized and the answer is more keys.`,
         }) + '\n');
         continue;
       }
