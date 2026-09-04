@@ -988,6 +988,24 @@ async function main(): Promise<void> {
         }) + '\n');
         continue;
       }
+      // Reset-boundary blind spot (2026-09-04): keyPoolQuotaExhausted() reads a live
+      // snapshot of dead-keys.json. Right after the midnight-PT reset, last night's
+      // dead entries all expire within the same few minutes, so the snapshot can read
+      // "mostly alive" (e.g. 16/66) even though NOTHING has actually been produced yet
+      // this side of the reset — the finder was still hard-walling on a 100%-dead pool
+      // moments before it flipped, and peer_sweep's own --extend has nothing new
+      // because no other lane has qualified a fresh score>=6 seed since. `starving`
+      // (recentFinderStats, computed above in section 5) reflects actual recent pass
+      // outcomes rather than an instantaneous key count, so it survives that gap: a
+      // near-dry finder still explains "nothing new to extend with" even when the key
+      // snapshot alone would not.
+      if (starving && !scoringFailedAlarm) {
+        appendFileSync(OBSERVATIONS, JSON.stringify({
+          ts: new Date().toISOString(), kind: 'sweep_daemon_resting_on_quota', lane: c.method,
+          detail: `${c.method}'s state file is ${ageH.toFixed(1)}h old; the live key-pool snapshot no longer reads as exhausted, but the last ${fstats.total} finder passes still surfaced only ${fstats.pitchable} fresh pitchable (near-dry) — likely still catching up from the same overnight quota exhaustion just after the midnight-PT reset, with no fresh score>=6 seed produced yet for it to extend with. Not escalating — a fix-agent cannot force new leads to exist. If this repeats daily, the pool is undersized and the answer is more keys.`,
+        }) + '\n');
+        continue;
+      }
       anomalies.push({ kind: 'sweep_daemon_stale', detail: `${c.method}'s state file hasn't updated in ${ageH.toFixed(1)}h (expected within ~${c.maxAgeH}h). Check: systemctl status ${c.timer}, and the unit this timer drives, for an error.` });
     }
   }
