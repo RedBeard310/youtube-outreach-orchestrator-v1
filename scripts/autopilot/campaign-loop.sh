@@ -121,6 +121,37 @@ sweep_rest_until_epoch() {
   echo "$best"
 }
 
+# ASK OUR OWN SESSION, don't wait for a sweep to be asleep too (2026-09-05).
+#
+# The marker read above shipped yesterday and never fired once: this loop hard-walled
+# 21 more times on 2026-09-04/05, one every ~34 minutes from 19:37Z to 06:53Z, and no
+# *-quota-rest.json ever existed on disk. The dependency is structurally wrong, not
+# merely unlucky. A finder pass spends 100 quota units per `search.list`; the sweeps
+# spend 1 per `channels.list` and get their edges by scraping watch pages, which costs
+# no quota at all. So THIS loop hits the daily wall many hours before a sweep does —
+# on 09-05 the sweeps walked 10,244 seeds and wrote channels in 23 of 24 hours while
+# this loop could not buy a single search. Waiting for a sweep to fall asleep means
+# waiting for a lane that is still working.
+#
+# The session log answers the question directly. When the pool cannot serve a search,
+# the finder rotates every key and aborts with a fixed line, and that line is a clean
+# discriminator: present in all 21 walled sessions of this cycle, absent from all 7
+# productive ones. Gating on it matters, because the OTHER thing that hard-walls this
+# loop is term-supply exhaustion (25 starvation notices this cycle), and terms do not
+# refill at midnight — parking a term wall until morning would be a new bug.
+#
+# Same clock math as the sweeps' sleep_until_quota_reset(), deliberately: a YouTube
+# allowance is DAILY and refills at midnight Pacific, `date -d 'tomorrow 00:05'` under
+# TZ=America/Los_Angeles survives the November DST change, and being clock-derived
+# makes it self-clearing — adding keys mid-day costs at most one extra sleep.
+session_hit_key_pool_wall() {
+  grep -qE '^\[runner\] All YouTube API keys exhausted' "$1" 2>/dev/null
+}
+
+quota_refill_epoch() {
+  TZ=America/Los_Angeles date -d 'tomorrow 00:05' +%s 2>/dev/null || echo 0
+}
+
 # Newest campaign jsonl (UTC-dated file; pick most-recently-modified to be robust).
 newest_campaign_jsonl() { ls -t "$REPO"/logs/campaign-*.jsonl 2>/dev/null | head -1; }
 
@@ -217,14 +248,22 @@ while true; do
   log "session done (rc=$rc, ${dur}s, stop=$reason)"
   case "$reason" in
     quota_stop|hard_stop)
+      # First ask our own session whether the key pool is what stopped it. That is the
+      # direct evidence; the sweep marker below is only a second-hand signal, and it
+      # never once fired in the 21 walls it was written for.
+      rest_until=0
+      if session_hit_key_pool_wall "$sess"; then
+        rest_until="$(quota_refill_epoch)"
+        [ "$rest_until" -le "$(date -u +%s)" ] && rest_until=0
+      fi
       # If a sweep loop is already asleep on a drained key pool, this loop faces the
       # same locked door and the same clock. Wait for the refill, not 30 minutes.
-      rest_until="$(sweep_rest_until_epoch)"
+      [ "$rest_until" -eq 0 ] && rest_until="$(sweep_rest_until_epoch)"
       if [ "$rest_until" -gt 0 ]; then
         wait=$(( rest_until - $(date -u +%s) ))
         [ "$wait" -lt "$QUOTA_WAIT" ] && wait="$QUOTA_WAIT"
         [ "$wait" -gt 86400 ] && wait=86400
-        log "quota/hard-wall stop, and a sweep is resting on a drained YouTube key pool until $(date -u -d "@$rest_until" +%FT%TZ) — sleeping ${wait}s to the refill instead of ${QUOTA_WAIT}s"
+        log "quota/hard-wall stop on a drained YouTube key pool — sleeping ${wait}s until the midnight-PT refill at $(date -u -d "@$rest_until" +%FT%TZ) instead of retrying every ${QUOTA_WAIT}s"
         sleep "$wait"
       else
         log "quota/hard-wall stop — sleeping ${QUOTA_WAIT}s before retry"
