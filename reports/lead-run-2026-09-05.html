@@ -1,0 +1,289 @@
+<title>Lead Run Debrief — 2026-09-05</title>
+<style>
+  :root {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+      --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+      --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+    --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+    --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 40px 22px 80px; }
+  .eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); font-weight: 600; }
+  h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.12; margin: 10px 0 6px; text-wrap: balance; letter-spacing: -.02em; }
+  h2 { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); margin: 44px 0 16px; font-weight: 700; }
+  h3 { font-size: 18px; margin: 0 0 6px; letter-spacing: -.01em; }
+  p { margin: 0 0 14px; }
+  .lede { font-size: 18px; color: var(--ink-soft); max-width: 68ch; }
+  .tag { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--red-soft); color: var(--red); letter-spacing: .02em; }
+  .tag.amber { background: var(--amber-soft); color: var(--amber); }
+  .tag.good { background: #1f8a5b1a; color: var(--good); }
+  .grid { display: grid; gap: 14px; }
+  .stats { grid-template-columns: repeat(4, 1fr); margin-top: 26px; }
+  @media (max-width: 720px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; box-shadow: var(--shadow); }
+  .stat .n { font-size: 30px; font-weight: 750; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .stat .l { font-size: 12.5px; color: var(--ink-soft); margin-top: 3px; }
+  .stat .s { font-size: 12px; margin-top: 8px; font-weight: 600; }
+  .up { color: var(--good); } .down { color: var(--red); } .warn { color: var(--amber); }
+  .accent-red { border-left: 3px solid var(--red); }
+  .accent-teal { border-left: 3px solid var(--teal); }
+  .accent-amber { border-left: 3px solid var(--amber); }
+  .accent-good { border-left: 3px solid var(--good); }
+
+  .strip { display: flex; align-items: flex-end; gap: 2px; height: 130px; padding: 14px 14px 10px; overflow-x: auto; }
+  .col { flex: 1 0 9px; min-width: 8px; display: flex; flex-direction: column; justify-content: flex-end; height: 100%; }
+  .bar { border-radius: 2px 2px 0 0; background: var(--teal); opacity: .92; }
+  .bar.zero { background: var(--red); height: 4px !important; }
+  .ghost { border-radius: 2px 2px 0 0; background: var(--ink-soft); opacity: .18; margin-bottom: 2px; }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-soft); padding: 0 14px 14px; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+
+  .q { border-radius: 14px; padding: 20px 22px; margin-bottom: 14px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); }
+  .q .ask { font-size: 17px; font-weight: 700; color: var(--ink); margin-bottom: 10px; display: flex; gap: 10px; align-items: baseline; }
+  .q .ask .qn { color: var(--red); font-weight: 800; flex: 0 0 auto; }
+  .q p { color: var(--ink-soft); }
+  .q b { color: var(--ink); }
+  .pill { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink); background: var(--panel-2); padding: 1px 7px; border-radius: 6px; border: 1px solid var(--line); white-space: nowrap; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+  th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .fix td:first-child { color: var(--good); font-weight: 650; }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); box-shadow: var(--shadow); margin-bottom: 14px; }
+  ol.recs { padding-left: 0; list-style: none; counter-reset: r; margin: 0; }
+  ol.recs li { counter-increment: r; position: relative; padding: 14px 16px 14px 52px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 10px; box-shadow: var(--shadow); }
+  ol.recs li::before { content: counter(r); position: absolute; left: 14px; top: 14px; width: 26px; height: 26px; border-radius: 8px; background: var(--teal-soft); color: var(--teal); font-weight: 800; font-size: 14px; display: grid; place-items: center; }
+  ol.recs b { color: var(--ink); }
+  .foot { margin-top: 46px; padding: 16px 18px; border-radius: 12px; background: var(--amber-soft); border: 1px solid var(--line); font-size: 14px; color: var(--ink-soft); }
+  .foot b { color: var(--ink); }
+  .muted { color: var(--ink-soft); font-size: 13.5px; }
+  code { background: var(--panel-2); border: 1px solid var(--line); border-radius: 5px; padding: 0 5px; font-size: .9em; }
+</style>
+
+
+<div class="wrap">
+
+  <div class="eyebrow">Lead Run Debrief · YouTube outreach</div>
+  <h1>2026-09-05: the free way around yesterday's $5 wall has been broken since the day it shipped</h1>
+  <p class="lede">The ready-to-write pool gained <b>71</b> again, the same number as yesterday. Yesterday that was blamed on a search plan hitting its monthly spending cap, and the recommendation was to raise the cap. That was only half the story. The recovery lane has a second, free way to find a creator's website, written specifically so the paid search would not be a single point of failure. It reads the first megabyte of the creator's YouTube About page. That page runs between 1.1 and 1.9 megabytes, and the links sit in the last four percent of it. The method has therefore returned nothing, for every lead, since the day it landed. It is fixed and verified live, and it costs nothing to run.</p>
+  <div style="margin-top:14px">
+    <span class="tag">+71 PARKED, SAME AS YESTERDAY</span>
+    <span class="tag" style="margin-left:6px">FREE SITE LOOKUP NEVER WORKED</span>
+    <span class="tag amber" style="margin-left:6px">21 MORE HARD WALLS</span>
+    <span class="tag good" style="margin-left:6px">23 OF 24 HOURS PRODUCED</span>
+  </div>
+
+  <div class="grid stats">
+    <div class="card stat accent-red"><div class="n">+71</div><div class="l">Parked into <code>approved_hold</code></div><div class="s down">flat vs 09-04, 4,734 → 4,805</div></div>
+    <div class="card stat accent-teal"><div class="n">2,162</div><div class="l">New channels found</div><div class="s up">+37% vs 1,581 yesterday</div></div>
+    <div class="card stat accent-good"><div class="n">23</div><div class="l">Of 24 hours produced channels</div><div class="s up">17 dark hours yesterday</div></div>
+    <div class="card stat accent-amber"><div class="n">21</div><div class="l">Hard walls on drained YouTube keys</div><div class="s warn">yesterday's fix never fired</div></div>
+  </div>
+
+  <h2>Shape of the day</h2>
+
+  <div class="card" style="padding:0">
+    <div class="strip">
+      <div class="col" title="07Z: 86"><div class="bar" style="height:51%"></div></div>
+      <div class="col" title="08Z: 47"><div class="bar" style="height:28%"></div></div>
+      <div class="col" title="09Z: 95"><div class="bar" style="height:56%"></div></div>
+      <div class="col" title="10Z: 135"><div class="bar" style="height:80%"></div></div>
+      <div class="col" title="11Z: 132"><div class="bar" style="height:78%"></div></div>
+      <div class="col" title="12Z: 108"><div class="bar" style="height:64%"></div></div>
+      <div class="col" title="13Z: 148"><div class="bar" style="height:88%"></div></div>
+      <div class="col" title="14Z: 169"><div class="bar" style="height:100%"></div></div>
+      <div class="col" title="15Z: 157"><div class="bar" style="height:93%"></div></div>
+      <div class="col" title="16Z: 104"><div class="bar" style="height:62%"></div></div>
+      <div class="col" title="17Z: 91"><div class="bar" style="height:54%"></div></div>
+      <div class="col" title="18Z: 73"><div class="bar" style="height:43%"></div></div>
+      <div class="col" title="19Z: 73, campaign lane hits the key wall here"><div class="bar" style="height:43%"></div></div>
+      <div class="col" title="20Z: 72"><div class="bar" style="height:43%"></div></div>
+      <div class="col" title="21Z: 74"><div class="bar" style="height:44%"></div></div>
+      <div class="col" title="22Z: 109"><div class="bar" style="height:64%"></div></div>
+      <div class="col" title="23Z: 105"><div class="bar" style="height:62%"></div></div>
+      <div class="col" title="00Z: 73"><div class="bar" style="height:43%"></div></div>
+      <div class="col" title="01Z: 85"><div class="bar" style="height:50%"></div></div>
+      <div class="col" title="02Z: 52"><div class="bar" style="height:31%"></div></div>
+      <div class="col" title="03Z: 71"><div class="bar" style="height:42%"></div></div>
+      <div class="col" title="04Z: 44"><div class="bar" style="height:26%"></div></div>
+      <div class="col" title="05Z: 59"><div class="bar" style="height:35%"></div></div>
+      <div class="col" title="06Z: 0"><div class="bar zero"></div></div>
+    </div>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--teal)"></span>Channels written per hour, 07:00Z to 07:00Z. Peak 169 at 14Z.</span>
+      <span><span class="dot" style="background:var(--red)"></span>Zero. One hour, the last.</span>
+    </div>
+  </div>
+
+  <p class="muted">This is the mirror image of yesterday, and it is worth pausing on. The campaign lane hit the daily YouTube wall at <b>19:05Z</b> and never got past it again. Discovery still ran all night, because the lanes that kept producing are the cheap ones. That distinction turns out to matter more than the raw pool size, and it is covered in question three.</p>
+
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Metric</th><th class="num">09-05</th><th class="num">09-04</th><th class="num">09-03</th></tr></thead>
+      <tbody>
+        <tr><td>Parked into <code>approved_hold</code></td><td class="num"><b>+71</b></td><td class="num">+71</td><td class="num">+627</td></tr>
+        <tr><td><code>approved_hold</code> pool</td><td class="num"><b>4,805</b></td><td class="num">4,734</td><td class="num">4,663</td></tr>
+        <tr><td><code>needs_contact</code> pool</td><td class="num">4,352</td><td class="num">4,344</td><td class="num">4,350</td></tr>
+        <tr><td>Total found, never contacted</td><td class="num"><b>9,157</b></td><td class="num">9,078</td><td class="num">9,013</td></tr>
+        <tr><td>New channels found</td><td class="num"><b>2,162</b></td><td class="num">1,581</td><td class="num">2,817</td></tr>
+        <tr><td>Pitchable, score 6 or better</td><td class="num">79 (3.7%)</td><td class="num">64 (4.0%)</td><td class="num">90 (3.2%)</td></tr>
+        <tr><td>Emails verified</td><td class="num">47 (59%)</td><td class="num">37 (58%)</td><td class="num">56 (62%)</td></tr>
+        <tr><td>Hours with zero channels written</td><td class="num"><b>1</b></td><td class="num">17</td><td class="num">5</td></tr>
+        <tr><td>Campaign sessions</td><td class="num">28 / 28</td><td class="num">35 / 36</td><td class="num">21 / 21</td></tr>
+        <tr><td>Finder runs</td><td class="num">264</td><td class="num">151</td><td class="num">314</td></tr>
+        <tr><td>Fresh pitchable, campaign lane</td><td class="num">12</td><td class="num">18</td><td class="num">10</td></tr>
+        <tr><td>Fades · discovers · promotes</td><td class="num">243 · 271 · 264</td><td class="num">119 · 154 · 152</td><td class="num">298 · 319 · 313</td></tr>
+        <tr><td>Hard · quota · time-budget stops</td><td class="num"><b>21</b> · 0 · 7</td><td class="num">32 · 0 · 3</td><td class="num">13 · 1 · 8</td></tr>
+        <tr><td>Term-starvation notices</td><td class="num">26</td><td class="num">26</td><td class="num">25</td></tr>
+        <tr><td>Hours halted · fatal signatures</td><td class="num">0 · 0</td><td class="num">0 · 0</td><td class="num">0 · 0</td></tr>
+        <tr><td>Anthropic API spend</td><td class="num"><b>$0.00</b></td><td class="num">$2.04</td><td class="num">$0.00</td></tr>
+        <tr><td>OpenRouter, account meter</td><td class="num">$13.53/day</td><td class="num">$29.32/day</td><td class="num">$82.05/day</td></tr>
+        <tr><td>OpenRouter balance</td><td class="num"><b>$180.23 (13.3 d)</b></td><td class="num">$193.76 (6.6 d)</td><td class="num">$223.07 (2.7 d)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p class="muted">The runway number is soft in the same way it was yesterday. Spend is low partly because the campaign lane was walled for twelve hours. Read it as roughly a week, not thirteen days.</p>
+
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Lane</th><th class="num">Channels</th><th class="num">Score 6+</th><th class="num">Hit rate</th><th class="num">Cost per pitchable</th><th>Seed book</th></tr></thead>
+      <tbody>
+        <tr><td>Recommended-videos feed</td><td class="num">1,518</td><td class="num">58</td><td class="num">3.8%</td><td class="num">3.8¢</td><td>7,331 of 12,663 after a lap rollover. <b>5,332 left, about half a day</b></td></tr>
+        <tr><td>Keyword search</td><td class="num">360</td><td class="num">12</td><td class="num"><b>3.3%</b></td><td class="num">3.9¢</td><td>Term-supply bound. 26 starvation notices</td></tr>
+        <tr><td>Video-graph sweep</td><td class="num">208</td><td class="num">9</td><td class="num"><b>4.3%</b></td><td class="num">3.2¢</td><td><b>82,829 of 82,829. Empty</b></td></tr>
+        <tr><td>Peer network</td><td class="num">76</td><td class="num">0</td><td class="num">0%</td><td class="num">no yield</td><td><b>12,604 of 12,604. Empty</b></td></tr>
+        <tr><td>Podcast crossover</td><td class="num">0</td><td class="num">0</td><td class="num">&mdash;</td><td class="num">&mdash;</td><td>Ran once, zero as usual</td></tr>
+        <tr><td>Comment sweep</td><td class="num">0</td><td class="num">0</td><td class="num">&mdash;</td><td class="num">&mdash;</td><td>Paused by Casey on 08-20</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p class="muted">Niche mix of the 79 pitchable: Other 28, Coaching and Consulting 14, Real Estate 7, Business Growth Coaching 6, Health and Wellness Clinics 6, Transformation Coaching 6, Marketing Agencies 4, Relocation 3, Financial Planning 2, plus singles in Sales Training, Legal and Manufacturing. Tarot, astrology and manifestation-adjacent channels are <b>8 of 79, about 10%</b>, up from 5% yesterday and back in line with the two-week average. Still Casey's call, still untouched.</p>
+
+  <h2>The four questions</h2>
+
+  <div class="q accent-red">
+    <div class="ask"><span class="qn">Q1</span><span>Why did the pool gain 71 again, when yesterday's diagnosis said the cause was a spending cap?</span></div>
+    <p>Because the spending cap was only the visible half. The recovery lane resolves a creator's own website before nine of its ten collection methods can do anything. It has two ways to do that: a paid Brave search, and a free read of the creator's YouTube About page. Yesterday found the paid one dead. Today's finding is that <b>the free one has never worked</b>.</p>
+    <p>The method is <code>34-channel-page.ts</code>. Its own header calls it "the one that unblocks the lane," and it was written precisely so the paid search would not be a single point of failure. It fetches the About page through <code>fetchRaw</code>, which caps its read at <b>1,000,000 bytes</b>.</p>
+    <p>Measured this morning on four consecutive leads that the lane had recorded as having no website:</p>
+    <div class="tablewrap" style="margin:12px 0">
+      <table>
+        <thead><tr><th>Lead</th><th class="num">Page size</th><th class="num">Links at byte</th><th class="num">Links in full page</th><th class="num">Links under the 1 MB cap</th></tr></thead>
+        <tbody>
+          <tr><td>David Burkus</td><td class="num">1,325,357</td><td class="num">1,272,894 (96%)</td><td class="num">12</td><td class="num"><b>0</b></td></tr>
+          <tr><td>MUMFORD LAW</td><td class="num">1,194,136</td><td class="num">none</td><td class="num">0</td><td class="num">0</td></tr>
+          <tr><td>Nick Carrier</td><td class="num">1,875,821</td><td class="num">1,821,094 (97%)</td><td class="num">14</td><td class="num"><b>0</b></td></tr>
+          <tr><td>PM Problems</td><td class="num">1,102,247</td><td class="num">1,063,899 (97%)</td><td class="num">6</td><td class="num"><b>0</b></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>The About-tab links sit after the entire video grid and the player bundle, in the last four percent of the document. Every page is bigger than the cap. So the method fetched successfully, parsed successfully, found nothing, and reported no fault, because "this creator pinned no links" is a legitimate outcome that produces the identical <code>site=(none)</code> line.</p>
+    <p>This is the same shape as the 402 that hid inside <code>if (!res.ok) return []</code> a day earlier, and the same shape as the enrichment batches on 09-02. <b>Four cycles running, the defect has been a step wearing the success path's clothes.</b></p>
+    <p><b>Fixed and verified live.</b> <code>fetchRaw</code> now takes a caller-supplied byte cap, defaulting to the old 1 MB so no other method changes, and reports whether it truncated. Method 34 asks for 4 MB, better than twice the largest page seen. Re-running the real method against those same four leads: <span class="pill">davidburkus.com</span> <span class="pill">nickcarrier.com</span> <span class="pill">solvepmproblems.com</span> now resolve, along with nine social profiles between them. MUMFORD LAW correctly reports "page rendered with no outbound links," which is the genuine case and is now distinguishable from the broken one. Each resolved site un-skips nine downstream methods for that lead.</p>
+    <p class="muted"><b>What this changes about yesterday's recommendation.</b> Raising the Brave cap is still worth doing, but it is no longer the only route. The free path costs no money, no API key and no YouTube quota, which matters because quota is the binding constraint on everything else.</p>
+  </div>
+
+  <div class="q accent-amber">
+    <div class="ask"><span class="qn">Q2</span><span>Yesterday's fix was supposed to stop the loop walling every 30 minutes. Why did it wall 21 more times?</span></div>
+    <p>Because it waited for a signal that was never going to arrive. Yesterday's change told the campaign loop to sleep until the midnight-Pacific refill <b>if a sweep lane had already fallen asleep on the same drained key pool</b>, reading the rest marker the sweeps write. The reasoning was that all copies of "out of quota" should agree.</p>
+    <p>No marker file has ever existed on disk. The loop fell straight through to the old flat 30-minute retry, and hard-walled at <b>19:05Z, then every 34 minutes through to 06:53Z</b>, 21 times.</p>
+    <p>The dependency is structurally wrong, not merely unlucky. <b>A finder pass spends 100 quota units on every search. The sweeps spend 1 unit per channel lookup and get their edges by scraping watch pages, which costs no quota at all.</b> So the campaign lane hits the daily wall many hours before a sweep does, and on a day like today the sweeps never hit it. They walked 10,244 seeds and wrote channels in 23 of 24 hours while the campaign loop could not buy a single search. Waiting for a sweep to fall asleep meant waiting for a lane that was still working.</p>
+    <p><b>Fixed.</b> The loop now asks its own session log. When the pool cannot serve a search, the finder rotates every key and aborts with a fixed line, and that line is a clean discriminator: present in all 21 walled sessions this cycle, absent from all 7 productive ones. Verified against every session log on disk. It then sleeps to the midnight-Pacific refill using the same clock arithmetic the sweeps use, which survives the November daylight-saving change and clears itself, since adding keys mid-day costs at most one extra sleep.</p>
+    <p>The gate matters as much as the sleep. The <em>other</em> thing that hard-walls this loop is term-supply exhaustion, and there were 26 starvation notices this cycle. Terms do not refill at midnight, so parking a term wall until morning would have been a fresh bug. A session with no exhaustion line keeps the old behaviour.</p>
+  </div>
+
+  <div class="q accent-teal">
+    <div class="ask"><span class="qn">Q3</span><span>How did discovery run all night if the key pool was drained by 19:00Z?</span></div>
+    <p>Because "the pool is drained" is not one condition. It is drained <b>for searches</b>. A <code>search.list</code> call costs 100 quota units and a <code>channels.list</code> call costs 1, and the recommended-videos lane finds its next channels by scraping public watch pages, which costs nothing.</p>
+    <p>So after 19:05Z the campaign lane could not run a single term, while the feed lane kept writing 44 to 109 channels an hour on the small change left in the pool. It produced <b>1,518 of the day's 2,162 channels and 58 of the 79 pitchable leads</b>.</p>
+    <p>This is why the day looks healthier than yesterday on every discovery metric despite an identical parked number. Yesterday's 17 dark hours were not a worse quota situation. They were the feed lane having run out of seeds; today it rolled into a fresh lap and had material to walk.</p>
+    <p class="muted">Stated plainly because it changes what "add more YouTube keys" buys: more keys mostly buy <b>keyword search</b>, which is the lane that needs 100 units a query. The cheap lanes are limited by seeds, not by quota.</p>
+  </div>
+
+  <div class="q accent-amber">
+    <div class="ask"><span class="qn">Q4</span><span>What is left in the seed books?</span></div>
+    <div class="tablewrap" style="margin:6px 0 12px">
+      <table>
+        <thead><tr><th>Lane</th><th class="num">Walked</th><th class="num">Left</th><th>State</th></tr></thead>
+        <tbody>
+          <tr><td>Video-graph sweep</td><td class="num">82,829</td><td class="num"><b>0</b></td><td>Book finished. 208 channels this cycle on leftovers, at the best hit rate of any lane</td></tr>
+          <tr><td>Peer network</td><td class="num">12,604</td><td class="num"><b>0</b></td><td>Book finished, and now <b>yield-dead</b>: 76 channels, zero pitchable</td></tr>
+          <tr><td>Recommended-videos feed</td><td class="num">7,331</td><td class="num">5,332</td><td>Re-lapped. About half a day of road at <b>0.0057 pitchable per seed</b></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>This is the same structural finding as yesterday, one day further along. Two books are empty and the third is re-walking ground it has already covered. The lanes refill each other's books, a lane qualifies a good creator and that creator becomes a seed for the next lane, so a circuit with only one producing lane runs down.</p>
+    <p>The peer lane is the clearest signal: it walked 76 channels and produced <b>nothing at all</b>. It is not broken, it has simply read everything it owns.</p>
+    <p><b>Deliberately not changed.</b> Stopping the peer lane, or setting a yield floor on the feed lane's re-lap, are spend and policy decisions rather than defects. The feed's re-lap gate is a price ceiling by design, chosen because a yield gate would have killed the cheapest source we have. Those calls are Casey's and nothing here made them unilaterally.</p>
+  </div>
+
+  <h2>What broke, what held</h2>
+
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Yesterday's fix</th><th>Held?</th><th>Evidence</th></tr></thead>
+      <tbody>
+        <tr><td>Brave key rotation on any refusal, plus a loud line</td><td><span class="tag good">HELD</span></td><td>Four explicit 402 warnings naming the cap in the collect log. The failure is no longer silent</td></tr>
+        <tr><td>Check-in observes collapsed site resolution</td><td><span class="tag good">HELD</span></td><td><code>bloodhound_site_resolution_collapsed</code> recorded 23 times, correctly refusing to escalate a spend decision</td></tr>
+        <tr><td>An empty seed book is not a stalled daemon</td><td><span class="tag good">HELD</span></td><td><code>sweep_daemon_book_drained</code> twice. Anthropic spend back to <b>$0.00</b> from $2.04, zero fix-agent pages</td></tr>
+        <tr><td>Campaign loop sleeps to the midnight refill</td><td><span class="tag">DID NOT FIRE</span></td><td>21 hard walls at 34-minute intervals. No rest marker ever written. Re-fixed today, see Q2</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p class="muted">Check-in observations this cycle: 27 <code>finder_hard_wall_benign</code>, 25 <code>term_starvation</code>, 23 <code>bloodhound_site_resolution_collapsed</code>, 9 <code>harvest_kick</code>, 2 <code>sweep_daemon_book_drained</code>, 1 <code>sweep_daemon_resting_on_quota</code>, 1 <code>pitchable_rate_term_supply_degraded</code>. Zero escalations to a paid fix-agent.</p>
+
+  <h2>Fixes shipped</h2>
+
+  <div class="tablewrap">
+    <table class="fix">
+      <thead><tr><th>#</th><th>Repo</th><th>Change</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td><code>youtube-email-outreach-v1</code></td><td><code>fetchRaw</code> takes a caller-supplied byte cap and reports truncation. Method 34 reads 4 MB instead of 1 MB, so it can actually see the About-tab links, and it now names truncation explicitly rather than looking like a creator with no website. Verified live: 3 of 4 previously unresolvable leads now resolve a real site</td></tr>
+        <tr><td>2</td><td><code>youtube-outreach-orchestrator-v1</code></td><td>The campaign loop reads its own session log for the finder's key-exhaustion line and sleeps to the midnight-Pacific refill itself, instead of waiting for a sweep lane that spends 100× less quota and therefore never falls asleep. Gated on the exhaustion signature so a term-supply wall keeps the 30-minute retry</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p class="muted">Both verified before commit. The email repo typechecks clean and method 34 was run against the four real leads. The loop parses clean and its two new functions were exercised against all 41 session logs on disk, detecting the wall in exactly the 34 walled sessions and none of the 7 productive ones. Nothing was stopped, no halt flag written, the loop was left running.</p>
+
+  <h2>Recommended next, ranked</h2>
+
+  <ol class="recs">
+    <li><b>Watch the recovery lane over the next cycle, before spending anything on Brave.</b> The free website path is fixed and it is the same path nine of ten collection methods wait on. If site resolution drops back toward the 9% failure rate it ran at on 09-02, the lane recovers without the cap being touched. If it stays high, then the Brave cap is genuinely binding and worth raising. One cycle of evidence costs nothing and decides a spend question.</li>
+    <li><b>Decide how the seed books refill.</b> Two of three are empty and the third has about half a day left, re-walking its own ground. The three levers are all yours: more YouTube quota so the surviving lane walks faster, wider niches for keyword search, or a new discovery method. The video-graph book is the one worth refilling first, at 3.2¢ per pitchable lead and the best hit rate of any lane.</li>
+    <li><b>Add YouTube keys, knowing what they buy.</b> The allowance was gone by 19:00Z. Today's fix stops the waste but creates no quota. Worth being precise: more keys mainly buy keyword search, the lane that spends 100 units a query and the one with a real hit rate. The cheap lanes are short of seeds, not units.</li>
+    <li><b>Top up OpenRouter within the week.</b> $180.23 left. The 13-day reading is flattered by twelve walled hours; a full working day reads closer to a week. Everything bills this account, and an empty balance stopped the whole pipeline on 08-25.</li>
+    <li><b>The tarot and astrology question is still open.</b> 8 of 79 today, about 10%, in line with the two-week average and roughly 1 in 8 of everything parked. Nothing has been excluded, per your standing preference to filter liberally and ask first.</li>
+    <li><b>Enrichment needs nothing.</b> 4,701 of 4,805 parked leads carry their research bundle. 104 outstanding, flat on yesterday's 105.</li>
+  </ol>
+
+  <div class="foot">
+    <b>Status caveat:</b> everything here is <b>parked</b>, nothing sent. <code>approved_hold</code> holds until <code>npm run send</code> is run by hand. Cycle window 2026-09-04 07:00Z to 2026-09-05 07:00Z, which is midnight to midnight Pacific. Grounded snapshot: <code>youtube-outreach-orchestrator-v1/logs/autopilot-debrief-2026-09-05.json</code>.
+  </div>
+
+</div>
