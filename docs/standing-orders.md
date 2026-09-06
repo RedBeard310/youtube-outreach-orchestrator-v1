@@ -142,6 +142,49 @@ this is the shape to check first.**
 
 ## Change log
 
+- 2026-09-06 (evening): **The Apify lane's "collapsing hit rate" was a
+  double-billing bug, not a thinning pool — and the price ceiling is now
+  enforced by the lane itself.** Casey saw $1.00 per recovered lead and said
+  stop immediately; his limit is $0.15-$0.20 against a $0.10 target.
+
+  What was actually happening: a channel that publishes no email writes no
+  contact point, and the cohort selector only excluded channels that HAD one.
+  So a miss looked exactly like a channel nobody had checked, and the ordering
+  is deterministic, so the same 82 misses sat at the top of every batch and were
+  billed again. 485 channels cost 825 scrapes; $23.87 of $57.92 bought nothing.
+  The apparent 89% → 17% decay was each batch filling up with those known
+  misses.
+
+  **There is no "bad channel" pattern to filter on, and you should stop looking
+  for one.** On distinct channels the hit rate is 83% flat. Subscribers move it
+  67-93%, niche 77-100%, channel age 75-86% — every bucket is worth scraping, so
+  a predictor would only cost yield. The lever was never targeting.
+
+  Fixed by `leads.apify_endspec_attempts` (one row per settled outcome; the
+  selector skips anything in it) plus a self-enforcing ceiling: two consecutive
+  batches over `MAX_COST_PER_LEAD` write `logs/apify-endspec-halt.flag` and the
+  wrapper checks it before spending. **The brake cannot be `systemctl disable`**
+  — the unit runs as `casey` with no passwordless sudo, so it fails silently and
+  the lane keeps spending while looking stopped. Resume with `rm` on the flag.
+
+  Projected cost after the fix: about $0.15/lead. Watch the first two batches;
+  if the ceiling trips twice, the pool really has thinned and it is Casey's call.
+
+- 2026-09-06 (evening): **Role addresses (info@, contact@, bookings@) are
+  acceptable now — Casey: "as long as they're real, valid emails that don't
+  bounce."** But role_based and catch-all both arrive from ZeroBounce as
+  "risky", and only the first is a proved mailbox: catch-all means the domain
+  accepts everything and nothing about that mailbox was checked. Accept
+  role_based only, by reading `rawSubStatus`. Never widen this to a bare
+  `status === "risky"` test.
+
+  A personal mailbox still wins; the role address is a fallback used only after
+  every candidate is checked, and it lands at confidence 70, not 95.
+  `scripts/recheck-risky-role.ts` reopens leads already parked on a risky
+  verdict — it costs one credit each because the stored note says only "risky",
+  and it recovered 76% of the first 25.
+
+
 - 2026-09-06 (debrief): **A `Type=oneshot` timer unit KILLS the background job it
   launched, and that is what the recovery lane's new timer had been doing all day.**
   The collect pass runs ~46 minutes as a detached child. systemd's default
