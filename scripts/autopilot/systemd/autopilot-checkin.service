@@ -8,3 +8,9 @@ WorkingDirectory=/home/casey/repos/youtube-outreach-orchestrator-v1
 Environment=HOME=/home/casey
 Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 ExecStart=/home/casey/repos/youtube-outreach-orchestrator-v1/scripts/autopilot/checkin.sh
+# A HUNG WATCHDOG MUST DIE (2026-09-06). This unit inherited an infinite start
+# timeout, and checkin.sh can spawn a `claude -p` fix agent, so one wedged agent
+# would have held the unit "activating" forever. Paired with the wall-clock timer
+# next door: a run that overruns is killed rather than parking the only health
+# check the pipeline has. 45 min is ~20x the observed 2.7s run.
+TimeoutStartSec=45min

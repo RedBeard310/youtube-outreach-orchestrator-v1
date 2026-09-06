@@ -2,8 +2,15 @@
 Description=Autopilot: run the health check-in hourly
 
 [Timer]
-OnBootSec=10min
-OnUnitActiveSec=1h
+# WALL CLOCK, NOT OnUnitActiveSec (2026-09-06). OnUnitActiveSec only schedules the
+# next run once the unit goes inactive, so a check-in that hangs — or that holds a
+# child in its cgroup — stops the hourly cadence for good, with no error anywhere.
+# That is the same silent-stall shape that cost the recovery lane two collect
+# passes today. A calendar schedule cannot be stopped by a long run; systemd just
+# skips a trigger while the service is still active. Keeps the historic :11 slot.
+# Check: systemctl show autopilot-checkin.timer -p NextElapseUSecRealtime --value
+#        must return a date, never `infinity`.
+OnCalendar=*-*-* *:11:00
 Persistent=true
 
 [Install]
