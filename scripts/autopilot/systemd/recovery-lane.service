@@ -1,0 +1,27 @@
+[Unit]
+Description=Bloodhound recovery lane: needs_contact -> approved_hold (collect + verify)
+Documentation=file:///home/casey/repos/youtube-outreach-orchestrator-v1/src/cli/run-recovery.ts
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=casey
+WorkingDirectory=/home/casey/repos/youtube-outreach-orchestrator-v1
+Environment=HOME=/home/casey
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+ExecStart=/usr/bin/npm run recovery
+# The lane self-gates on logs/bloodhound-lane-state.json, so a tick that is not
+# due is a no-op. Failure here must not stop the timer.
+TimeoutStartSec=30min
+# LOAD-BEARING (2026-09-06). The collect pass is a DETACHED child that runs for
+# ~46 minutes after ExecStart exits. systemd's default KillMode=control-group
+# kills everything left in the cgroup the moment a oneshot unit deactivates, and
+# `detached: true` does not escape a cgroup — only KillMode does. Measured on the
+# first two timer-dispatched passes: 6 and 13 leads of 150 reached the log before
+# the child died ~30s in, while the lane's cursor had stepped over all 300, so
+# 281 leads were silently skipped to the next lap. Verified with a controlled
+# systemd-run pair: default KillMode = 0 survivors, KillMode=process = 1.
+# Check after any edit here:
+#   systemctl show recovery-lane.service -p KillMode --value   # must be 'process'
+KillMode=process

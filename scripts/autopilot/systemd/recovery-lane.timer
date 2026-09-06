@@ -1,0 +1,20 @@
+[Unit]
+Description=Run the Bloodhound recovery lane hourly, independent of the YouTube quota clock
+
+[Timer]
+# WALL-CLOCK, NOT OnUnitActiveSec. The collect pass is a DETACHED child (it must
+# not burn the caller's time budget), and it stays in the service's cgroup for the
+# ~46 minutes a 150-lead batch takes. That keeps the unit in `activating` long
+# after ExecStart has exited 0, and OnUnitActiveSec only schedules the next run
+# once the unit goes inactive — so the next elapse read `infinity` and the timer
+# would not have fired again until the collector finished. A hung collector would
+# have parked the lane forever, silently, which is the exact failure mode this
+# timer was installed to end.
+# OnCalendar is computed from the clock, so a long or stuck run cannot stop the
+# schedule. systemd simply skips a trigger while the service is still active.
+OnCalendar=hourly
+RandomizedDelaySec=2min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

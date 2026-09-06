@@ -10,7 +10,8 @@ set -euo pipefail
 SRC="/home/casey/repos/youtube-outreach-orchestrator-v1/scripts/autopilot/systemd"
 DEST="/etc/systemd/system"
 UNITS=(autopilot-campaign.service autopilot-checkin.service autopilot-checkin.timer \
-       autopilot-debrief.service autopilot-debrief.timer)
+       autopilot-debrief.service autopilot-debrief.timer \
+       recovery-lane.service recovery-lane.timer)
 
 if [ "${1:-}" = "--status" ]; then
   systemctl status autopilot-campaign.service --no-pager -l | head -12 || true
@@ -33,6 +34,10 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now autopilot-campaign.service
 sudo systemctl enable --now autopilot-checkin.timer
 sudo systemctl enable --now autopilot-debrief.timer
+# The recovery lane runs on its own hourly clock, off the YouTube quota. It was
+# installed by hand on 2026-09-06 and lives here now so its KillMode=process line
+# (see the unit) cannot be lost to a reinstall.
+sudo systemctl enable --now recovery-lane.timer
 
 echo "Installed. Status:"
 systemctl is-active autopilot-campaign.service && echo "  campaign driver: active"

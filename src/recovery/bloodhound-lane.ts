@@ -19,7 +19,9 @@
 // unverified email points. Credits are spent only on unverified email points;
 // the verify selector only picks leads that have them.
 import { spawn } from 'node:child_process';
-import { existsSync, mkdirSync, openSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  closeSync, existsSync, mkdirSync, openSync, readFileSync, readSync, statSync, writeFileSync,
+} from 'node:fs';
 import { join } from 'node:path';
 import { query } from 'pipeline-db';
 
@@ -41,6 +43,12 @@ export interface LaneState {
   collectCursor?: CollectCursor;
   /** How many full laps of the untouched pool the collect pass has walked. */
   collectLaps?: number;
+  /** Cursor and lap count as they stood BEFORE the last dispatched batch, held
+   *  until that child is seen to have finished. See rewindIfTruncated. */
+  collectResume?: { from: CollectCursor | null; laps: number };
+  /** Consecutive rewinds, so a child that dies every single time cannot pin the
+   *  walk on one batch forever (the 2026-08-27 walking-in-place failure). */
+  collectRewinds?: number;
 }
 
 export const LANE_STATE_PATH = join('logs', 'bloodhound-lane-state.json');
@@ -83,6 +91,54 @@ function collectLogFd(): number | 'ignore' {
     return 'ignore';
   }
 }
+
+/** Did the last collect pass in the log run to completion?
+ *
+ *  WHY THIS EXISTS (2026-09-06). The collect child is detached and never reports
+ *  back, so the cursor advances at dispatch: a batch that dies is skipped until
+ *  the next lap. That was an acceptable trade while the only dispatcher was the
+ *  always-on campaign service. It stopped being acceptable the moment the lane
+ *  got its own `recovery-lane.service`, a Type=oneshot unit: systemd's default
+ *  KillMode is `control-group`, so when ExecStart exits the unit deactivates and
+ *  everything left in its cgroup is killed — detached or not. Measured on the
+ *  two timer-dispatched passes of 2026-09-06: 6 and 13 leads of 150 reached the
+ *  log before the child died ~30s in, and the cursor had already stepped over
+ *  all 300. The unit now carries `KillMode=process`, but a killed child is not
+ *  special: an OOM, a reboot or a `systemctl stop` does the same thing, and the
+ *  damage is silent every time.
+ *
+ *  So read the lane's OUTPUT rather than trusting the dispatch. The email repo's
+ *  CLI prints exactly one completion line per pass; if the newest pass header in
+ *  the log has no completion line after it, that pass did not finish.
+ *
+ *  Returns null when the log cannot answer (missing, unreadable, no header yet),
+ *  which is treated as "assume it finished" — an unknown must never rewind. */
+export function lastCollectPassFinished(
+  path = COLLECT_LOG_PATH,
+  tailBytes = 512_000,
+): boolean | null {
+  try {
+    const fd = openSync(path, 'r');
+    try {
+      const size = statSync(path).size;
+      const start = Math.max(0, size - tailBytes);
+      const buf = Buffer.alloc(Math.min(size, tailBytes));
+      readSync(fd, buf, 0, buf.length, start);
+      const tail = buf.toString('utf8');
+      const header = tail.lastIndexOf('\nBloodhound: ');
+      if (header < 0) return null;
+      return tail.lastIndexOf('\nCollected ') > header;
+    } finally {
+      closeSync(fd);
+    }
+  } catch {
+    return null;
+  }
+}
+
+/** Maximum times in a row a truncated pass may be re-walked. Past this the walk
+ *  moves on regardless: re-running one batch forever is the worse failure. */
+export const MAX_CONSECUTIVE_REWINDS = 3;
 
 /** How long a detached collect child may live before a matching PID is assumed
  *  to be OS reuse. Scales with the batch so the guard cannot drift out of date
@@ -370,6 +426,32 @@ export async function runBloodhoundLane(opts: LaneOpts): Promise<void> {
       opts.log({ event: 'bloodhound_collect', skipped: 'previous_still_running', pid: state.collectPid });
       return;
     }
+    // The previous child is gone. Did it get through its batch, or was it cut
+    // off? A cut-off pass leaves its leads unwalked behind an advanced cursor,
+    // so put the cursor back before selecting the next batch.
+    if (state.collectResume && !opts.dryRun) {
+      const finished = lastCollectPassFinished();
+      const rewinds = state.collectRewinds ?? 0;
+      if (finished === false && rewinds < MAX_CONSECUTIVE_REWINDS) {
+        state.collectCursor = state.collectResume.from ?? undefined;
+        state.collectLaps = state.collectResume.laps;
+        state.collectRewinds = rewinds + 1;
+        opts.log({
+          event: 'bloodhound_collect',
+          rewound: true,
+          reason: 'previous_pass_truncated',
+          cursor_tier: state.collectCursor?.tier ?? null,
+          rewinds: state.collectRewinds,
+        });
+      } else {
+        if (finished === false) {
+          opts.log({ event: 'bloodhound_collect', rewound: false, reason: 'rewind_cap_reached', rewinds });
+        }
+        state.collectRewinds = 0;
+      }
+      state.collectResume = undefined;
+      saveState(state);
+    }
     try {
       const batch = await selectUntouchedBatch(opts.collectBatch, state.collectCursor);
       const ids = batch.ids;
@@ -408,8 +490,11 @@ export async function runBloodhoundLane(opts: LaneOpts): Promise<void> {
       child.unref();
       // Advance BEFORE the child reports, because it never reports: it is
       // detached on purpose so the session's time budget goes to finder passes.
-      // Worst case a failed batch is skipped until the next lap, which beats
-      // the old behaviour of re-running the same failed batch every 6 hours.
+      // A batch the collector genuinely worked and failed on is skipped until
+      // the next lap, which beats re-running the same failed batch every 6
+      // hours. A batch it never got to is a different thing, so remember where
+      // this one started; the next pass rewinds here if the child was cut off.
+      state.collectResume = { from: state.collectCursor ?? null, laps: state.collectLaps ?? 0 };
       advance();
       state.collectPid = child.pid;
       state.lastCollectAt = new Date().toISOString();
