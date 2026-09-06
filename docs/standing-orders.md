@@ -176,6 +176,19 @@ this is the shape to check first.**
   - **ZeroBounce credits replenish on their own** (Casey, 09-06), so the 2,718
     balance is not a wall. The lane still breaks its verify loop cleanly on a
     momentary dry spell and keeps the scrape.
+  - **BOTH TIMERS USE `OnCalendar`, NOT `OnUnitActiveSec`, AND THAT IS LOAD-BEARING.**
+    Caught on install: the collect pass is a detached child that stays in the
+    service's cgroup for the ~46 minutes a 150-lead batch runs, so the unit sits in
+    `activating` long after ExecStart exits 0. `OnUnitActiveSec` only schedules the
+    next run once the unit goes inactive, so `NextElapseUSecMonotonic` read
+    **`infinity`** — the timer would not have fired again until the collector
+    finished, and a hung collector would have parked the lane forever with no
+    error. That is the same silent-stall shape as 08-12, 08-27, 08-29 and 09-02.
+    A wall-clock schedule cannot be stopped by a long or stuck run; systemd just
+    skips a trigger while the service is still active. **Any future timer wrapping
+    a lane that detaches a child must do the same, and the check is one command:**
+    `systemctl show <unit>.timer -p NextElapseUSecRealtime --value` must return a
+    date, never `infinity`.
 
 
 - 2026-09-06: **THE 09-02 SHARED-PROJECT FINDING BELOW IS WRONG. Every key has its
