@@ -12,6 +12,8 @@
     "campaign:dry": "tsx src/cli/run-campaign.ts --dry-run",
     "send": "tsx src/cli/run-send.ts",
     "send:dry": "tsx src/cli/run-send.ts --dry-run",
+    "recovery": "tsx src/cli/run-recovery.ts",
+    "recovery:dry": "tsx src/cli/run-recovery.ts --dry-run",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

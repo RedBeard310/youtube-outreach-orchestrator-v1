@@ -142,6 +142,42 @@ this is the shape to check first.**
 
 ## Change log
 
+- 2026-09-06: **The two best recovery lanes now run on their own timers instead of
+  waiting for a person or for YouTube quota.** Both installed and verified live.
+  - **`apify-endspec.timer`** (every 2h) -> `youtube-email-outreach-v1/scripts/apify-endspec-loop.sh`.
+    The endspec actor solves the reCAPTCHA behind YouTube's "View email address"
+    button, which is the one address no free HTTP can reach. Measured on the live
+    09-06 batch: **92% of channels returned an email** (48 of the first 52), and
+    after ZeroBounce roughly **59% of every channel run becomes a usable lead**.
+    **3,164 leads qualify**; a full sweep is ~$222 at $0.0702/run against a $100
+    monthly Apify cap.
+    **The wrapper checks the monthly ledger ITSELF and exits 0 quietly when short,
+    rather than letting the script's preflight throw.** Under a timer a throw means
+    a failed unit every two hours for the rest of the billing cycle, which trains
+    you to ignore the lane. It also reserves `BUDGET_RESERVE_USD` (10) so an ad-hoc
+    run always has room — burning a cap to the last cent is exactly how Brave took
+    the recovery engine down for two days on 09-02. And it `pgrep`s for a live
+    batch before taking its flock, because flock cannot see a manual
+    `npm run apify-endspec` and the actor MUST be serialised (38 of 50 parallel
+    runs came back overloaded on 09-02, every one reporting SUCCEEDED).
+  - **`recovery-lane.timer`** (hourly) -> `npm run recovery` (`src/cli/run-recovery.ts`).
+    Fixes the throttle recorded earlier today: `runBloodhoundLane` was dispatched
+    only from the campaign's finish block, so the 09-04 midnight-PT sleep took its
+    collect passes from 4/day to 2/day on a lane that spends **no YouTube quota at
+    all**. The timer fires hourly and lets the lane's own state file decide what is
+    due (collect 6h, verify 3h) — the schedule stays in ONE place. It takes no tick
+    lock on purpose; collect is detached HTTP against creators' sites and verify
+    only spends ZeroBounce, so neither touches the send path.
+  - **They compound, which is the point.** First run: Apify scraped addresses, the
+    recovery lane verified 63 of them and flipped **10 straight into approved_hold**
+    (`brian@moneyguy.com`, `louise@louisebrogan.com`, ...). `needs_contact` 4,334 ->
+    4,324 in under a minute. Those land WITHOUT an enrichment bundle, so the
+    backfill chain (idling on "no pending inflow") picks them up next.
+  - **ZeroBounce credits replenish on their own** (Casey, 09-06), so the 2,718
+    balance is not a wall. The lane still breaks its verify loop cleanly on a
+    momentary dry spell and keeps the scrape.
+
+
 - 2026-09-06: **THE 09-02 SHARED-PROJECT FINDING BELOW IS WRONG. Every key has its
   own Google Cloud project, so more keys DO buy more quota.** Measured twice with
   `youtube-lead-finder-v1/scripts/audit-key-projects.sh` (written for this, costs
