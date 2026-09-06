@@ -122,6 +122,16 @@ fixed unit and is walking normally, resolving a website for about 6 of every 8 l
 
 Commit: `08238bb` in `youtube-outreach-orchestrator-v1`.
 
+**One thread left open for tomorrow.** The verification pass is alive and working, but
+slower than the 18.5s per lead the 150-lead batch was sized on: 8 leads in the first
+30 seconds, then a long stretch with the worker process pegged at 100% of a core and
+only two open sockets, so it is CPU-bound rather than waiting on the network. Node is
+single-threaded, so one expensive parse stalls all 8 concurrency slots. The obvious
+suspect is yesterday's `MAX_HTML_BYTES` change feeding multi-megabyte About pages
+through the whole-document regexes in `web.ts` and `methods/33-about-text.ts`, but
+**that is a suspicion, not a measurement**, and the 09-05 12:03Z pass completed all 150
+after the same change. Time one full pass tomorrow before touching anything.
+
 ## 4. The second fix: the watchdog could park itself
 
 `autopilot-checkin.timer` ran on `OnUnitActiveSec=1h`, which schedules the next run from
