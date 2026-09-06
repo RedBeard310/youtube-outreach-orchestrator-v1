@@ -142,6 +142,52 @@ this is the shape to check first.**
 
 ## Change log
 
+- 2026-09-06 (debrief): **A `Type=oneshot` timer unit KILLS the background job it
+  launched, and that is what the recovery lane's new timer had been doing all day.**
+  The collect pass runs ~46 minutes as a detached child. systemd's default
+  `KillMode=control-group` kills everything left in the cgroup the moment the unit
+  deactivates, and `detached: true` makes a process-group leader, not a cgroup
+  escapee. Both scheduled passes died ~30s in: **6 of 150 leads walked, then 13 of
+  150**, while the lane's cursor had already stepped past all 300. **281 leads were
+  recorded as walked with nobody looking at them.** The campaign-dispatched pass of
+  09-05 12:03Z walked all 150, because `autopilot-campaign.service` stays active.
+  Proven with a controlled `systemd-run` pair: default KillMode left 0 survivors,
+  `KillMode=process` left 1.
+  **This corrects the entry below**, which records that a detached child holds the
+  unit in `activating`. It does not; the unit goes `inactive (dead)` and takes the
+  child with it. The wall-clock timer schedules in `2aec64b` are still right, for
+  their own separate reason, and both checks are worth running on any new lane unit:
+  `systemctl show <unit>.timer -p NextElapseUSecRealtime --value` must be a date, and
+  `systemctl show <unit>.service -p KillMode --value` must be `process` wherever
+  ExecStart leaves a child behind.
+  Fixed in `08238bb`: the unit carries `KillMode=process` and now lives in
+  `scripts/autopilot/systemd/` wired into `install.sh`, so a reinstall cannot lose
+  it. **And the lane no longer trusts its own dispatch** — it remembers where each
+  batch started and rewinds the cursor when the collect log shows the previous pass
+  never printed its completion line, capped at 3 consecutive rewinds so a child that
+  always dies cannot pin the walk on one batch. A kill is not special: an OOM, a
+  reboot or a `systemctl stop` does the same damage, silently. Today's cursor was
+  rewound by hand and a full pass verified live.
+  Same day, same shape, pre-emptively: **`autopilot-checkin.timer` could have parked
+  the pipeline's only watchdog forever.** It ran on `OnUnitActiveSec` with
+  `TimeoutStartUSec=infinity` on a service that can spawn a `claude -p` fix agent.
+  Now `OnCalendar=*-*-* *:11:00` plus `TimeoutStartSec=45min` (`2fc4f79`).
+
+- 2026-09-06 (debrief): **The Apify endspec figures below are PILOT numbers off the
+  best-ordered 52 channels. Do not plan against them.** Four live batches of 100 on
+  09-06 measured emails found per 100 channels of **89, 75, 67, 54** and parked leads
+  of **11, 35, 24, 22**, at **$0.638, $0.201, $0.292, $0.319** per recovered lead. The
+  honest planning number after 400 channels is ~25 parked per 100 channels at ~$0.30,
+  still drifting down, so a full 3,164-lead sweep buys roughly 790 leads for $222
+  rather than the ~1,870 the 92%/59% figures imply. **The lane also stops by itself
+  around midday Tuesday**: $28.08 spent since midnight, ~$53 left of the $100 monthly
+  cap after the $10 reserve, and the wrapper exits 0 quietly when short, by design, so
+  nothing will announce it. Raising the cap is Casey's spend call; it is still the
+  only route to an address hidden behind the "View email address" button.
+  **Brave is capped again** (both keys answered 402 on today's passes) and it no
+  longer matters much: the free channel-page route resolved 119 of 150 sites on the
+  last full collect pass.
+
 - 2026-09-06: **The two best recovery lanes now run on their own timers instead of
   waiting for a person or for YouTube quota.** Both installed and verified live.
   - **`apify-endspec.timer`** (every 2h) -> `youtube-email-outreach-v1/scripts/apify-endspec-loop.sh`.
