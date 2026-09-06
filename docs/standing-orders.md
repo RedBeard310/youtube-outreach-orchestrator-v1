@@ -142,6 +142,60 @@ this is the shape to check first.**
 
 ## Change log
 
+- 2026-09-06: **THE 09-02 SHARED-PROJECT FINDING BELOW IS WRONG. Every key has its
+  own Google Cloud project, so more keys DO buy more quota.** Measured twice with
+  `youtube-lead-finder-v1/scripts/audit-key-projects.sh` (written for this, costs
+  no YouTube quota): 66 keys, **64 distinct project numbers**, 2 more whose API
+  restrictions are locked to YouTube so they answer opaquely, and **zero projects
+  hosting two keys**. Daily pool is therefore ~660,000 units, not the ~270,000 the
+  09-02 entry claimed.
+  **The test that produced the wrong answer was inference from contiguous slot
+  deaths, and that test cannot work.** `nextLiveIndex()` in the finder's
+  `src/youtube/client.ts` walks the pool as `(this.index + i) % n`, a plain
+  round-robin cursor, so consecutive slots are SPENT consecutively and therefore
+  DIE consecutively no matter which project funds them. The 09-02 reasoning saw a
+  real pattern and attributed it to the wrong cause. **Ask Google instead of
+  inferring:** the audit script reads the project number straight out of a Cloud
+  Translation 403, which names the calling project.
+  **What this changes for spend:** buying keys is back on the table as the way to
+  add keyword-search capacity, at ~10,000 units per key per day. Remember the
+  quota asymmetry though — only the 100-unit `search.list` calls are constrained,
+  and the graph sweeps run on 1-unit calls plus free scraping, so more keys buys
+  keyword search and buys the sweeps almost nothing.
+  **Pool health today:** 65 of 66 keys are fine. Exactly one is genuinely dead,
+  slot 38, which answers `Consumer ... has been suspended`. Slots 3 and 10 read
+  `forbidden` on the audit probe and serve YouTube normally; that is a correctly
+  restricted key, not a broken one.
+
+- 2026-09-06: **Video-graph cap raised $53 -> $100 on Casey's explicit approval**
+  ("let's give it up to $100"). The lane had stopped at $53.0093 with 264 of
+  83,338 seeds unwalked, roughly $0.20 short of finishing its book, and had been
+  relaunching and dying in two seconds every hour since 08-28. Restarted and
+  confirmed walking. The jump is deliberately large because the two previous
+  raises each bought a few dollars and stranded the lane again within the week;
+  at 2.7c per qualified lead this is the cheapest source in the pipeline. The
+  durable fix is still to make its cap per-lap like the feed lane's, since this
+  one counts LIFETIME dollars and waiting never releases it.
+
+- 2026-09-06: **Brave key 1 is live again, key 2 is still capped.** Casey raised
+  one of the two plans. `BRAVE_SEARCH_API_KEY_1` answers 200;
+  `BRAVE_SEARCH_API_KEY_2` answers 402 at `current_spend 5.0 / usage_limit 5.0`.
+  The recovery lane's collect pass recovered with it: the 09-05 12:03Z pass took
+  686 contact points off **135 of 150 leads**, against the ~0.93/lead this lane
+  averaged before. Raise key 2's cap as well when convenient; collect throughput
+  and Brave headroom are the same lever.
+
+- 2026-09-06: **The recovery lane is throttled by a YouTube quota sleep it has no
+  reason to obey.** `runBloodhoundLane` is dispatched only from the campaign's
+  finish block (`src/drivers/campaign.ts:872`), plus an OpenRouter-halt branch in
+  `checkin.ts`. Since the 09-04 change that sleeps the campaign loop to the
+  midnight-PT refill instead of retrying every 30 minutes, the campaign is down
+  ~14h a day, and the lane sleeps with it: collect passes went 4, 3, 4, 4, **2**
+  across 09-01..09-05, on a 6h interval that should give 4. The lane spends ZERO
+  YouTube quota. Giving it its own timer is free throughput and is the highest-
+  value open item. Not done yet: it is a change to how a producing lane is
+  scheduled, so it is Casey's call.
+
 - 2026-09-02 (debrief): **A guard written in absolute leads cannot see an outage
   on a machine that works inflow.** The enrichment chain's mass-failure guard
   fires above 100 failed leads. The VPS side works new arrivals, so its batches
@@ -175,8 +229,11 @@ this is the shape to check first.**
   wording all fail it. Orchestrator `7900f17` adds the matching SQL predicate,
   which retires the rows already stored with no backfill. Queue 38 to 37.
 
-- 2026-09-02: **The YouTube keys are not being banned. Many of them share a
-  Google Cloud project, so they share one 10,000-unit quota.** The 09-02 handoff
+- 2026-09-02: **SUPERSEDED 2026-09-06 — the shared-project half of this entry was
+  measured false; see the top of this log. Its first paragraph (keys are not being
+  banned) still stands; everything about projects and about buying keys does not.**
+  ~~The YouTube keys are not being banned. Many of them share a
+  Google Cloud project, so they share one 10,000-unit quota.~~ The 09-02 handoff
   read `logs/youtube-dead-keys.json`, saw 39 keys rejected within minutes of the
   07:00 UTC quota reset, reasoned that no key can spend 10,000 units in a
   fraction of a second, and concluded Google had zeroed them, leaving ~26 usable

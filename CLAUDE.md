@@ -540,6 +540,15 @@ Key values must never be printed, echoed, logged, or committed. That applies to 
 
 **A repo's own `.env` can freeze the pool.** If a repo keeps a local copy of the keys, it runs on whatever count that file was frozen at, which is how one repo ran 7 keys against a 39-key bank. The fix is to merge the shared bank by key value at load time, the way `youtube-deep-research-v1`, `youtube-lead-finder-v1`, and `youtube-email-outreach-v1` do. Copy that, don't hand-sync the file.
 
+**Each key sits in its own Google Cloud project, so each key really does add
+~10,000 units/day (measured 2026-09-06).** Do NOT infer project grouping from keys
+dying in contiguous slot blocks — the rotation is a round-robin cursor over slot
+order, so consecutive slots are spent, and therefore die, consecutively regardless
+of project. Ask Google instead: `youtube-lead-finder-v1/scripts/audit-key-projects.sh`
+reads each key's project number out of a Cloud Translation 403 and costs no YouTube
+quota. A 2026-09-02 note claiming 39 keys shared 6 projects, and that more keys buy
+nothing, was this inference and it was wrong.
+
 **A dead key is normal, not an incident.** Keys go over daily quota or get their Google Cloud project suspended. Rotate past them. Match failures specifically: `quotaExceeded` and `keyInvalid` retire a key for the run, `403 forbidden` means suspended, a plain 429 rotates but keeps the key eligible, and anything else (like `commentsDisabled`) must propagate without burning a key.
 
 **Source of truth is the Notion "YouTube API Key Database."** New keys land there before they reach `.env`, so re-read it rather than assuming the pool is current. It needs no Notion connector, only the API token (see the Notion Access block). The `Select` column carries Working / Suspended, and a blank status means nobody has checked yet, not that the key is bad.
