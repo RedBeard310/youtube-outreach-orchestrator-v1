@@ -142,6 +142,40 @@ this is the shape to check first.**
 
 ## Change log
 
+- 2026-09-07 (debrief): **The YouTube key pool did not refill at midnight PT, and
+  that is now the ceiling on finding.** The video-graph sweep stopped 19:29Z on an
+  exhausted pool and correctly slept 11.6h to the refill, taking every other
+  YouTube lane with it: **11 of 24 hours produced zero channels**. It woke at
+  07:05Z, five minutes past the reset, and retired 12 keys in 270ms. A hand-run of
+  `youtube-lead-finder-v1/scripts/test-youtube-keys.ts` at 07:35Z, **35 minutes
+  past the reset**, found **15 working / 50 quota-exhausted / 1 suspended of 66** —
+  including keys the rotation had never touched that day, so this is not the
+  rotation mislabelling its own spending.
+
+  **Do not assume it is a slow reset and do not assume the quota was cut.** One
+  reading cannot tell them apart. `debrief-data.ts` now emits `youtube_key_pool`
+  every morning at ~00:20 PT (one quota unit per key, values never logged), so the
+  answer arrives by itself: a second 15-of-66 morning means the projects' quota was
+  cut and buying more keys from those accounts buys nothing. Check the projects
+  with `audit-key-projects.sh`, which costs no YouTube quota.
+
+  Also settled today: **yesterday's rec to checkpoint the video-graph chunk is not
+  worth doing.** A chunk is 20 seeds, judged channels are remembered in a persisted
+  `evaluated` set, and the re-walk is free watch-page scraping. The code's comment
+  explains why the seeds are deliberately not consumed. Leave it alone.
+
+  **The Apify lane is out of money for the month** ($83.89 of $100; the wrapper
+  holds $10 back so it cannot fit a $7.02 batch) and rests until 30 September.
+  Post-fix economics, which are much better than the 09-06 figures: 83.4% of
+  distinct channels publish an email, the first clean batch parked 60 of 100 at
+  **$0.117/lead**, and the 3,644 leads it has never touched would cost about **$256
+  for roughly 2,100 parks**. Raising the cap is Casey's spend call; the lane halts
+  itself above $0.20/lead either way.
+
+  **OpenRouter is at 2.5 days** ($113.30 against $45.26/day account meter). Every
+  lane scores through it, so a zero balance stops finding exactly the way the empty
+  key pool did.
+
 - 2026-09-06 (evening): **The Apify lane's "collapsing hit rate" was a
   double-billing bug, not a thinning pool — and the price ceiling is now
   enforced by the lane itself.** Casey saw $1.00 per recovered lead and said

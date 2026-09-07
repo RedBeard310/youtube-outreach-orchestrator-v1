@@ -1,0 +1,209 @@
+<title>Lead Run Debrief — 2026-09-07</title>
+<style>
+  :root {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+      --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+      --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+    --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+    --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 40px 22px 80px; }
+  .eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); font-weight: 600; }
+  h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.12; margin: 10px 0 6px; text-wrap: balance; letter-spacing: -.02em; }
+  h2 { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); margin: 44px 0 16px; font-weight: 700; }
+  h3 { font-size: 18px; margin: 0 0 6px; letter-spacing: -.01em; }
+  p { margin: 0 0 14px; }
+  .lede { font-size: 18px; color: var(--ink-soft); max-width: 68ch; }
+  .tag { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--amber-soft); color: var(--amber); letter-spacing: .02em; }
+  .tag.good { background: var(--teal-soft); color: var(--teal); }
+  .grid { display: grid; gap: 14px; }
+  .stats { grid-template-columns: repeat(4, 1fr); margin-top: 26px; }
+  @media (max-width: 720px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; box-shadow: var(--shadow); }
+  .stat .n { font-size: 30px; font-weight: 750; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .stat .l { font-size: 12.5px; color: var(--ink-soft); margin-top: 3px; }
+  .stat .s { font-size: 12px; margin-top: 8px; font-weight: 600; }
+  .up { color: var(--good); } .down { color: var(--red); } .warn { color: var(--amber); }
+  .accent-red { border-left: 3px solid var(--red); }
+  .accent-teal { border-left: 3px solid var(--teal); }
+  .accent-amber { border-left: 3px solid var(--amber); }
+
+  .strip { display: flex; align-items: flex-end; gap: 3px; height: 130px; padding: 14px 14px 10px; overflow-x: auto; }
+  .bar { flex: 1 0 8px; min-width: 7px; border-radius: 2px 2px 0 0; background: var(--teal); opacity: .9; }
+  .bar.zero { background: var(--red); }
+  .bar.low { background: var(--amber); }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-soft); padding: 0 14px 14px; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+
+  .q { border-radius: 14px; padding: 20px 22px; margin-bottom: 14px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); }
+  .q .ask { font-size: 17px; font-weight: 700; color: var(--ink); margin-bottom: 10px; display: flex; gap: 10px; align-items: baseline; }
+  .q .ask .qn { color: var(--red); font-weight: 800; flex: 0 0 auto; }
+  .q p { color: var(--ink-soft); }
+  .q b { color: var(--ink); }
+  .pill { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink); background: var(--panel-2); padding: 1px 7px; border-radius: 6px; border: 1px solid var(--line); white-space: nowrap; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+  th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); }
+  td .num { font-variant-numeric: tabular-nums; font-weight: 650; }
+  td.num { font-variant-numeric: tabular-nums; }
+  .fix td:first-child { color: var(--good); font-weight: 650; }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); box-shadow: var(--shadow); margin-bottom: 14px; }
+  ol.recs { padding-left: 0; list-style: none; counter-reset: r; margin: 0; }
+  ol.recs li { counter-increment: r; position: relative; padding: 14px 16px 14px 52px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 10px; box-shadow: var(--shadow); }
+  ol.recs li::before { content: counter(r); position: absolute; left: 14px; top: 14px; width: 26px; height: 26px; border-radius: 8px; background: var(--teal-soft); color: var(--teal); font-weight: 800; font-size: 14px; display: grid; place-items: center; }
+  ol.recs b { color: var(--ink); }
+  .foot { margin-top: 46px; padding: 16px 18px; border-radius: 12px; background: var(--amber-soft); border: 1px solid var(--line); font-size: 14px; color: var(--ink-soft); }
+  .foot b { color: var(--ink); }
+  .muted { color: var(--ink-soft); font-size: 13.5px; }
+</style>
+
+<div class="wrap">
+
+  <div class="eyebrow">Lead Run Debrief · YouTube outreach</div>
+  <h1>2026-09-07 — the best day on record, and half of it produced nothing at all</h1>
+  <p class="lede">488 leads parked, more than any day since the pipeline started, and it came almost entirely from working the pile of creators we already had. Meanwhile the finding side stopped at lunchtime and never came back: <b>the YouTube key pool ran out at 12:29 Pacific and did not refill at midnight</b>. Fifty of the sixty-six keys were still refusing half an hour after the reset that was supposed to give them a fresh day.</p>
+  <div style="margin-top:14px"><span class="tag good">+488 PARKED, NO ERRORS, NOTHING HALTED</span> <span class="tag">OPENROUTER HAS 2.5 DAYS OF MONEY</span></div>
+
+  <div class="grid stats">
+    <div class="card stat accent-teal">
+      <div class="n">+488</div>
+      <div class="l">parked → <code>approved_hold</code></div>
+      <div class="s up">4,956 → 5,444 · biggest day on record</div>
+    </div>
+    <div class="card stat accent-teal">
+      <div class="n">−371</div>
+      <div class="l"><code>needs_contact</code> pool, net</div>
+      <div class="s up">took in 26, ended 371 smaller</div>
+    </div>
+    <div class="card stat accent-red">
+      <div class="n">15 / 66</div>
+      <div class="l">YouTube keys working</div>
+      <div class="s down">measured 28 min after the daily reset</div>
+    </div>
+    <div class="card stat accent-red">
+      <div class="n">2.5 d</div>
+      <div class="l">of OpenRouter money left</div>
+      <div class="s down">$113.30 at $45.26 a day</div>
+    </div>
+  </div>
+
+  <h2>The shape of the day</h2>
+  <div class="card" style="padding:0">
+    <div class="strip" id="strip"></div>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--teal)"></span>6 or more good leads that hour</span>
+      <span><span class="dot" style="background:var(--amber)"></span>1 to 5</span>
+      <span><span class="dot" style="background:var(--red)"></span>none at all (the last 11 hours)</span>
+    </div>
+  </div>
+  <p class="muted">Each bar is one hour, 07:00 UTC Sunday to 07:00 UTC Monday. Height is channels discovered, colour is how many of them scored 6 or better. The first thirteen hours were steady and good. Then <b>every bar after 19:59 UTC is empty</b>, and empty means zero channels, not a thin hour. Discovery ran for 13 hours and the key pool switched it off for the other 11.</p>
+
+  <h2>The three questions</h2>
+
+  <div class="q accent-teal">
+    <div class="ask"><span class="qn">Q1</span><span>Where did a record 488 leads come from on a half-dark day?</span></div>
+    <p><b>Almost none of it was new finding.</b> The day discovered 1,604 channels, 81 of them worth pitching, and only <span class="pill">31</span> of those had a verified email by the close. The other 450-odd parks came out of the pile of creators we found weeks ago and could never reach.</p>
+    <p>Three things emptied that pile at once, and two of them were changes you shipped mid-cycle at 16:45 UTC. Counting each parked lead by where its address came from: <span class="pill">254</span> were addresses the Apify scraper pulled from behind YouTube's "View email address" button, <span class="pill">216</span> came from the free Bloodhound methods, mostly a plain mailto link on the creator's own website, and <span class="pill">237</span> had no stored contact point at all, which is the signature of the third thing.</p>
+    <p><b>That third thing was accepting role addresses.</b> Addresses like <code>info@</code> and <code>team@</code> had been parked as "risky" and never used. Your rule was that a role address is fine as long as it is real and won't bounce, and the code now takes only the ones where ZeroBounce actually reached the mailbox, holding back the catch-all domains where nothing was proved. Reopening the backlog on that rule checked <b>227 addresses and recovered 187</b>, an 87% hit rate on leads we had already written off. That backlog is now empty: zero risky-verdict leads are left waiting.</p>
+    <p class="muted">The pool of creators found but never contacted fell from 4,243 to <b>3,872</b>, its third fall on record and by far the largest. It has now dropped on three of the last six days, so recovery outproducing discovery is a pattern rather than a good afternoon.</p>
+  </div>
+
+  <div class="q accent-red">
+    <div class="ask"><span class="qn">Q2</span><span>Why did the finding side go dark at lunchtime and stay dark?</span></div>
+    <p>At 19:29 UTC the video-graph sweep stopped with "YouTube key pool exhausted" and did exactly what it is built to do: it slept 11.6 hours until the midnight-Pacific refill rather than retrying into a wall every fifteen minutes. Everything else that needs the YouTube API went quiet with it. <b>That behaviour is correct, and it is why eleven of twenty-four hours produced not one channel.</b></p>
+    <p><b>The part that isn't normal is what happened at the refill.</b> The sweep woke at 07:05 UTC, five minutes after midnight Pacific, and immediately retired twelve keys in a row on "daily quota exhausted". So I tested every key by hand at 07:35, thirty-five minutes past the reset: <span class="pill">15 working</span>, <span class="pill">50 out of quota</span>, <span class="pill">1 suspended project</span>, out of 66. Keys the rotation had not touched all day were refusing too, so this is not the rotation mislabelling its own spending. <b>The pool did not come back.</b></p>
+    <p>Two explanations fit, and they need different answers. Either Google's reset is running very late, in which case the pool fills later in the day and this costs us the morning. Or those projects have had their YouTube quota cut, which is what a compliance audit does, and no amount of waiting fixes it. One reading can't tell them apart, so <b>the daily snapshot now takes that reading every morning</b> twenty minutes after the reset, which is the moment the answer is worth the most. If tomorrow's number is 15 again, it's the projects.</p>
+    <p class="muted">Worth holding onto: the cheap lanes barely use this. A keyword search costs 100 quota units, while the sweeps spend 1 unit per channel and get their leads by reading watch pages for free. So a drained pool hurts the sweeps last and the keyword lane first, and more keys mainly buy keyword search.</p>
+  </div>
+
+  <div class="q accent-amber">
+    <div class="ask"><span class="qn">Q3</span><span>The Apify scraper is the best producer we have. It just ran out of money 23 days early.</span></div>
+    <p><b>It spent $83.89 of its $100 month and stopped itself on Saturday evening.</b> The wrapper keeps $10 back on purpose, so with $16.11 showing it can no longer fit a $7.02 batch and now rests quietly until the billing month resets on 30 September. Nothing is broken. It is simply out.</p>
+    <p><b>The reason it ran out is the bug you fixed mid-cycle, and the fix changes the whole business case.</b> A channel that publishes no email left no trace, and the queue is sorted best-first, so the same 82 misses sat at the top of every batch and were paid for again. 485 channels became 825 billed scrapes. What looked like a collapsing hit rate, 89% falling to 17% over eight batches, was never the good channels running out: <b>on distinct channels the rate is 83% and flat</b>. Now that each attempt is recorded, the first clean batch found 85 of 100 and parked 60 of them at <span class="pill">$0.117 per lead</span>, comfortably under your $0.15 to $0.20 limit and the cheapest recovery in the pipeline.</p>
+    <p><b>What that buys, in plain numbers.</b> 3,644 leads in the parked pool have never been through this scraper. At $0.0702 a channel that is about <b>$256 to run all of them</b>, and at the measured rate roughly <b>2,100 more parked leads</b>. Yesterday's honest planning figure of 25 parks per 100 channels was computed on the double-billed batches and is too pessimistic; the fixed lane runs at about 60. The lane also brakes itself now, halting after two consecutive batches over $0.20 a lead, so a raised cap can't quietly turn into a bad month.</p>
+  </div>
+
+  <h2>Where the leads came from</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Lane</th><th class="num">Channels</th><th class="num">Score 6+</th><th class="num">Rate</th><th>State</th></tr></thead>
+      <tbody>
+        <tr><td>Video-graph sweep</td><td class="num">1,022</td><td class="num">57</td><td class="num">5.6%</td><td class="warn">Best lane again. Stopped 19:29 on the key pool, slept to the refill</td></tr>
+        <tr><td>Recommended-videos feed</td><td class="num">254</td><td class="num">6</td><td class="num">2.4%</td><td class="warn">Seed book hit zero. Refill restarted it at 07:11</td></tr>
+        <tr><td>Keyword search</td><td class="num">225</td><td class="num">17</td><td class="num">7.6%</td><td>214 finder passes. Best hit rate of the day, most expensive units</td></tr>
+        <tr><td>Peer network</td><td class="num">100</td><td class="num">1</td><td class="num">1.0%</td><td>Book fully walked, refill finding no new seeds</td></tr>
+        <tr><td>Guest-link mining</td><td class="num">3</td><td class="num">0</td><td class="num">—</td><td>Trickle</td></tr>
+        <tr><td>Comment sweep</td><td class="num">0</td><td class="num">0</td><td class="num">—</td><td>Paused by you on 08-20. Working as intended</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="muted">Health clinics were the day's strongest niche at 23 of 81 good leads, then coaching at 13 and transformation coaching at 13, with real estate at 11. Tarot and astrology channels did not show up in the top categories today.</p>
+
+  <h2>What broke → what's fixed</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Issue</th><th>Mechanism</th><th>Status</th></tr></thead>
+      <tbody class="fix">
+        <tr><td>Paying twice for channels with no email</td><td>A miss left no record, and the queue is sorted best-first, so the same 82 misses topped every batch</td><td class="up">Fixed by you mid-cycle. Attempts are recorded; the next batch ran at $0.117 a lead</td></tr>
+        <tr><td>Real role addresses thrown away</td><td>ZeroBounce reports "reached the mailbox" and "domain accepts anything" with the same word</td><td class="up">Fixed by you mid-cycle. 187 of 227 reopened leads recovered; that backlog is now zero</td></tr>
+        <tr><td>The verify half dying after the money was spent</td><td>One transient network error threw out of the batch, so $14.04 of scraping bought 40 addresses nobody checked, and the price brake lost its input</td><td class="up">Fixed today: the wrapper replays the frozen ledger, which costs nothing at Apify. Both crashed batches replayed live</td></tr>
+        <tr><td>Nothing measured the key pool</td><td>Half a cycle went dark on it and the daily snapshot carried no number for it at all</td><td class="up">Fixed today: the snapshot probes every key 20 minutes after the reset, one quota unit each</td></tr>
+        <tr><td>50 of 66 keys still out of quota after the reset</td><td>Slow reset, or projects whose quota has been cut. One reading can't tell</td><td class="down">Open, and it is now the ceiling on finding. Rec 2</td></tr>
+        <tr><td>OpenRouter down to 2.5 days</td><td>$45.26 a day against $113.30, mostly the enrichment backfill, which keeps no spend log</td><td class="down">Open. Hard deadline. Rec 1</td></tr>
+        <tr><td>Video-graph re-walks its chunk on a quota stop</td><td>Raised yesterday as waste. Measured today: a chunk is 20 seeds, and the channels already judged are remembered</td><td class="warn">Not worth fixing. The waste is 20 free watch-page reads</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Recommended next — ranked</h2>
+  <ol class="recs">
+    <li><b>Top up OpenRouter today.</b> $113.30 at $45.26 a day is 2.5 days, and this is the one line that stops everything: every lane scores its channels through it, so when the balance hits zero, finding stops the same way an empty key pool stopped it yesterday. The daily rate has doubled since Friday and most of it is the enrichment backfill, which keeps no spend log of its own, so the account meter is the only honest number here.</li>
+    <li><b>Look at the YouTube key projects in Google Cloud.</b> 50 of 66 keys were still out of quota half an hour after the reset that was meant to refill them, and today's snapshot will say whether that repeats. If it does, the quota on those projects has been cut and buying more keys from the same accounts buys nothing. The audit script that reads each key's project without spending quota is <code>youtube-lead-finder-v1/scripts/audit-key-projects.sh</code>.</li>
+    <li><b>Decide the Apify budget for this month.</b> The lane is out of money on 7 September and rests until the 30th. The overspend that got it there is fixed, and the corrected numbers are much better than yesterday's: about $256 to run the 3,644 leads it has never touched, for roughly 2,100 parked leads at about $0.12 each. It brakes itself if the price ever goes above $0.20. This is a spend call, not an engineering one.</li>
+    <li><b>Both graph lanes need new seeds.</b> The recommended-videos feed walked its book to zero and the peer network refill is finding nothing new to add. The video-graph lane is the one still working because it rebuilds its own seeds hourly from newly qualified channels, which is the pattern the other two are missing.</li>
+    <li><b>Nothing needs saying about enrichment.</b> 5,314 of 5,459 parked leads carry a research bundle, so 145 are outstanding and the backlog is effectively clear.</li>
+  </ol>
+
+  <div class="foot">
+    <b>Status caveat:</b> everything is <b>parked</b>, nothing sent. <code>approved_hold</code> is a deliberate holding lane and only <code>npm run send</code> mails anyone. Today's +488 makes <b>5,444 parked</b>, plus <b>3,872</b> found-but-uncontactable, so <b>9,316 creators found and never contacted</b>. No fatal errors, no halted hours, no scoring failures, no quota stops in the campaign lane, and $0.00 of Anthropic API spend. Two fixes shipped and committed today, one in the orchestrator and one in the email repo, both verified against live data before commit.
+  </div>
+
+</div>
+
+<script>
+  // channels discovered per hour, 07:00Z 09-06 → 07:00Z 09-07, with score-6+ counts
+  var chans = [154,105,143,92,150,138,74,102,155,128,127,165,71,0,0,0,0,0,0,0,0,0,0,0];
+  var good  = [12,5,8,4,7,4,3,6,8,6,6,9,3,0,0,0,0,0,0,0,0,0,0,0];
+  var hours = ['07','08','09','10','11','12','13','14','15','16','17','18','19','20','21','22','23','00','01','02','03','04','05','06'];
+  var max = Math.max.apply(null, chans);
+  var strip = document.getElementById('strip');
+  chans.forEach(function (v, i) {
+    var b = document.createElement('div');
+    b.className = 'bar' + (good[i] === 0 ? ' zero' : good[i] < 6 ? ' low' : '');
+    b.style.height = Math.max(6, Math.round((v / max) * 100)) + '%';
+    b.title = hours[i] + ':00 UTC — ' + v + ' channels, ' + good[i] + ' scoring 6+';
+    strip.appendChild(b);
+  });
+</script>
