@@ -845,6 +845,132 @@ function netNewChannelsWritten(sinceMs: number): { total: number; passes_with_wr
 }
 
 /**
+ * How many YouTube API keys actually work, measured right after the daily reset.
+ *
+ * WHY (2026-09-07). The key pool is the binding constraint on discovery, and
+ * nothing measured it. On the cycle ending 2026-09-07 the video-graph sweep hit
+ * an exhausted pool at 19:29Z and correctly slept 11.6h to the midnight-PT
+ * refill, so HALF THE CYCLE produced no channels at all — and the snapshot that
+ * is supposed to explain the day carried no number for the thing that caused it.
+ * A hand-run of the finder's key test at 00:35 PT then found 50 of 66 keys still
+ * answering `403 daily quota exhausted` THIRTY-FIVE MINUTES AFTER the reset that
+ * was meant to refill them. That is either a slow reset or projects whose quota
+ * has been cut, and one number a day tells the two apart. Nobody should have to
+ * discover it by hand again.
+ *
+ * TIMING IS THE POINT. This runs at ~00:20 PT, twenty minutes past the reset, so
+ * it measures the pool the day is about to run on rather than the pool the last
+ * day ended with. Read it as a forecast, not a post-mortem.
+ *
+ * COST is one unit per key (`channels.list?part=id`), so ~66 units against a
+ * ~660,000-unit pool. Key VALUES are never emitted — Google echoes the key back
+ * inside its own error bodies, so only the slot label and the verdict leave here.
+ *
+ * Fails soft to nulls, like everything else in this file: a debrief must still be
+ * written when the network is down, and a missing count must never read as zero.
+ */
+type KeyVerdict = 'working' | 'quota_exhausted' | 'blocked' | 'invalid' | 'rate_limited' | 'other';
+
+export function classifyKeyProbe(status: number, body: string): KeyVerdict {
+  if (status === 200) return 'working';
+  if (status === 429) return 'rate_limited';
+  const b = body.toLowerCase();
+  if (status === 403) {
+    // Order matters: a suspended project also says "forbidden", but only a spent
+    // key says quotaExceeded, and the two need different answers (wait vs replace).
+    if (b.includes('quotaexceeded') || b.includes('quota') && b.includes('exceeded')) return 'quota_exhausted';
+    if (b.includes('accessnotconfigured') || b.includes('suspend') || b.includes('blocked') || b.includes('forbidden')) return 'blocked';
+    return 'other';
+  }
+  if (status === 400 && (b.includes('keyinvalid') || b.includes('api key not valid'))) return 'invalid';
+  return 'other';
+}
+
+/** Slot labels + values from the shared bank. Values never leave this function's caller. */
+function youtubeKeySlots(): Array<{ label: string; key: string }> {
+  const path = join(process.env.HOME ?? '/home/casey', 'env-storage', '.env');
+  if (!existsSync(path)) return [];
+  try {
+    const found: Array<{ n: number; label: string; key: string }> = [];
+    for (const rawLine of readFileSync(path, 'utf8').split(/\r?\n/)) {
+      const line = rawLine.trim();
+      if (!line || line.startsWith('#')) continue;
+      const eq = line.indexOf('=');
+      if (eq === -1) continue;
+      const k = line.slice(0, eq).trim();
+      let v = line.slice(eq + 1).trim();
+      if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) v = v.slice(1, -1);
+      if (!v) continue;
+      if (k === 'YOUTUBE_API_KEY') found.push({ n: 0, label: 'YOUTUBE_API_KEY', key: v });
+      const m = k.match(/^YOUTUBE_API_KEY_(\d+)$/);
+      if (m) found.push({ n: Number(m[1]), label: k, key: v });
+    }
+    found.sort((a, b) => a.n - b.n);
+    return found.map((f) => ({ label: f.label, key: f.key }));
+  } catch {
+    return [];
+  }
+}
+
+async function youtubeKeyPoolHealth(): Promise<Record<string, unknown>> {
+  const slots = youtubeKeySlots();
+  if (slots.length === 0) {
+    return { probed: false, reason: 'no YOUTUBE_API_KEY slots readable in the shared bank', total: 0 };
+  }
+  const counts: Record<KeyVerdict, number> = {
+    working: 0, quota_exhausted: 0, blocked: 0, invalid: 0, rate_limited: 0, other: 0,
+  };
+  const deadSlots: string[] = [];
+  let probed = 0;
+  const CONCURRENCY = 8;
+  const queue = [...slots];
+  const worker = async (): Promise<void> => {
+    for (;;) {
+      const slot = queue.shift();
+      if (!slot) return;
+      try {
+        const res = await fetch(
+          `https://www.googleapis.com/youtube/v3/channels?part=id&id=UC_x5XG1OV2P6uZZ5FSM9Ttw&key=${encodeURIComponent(slot.key)}`,
+          { signal: AbortSignal.timeout(20_000) },
+        );
+        const body = res.ok ? '' : await res.text().catch(() => '');
+        const verdict = classifyKeyProbe(res.status, body);
+        counts[verdict] += 1;
+        probed += 1;
+        if (verdict !== 'working') deadSlots.push(`${slot.label}:${verdict}`);
+      } catch {
+        // A network failure is not a key verdict. Leave it uncounted rather than
+        // reporting a healthy key as dead and starting a key hunt over a blip.
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, slots.length) }, worker));
+
+  const workingPct = probed > 0 ? Number(((100 * counts.working) / probed).toFixed(1)) : null;
+  return {
+    probed: true,
+    probed_at: new Date().toISOString(),
+    // Named so it cannot be read as "how many keys exist". Slots that failed to
+    // answer at all are in `total` but not in `probed`.
+    total: slots.length,
+    probed_count: probed,
+    working: counts.working,
+    quota_exhausted: counts.quota_exhausted,
+    blocked: counts.blocked,
+    invalid: counts.invalid,
+    rate_limited: counts.rate_limited,
+    other: counts.other,
+    working_pct: workingPct,
+    // The finding this field exists for: keys still refusing minutes after the
+    // midnight-PT reset are not spent-today, they are a pool that did not refill.
+    exhausted_after_reset: counts.quota_exhausted,
+    pool_collapsed: workingPct !== null && workingPct < 50,
+    dead_slots: deadSlots.sort(),
+    note: 'Probed ~20 min after the midnight-PT quota reset, so this is the pool TODAY starts with. A high exhausted_after_reset means the reset did not refill those projects.',
+  };
+}
+
+/**
  * The account that actually pays for this pipeline, and how long it has left.
  *
  * WHY (2026-08-25). `burn_today` meters Anthropic, which has been $0.00 since the
@@ -1130,6 +1256,7 @@ async function main(): Promise<void> {
       hard: burn.hard_usd,
     },
     openrouter_today: await openRouterHealth(sinceISO, untilISO),
+    youtube_key_pool: await youtubeKeyPoolHealth(),
     supply_health: supplyHealth,
     halt: haltHealth(sinceMs, Date.parse(untilISO)),
     fatal_signatures_today: fatalSignaturesToday(sinceMs),

@@ -1,4 +1,4 @@
-import { isVerifiedOrBeyond, laneYield, priorAdvanceSource, priorSeedsAdvanced, priorSeedsWalked, reconcileAdvanced, sessionSeedsAdvanced, sessionStartMs, walkRateTrend } from './debrief-data.ts';
+import { classifyKeyProbe, isVerifiedOrBeyond, laneYield, priorAdvanceSource, priorSeedsAdvanced, priorSeedsWalked, reconcileAdvanced, sessionSeedsAdvanced, sessionStartMs, walkRateTrend } from './debrief-data.ts';
 let fail = 0;
 const ok = (name: string, got: unknown, want: unknown) => {
   const pass = JSON.stringify(got) === JSON.stringify(want);
@@ -137,6 +137,20 @@ ok('a lane that wrote nothing at all reports nothing, not a divide-by-zero',
 ok('unknown seed advance still gives the channel-side rate',
   laneYield(106, 6, null),
   { channels_in_cycle: 106, pitchable_in_cycle: 6, pitchable_rate_pct: 5.7, pitchable_per_seed: null, yield_dead: false });
+
+// classifyKeyProbe — a spent key and a dead project both answer 403, and they need
+// different answers (wait for midnight vs replace the key), so the split matters.
+ok('200 is the only healthy answer', classifyKeyProbe(200, ''), 'working');
+ok('quotaExceeded is spent-for-today',
+  classifyKeyProbe(403, '{"error":{"errors":[{"reason":"quotaExceeded"}],"message":"The request cannot be completed because you have exceeded your quota."}}'),
+  'quota_exhausted');
+ok('a suspended project is not a spent key',
+  classifyKeyProbe(403, '{"error":{"errors":[{"reason":"accessNotConfigured"}],"message":"YouTube Data API v3 has not been used in project 123"}}'),
+  'blocked');
+ok('a burst limit is transient, never a retirement', classifyKeyProbe(429, 'rateLimitExceeded'), 'rate_limited');
+ok('a bad key string is its own verdict',
+  classifyKeyProbe(400, '{"error":{"errors":[{"reason":"keyInvalid"}],"message":"Bad Request"}}'), 'invalid');
+ok('anything unrecognised stays unrecognised', classifyKeyProbe(500, 'backend error'), 'other');
 
 console.log(fail === 0 ? '\nALL PASS' : `\n${fail} FAILED`);
 process.exit(fail === 0 ? 0 : 1);
