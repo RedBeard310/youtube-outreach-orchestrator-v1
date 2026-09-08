@@ -142,6 +142,54 @@ this is the shape to check first.**
 
 ## Change log
 
+- 2026-09-08 (debrief): **WE WERE WRITING OFF GOOD YOUTUBE KEYS OURSELVES, ELEVEN
+  MINUTES INTO THE DAY.** `expiryFor('quota')` in the finder's
+  `src/youtube/dead-keys.ts` pinned a quota death until the NEXT Pacific midnight.
+  That is right at 3pm and badly wrong at 00:11, because the always-on sweeps sleep
+  to the reset and then touch every key within seconds of waking, so a refill that
+  has not landed yet reads as "out of quota". Measured live this morning: **11 keys
+  retired between 07:11:28Z and 07:19:12Z, every one inside the first twenty minutes,
+  every one locked for 23h49m off a single early answer.** 09-07 had the same shape
+  (12 keys in 270ms at 07:05Z). The client already refuses to believe a store that
+  condemns the WHOLE pool, and had no defence against one condemning **50 of 66**,
+  which is the case that actually happens.
+  Fixed in finder `24bfacc`: inside `YT_RESET_GRACE_MINUTES` (180) a quota death
+  expires after `YT_QUOTA_RETRY_MINUTES` (30), clamped so it never outlives the next
+  reset. Defaults in code, not env. Safe in both directions with no diagnosis needed
+  — a genuinely spent key is re-retired on its next turn for one HTTP round trip and
+  **no quota** (an exhausted key rejects the request rather than charging for it).
+
+  **This retires yesterday's decision rule.** "If tomorrow reads 15 of 66 again, the
+  quota was cut" does not hold: both readings were taken at the same point in the
+  morning, 20 and 35 minutes past the reset, so they are one measurement repeated. A
+  refill that is consistently more than 35 minutes late produces exactly that pair.
+  **The new rule needs no extra probe.** Read `logs/youtube-dead-keys.json` in the
+  finder: a fingerprint refused early that then stops reappearing was a late refill;
+  one refused repeatedly all morning belongs to a project whose quota was cut.
+  Today's pool still probed **15 working / 50 quota-exhausted / 1 suspended of 66**,
+  and 22 quota deaths landed in the first 29 minutes.
+
+  **All three graph lanes finished their seed books on the same day.** Video-graph
+  **53 seeds left of 90,139**, recommended-videos feed **57 of 12,970**, peer network
+  **0 of 12,876** and already yield-dead (142 channels, zero pitchable). They made
+  2,759 of the day's 3,046 channels at ~3c/lead, and only video-graph refills itself
+  hourly from newly qualified channels. Re-walking pays less each lap (feed lap 1
+  0.45/seed, lap 6 0.014). **Nothing was changed: this is Casey's spend call**, and
+  it is now the structural limit on finding while the key pool is capped.
+
+  **Not done, flagged only: keyword search is spending the scarce quota.** A keyword
+  search costs 100 units; the sweeps run on 1-unit calls plus free scraping. Today it
+  bought 13 of 99 good leads and the pool ran out at 22:32Z. Throttling it under a
+  thin pool would likely buy the sweeps hours, but it is a producing lane and the
+  standing rule is not to stop one.
+
+  **The 09-07 parking record was a backlog drain and the backlog is now empty.** The
+  risky-address reopen is finished (0 left) and Apify made **zero attempts** this
+  cycle, resting until 30 September. Parking fell 488 to 142, but the ordinary path
+  improved: **52 of 142 parks were found the same day, against 31 of 488.**
+  OpenRouter is at **3.5 days** ($88.21 at $25.09/day); the rate halved only because
+  Apify and the enrichment backfill went quiet, so it is a reprieve, not a fix.
+
 - 2026-09-07 (debrief): **The YouTube key pool did not refill at midnight PT, and
   that is now the ceiling on finding.** The video-graph sweep stopped 19:29Z on an
   exhausted pool and correctly slept 11.6h to the refill, taking every other

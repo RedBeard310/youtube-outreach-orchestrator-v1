@@ -1,0 +1,209 @@
+<title>Lead Run Debrief — 2026-09-08</title>
+<style>
+  :root {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+      --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+      --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+    --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+    --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 40px 22px 80px; }
+  .eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); font-weight: 600; }
+  h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.12; margin: 10px 0 6px; text-wrap: balance; letter-spacing: -.02em; }
+  h2 { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); margin: 44px 0 16px; font-weight: 700; }
+  h3 { font-size: 18px; margin: 0 0 6px; letter-spacing: -.01em; }
+  p { margin: 0 0 14px; }
+  .lede { font-size: 18px; color: var(--ink-soft); max-width: 68ch; }
+  .tag { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--amber-soft); color: var(--amber); letter-spacing: .02em; }
+  .tag.good { background: var(--teal-soft); color: var(--teal); }
+  .grid { display: grid; gap: 14px; }
+  .stats { grid-template-columns: repeat(4, 1fr); margin-top: 26px; }
+  @media (max-width: 720px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; box-shadow: var(--shadow); }
+  .stat .n { font-size: 30px; font-weight: 750; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .stat .l { font-size: 12.5px; color: var(--ink-soft); margin-top: 3px; }
+  .stat .s { font-size: 12px; margin-top: 8px; font-weight: 600; }
+  .up { color: var(--good); } .down { color: var(--red); } .warn { color: var(--amber); }
+  .accent-red { border-left: 3px solid var(--red); }
+  .accent-teal { border-left: 3px solid var(--teal); }
+  .accent-amber { border-left: 3px solid var(--amber); }
+
+  .strip { display: flex; align-items: flex-end; gap: 3px; height: 130px; padding: 14px 14px 10px; overflow-x: auto; }
+  .bar { flex: 1 0 8px; min-width: 7px; border-radius: 2px 2px 0 0; background: var(--teal); opacity: .9; }
+  .bar.zero { background: var(--red); }
+  .bar.low { background: var(--amber); }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-soft); padding: 0 14px 14px; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+
+  .q { border-radius: 14px; padding: 20px 22px; margin-bottom: 14px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); }
+  .q .ask { font-size: 17px; font-weight: 700; color: var(--ink); margin-bottom: 10px; display: flex; gap: 10px; align-items: baseline; }
+  .q .ask .qn { color: var(--red); font-weight: 800; flex: 0 0 auto; }
+  .q p { color: var(--ink-soft); }
+  .q b { color: var(--ink); }
+  .pill { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink); background: var(--panel-2); padding: 1px 7px; border-radius: 6px; border: 1px solid var(--line); white-space: nowrap; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+  th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); }
+  td .num { font-variant-numeric: tabular-nums; font-weight: 650; }
+  td.num { font-variant-numeric: tabular-nums; }
+  .fix td:first-child { color: var(--good); font-weight: 650; }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); box-shadow: var(--shadow); margin-bottom: 14px; }
+  ol.recs { padding-left: 0; list-style: none; counter-reset: r; margin: 0; }
+  ol.recs li { counter-increment: r; position: relative; padding: 14px 16px 14px 52px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 10px; box-shadow: var(--shadow); }
+  ol.recs li::before { content: counter(r); position: absolute; left: 14px; top: 14px; width: 26px; height: 26px; border-radius: 8px; background: var(--teal-soft); color: var(--teal); font-weight: 800; font-size: 14px; display: grid; place-items: center; }
+  ol.recs b { color: var(--ink); }
+  .foot { margin-top: 46px; padding: 16px 18px; border-radius: 12px; background: var(--amber-soft); border: 1px solid var(--line); font-size: 14px; color: var(--ink-soft); }
+  .foot b { color: var(--ink); }
+  .muted { color: var(--ink-soft); font-size: 13.5px; }
+</style>
+
+<div class="wrap">
+
+  <div class="eyebrow">Lead Run Debrief · YouTube outreach</div>
+  <h1>2026-09-08 — the key pool said 15 of 66 again, and we were quietly writing off keys ourselves</h1>
+  <p class="lede">Finding had a strong day: 3,046 channels, the most since 1 September, and sixteen of twenty-four hours produced something against yesterday's thirteen. Parking dropped to 142 because yesterday's 488 was the backlog emptying and the backlog is now empty. The morning key check came back <b>identical to yesterday, 15 working of 66</b>, which was the pre-agreed signal that Google cut the quota. Digging into it turned up a second problem that is ours, not Google's, and that one is fixed.</p>
+  <div style="margin-top:14px"><span class="tag good">+142 PARKED, NO ERRORS, NOTHING HALTED</span> <span class="tag">OPENROUTER HAS 3.5 DAYS OF MONEY</span></div>
+
+  <div class="grid stats">
+    <div class="card stat accent-teal">
+      <div class="n">+142</div>
+      <div class="l">parked → <code>approved_hold</code></div>
+      <div class="s up">5,444 → 5,586 · a normal day after two huge ones</div>
+    </div>
+    <div class="card stat accent-teal">
+      <div class="n">3,046</div>
+      <div class="l">channels found</div>
+      <div class="s up">most since 1 September · 99 worth pitching</div>
+    </div>
+    <div class="card stat accent-red">
+      <div class="n">15 / 66</div>
+      <div class="l">YouTube keys working</div>
+      <div class="s down">same number, second morning running</div>
+    </div>
+    <div class="card stat accent-amber">
+      <div class="n">3.5 d</div>
+      <div class="l">of OpenRouter money left</div>
+      <div class="s warn">$88.21 at $25.09 a day</div>
+    </div>
+  </div>
+
+  <h2>The shape of the day</h2>
+  <div class="card" style="padding:0">
+    <div class="strip" id="strip"></div>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--teal)"></span>6 or more good leads that hour</span>
+      <span><span class="dot" style="background:var(--amber)"></span>1 to 5</span>
+      <span><span class="dot" style="background:var(--red)"></span>none at all (the last 8 hours)</span>
+    </div>
+  </div>
+  <p class="muted">Each bar is one hour, 07:00 UTC Monday to 07:00 UTC Tuesday. Height is channels found, colour is how many of them scored 6 or better. The day ran hard until <b>22:32 UTC</b>, when the video-graph sweep hit the exhausted key pool and went to sleep until the refill, taking the other YouTube lanes with it. That is three hours later than yesterday, so the dark stretch shrank from eleven hours to eight.</p>
+
+  <h2>The three questions</h2>
+
+  <div class="q accent-teal">
+    <div class="ask"><span class="qn">Q1</span><span>Parking fell from 488 to 142. Is something wrong?</span></div>
+    <p><b>No. Yesterday was the backlog emptying, and it emptied.</b> The 488 came from three one-off pushes hitting at once: the Apify scraper, the free Bloodhound methods, and reopening every lead that had been filed as a "risky" address. All three of those are now spent. The risky backlog is at zero, and the Apify scraper ran out of money on Saturday and rests until the billing month turns on 30 September. It made <b>no runs at all</b> this cycle, exactly as designed.</p>
+    <p><b>Strip the one-offs out and the ordinary machine got better, not worse.</b> Of the 142 leads parked today, <span class="pill">52</span> are channels we found today. Yesterday only 31 of 488 were. So the plain path, find a creator and reach them the same day, roughly held its rate on a much larger discovery day.</p>
+    <p><b>The free half of the recovery lane is still the strongest thing we own.</b> Its collect pass pulled <span class="pill">697</span> contact points off <b>132 of 150</b> leads. Every one of those is free: it reads the creator's own website. Only 18 of 150 leads came back with nothing, so website resolution is healthy and the Brave search cap is not biting.</p>
+    <p class="muted">The pool of creators found but never contacted fell again, 3,872 to <b>3,854</b>, while taking in 46 new arrivals. Small, but it is now the fourth fall in eight days, so recovery keeping pace with arrivals is holding as a pattern.</p>
+  </div>
+
+  <div class="q accent-red">
+    <div class="ask"><span class="qn">Q2</span><span>The key pool read 15 of 66 for a second morning. What does that settle?</span></div>
+    <p><b>Less than we agreed it would, and the reason is worth knowing.</b> Yesterday's rule was simple: if the number comes back 15 again, the quota on those projects has been cut and buying more keys from the same Google accounts buys nothing. It came back 15 again. Fifty keys out of quota, one suspended project, measured with 66 separate live calls twenty minutes after the reset. That reading is Google refusing, not our bookkeeping.</p>
+    <p><b>But both readings were taken at the same moment of the morning</b>, twenty and thirty-five minutes past the reset, so both are equally consistent with a refill that simply lands late. Two identical measurements of the same instant on two days are one measurement repeated, not two independent tests.</p>
+    <p><b>What the dig did turn up is a bug on our side, and it is a costly one.</b> When a key answers "daily quota exhausted", we write it down as dead until the next reset, which is the right rule almost all the time. The trouble is <i>when</i> we take that reading. The sweeps sleep until the reset and then touch every key within seconds of waking. Today <b>11 keys were written off between 07:11 and 07:19 UTC</b>, all of them inside the first twenty minutes of the new day, each one pinned shut for the following 23 hours and 49 minutes on the strength of one early answer.</p>
+    <p><b>Fixed and already applied to today.</b> A quota refusal in the first three hours after a reset now sets a 30 minute cooldown instead of a full-day lock. If the key really is spent it gets refused again on its next turn, which costs one web request and no quota at all, because an exhausted key rejects the request rather than charging for it. If the refill was just late, the key comes back the same morning instead of tomorrow. Today's 11 were released back into rotation by hand under the new rule rather than left locked until Wednesday.</p>
+    <p class="muted">It also answers the original question for free. From tomorrow, a key that gets refused at 07:11 and then stops reappearing was a late refill. A key that keeps getting refused all morning belongs to a project whose quota was genuinely cut. The file that records this is <code>youtube-lead-finder-v1/logs/youtube-dead-keys.json</code>, and it holds fingerprints, never key values.</p>
+  </div>
+
+  <div class="q accent-amber">
+    <div class="ask"><span class="qn">Q3</span><span>All three graph lanes ran out of road on the same day.</span></div>
+    <p>These three lanes find leads by walking a list of seed videos and looking at who shows up next to them. They are the cheapest source we have, about three cents a lead, and between them they found <b>2,759 of today's 3,046 channels</b>. Today all three finished their lists at once.</p>
+    <p><b>Video-graph has 53 seeds left of 90,139. The recommended-videos feed has 57 left of 12,970. The peer network has zero left of 12,876</b>, and it found 142 channels today with not one of them worth pitching. Video-graph is the only one still healthy, and only because it rebuilds its own seed list every hour out of channels the scorer newly approved.</p>
+    <p><b>This is not a bug and there is nothing to repair.</b> A lane runs out of road when it has looked at everything on its list. The options are to re-walk the list, which pays less each time round (the feed lane's laps went from 0.45 good leads per seed on the first lap to 0.014 on the sixth), or to feed it genuinely new seeds, which only the other lanes can produce. <b>Which of those to do is a spend decision, so nothing was changed unattended.</b></p>
+  </div>
+
+  <h2>Where the leads came from</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Lane</th><th class="num">Channels</th><th class="num">Score 6+</th><th class="num">Rate</th><th>State</th></tr></thead>
+      <tbody>
+        <tr><td>Video-graph sweep</td><td class="num">1,553</td><td class="num">62</td><td class="num">4.0%</td><td class="warn">Best lane again, walked 3,423 seeds (+77%). <b>53 seeds left</b></td></tr>
+        <tr><td>Recommended-videos feed</td><td class="num">1,064</td><td class="num">23</td><td class="num">2.2%</td><td class="warn">Held up well on a nearly empty list. <b>57 seeds left</b></td></tr>
+        <tr><td>Keyword search</td><td class="num">286</td><td class="num">13</td><td class="num">4.5%</td><td>183 finder runs. Costs 100 quota units a search against 15 keys</td></tr>
+        <tr><td>Peer network</td><td class="num">142</td><td class="num">0</td><td class="num">0%</td><td class="down">List fully walked, nothing worth pitching all day</td></tr>
+        <tr><td>Guest-link mining</td><td class="num">1</td><td class="num">1</td><td class="num">—</td><td>Trickle, and it converted</td></tr>
+        <tr><td>Comment sweep</td><td class="num">0</td><td class="num">0</td><td class="num">—</td><td>Paused by you on 08-20. Working as intended</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="muted">Real estate led the named categories at 21 of 99 good leads, then coaching at 17 and health clinics at 14. A third of them, 33, landed in "Other", which is the biggest uncategorised share in a while and worth a glance if you want the niche mix to stay readable.</p>
+
+  <h2>What broke → what's fixed</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Issue</th><th>Mechanism</th><th>Status</th></tr></thead>
+      <tbody class="fix">
+        <tr><td>Writing off good keys 11 minutes into the day</td><td>The sweeps wake at the reset and touch every key at once. A refill that has not landed yet reads as "out of quota", and we locked that in until the next reset</td><td class="up">Fixed today. A refusal in the first 3 hours now retries in 30 minutes. Today's 11 locked keys were released</td></tr>
+        <tr><td>15 of 66 keys working, two mornings running</td><td>Either Google's refill is late or those projects had their quota cut. Both readings were taken at the same minute of the morning, so neither can separate the two</td><td class="down">Open, and still the ceiling on finding. The fix above now produces the evidence by itself. Rec 2</td></tr>
+        <tr><td>All three graph lanes out of seeds at once</td><td>They only grow on channels the other lanes newly qualify, about three an hour, and today they finished their lists together</td><td class="warn">Open by choice. Re-walking pays less each lap, so it is a spend call. Rec 3</td></tr>
+        <tr><td>OpenRouter down to 3.5 days</td><td>$25.09 a day against $88.21. The rate halved from Sunday because the Apify lane and the enrichment backfill both went quiet</td><td class="warn">Open. Still a hard deadline, just a later one. Rec 1</td></tr>
+        <tr><td>Apify scraper made no runs</td><td>Out of its $100 month since Saturday evening; the wrapper holds $10 back so it cannot fit a $7.02 batch</td><td class="up">Correct behaviour, not a fault. Resumes 30 September unless you raise the cap. Rec 4</td></tr>
+        <tr><td>Peer lane scoring 142 channels for zero leads</td><td>Its seed list is fully walked and the refill finds nothing new to add</td><td class="warn">Left running. It costs six cents a day and stopping a lane is your call</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Recommended next — ranked</h2>
+  <ol class="recs">
+    <li><b>Top up OpenRouter.</b> $88.21 at $25.09 a day is three and a half days. The daily rate halved from Sunday's $45.26 because the Apify lane and the enrichment backfill both went quiet, so this is a reprieve rather than a fix. Every lane scores its channels through this account, so a zero balance stops finding the same way an empty key pool does.</li>
+    <li><b>Check the YouTube key projects in Google Cloud, and read the key file tomorrow morning.</b> The pool has now read 15 of 66 twice, but both readings were taken at the same point in the morning, so they cannot tell a late refill from a cut quota. Today's fix makes tomorrow's <code>youtube-dead-keys.json</code> answer it directly: keys that get refused early and then go quiet were late, keys refused repeatedly all morning were cut. The script that reads each key's project without spending any quota is <code>youtube-lead-finder-v1/scripts/audit-key-projects.sh</code>.</li>
+    <li><b>Decide what the graph lanes walk next.</b> All three finished their seed lists today. Re-walking a finished list works but pays less every time round, and only video-graph refills itself. This is the structural limit on finding now that the key pool is capped, and it is a spend decision rather than an engineering one, so nothing was changed.</li>
+    <li><b>Decide the Apify budget.</b> Unchanged from yesterday and still worth doing: roughly $256 runs the 3,644 leads it has never touched, for about 2,100 more parked leads at around $0.12 each. It brakes itself if the price ever goes above $0.20 a lead. It made no runs today and will make none until 30 September.</li>
+    <li><b>Worth a look, not an action: keyword search is spending the scarce quota.</b> A keyword search costs 100 quota units. Everything the graph lanes do costs 1 unit or is free. Today keyword search used the expensive calls to produce 13 of the day's 99 good leads, and the pool ran out at 22:32. Slowing that lane when the pool is low would buy the sweeps more hours, but it is a producing lane and the standing rule is not to stop one, so this is flagged rather than done.</li>
+  </ol>
+
+  <div class="foot">
+    <b>Status caveat:</b> everything is <b>parked</b>, nothing sent. <code>approved_hold</code> is a deliberate holding lane and only <code>npm run send</code> mails anyone. Today's +142 makes <b>5,586 parked</b>, plus <b>3,854</b> found-but-uncontactable, so <b>9,440 creators found and never contacted</b>. 5,436 of the parked leads carry a research bundle, so 150 are outstanding. No fatal errors, no halted hours, no scoring failures, no quota stops in the campaign lane, and $0.00 of Anthropic API spend. One fix shipped and committed today, in the lead finder, verified by a full test run and applied to live state before commit.
+  </div>
+
+</div>
+
+<script>
+  // channels found per hour, 07:00Z 09-07 → 07:00Z 09-08, with score-6+ counts
+  var chans = [118,142,153,233,242,226,263,285,246,150,200,229,132,244,153,30,0,0,0,0,0,0,0,0];
+  var good  = [6,3,4,12,10,5,7,10,9,2,9,7,4,6,5,0,0,0,0,0,0,0,0,0];
+  var hours = ['07','08','09','10','11','12','13','14','15','16','17','18','19','20','21','22','23','00','01','02','03','04','05','06'];
+  var max = Math.max.apply(null, chans);
+  var strip = document.getElementById('strip');
+  chans.forEach(function (v, i) {
+    var b = document.createElement('div');
+    b.className = 'bar' + (good[i] === 0 ? ' zero' : good[i] < 6 ? ' low' : '');
+    b.style.height = Math.max(6, Math.round((v / max) * 100)) + '%';
+    b.title = hours[i] + ':00 UTC — ' + v + ' channels, ' + good[i] + ' scoring 6+';
+    strip.appendChild(b);
+  });
+</script>
