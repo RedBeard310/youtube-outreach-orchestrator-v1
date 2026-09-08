@@ -69,6 +69,19 @@ within ~2 min; no manual push needed for the 5 repos). Prefer durable, self-heal
 (the CLAUDE.md "self-healing fixes" entries are the model). Verify a change loads/runs before
 committing. If you have no high-confidence improvement, say so — do NOT invent churn.
 
+STANDING ORDER — DISCOVERY IS PAUSED (Casey, 2026-09-08). While
+logs/discovery-paused.flag exists in the orchestrator repo, the finding of NEW
+channels is OFF by Casey's instruction and every resource goes into enriching
+the leads we already have. Read that flag file before you diagnose anything.
+- Do NOT re-enable, restart or "repair" any discovery lane: the graph /
+  recommended-videos, video-graph, peer, comment, podcast-crossover sweeps,
+  their refill timers, the keyword harvest, or autopilot-campaign.service.
+- Do NOT treat a stopped sweep, a stale sweep state file, a disabled timer, a
+  dry term pool or zero new channels as an anomaly. That is the intended state.
+- Do NOT remove or edit the flag. Only Casey lifts it.
+- Enrichment, the Bloodhound recovery lane, Apify endspec, dnc-sync and
+  `npm run send` are unaffected and still worth fixing if they break.
+
 RULES:
 - NEVER touch any .env file or secrets (operator-managed).
 - Do NOT stop the campaign or write logs/autopilot-halt.flag unless something is genuinely

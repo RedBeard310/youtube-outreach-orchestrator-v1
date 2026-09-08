@@ -34,6 +34,25 @@ const LOGS = join(REPO, 'logs');
 // finder's src/lib/run-gate.ts already honours the same variable, so the two
 // halves of the halt contract now agree about where the flag lives.
 const HALT_FLAG = process.env.AUTOPILOT_HALT_FLAG || join(LOGS, 'autopilot-halt.flag');
+/**
+ * Casey paused the finding of NEW channels on 2026-09-08 ("we're just doing
+ * enrichment on the ones that we have"). Deliberately NOT the halt flag: a halt
+ * is a fault, it is reported as a breach, and tryAutoClearHalt can lift it. This
+ * one is a standing instruction and only Casey lifts it.
+ *
+ * While it is present the check-in stays fully alive for everything that still
+ * runs — burn, the recovery lane, Bloodhound site resolution — and simply stops
+ * diagnosing the lanes Casey turned off. Without this, section 7 would report
+ * every disabled sweep timer as `sweep_daemon_disabled` every hour and spend a
+ * paid fix-agent re-enabling exactly what he asked us to stop.
+ */
+const DISCOVERY_PAUSED_FLAG = process.env.DISCOVERY_PAUSED_FLAG || join(LOGS, 'discovery-paused.flag');
+
+/** Anomaly kinds that only describe the paused discovery lanes. */
+const DISCOVERY_ANOMALY_KINDS = new Set([
+  'sweep_daemon_disabled', 'sweep_daemon_stale', 'find_no_park',
+  'scoring_failure_rate', 'pitchable_rate_collapse', 'term_starvation',
+]);
 const ATTENTION = join(LOGS, 'autopilot-attention.jsonl');
 // Overridable for the same reason HALT_FLAG is: so the halt paths can be exercised
 // against a scratch file instead of appending test rows to the real observation stream
@@ -294,6 +313,10 @@ function hoursSinceAnyHarvest(): number {
 // that the next campaign pass consumes; the check-in must stay fast and free, so it does not
 // wait on the result. Returns true if a harvest was launched.
 function kickKeywordHarvest(reason: string): boolean {
+  // Casey paused discovery (2026-09-08). A keyword harvest invents new search
+  // terms, which is the term-supply half of finding new channels — so the
+  // backstop kick stays down with the rest of it. Deleting the flag re-arms it.
+  if (existsSync(DISCOVERY_PAUSED_FLAG)) return false;
   if (hoursSinceAnyHarvest() < HARVEST_KICK_INTERVAL_H) return false;
   const cap = process.env.KEYWORD_HARVEST_CAP ?? '200';
   const logFile = join(LOGS, `harvest-kick-${new Date().toISOString().replace(/[:.]/g, '-')}.log`);
@@ -473,6 +496,7 @@ async function tryAutoClearHalt(day: string): Promise<boolean> {
 async function main(): Promise<void> {
   const burn = summarizeToday();
   const day = pacificDate();
+  const discoveryPaused = existsSync(DISCOVERY_PAUSED_FLAG);
 
   // 1) Halt flag already up → loop is stopping; nothing for the agent to do.
   //    Unless its stated cause has provably cleared (see tryAutoClearHalt).
@@ -912,7 +936,7 @@ async function main(): Promise<void> {
     { lane: 'peer_sweep', stateFile: 'peer-sweep-state.json', sessionDir: 'peer-sweep-sessions' },
     // comment_sweep deliberately absent, same reason as section 7: Casey paused it 08-20.
   ];
-  for (const l of progressLanes) {
+  for (const l of discoveryPaused ? [] : progressLanes) {
     const p = sweepProgress(l.stateFile);
     if (p) progressNow.push({ ts: new Date().toISOString(), lane: l.lane, done: p.done, total: p.total });
   }
@@ -944,7 +968,7 @@ async function main(): Promise<void> {
     }
   }
 
-  for (const c of sweepChecks) {
+  for (const c of discoveryPaused ? [] : sweepChecks) {
     const enabled = isEnabled(c.timer);
     if (enabled === false) {
       anomalies.push({ kind: 'sweep_daemon_disabled', detail: `${c.timer} is not enabled — ${c.method} will never refill/rerun. Re-enable: sudo systemctl enable --now ${c.timer}.` });
@@ -1101,6 +1125,16 @@ async function main(): Promise<void> {
         }
       }
     } catch { /* an unreadable collect log is not an incident */ }
+  }
+
+  // Discovery is paused on Casey's instruction, so anything that only describes a
+  // stopped lane is expected, not an anomaly. Everything else still escalates.
+  if (discoveryPaused) {
+    const dropped = anomalies.filter((a) => DISCOVERY_ANOMALY_KINDS.has(a.kind)).length;
+    for (let i = anomalies.length - 1; i >= 0; i -= 1) {
+      if (DISCOVERY_ANOMALY_KINDS.has(anomalies[i]!.kind)) anomalies.splice(i, 1);
+    }
+    console.log(`[checkin ${day}] discovery paused by Casey — ${dropped} discovery anomaly(ies) ignored, enrichment lanes still checked`);
   }
 
   const softNote = burn.over_soft ? ` [OVER SOFT $${burn.soft_usd}]` : '';

@@ -6,6 +6,61 @@ cracks between sessions (Casey, 2026-08-14). When Casey changes a priority in
 chat, UPDATE THIS FILE in the same session — that is what "living" means.
 Keep the change log at the bottom.
 
+## PAUSED as of 2026-09-08: we are not looking for new channels
+
+**Casey, 2026-09-08: "Stop the process of the outreach orchestrator looking for
+new channels. We're just doing enrichment on the ones that we have and putting
+all of our resources into that. Discovery is hereby paused until further
+notice."** He also asked for **no notifications about it** from any agent until
+he says to turn it back on.
+
+The off switch is `logs/discovery-paused.flag` in this repo, plus disabled
+systemd units. Nothing was deleted.
+
+**Off (stopped AND `systemctl disable`d):** `graph-sweep.service`,
+`graph-sweep-refill.timer`, `video-graph-sweep.service`,
+`video-graph-sweep-refill.timer`, `peer-sweep.service`,
+`peer-sweep-refill.timer`, `autopilot-campaign.service`. `comment-sweep-daily.timer`
+was already off from 08-20.
+
+**Still on, deliberately — this is where the resources went:**
+`backfill-chain.service` (enrichment), `recovery-lane.timer` (Bloodhound
+needs_contact → approved_hold), `apify-endspec.timer`, `dnc-sync.timer`,
+`autopilot-checkin.timer`, `autopilot-debrief.timer`, and manual `npm run send`.
+
+**The flag is belt-and-braces, because this pipeline has a long history of lanes
+resurrecting themselves.** It is read by:
+- `discoveryPausedReason()` in `youtube-lead-finder-v1/src/lib/run-gate.ts`, wired
+  into all six sweep scripts, so a hand-started sweep exits RESUMABLE instead of
+  walking seeds. It is deliberately separate from `haltReason()`: a halt means
+  something is broken, gets reported as a breach, and the check-in can auto-clear
+  it. This is a standing instruction and nothing clears it but Casey.
+- `campaign-loop.sh`, so a restarted campaign unit exits without a pass.
+- `checkin.ts`, which skips every sweep check, drops discovery anomalies and
+  refuses to fire the keyword-harvest backstop — otherwise it would page a paid
+  fix-agent every hour to re-enable exactly what Casey turned off.
+- The check-in and debrief agent prompts, and the Hermes side (below).
+
+**Hermes is paused too, on the same instruction.** Its three lead-gen cron jobs
+are `hermes cron pause`d, not deleted: `7f83cf90222c` (refresh video seeds +
+restart sweep), `ea79cb32e046` (weekly discovery yield report), `76ced4a203e6`
+(12-hourly lead-gen continuous improvement, which had standing permission to
+scale discovery methods). The pause is also written into Hermes' own
+`~/.hermes/memories/MEMORY.md` and the top of its
+`youtube-lead-gen-pipeline` skill, so a fresh Hermes session reads it before it
+diagnoses anything.
+
+**Do not read a stopped sweep, a stale sweep state file, a dry term pool or a day
+of zero new channels as an incident.** That is the intended state now.
+
+**To resume (Casey's word only):** `rm logs/discovery-paused.flag`, then
+`sudo systemctl enable --now graph-sweep-refill.timer video-graph-sweep-refill.timer
+autopilot-campaign.service` (add `peer-sweep-refill.timer` if that lane is wanted
+back — its book drained 09-08), then `hermes cron resume <id>` for the three jobs.
+
+**Everything under "Discovery lane priority" below is frozen, not deleted.** It
+is the state to return to.
+
 ## The mission (never changes)
 
 More qualified leads. Every discovery method runs permanently and overnight.
@@ -141,6 +196,15 @@ this is the shape to check first.**
 5. Anything in this file contradicted by what Casey said today? → update it.
 
 ## Change log
+
+- 2026-09-08 (Casey, in chat): **DISCOVERY OF NEW CHANNELS PAUSED UNTIL FURTHER
+  NOTICE.** See the banner at the top of this file for the full switch list. All
+  resources go to enriching the leads we already have. Seven systemd units
+  stopped + disabled, three Hermes cron jobs paused, one flag file
+  (`logs/discovery-paused.flag`) gating six sweep scripts, the campaign loop, the
+  hourly check-in and the keyword-harvest backstop. No code was deleted and
+  nothing was reconfigured beyond the off switch. Casey does not want
+  notifications about the paused lanes from any agent until he lifts it.
 
 - 2026-09-08 (debrief): **WE WERE WRITING OFF GOOD YOUTUBE KEYS OURSELVES, ELEVEN
   MINUTES INTO THE DAY.** `expiryFor('quota')` in the finder's

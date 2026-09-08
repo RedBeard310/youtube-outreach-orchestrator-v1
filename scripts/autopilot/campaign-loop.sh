@@ -36,6 +36,7 @@ REPO="/home/casey/repos/youtube-outreach-orchestrator-v1"
 cd "$REPO" || { echo "cannot cd $REPO"; exit 1; }
 
 HALT_FLAG="$REPO/logs/autopilot-halt.flag"
+DISCOVERY_PAUSED_FLAG="$REPO/logs/discovery-paused.flag"
 SESS_LOG_DIR="$REPO/logs/autopilot-sessions"
 mkdir -p "$SESS_LOG_DIR"
 
@@ -182,6 +183,17 @@ log "starting (max-minutes=$MAX_MINUTES, quota-wait=${QUOTA_WAIT}s, hard-pct=$HA
 while true; do
   if [ -f "$HALT_FLAG" ]; then
     log "HALT flag present ($HALT_FLAG) — stopping loop"
+    exit 0
+  fi
+
+  # Casey paused the finding of NEW channels on 2026-09-08 so every resource goes
+  # into enriching the leads we already have. This is a deliberate, open-ended
+  # pause, NOT a fault, which is why it is a flag of its own rather than the halt
+  # flag: the halt flag reads as a breach in the debrief and the check-in can
+  # auto-clear it. Nothing clears this one but Casey. Enrichment, the recovery
+  # lane and `npm run send` are unaffected — see the flag file itself.
+  if [ -f "$DISCOVERY_PAUSED_FLAG" ]; then
+    log "discovery paused by Casey ($DISCOVERY_PAUSED_FLAG) — not starting a campaign pass"
     exit 0
   fi
 
