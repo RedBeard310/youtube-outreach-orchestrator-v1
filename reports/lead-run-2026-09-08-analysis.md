@@ -164,6 +164,16 @@ at 0.014).
 **Nothing was changed.** Per the standing orders this is Casey's spend call, and the
 relap policy question has been carried as an open item since 08-28.
 
+**Update measured during the write-up (outside the cycle window):** video-graph walked
+its last 53 seeds and exited at **07:29:26Z** with `SWEEP COMPLETE, every seed walked.
+Stopping for good.` The unit is `Restart=on-failure` and it exited 0, so systemd
+correctly did not restart it. `video-graph-sweep-refill.timer` fired at 07:31:33Z,
+detected the idle sweep and began a full seed rebuild, which is exactly what that script
+exists for (it stops the unit, extends the book, restarts it, and refuses to do any of
+that if the lifetime cost cap is the reason for the stop — lifetime spend is $57.30
+against the $100 cap raised on 09-06, so there is headroom). No intervention needed, and
+the check-in's `sweep_stalled` heartbeat covers the case where the rebuild fails.
+
 ## Deliberately not done
 
 - **Throttling keyword search when the pool is low.** A keyword search costs 100 quota
