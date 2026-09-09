@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lead Run Debrief — 2026-09-09</title>
+<style>
+  :root {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+      --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+      --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+    --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+    --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 40px 22px 80px; }
+  .eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); font-weight: 600; }
+  h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.12; margin: 10px 0 6px; text-wrap: balance; letter-spacing: -.02em; }
+  h2 { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); margin: 44px 0 16px; font-weight: 700; }
+  h3 { font-size: 18px; margin: 0 0 6px; letter-spacing: -.01em; }
+  p { margin: 0 0 14px; }
+  .lede { font-size: 18px; color: var(--ink-soft); max-width: 68ch; }
+  .tag { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--amber-soft); color: var(--amber); letter-spacing: .02em; }
+  .tag.ok { background: var(--teal-soft); color: var(--teal); }
+  .grid { display: grid; gap: 14px; }
+  .stats { grid-template-columns: repeat(4, 1fr); margin-top: 26px; }
+  @media (max-width: 720px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; box-shadow: var(--shadow); }
+  .stat .n { font-size: 30px; font-weight: 750; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .stat .l { font-size: 12.5px; color: var(--ink-soft); margin-top: 3px; }
+  .stat .s { font-size: 12px; margin-top: 8px; font-weight: 600; }
+  .up { color: var(--good); } .down { color: var(--red); } .warn { color: var(--amber); }
+  .accent-red { border-left: 3px solid var(--red); }
+  .accent-teal { border-left: 3px solid var(--teal); }
+  .accent-amber { border-left: 3px solid var(--amber); }
+
+  .strip { display: flex; align-items: flex-end; gap: 3px; height: 120px; padding: 14px 14px 10px; overflow-x: auto; }
+  .bar { flex: 1 0 8px; min-width: 7px; border-radius: 2px 2px 0 0; background: var(--teal); opacity: .9; }
+  .bar.zero { background: var(--panel-2); border: 1px dashed var(--line); height: 6px !important; }
+  .bar.low { background: var(--amber); }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-soft); padding: 0 14px 14px; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+
+  .q { border-radius: 14px; padding: 20px 22px; margin-bottom: 14px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); }
+  .q .ask { font-size: 17px; font-weight: 700; color: var(--ink); margin-bottom: 10px; display: flex; gap: 10px; align-items: baseline; }
+  .q .ask .qn { color: var(--red); font-weight: 800; flex: 0 0 auto; }
+  .q.accent-teal .ask .qn { color: var(--teal); }
+  .q p { color: var(--ink-soft); }
+  .q b { color: var(--ink); }
+  .pill { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink); background: var(--panel-2); padding: 1px 7px; border-radius: 6px; border: 1px solid var(--line); white-space: nowrap; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+  th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); }
+  td .num { font-variant-numeric: tabular-nums; font-weight: 650; }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); box-shadow: var(--shadow); }
+  ol.recs { padding-left: 0; list-style: none; counter-reset: r; margin: 0; }
+  ol.recs li { counter-increment: r; position: relative; padding: 14px 16px 14px 52px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 10px; box-shadow: var(--shadow); }
+  ol.recs li::before { content: counter(r); position: absolute; left: 14px; top: 14px; width: 26px; height: 26px; border-radius: 8px; background: var(--teal-soft); color: var(--teal); font-weight: 800; font-size: 14px; display: grid; place-items: center; }
+  ol.recs b { color: var(--ink); }
+  .foot { margin-top: 46px; padding: 16px 18px; border-radius: 12px; background: var(--amber-soft); border: 1px solid var(--line); font-size: 14px; color: var(--ink-soft); }
+  .foot b { color: var(--ink); }
+  .muted { color: var(--ink-soft); font-size: 13.5px; }
+  code { background: var(--panel-2); border: 1px solid var(--line); border-radius: 5px; padding: 0 5px; font-size: .9em; }
+</style>
+
+<div class="wrap">
+
+  <div class="eyebrow">Lead Run Debrief · YouTube outreach</div>
+  <h1>2026-09-09 — the send was broken, and now it isn't</h1>
+  <p class="lede">First cycle with discovery switched off. Parking barely moved, which is the point: the pile does the work now. The real event was elsewhere. A send of 11 ready leads failed on all 11, and the reason turned out to be three separate faults stacked on top of each other. All three are fixed and the leads are back in the queue.</p>
+  <div style="margin-top:14px"><span class="tag">DISCOVERY PAUSED BY CASEY, 2026-09-08 23:16Z</span> <span class="tag ok">SEND PATH REPAIRED</span></div>
+
+  <div class="grid stats">
+    <div class="card stat accent-teal">
+      <div class="n">+133</div>
+      <div class="l">parked → <code>approved_hold</code></div>
+      <div class="s muted">5,569 → 5,702. Yesterday: +142</div>
+    </div>
+    <div class="card stat accent-red">
+      <div class="n">0 of 11</div>
+      <div class="l">leads sent in the 07:20Z send</div>
+      <div class="s down">every one failed, all recovered</div>
+    </div>
+    <div class="card stat">
+      <div class="n">28</div>
+      <div class="l">of the 133 parks came from channels found today</div>
+      <div class="s muted">the other 105 came off the pile</div>
+    </div>
+    <div class="card stat accent-amber">
+      <div class="n">4.7 days</div>
+      <div class="l">OpenRouter runway</div>
+      <div class="s warn">$72.86 left, $15.35/day</div>
+    </div>
+  </div>
+
+  <h2>The shape of the day</h2>
+  <div class="card" style="padding:0">
+    <div class="strip" id="strip"></div>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--teal)"></span>hour that found channels</span>
+      <span><span class="dot" style="background:var(--amber)"></span>thin hour (under 60)</span>
+      <span><span class="dot" style="background:var(--panel-2); border:1px dashed var(--line)"></span>silent by instruction, not by fault</span>
+    </div>
+  </div>
+  <p class="muted">One bar per hour, 07:00Z on 09-08 through 06:00Z on 09-09. Height is channels found. Discovery ran normally for seventeen hours and then stopped dead at 23:16Z, the minute the pause flag was written. The seven flat bars at the end are the instruction working, not a stall.</p>
+
+  <h2>The funnel</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Measure</th><th>Value</th><th>Note</th></tr></thead>
+      <tbody>
+        <tr><td>Channels discovered</td><td class="num">1,616</td><td>17 productive hours, then the pause</td></tr>
+        <tr><td>Scored 6 or better</td><td class="num">67 (4.1%)</td><td>rate above yesterday's 3.3%</td></tr>
+        <tr><td>Verified an email by cycle end</td><td class="num">28</td><td>all 28 already parked</td></tr>
+        <tr><td>Parked into <code>approved_hold</code></td><td class="num">+133</td><td>pool now 5,702</td></tr>
+        <tr><td><code>needs_contact</code> pool</td><td class="num">3,789</td><td>down 65, took in 23 arrivals</td></tr>
+        <tr><td>Parked leads carrying a research bundle</td><td class="num">5,553 of 5,702</td><td>149 outstanding, backfill still chewing</td></tr>
+        <tr><td>Scoring failures</td><td class="num">0</td><td></td></tr>
+        <tr><td>Fatal error signatures</td><td class="num">0</td><td>none all cycle</td></tr>
+        <tr><td>Anthropic spend</td><td class="num">$0.00</td><td>house rule held</td></tr>
+        <tr><td>OpenRouter spend</td><td class="num">$15.35 account, $2.26 logged</td><td>balance $72.86</td></tr>
+        <tr><td>Apify runs</td><td class="num">0</td><td>resting on budget until 09-30</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>The three questions</h2>
+
+  <div class="q accent-teal">
+    <div class="ask"><span class="qn">Q1</span><span>Did switching off discovery cost anything?</span></div>
+    <p><b>Almost nothing, and the numbers say why.</b> Parking came in at <span class="pill">+133</span> against yesterday's 142, a difference well inside the normal day-to-day wobble. Only <b>28 of the 133</b> were channels found during this cycle. The other 105 came out of the pile we already had, through enrichment and the recovery lane.</p>
+    <p>That is the whole case for the pause in one line. Finding channels and parking leads had already come apart from each other. The recovery lane has been the bigger producer since early September, and it does not need a single new channel to keep going. It has <b>3,789 creators</b> waiting in <code>needs_contact</code>, all of them already found and scored.</p>
+  </div>
+
+  <div class="q accent-red">
+    <div class="ask"><span class="qn">Q2</span><span>Why did every lead in the send fail?</span></div>
+    <p><b>Three faults, stacked.</b> Two of them broke the send, and the third turned a bad send into lost work.</p>
+    <p><b>One: the repo stopped reading half its own config.</b> env-storage keeps two files, a shared bank of keys plus a per-repo fragment holding that repo's own settings, and <code>build-envs.sh</code> glues them into each repo's generated <code>.env</code>. When that generated file was deleted from the email repo on 2026-09-01, the loader kept reading the shared bank and silently lost every fragment-only value. This is the <b>second</b> outage from it. The first was <code>ENRICHMENT_REPO_PATH</code> on 09-02, which stalled the backfill chain for days and got patched one variable at a time. This time it took all <b>16 SmartLead campaign IDs</b>, so nine leads had nowhere to be pushed.</p>
+    <p><b>Two: a skill folder was renamed a month ago and nobody told the code.</b> The composer for the <code>nick_saraev</code> variant reads its instructions off disk at <code>~/.claude/skills/nick-saraev-cold-email</code>. The 2026-08-06 skills reshuffle renamed that folder to <code>cold-email-nick-saraev</code>. Two leads died on <code>ENOENT</code> before writing a word.</p>
+    <p><b>Three, and this is the expensive one: the campaign ID was looked up after the email was written.</b> Nine leads paid for a full compose, roughly a minute of model time each, and then hit the missing ID at the push step. Worse, every failure was written back as <code>outreach_status = failed</code>, and <code>failed</code> is not in the send queue. Those <b>11 enriched, ready-to-mail leads fell out of <code>npm run send</code> entirely</b> and into the tick's prep queue, where they would have been re-enriched from scratch.</p>
+  </div>
+
+  <div class="q accent-teal">
+    <div class="ask"><span class="qn">Q3</span><span>The key pool question from yesterday: did the pause answer it for free?</span></div>
+    <p><b>Yes, and it rules out the explanation that was ours.</b> The last two debriefs both read <span class="pill">15 working of 66</span> twenty-odd minutes after the reset and could not tell three explanations apart: Google refills late, those projects had their quota cut, or our own sweeps wake at the reset and burn the pool within seconds.</p>
+    <p>Last night was an accidental controlled test. <b>59 keys were already quota-dead at 22:40Z</b>, and then discovery stopped and <b>nothing of ours touched a YouTube key for over eight hours</b>. The probe at 07:20Z, twenty minutes past the reset, still found <b>50 exhausted and 15 working</b>. Only about eight of the 59 came back.</p>
+    <p>So our early-morning spending was never the main story. Either the refill lands well after 07:00Z for those projects, or their quota really has been reduced. The free way to tell them apart is <code>audit-key-projects.sh</code>, which reads each key's project number without spending a unit. There is no rush: discovery is off, and the lanes that are still running use one-unit calls and free page reads, not the hundred-unit searches that drain a pool.</p>
+  </div>
+
+  <h2>What broke → what's fixed</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Issue</th><th>Mechanism</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>Repo blind to its own config</td>
+          <td><code>shared-env.ts</code> read only <code>env-storage/.env</code>, never <code>fragments/&lt;repo&gt;.env</code>. Cost <code>ENRICHMENT_REPO_PATH</code> on 09-02 and all 16 campaign IDs today</td>
+          <td class="up">Fixed. The loader now reads the fragment the way <code>build-envs.sh</code> does. Verified: 16 IDs visible again, 11 of 11 leads resolve a campaign</td>
+        </tr>
+        <tr>
+          <td>Renamed skill folder</td>
+          <td>Hard-coded path to <code>nick-saraev-cold-email</code>, renamed 2026-08-06</td>
+          <td class="up">Fixed. New <code>writer/skill-files.ts</code> finds a skill by search, then each file by name. Verified: the 47,279-character block loads</td>
+        </tr>
+        <tr>
+          <td>Paying to write emails that cannot be sent</td>
+          <td>Campaign ID resolved at push, after compose</td>
+          <td class="up">Fixed. Preflighted before compose. Blocked leads drop out of the batch untouched and the exact missing variable names are printed. Aborts in seconds instead of after 101</td>
+        </tr>
+        <tr>
+          <td>Config faults stranding good leads</td>
+          <td>Any throw wrote <code>failed</code>, which is outside the send queue and inside the prep queue</td>
+          <td class="up">Fixed. A config fault never writes a status. The 11 stranded leads were restored to <code>ready_data_scraped</code> by hand</td>
+        </tr>
+        <tr>
+          <td>Recovery lane burning leads while Brave is capped</td>
+          <td>Website resolution is down at the $5 monthly cap, but the pass still "completes" and the cursor steps over all 150 leads, so they wait a full lap</td>
+          <td class="up">Fixed. A search-dead pass now rewinds its bookmark exactly as a cut-off pass does, under the same three-rewind cap</td>
+        </tr>
+        <tr>
+          <td>Brave Search refusing</td>
+          <td>Monthly spending cap reached across both keys, 19 refusals in the current log</td>
+          <td class="warn">Open. This is a spend decision, not a code fix. See lever 3</td>
+        </tr>
+        <tr>
+          <td>Apify idle since 09-06</td>
+          <td>$16.11 left, $10 held in reserve, a 100-lead batch needs $7.02. It cannot fit a batch until the cycle resets</td>
+          <td class="warn">Open. Spend decision. See lever 4</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Recommended next — ranked</h2>
+  <ol class="recs">
+    <li><b>Decide whether to send the 11.</b> They are enriched, back at <code>ready_data_scraped</code>, and all 11 now resolve a campaign. Sending stays manual on purpose, so nothing goes out until you run <code>npm run send</code>. Nothing was mailed this cycle.</li>
+    <li><b>Top up OpenRouter. 4.7 days left</b> at $72.86 and $15.35 a day. This matters more than it did last week, not less. Enrichment and the recovery lane are the only lanes still running, and both of them score and write through OpenRouter. When the balance hits zero, the thing the pause was meant to protect is what stops.</li>
+    <li><b>Raise the Brave Search cap, or accept a slower recovery lane.</b> Both keys sit on a plan with a $5 monthly cap and they are refusing again, 19 times in the current collect log. Nine of the ten collection methods need a creator's website first, so a capped plan is a quiet throttle on the biggest producer we have. Today's fix stops it destroying leads. It cannot make searches happen.</li>
+    <li><b>Decide the Apify budget.</b> It has made zero runs since 09-06 and will not run again until 09-30, because $16.11 minus a $10 reserve leaves less than one $7.02 batch. It has roughly 3,600 leads it has never touched. This is the single largest untapped enrichment lane and it is parked on arithmetic.</li>
+    <li><b>Run <code>audit-key-projects.sh</code> before resuming discovery.</b> Free, spends no quota, and it settles whether 50 exhausted keys are a late refill or a cut. Worth knowing before the sweeps get switched back on, and worth nothing until then.</li>
+  </ol>
+
+  <div class="foot">
+    <b>Status caveat:</b> everything is <b>parked</b>, nothing sent. Today's +133 brings <code>approved_hold</code> to <b>5,702</b>, of which 5,553 carry a research bundle. <b>Discovery is off by instruction</b> and stays off until you say otherwise. Nothing in this debrief re-enabled a sweep, edited the pause flag, or touched an <code>.env</code> file. The one manual data change was restoring the 11 stranded leads to the parked state they were in before the botched send.
+  </div>
+
+</div>
+
+<script>
+  // channels found per hour, 07:00Z 09-08 through 06:00Z 09-09 (pipeline db, first_discovered_at)
+  var seq  = [150,138,109,121,124,137,94,87,111,62,43,77,116,53,69,98,27,0,0,0,0,0,0,0];
+  var good = [4,3,5,11,13,7,5,2,2,2,1,1,6,2,0,2,1,0,0,0,0,0,0,0];
+  var hours = ['07','08','09','10','11','12','13','14','15','16','17','18','19','20','21','22','23','00','01','02','03','04','05','06'];
+  var max = Math.max.apply(null, seq);
+  var strip = document.getElementById('strip');
+  seq.forEach(function (v, i) {
+    var b = document.createElement('div');
+    b.className = 'bar' + (v === 0 ? ' zero' : v < 60 ? ' low' : '');
+    b.style.height = Math.max(6, Math.round((v / max) * 100)) + '%';
+    b.title = hours[i] + ':00Z — ' + v + ' channels, ' + good[i] + ' scored 6+';
+    strip.appendChild(b);
+  });
+</script>
+</html>
