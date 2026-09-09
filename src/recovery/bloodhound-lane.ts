@@ -136,6 +136,49 @@ export function lastCollectPassFinished(
   }
 }
 
+/** Did the last collect pass run with website resolution DOWN?
+ *
+ *  WHY THIS EXISTS (2026-09-09). Nine of the collector's ten methods need the
+ *  creator's own website, and the website comes from Brave Search, which sits on
+ *  a plan with a monthly spending cap. When the cap is hit every key answers
+ *  `402 Usage limit exceeded` and resolution stops. The pass still "completes" —
+ *  it walks all 150 leads, finds almost nothing, and the cursor steps over every
+ *  one of them. Those leads then wait a FULL LAP before anyone looks at them
+ *  again. That is what turned the 2026-09-02 batch widening into 71 parks
+ *  instead of 627: the leads were not barren, they were never actually searched.
+ *
+ *  The loud one-line diagnostic added on 2026-09-04 named the cause but nothing
+ *  acted on it. Act on it: a pass that ran with a dead search plan did not walk
+ *  its batch in any meaningful sense, so rewind exactly as a truncated pass
+ *  does. The same rewind cap applies, so a cap that stays hit for days cannot
+ *  pin the walk in place forever.
+ *
+ *  Returns null when the log cannot answer, which is treated as "search was
+ *  fine" — an unknown must never rewind. */
+export function lastCollectPassSearchDead(
+  path = COLLECT_LOG_PATH,
+  tailBytes = 512_000,
+): boolean | null {
+  try {
+    const fd = openSync(path, 'r');
+    try {
+      const size = statSync(path).size;
+      const start = Math.max(0, size - tailBytes);
+      const buf = Buffer.alloc(Math.min(size, tailBytes));
+      readSync(fd, buf, 0, buf.length, start);
+      const tail = buf.toString('utf8');
+      const header = tail.lastIndexOf('\nBloodhound: ');
+      if (header < 0) return null;
+      // Matches the searchBrave() all-keys-refused line, whatever the status.
+      return /Brave Search API key\(s\) refused/.test(tail.slice(header));
+    } finally {
+      closeSync(fd);
+    }
+  } catch {
+    return null;
+  }
+}
+
 /** Maximum times in a row a truncated pass may be re-walked. Past this the walk
  *  moves on regardless: re-running one batch forever is the worse failure. */
 export const MAX_CONSECUTIVE_REWINDS = 3;
@@ -431,21 +474,28 @@ export async function runBloodhoundLane(opts: LaneOpts): Promise<void> {
     // so put the cursor back before selecting the next batch.
     if (state.collectResume && !opts.dryRun) {
       const finished = lastCollectPassFinished();
+      const searchDead = lastCollectPassSearchDead();
+      // Two ways a pass fails to walk its batch: it was cut off, or it ran with
+      // website resolution down. Both leave real leads behind an advanced cursor.
+      const reason =
+        finished === false ? 'previous_pass_truncated'
+        : searchDead === true ? 'previous_pass_search_dead'
+        : null;
       const rewinds = state.collectRewinds ?? 0;
-      if (finished === false && rewinds < MAX_CONSECUTIVE_REWINDS) {
+      if (reason && rewinds < MAX_CONSECUTIVE_REWINDS) {
         state.collectCursor = state.collectResume.from ?? undefined;
         state.collectLaps = state.collectResume.laps;
         state.collectRewinds = rewinds + 1;
         opts.log({
           event: 'bloodhound_collect',
           rewound: true,
-          reason: 'previous_pass_truncated',
+          reason,
           cursor_tier: state.collectCursor?.tier ?? null,
           rewinds: state.collectRewinds,
         });
       } else {
-        if (finished === false) {
-          opts.log({ event: 'bloodhound_collect', rewound: false, reason: 'rewind_cap_reached', rewinds });
+        if (reason) {
+          opts.log({ event: 'bloodhound_collect', rewound: false, reason: 'rewind_cap_reached', blocked_by: reason, rewinds });
         }
         state.collectRewinds = 0;
       }
