@@ -197,6 +197,27 @@ this is the shape to check first.**
 
 ## Change log
 
+- 2026-09-09 (debrief): **THE SEND PATH WAS DEAD AND IS NOW REPAIRED. A REPO
+  CANNOT SEE ITS OWN CONFIG UNLESS THE LOADER READS THE FRAGMENT.** The 07:20Z
+  `npm run send` failed on all 11 leads. `env-storage` holds a shared key bank
+  AND `fragments/<repo>.env` for repo-specific config, `build-envs.sh` glues them
+  into each repo's generated `.env`, and the email repo's generated `.env` was
+  deleted 2026-09-01 while `shared-env.ts` only ever read the shared bank. That
+  is the **second** outage from it: `ENRICHMENT_REPO_PATH` on 09-02 (patched with
+  a code default), all **16 `SMARTLEAD_CAMPAIGN_*` ids** today. Fixed at the
+  loader, so the class is closed rather than one more variable. Two more faults
+  rode along: `compose-nick-saraev.ts` still pointed at the pre-08-06 skill folder
+  name, and a config fault wrote `outreach_status=failed`, which is outside
+  `APPROVED_FIRE_READY` and inside the prep queue, so 11 enriched leads fell out
+  of the send queue and were priced at a full re-enrichment. Campaign ids are now
+  preflighted **before** compose and a config fault never writes a status. **If a
+  send ever reports every lead failed, read the first line of the failure before
+  anything else: a config gap now aborts in seconds and names the missing
+  variables.** Also shipped: the Bloodhound collect pass rewinds its bookmark when
+  Brave Search is refusing, instead of stepping the cursor over 150 unsearched
+  leads (the 09-02 shape that parked 71 instead of 627). Brave is capped again,
+  19 refusals in the current log, ~25% `site=(none)`.
+
 - 2026-09-08 (Casey, in chat): **DISCOVERY OF NEW CHANNELS PAUSED UNTIL FURTHER
   NOTICE.** See the banner at the top of this file for the full switch list. All
   resources go to enriching the leads we already have. Seven systemd units
