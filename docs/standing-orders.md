@@ -197,6 +197,47 @@ this is the shape to check first.**
 
 ## Change log
 
+- 2026-09-10 (debrief): **THE SEND REPAIR HELD (11 of 11 to SmartLead), AND A $5/MONTH
+  SEARCH PLAN IS NOW THE ENTIRE TOP OF THE FUNNEL.** With discovery paused, every new lead
+  comes from the Bloodhound recovery lane, nine of its ten collection methods need a website
+  first, and both `BRAVE_SEARCH_API_KEY` slots are answering `402 Usage limit exceeded`
+  against a **$5 monthly cap**. Parking fell **133 to 44**, the lowest since 08-31. The
+  no-website share slid **9.3, 10.7, 18.0, 16.7, 24.7, 20.7, 33.3, 28.0, 59.7, 55.9%** across
+  ten passes while output fell from **885 contact points off 148/150 leads to 186 off 40/150**.
+  **Third time in a fortnight** (08-31 parked 5, 09-04 parked 71, today 44) and the first with
+  no discovery cushioning it. **Raising that cap is the #1 lever in the pipeline and it is
+  Casey's call.**
+
+  **Yesterday's rewind fix hit its own cap and reopened the hole it closed.** It shared the
+  3-deep budget with the truncated-pass case, so it rewound three times, logged
+  `rewind_cap_reached`, reset the counter and **advanced 150 leads blind**, then repeated. A
+  full lap closed with its tail walked at a 27% hit rate. Brave's cap is **monthly**, so a
+  re-run can never fix search-dead. Fixed in `f92e022`: separate budgets, truncated keeps 3,
+  search-dead gets **48** (~12 days at the 6h cadence), counters reset each other so
+  alternating failures cannot add to a cap neither reached alone. While resolution is down the
+  bookmark **holds**, which costs nothing (every lead ahead of the cursor is as unsearchable as
+  the one under it) and the re-walk doubles as the probe that notices Brave returning. Still
+  finite: a misfiring detector must not park the lane silently.
+
+  **The 70% no-website alarm is calibrated to a total outage and slept through the whole
+  slide**, including the two worst passes at 60% and 56%, while the lane's output fell 87%.
+  The check-in now judges the lane against **its own trailing median hit rate**
+  (`bloodhound_collect_yield_degraded`, 40% relative fall). Verified on the real log: silent
+  on every healthy pass, fires on both damaged ones. Observation-only.
+
+  **Enrichment is NOT the constraint and has nothing to eat.** 4 batches, 65 leads, **zero
+  failures**, and `no pending inflow — idling` for roughly **20 of 24 hours**. The 09-08
+  redirect of all resources into enrichment is currently buying idle time, because what feeds
+  enrichment is gated behind the $5 plan above.
+
+  **The key pool question narrowed but is still NOT settled.** Third identical morning
+  (**15 working / 50 exhausted / 1 blocked of 66**), and now the second consecutive cycle in
+  which nothing of ours spent a single unit overnight, so our own spending is ruled out twice.
+  But both readings sat ~20 minutes past the reset, so per the 09-08 rule they remain **one
+  measurement repeated**. **The untried discriminator: one probe 6+ hours after the reset on a
+  quiet day** (66 units total). Still 50 exhausted means the quota was cut and more keys from
+  those accounts buy nothing. Do it before discovery resumes, not after.
+
 - 2026-09-09 (debrief): **THE SEND PATH WAS DEAD AND IS NOW REPAIRED. A REPO
   CANNOT SEE ITS OWN CONFIG UNLESS THE LOADER READS THE FRAGMENT.** The 07:20Z
   `npm run send` failed on all 11 leads. `env-storage` holds a shared key bank
