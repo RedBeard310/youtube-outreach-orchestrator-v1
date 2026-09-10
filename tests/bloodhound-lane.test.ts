@@ -1,10 +1,17 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import {
   isDue,
   laneOptsFromEnv,
   runRecoveryDuringOpenRouterHalt,
   staleCollectAfterMs,
+  lastCollectPassFinished,
+  lastCollectPassSearchDead,
+  MAX_CONSECUTIVE_REWINDS,
+  MAX_CONSECUTIVE_SEARCH_DEAD_REWINDS,
   VERIFIABLE_IDS_SQL,
   COLLECT_IDS_SQL,
   type LaneState,
@@ -194,4 +201,61 @@ test('staleCollectAfterMs: outlasts the measured cost of its own batch', () => {
   for (const batch of [40, 150, 400]) {
     assert.ok(staleCollectAfterMs(batch) > batch * measuredMsPerLead * 3);
   }
+});
+
+// --- rewind budgets (2026-09-10) ---------------------------------------------
+// A truncated pass and a search-dead pass shared one 3-deep budget, so a
+// sustained Brave outage alternated three wasted re-walks with one blind
+// 150-lead advance. The budgets are separate now, and the search-dead one is
+// long enough to outlast a monthly spending cap.
+
+test('search-dead rewinds get a far longer budget than truncated ones', () => {
+  assert.equal(MAX_CONSECUTIVE_REWINDS, 3);
+  assert.ok(
+    MAX_CONSECUTIVE_SEARCH_DEAD_REWINDS > MAX_CONSECUTIVE_REWINDS * 4,
+    'a search-dead outage must survive far more passes than a dying child',
+  );
+  // Still finite: a misfiring detector must not pin the walk forever.
+  assert.ok(Number.isFinite(MAX_CONSECUTIVE_SEARCH_DEAD_REWINDS));
+});
+
+test('search-dead budget outlasts a multi-day search outage at the 6h cadence', () => {
+  const daysCovered = (MAX_CONSECUTIVE_SEARCH_DEAD_REWINDS * 6) / 24;
+  assert.ok(daysCovered >= 7, `only ${daysCovered} days of cover`);
+});
+
+test('lastCollectPassSearchDead: unknown log never rewinds', () => {
+  assert.equal(lastCollectPassSearchDead('/nonexistent/collect.log'), null);
+  assert.equal(lastCollectPassFinished('/nonexistent/collect.log'), null);
+});
+
+test('lastCollectPassSearchDead reads the newest pass only', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'bh-'));
+  const p = join(dir, 'collect.log');
+  // An older pass that hit the cap, then a newer clean one: the newer wins.
+  writeFileSync(p, [
+    '',
+    'Bloodhound: 150 leads',
+    '[bloodhound] All 2 Brave Search API key(s) refused: 402 Usage limit exceeded',
+    'Collected 186 contact points from 40/150 leads.',
+    'Bloodhound: 150 leads',
+    '[recA] "A" site=https://a.com/ +5 pts, 1 skipped, 0 err',
+    'Collected 885 contact points from 148/150 leads.',
+    '',
+  ].join('\n'));
+  assert.equal(lastCollectPassSearchDead(p), false);
+  assert.equal(lastCollectPassFinished(p), true);
+
+  // And a refusal inside the newest pass is seen.
+  writeFileSync(p, [
+    '',
+    'Bloodhound: 150 leads',
+    'Collected 885 contact points from 148/150 leads.',
+    'Bloodhound: 150 leads',
+    '[bloodhound] All 2 Brave Search API key(s) refused: 402 Usage limit exceeded',
+    'Collected 186 contact points from 40/150 leads.',
+    '',
+  ].join('\n'));
+  assert.equal(lastCollectPassSearchDead(p), true);
+  rmSync(dir, { recursive: true, force: true });
 });

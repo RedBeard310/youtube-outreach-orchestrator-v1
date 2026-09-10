@@ -1127,6 +1127,70 @@ async function main(): Promise<void> {
     } catch { /* an unreadable collect log is not an incident */ }
   }
 
+  // 7d. The recovery lane's collect pass is SLIDING, not collapsed.
+  //
+  // WHY (2026-09-10). The absolute 70% floor above is calibrated to a total
+  // outage and is blind to the failure that actually happens. As Brave's monthly
+  // cap tightened over 2026-09-09/10 the no-website rate walked up 9%, 11%, 18%,
+  // 17%, 25%, 21%, 33%, 28%, 60%, 56% and the alarm never once fired, while the
+  // lane's output fell from 885 contact points off 148/150 leads to 186 off
+  // 40/150. An 87% fall in the only lane still producing leads, entirely unseen,
+  // because every reading sat under a floor written for zero.
+  //
+  // So judge the lane against ITSELF rather than a fixed number. The signal is
+  // already in the line the block above parses: the M/K in each pass summary is
+  // the share of leads that produced any contact point at all, directly
+  // comparable across passes and immune to how site-rich a given slice happens
+  // to be. A median over the prior passes is the baseline; a large relative drop
+  // below it is the alarm. This fires on a slide that never reaches the floor,
+  // and it also fires if resolution fails some new way that logs no Brave line.
+  //
+  // OBSERVATION ONLY, never exit 7 — same reasoning as 7c. The remedy is a plan
+  // top-up or new keys, which is a spend call a fix-agent must not make.
+  const YIELD_DROP_ALARM_PCT = Number(process.env.AUTOPILOT_COLLECT_YIELD_DROP_PCT ?? 40);
+  if (existsSync(COLLECT_LOG)) {
+    try {
+      const SUMMARY = /^Collected (\d+) contact points from (\d+)\/(\d+) leads\.$/;
+      const passes: Array<{ points: number; hit: number; of: number; rate: number }> = [];
+      // Widen past the 400-line window above: one pass is ~150 lines, and the
+      // baseline needs several passes behind the newest one.
+      for (const raw of readFileSync(COLLECT_LOG, 'utf8').split('\n').slice(-2000)) {
+        const m = SUMMARY.exec(raw.trim());
+        if (!m) continue;
+        const hit = Number(m[2]), of = Number(m[3]);
+        if (of > 0) passes.push({ points: Number(m[1]), hit, of, rate: hit / of });
+      }
+      const MIN_PASS_SAMPLE = 30;
+      const MIN_BASELINE_PASSES = 3;
+      const recent = passes.slice(-9).filter((p) => p.of >= MIN_PASS_SAMPLE);
+      const current = recent[recent.length - 1];
+      const prior = recent.slice(0, -1);
+      if (current && prior.length >= MIN_BASELINE_PASSES) {
+        const sorted = prior.map((p) => p.rate).sort((a, b) => a - b);
+        const mid = Math.floor(sorted.length / 2);
+        const baseline = sorted.length % 2 ? sorted[mid]! : (sorted[mid - 1]! + sorted[mid]!) / 2;
+        const dropPct = baseline > 0 ? (1 - current.rate / baseline) * 100 : 0;
+        if (baseline > 0 && dropPct >= YIELD_DROP_ALARM_PCT) {
+          const braveRefused = readFileSync(COLLECT_LOG, 'utf8')
+            .split('\n').slice(-400).some((l) => l.includes('Brave Search API key'));
+          const cause = braveRefused
+            ? 'The lane logged a Brave Search refusal, so website resolution is the likely cause: raise the plan cap or add BRAVE_SEARCH_API_KEY[_N] keys.'
+            : 'No Brave refusal line was logged, so check the collect log for a new failure mode before assuming the backlog thinned.';
+          appendFileSync(OBSERVATIONS, JSON.stringify({
+            ts: new Date().toISOString(), kind: 'bloodhound_collect_yield_degraded',
+            current_hit: current.hit, current_of: current.of,
+            current_rate_pct: Number((current.rate * 100).toFixed(1)),
+            baseline_rate_pct: Number((baseline * 100).toFixed(1)),
+            drop_pct: Number(dropPct.toFixed(1)), baseline_passes: prior.length,
+            contact_points: current.points,
+            detail: `The recovery lane's last collect pass produced contact points for ${current.hit} of ${current.of} leads (${(current.rate * 100).toFixed(0)}%), against a ${prior.length}-pass median of ${(baseline * 100).toFixed(0)}% — a ${dropPct.toFixed(0)}% relative fall, alarm at ${YIELD_DROP_ALARM_PCT}%. This is the recovery lane's throughput, and while discovery is paused it is the only source of new parked leads. ${cause} Not escalating — the remedy is a spend call a fix-agent cannot make.`,
+          }) + '\n');
+          console.log(`[checkin ${day}] OBSERVATION bloodhound_collect_yield_degraded — ${current.hit}/${current.of} (${(current.rate * 100).toFixed(0)}%) vs ${(baseline * 100).toFixed(0)}% baseline, down ${dropPct.toFixed(0)}%`);
+        }
+      }
+    } catch { /* an unreadable collect log is not an incident */ }
+  }
+
   // Discovery is paused on Casey's instruction, so anything that only describes a
   // stopped lane is expected, not an anomaly. Everything else still escalates.
   if (discoveryPaused) {

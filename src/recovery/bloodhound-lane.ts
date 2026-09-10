@@ -46,9 +46,13 @@ export interface LaneState {
   /** Cursor and lap count as they stood BEFORE the last dispatched batch, held
    *  until that child is seen to have finished. See rewindIfTruncated. */
   collectResume?: { from: CollectCursor | null; laps: number };
-  /** Consecutive rewinds, so a child that dies every single time cannot pin the
-   *  walk on one batch forever (the 2026-08-27 walking-in-place failure). */
+  /** Consecutive rewinds after a TRUNCATED pass, so a child that dies every
+   *  single time cannot pin the walk on one batch forever (the 2026-08-27
+   *  walking-in-place failure). */
   collectRewinds?: number;
+  /** Consecutive rewinds after a SEARCH-DEAD pass. Counted separately from
+   *  `collectRewinds` on purpose — see MAX_CONSECUTIVE_SEARCH_DEAD_REWINDS. */
+  collectSearchDeadRewinds?: number;
 }
 
 export const LANE_STATE_PATH = join('logs', 'bloodhound-lane-state.json');
@@ -179,9 +183,39 @@ export function lastCollectPassSearchDead(
   }
 }
 
-/** Maximum times in a row a truncated pass may be re-walked. Past this the walk
+/** Maximum times in a row a TRUNCATED pass may be re-walked. Past this the walk
  *  moves on regardless: re-running one batch forever is the worse failure. */
 export const MAX_CONSECUTIVE_REWINDS = 3;
+
+/** Maximum times in a row a SEARCH-DEAD pass may be re-walked. Deliberately far
+ *  larger than the truncated cap, because the two failures need opposite
+ *  patience.
+ *
+ *  WHY (2026-09-10). Both reasons shared the 3-deep budget above, and that made
+ *  the lane behave at its worst under exactly the outage the search-dead rewind
+ *  was written for. Brave's cap is MONTHLY, so a re-run does not fix it: the
+ *  lane rewound three times, re-walking one batch it could not search, then hit
+ *  the cap, reset the counter to 0 and advanced 150 leads blind — and then did
+ *  the whole thing again. Measured over 2026-09-09/10: leads producing any
+ *  contact point fell 148/150 to 40/150 and 53/111, and a full lap closed with
+ *  its tail walked at a 27% hit rate. Three wasted re-walks AND a blind advance,
+ *  every cycle.
+ *
+ *  A truncated pass MIGHT succeed on a re-run, so it gets a small budget: a
+ *  child that dies every time must not pin the walk. A search-dead pass will
+ *  not succeed on a re-run, but walking on does not help either — every lead
+ *  ahead of the cursor is just as unsearchable as the one under it. So holding
+ *  the cursor costs nothing while resolution is down, and it preserves the one
+ *  invariant that matters here: a lead is marked walked only once somebody
+ *  actually searched for it. The re-walk doubles as the probe that notices Brave
+ *  coming back, so the lane resumes by itself with no diagnosis.
+ *
+ *  It is still a cap and not `Infinity`, because the detector could misfire and
+ *  a lane pinned forever with no error is the failure this whole file exists to
+ *  prevent. 48 is about twelve days at the 6h collect interval; a search plan
+ *  still refusing after twelve days is a spend decision that has been in the
+ *  observations log every hour since it started. */
+export const MAX_CONSECUTIVE_SEARCH_DEAD_REWINDS = 48;
 
 /** How long a detached collect child may live before a matching PID is assumed
  *  to be OS reuse. Scales with the batch so the guard cannot drift out of date
@@ -481,23 +515,38 @@ export async function runBloodhoundLane(opts: LaneOpts): Promise<void> {
         finished === false ? 'previous_pass_truncated'
         : searchDead === true ? 'previous_pass_search_dead'
         : null;
-      const rewinds = state.collectRewinds ?? 0;
-      if (reason && rewinds < MAX_CONSECUTIVE_REWINDS) {
+      // Two failures, two budgets. Sharing one made a sustained Brave outage
+      // alternate three wasted re-walks with one blind 150-lead advance — see
+      // MAX_CONSECUTIVE_SEARCH_DEAD_REWINDS for the measurement.
+      const truncated = reason === 'previous_pass_truncated';
+      const rewinds = (truncated ? state.collectRewinds : state.collectSearchDeadRewinds) ?? 0;
+      const cap = truncated ? MAX_CONSECUTIVE_REWINDS : MAX_CONSECUTIVE_SEARCH_DEAD_REWINDS;
+      if (reason && rewinds < cap) {
         state.collectCursor = state.collectResume.from ?? undefined;
         state.collectLaps = state.collectResume.laps;
-        state.collectRewinds = rewinds + 1;
+        // Only the reason that fired advances; the other resets, so alternating
+        // failures can never add up to a cap neither one reached on its own.
+        if (truncated) {
+          state.collectRewinds = rewinds + 1;
+          state.collectSearchDeadRewinds = 0;
+        } else {
+          state.collectSearchDeadRewinds = rewinds + 1;
+          state.collectRewinds = 0;
+        }
         opts.log({
           event: 'bloodhound_collect',
           rewound: true,
           reason,
           cursor_tier: state.collectCursor?.tier ?? null,
-          rewinds: state.collectRewinds,
+          rewinds: rewinds + 1,
+          cap,
         });
       } else {
         if (reason) {
-          opts.log({ event: 'bloodhound_collect', rewound: false, reason: 'rewind_cap_reached', blocked_by: reason, rewinds });
+          opts.log({ event: 'bloodhound_collect', rewound: false, reason: 'rewind_cap_reached', blocked_by: reason, rewinds, cap });
         }
         state.collectRewinds = 0;
+        state.collectSearchDeadRewinds = 0;
       }
       state.collectResume = undefined;
       saveState(state);
