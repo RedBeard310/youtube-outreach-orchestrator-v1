@@ -44,8 +44,11 @@ export interface LaneState {
   /** How many full laps of the untouched pool the collect pass has walked. */
   collectLaps?: number;
   /** Cursor and lap count as they stood BEFORE the last dispatched batch, held
-   *  until that child is seen to have finished. See rewindIfTruncated. */
-  collectResume?: { from: CollectCursor | null; laps: number };
+   *  until that child is seen to have finished. See rewindIfTruncated.
+   *  `lapComplete` records whether that batch came up short, i.e. whether it
+   *  closed the lap — a lap-closing batch must never be rewound. See
+   *  `rewindWaiver`. Absent on state written before 2026-09-11. */
+  collectResume?: { from: CollectCursor | null; laps: number; lapComplete?: boolean };
   /** Consecutive rewinds after a TRUNCATED pass, so a child that dies every
    *  single time cannot pin the walk on one batch forever (the 2026-08-27
    *  walking-in-place failure). */
@@ -181,6 +184,94 @@ export function lastCollectPassSearchDead(
   } catch {
     return null;
   }
+}
+
+/** How many leads the last collect pass walked, and how many of them produced at
+ *  least one contact point, read off the CLI's own completion line
+ *  ("Collected 268 contact points from 53/111 leads.").
+ *
+ *  Exists because "Brave refused" and "the pass did no work" are NOT the same
+ *  statement, and the 2026-09-10 rewind rule treated them as one. Returns null
+ *  when the log cannot answer, which every caller must read as "no evidence",
+ *  never as "zero". */
+export function lastCollectPassYield(
+  path = COLLECT_LOG_PATH,
+  tailBytes = 512_000,
+): { walked: number; withPoints: number } | null {
+  try {
+    const fd = openSync(path, 'r');
+    try {
+      const size = statSync(path).size;
+      const start = Math.max(0, size - tailBytes);
+      const buf = Buffer.alloc(Math.min(size, tailBytes));
+      readSync(fd, buf, 0, buf.length, start);
+      const tail = buf.toString('utf8');
+      const header = tail.lastIndexOf('\nBloodhound: ');
+      if (header < 0) return null;
+      const m = /\nCollected \d+ contact points from (\d+)\/(\d+) leads\./.exec(tail.slice(header));
+      if (!m) return null;
+      const withPoints = Number(m[1]);
+      const walked = Number(m[2]);
+      if (!Number.isFinite(walked) || walked <= 0) return null;
+      return { walked, withPoints };
+    } finally {
+      closeSync(fd);
+    }
+  } catch {
+    return null;
+  }
+}
+
+/** Hit rate at or above which a SEARCH-DEAD pass counts as a real walk and the
+ *  cursor is allowed to advance. Below it the pass is treated as "nobody looked
+ *  at these leads" and rewound.
+ *
+ *  WHY (2026-09-11). The search-dead rewind was written on the premise that
+ *  "every lead ahead of the cursor is just as unsearchable as the one under it",
+ *  so holding the cursor costs nothing. Measured against a live Brave outage
+ *  that premise is half wrong: nine methods need a website, but the FREE
+ *  channel-page route resolves one for a large share of leads with no Brave call
+ *  at all. Through this cycle's outage the lane still collected from 148/150,
+ *  143/150, 40/150 and 53/111 leads. Holding the cursor on a pass like that
+ *  costs the entire rest of the book — and Brave's cap is monthly, so "wait for
+ *  it to come back" is up to three weeks of nothing.
+ *
+ *  10% is deliberately far below the lane's healthy 85-95% and below every
+ *  degraded pass on record, so this waiver only fires when resolution is
+ *  genuinely producing something. A pass that truly collects nothing still
+ *  rewinds, which is the case the rule was written for. The relative-fall alarm
+ *  in `checkin.ts` (`bloodhound_collect_yield_degraded`) is the observation half
+ *  of the same measurement and is unchanged. */
+export const SEARCH_DEAD_REWIND_YIELD_FLOOR_PCT = 10;
+
+/** Why a rewind is being skipped even though the previous pass failed its batch,
+ *  or null to go ahead and rewind.
+ *
+ *  WHY `lap_complete` (2026-09-11, and this is the one that actually bit). A
+ *  rewind exists to recover leads stranded BEHIND an advanced cursor. A batch
+ *  that came up short did not strand anybody: it closed the lap, the cursor was
+ *  cleared rather than advanced, and every lead in it is still in the pool, so
+ *  the very next pass re-selects it from the top. Rewinding that case pins the
+ *  lane on the book's short tail instead.
+ *
+ *  That is exactly what ran for the 24h to 2026-09-11T07:00Z. The tail batch was
+ *  tier 1 (no external links) and unsearchable with Brave capped, so three
+ *  consecutive passes re-walked the SAME 58 leads and logged
+ *  "Collected 0 contact points from 0/58 leads" three times, while 3,737 leads
+ *  sat in `needs_contact` and the day parked 8. The 48-deep search-dead budget
+ *  meant it would have done that for about twelve more days. */
+export function rewindWaiver(
+  reason: string | null,
+  resume: { lapComplete?: boolean } | undefined,
+  passYield: { walked: number; withPoints: number } | null,
+): string | null {
+  if (!reason) return null;
+  if (resume?.lapComplete) return 'lap_complete';
+  if (reason === 'previous_pass_search_dead' && passYield) {
+    const pct = (passYield.withPoints / passYield.walked) * 100;
+    if (pct >= SEARCH_DEAD_REWIND_YIELD_FLOOR_PCT) return 'yield_held';
+  }
+  return null;
 }
 
 /** Maximum times in a row a TRUNCATED pass may be re-walked. Past this the walk
@@ -521,7 +612,11 @@ export async function runBloodhoundLane(opts: LaneOpts): Promise<void> {
       const truncated = reason === 'previous_pass_truncated';
       const rewinds = (truncated ? state.collectRewinds : state.collectSearchDeadRewinds) ?? 0;
       const cap = truncated ? MAX_CONSECUTIVE_REWINDS : MAX_CONSECUTIVE_SEARCH_DEAD_REWINDS;
-      if (reason && rewinds < cap) {
+      // A failed pass is not automatically a re-walkable one: a lap-closing
+      // batch strands nobody, and a pass that still collected from a real share
+      // of its leads did the work. Both cases advance. See rewindWaiver.
+      const waiver = rewindWaiver(reason, state.collectResume, lastCollectPassYield());
+      if (reason && !waiver && rewinds < cap) {
         state.collectCursor = state.collectResume.from ?? undefined;
         state.collectLaps = state.collectResume.laps;
         // Only the reason that fired advances; the other resets, so alternating
@@ -542,7 +637,9 @@ export async function runBloodhoundLane(opts: LaneOpts): Promise<void> {
           cap,
         });
       } else {
-        if (reason) {
+        if (reason && waiver) {
+          opts.log({ event: 'bloodhound_collect', rewound: false, reason: 'rewind_waived', waiver, blocked_by: reason });
+        } else if (reason) {
           opts.log({ event: 'bloodhound_collect', rewound: false, reason: 'rewind_cap_reached', blocked_by: reason, rewinds, cap });
         }
         state.collectRewinds = 0;
@@ -593,7 +690,11 @@ export async function runBloodhoundLane(opts: LaneOpts): Promise<void> {
       // the next lap, which beats re-running the same failed batch every 6
       // hours. A batch it never got to is a different thing, so remember where
       // this one started; the next pass rewinds here if the child was cut off.
-      state.collectResume = { from: state.collectCursor ?? null, laps: state.collectLaps ?? 0 };
+      state.collectResume = {
+        from: state.collectCursor ?? null,
+        laps: state.collectLaps ?? 0,
+        lapComplete: batch.lapComplete,
+      };
       advance();
       state.collectPid = child.pid;
       state.lastCollectAt = new Date().toISOString();

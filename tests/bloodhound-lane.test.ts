@@ -10,6 +10,8 @@ import {
   staleCollectAfterMs,
   lastCollectPassFinished,
   lastCollectPassSearchDead,
+  lastCollectPassYield,
+  rewindWaiver,
   MAX_CONSECUTIVE_REWINDS,
   MAX_CONSECUTIVE_SEARCH_DEAD_REWINDS,
   VERIFIABLE_IDS_SQL,
@@ -258,4 +260,89 @@ test('lastCollectPassSearchDead reads the newest pass only', () => {
   ].join('\n'));
   assert.equal(lastCollectPassSearchDead(p), true);
   rmSync(dir, { recursive: true, force: true });
+});
+
+// --- 2026-09-11: a failed pass is not automatically a re-walkable one ---
+// The 24h to 2026-09-11T07:00Z: the collect cursor sat on the book's short tail,
+// the tail was unsearchable with Brave capped, and three passes in a row logged
+// "Collected 0 contact points from 0/58 leads" while 3,737 leads waited.
+
+test('lastCollectPassYield reads the newest completion line', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'bh-'));
+  const p = join(dir, 'collect.log');
+  writeFileSync(p, [
+    '',
+    'Bloodhound: 150 leads',
+    'Collected 885 contact points from 148/150 leads.',
+    'Bloodhound: 58 leads',
+    '[bloodhound] All 2 Brave Search API key(s) refused: 402 Usage limit exceeded',
+    'Collected 0 contact points from 0/58 leads.',
+    '',
+  ].join('\n'));
+  assert.deepEqual(lastCollectPassYield(p), { walked: 58, withPoints: 0 });
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test('lastCollectPassYield: unknown log is no evidence, never zero', () => {
+  assert.equal(lastCollectPassYield('/nonexistent/collect.log'), null);
+});
+
+test('rewindWaiver: a lap-closing batch is never rewound', () => {
+  // The live shape: search dead, collected nothing, but the batch closed the lap
+  // so every one of its leads returns at the top of the next lap anyway.
+  assert.equal(
+    rewindWaiver('previous_pass_search_dead', { lapComplete: true }, { walked: 58, withPoints: 0 }),
+    'lap_complete',
+  );
+  // Same for a truncated pass: nothing was stranded behind an advanced cursor.
+  assert.equal(
+    rewindWaiver('previous_pass_truncated', { lapComplete: true }, null),
+    'lap_complete',
+  );
+});
+
+test('rewindWaiver: a search-dead pass that still collected advances', () => {
+  // Measured degraded passes from the 09-09/09-10 outage. Holding the cursor on
+  // one of these costs the rest of the book for a MONTHLY cap.
+  assert.equal(
+    rewindWaiver('previous_pass_search_dead', { lapComplete: false }, { walked: 150, withPoints: 40 }),
+    'yield_held',
+  );
+  assert.equal(
+    rewindWaiver('previous_pass_search_dead', { lapComplete: false }, { walked: 111, withPoints: 53 }),
+    'yield_held',
+  );
+});
+
+test('rewindWaiver: a search-dead pass that collected nothing still rewinds', () => {
+  assert.equal(
+    rewindWaiver('previous_pass_search_dead', { lapComplete: false }, { walked: 150, withPoints: 0 }),
+    null,
+  );
+  // Under the floor but not zero: still the case the rewind was written for.
+  assert.equal(
+    rewindWaiver('previous_pass_search_dead', { lapComplete: false }, { walked: 150, withPoints: 9 }),
+    null,
+  );
+});
+
+test('rewindWaiver: no yield evidence never waives, and a truncated pass ignores yield', () => {
+  assert.equal(rewindWaiver('previous_pass_search_dead', { lapComplete: false }, null), null);
+  // A child killed 30s in prints a high hit rate over the handful it reached.
+  assert.equal(
+    rewindWaiver('previous_pass_truncated', { lapComplete: false }, { walked: 6, withPoints: 6 }),
+    null,
+  );
+});
+
+test('rewindWaiver: no failure reason means nothing to waive', () => {
+  assert.equal(rewindWaiver(null, { lapComplete: true }, { walked: 58, withPoints: 0 }), null);
+});
+
+test('state written before 2026-09-11 carries no lapComplete and rewinds as before', () => {
+  const legacy: LaneState['collectResume'] = { from: null, laps: 1 };
+  assert.equal(
+    rewindWaiver('previous_pass_search_dead', legacy, { walked: 58, withPoints: 0 }),
+    null,
+  );
 });
