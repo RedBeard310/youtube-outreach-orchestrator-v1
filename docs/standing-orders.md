@@ -197,6 +197,52 @@ this is the shape to check first.**
 
 ## Change log
 
+- 2026-09-11 (debrief): **A REWIND EXISTS TO RESCUE LEADS STRANDED BEHIND AN ADVANCED
+  CURSOR. A BATCH THAT CLOSED ITS LAP STRANDED NOBODY.** Parking fell **44 to 8**, the
+  second-worst day on record, because three of the cycle's four collect passes were handed
+  the same 58 leads. The 07:02Z pass reached the end of the book and came up **short** (111,
+  not 150), which is the queue's signal that the lap is done: the cursor is cleared, not
+  stepped over, so the next pass restarts from the top and re-selects those leads anyway.
+  Yesterday's search-dead rewind put the cursor back instead. 53 of the 111 gained a contact
+  point and left the pool by definition, leaving exactly **58** tier-1 leads with no
+  resolvable site, re-read at 14:00Z, 20:01Z and 02:01Z for **0 contact points from 0 of 58**
+  each time, while **3,737** leads waited. The 48-deep budget shipped the day before meant
+  **twelve more days** of it. Verify starved behind it: 7 passes, 40 leads, against 129.
+
+  **And the reasoning written into that budget does not survive its own logs.** It said that
+  with search dead *"every lead ahead of the cursor is just as unsearchable as the one under
+  it"*, so holding costs nothing. Nine of ten methods need a website, but **Brave is not the
+  only route to one** — the free channel-page route never touches Brave. Measured through
+  this outage with every key answering 402, the lane still collected from **148/150, 143/150,
+  40/150 and 53/111**. **Brave-dead is roughly 48% of healthy, not zero.** Holding the cursor
+  therefore costs the rest of the book against a cap that does not reset until **1 October**.
+  Correct the "$5 plan is the entire top of the funnel" line in the 09-10 entry accordingly:
+  it is about half of it.
+
+  Fixed in `2e86c06` (content in the `e01c242` auto-sync commit — check `git show`, not the
+  message): `rewindWaiver()` skips a rewind when the batch closed its lap, and a search-dead
+  pass that still collected from **≥10%** of its batch advances. A pass that truly collects
+  nothing still rewinds, which is the case the rule was written for. The live state file's
+  pinned `collectResume` was cleared by hand so the next pass starts a fresh lap; backup at
+  `logs/bloodhound-lane-state.json.bak-20260911`. *Verified* 150 leads select from a fresh lap
+  against 58 from the pinned tail, tsc clean, 34/34 tests, 8 new.
+
+  **Second fix, a different permanent-loss class: one invisible byte kills a lead forever.**
+  Three enrichment runs failed on one lead with `invalid byte sequence for encoding "UTF8":
+  0x00`. Postgres cannot hold a NUL byte in text at all, and Stage 4 saves YouTube comment
+  bodies verbatim. Because it fails **identically every time**, the backfill chain relaunched
+  the lead and **burned all three `MAX_ATTEMPTS` in five minutes**, dropping it from the pool
+  for good, and it produced the `done=0` batches the 09-02 guard exists to catch.
+  `recvP5IA0vHjvMvrf` died the same way on 08-25. Fixed in `quick-youtube-channel-research-v1`
+  `04fa62d` (`src/lib/pg-safe.ts`, applied in stages 3 and 4). **The 67 permanently excluded
+  enrichment leads are infrastructure casualties, not bad leads, and nothing reopens them by
+  itself.**
+
+  **Key pool: fourth identical morning** (15 working / 50 exhausted / 1 blocked of 66) and a
+  third straight cycle with nothing of ours spending a unit overnight. Still **one
+  measurement repeated** — all four readings sat ~20 minutes past the reset. The untried
+  discriminator is unchanged: **one probe 6+ hours after the reset**, 66 units, on a quiet day.
+
 - 2026-09-10 (debrief): **THE SEND REPAIR HELD (11 of 11 to SmartLead), AND A $5/MONTH
   SEARCH PLAN IS NOW THE ENTIRE TOP OF THE FUNNEL.** With discovery paused, every new lead
   comes from the Bloodhound recovery lane, nine of its ten collection methods need a website
