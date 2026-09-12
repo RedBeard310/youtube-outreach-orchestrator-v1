@@ -264,12 +264,31 @@ export function rewindWaiver(
   reason: string | null,
   resume: { lapComplete?: boolean } | undefined,
   passYield: { walked: number; withPoints: number } | null,
+  priorSearchDeadRewinds = 0,
 ): string | null {
   if (!reason) return null;
   if (resume?.lapComplete) return 'lap_complete';
   if (reason === 'previous_pass_search_dead' && passYield) {
     const pct = (passYield.withPoints / passYield.walked) * 100;
     if (pct >= SEARCH_DEAD_REWIND_YIELD_FLOOR_PCT) return 'yield_held';
+    // A re-walk that produced nothing is the end of the evidence, not the start
+    // of it. WHY (2026-09-12): the pass that just ran was ITSELF a re-walk of
+    // the batch before it (priorSearchDeadRewinds >= 1). It walked the same
+    // leads, with the same search plan still refusing under the same MONTHLY
+    // cap, and collected zero a second time. Nothing about a third attempt can
+    // differ, so the 48-deep budget below just re-walks one batch for twelve
+    // days. Measured on 2026-09-11/12: passes three and four of the cycle were
+    // byte-identical 150-lead batches, both "Collected 0 contact points from
+    // 0/150 leads", and the budget had 46 more of those queued up.
+    //
+    // This waives only the SECOND consecutive zero. The first rewind still
+    // happens, which is what preserves the case the rewind was written for: a
+    // pass whose child was cut off logs no completion line, gets one re-walk,
+    // and that re-walk is real work. And a pass that collected anything at all
+    // is handled by the yield floor above, not here.
+    if (passYield.withPoints === 0 && priorSearchDeadRewinds >= 1) {
+      return 'rewalk_produced_nothing';
+    }
   }
   return null;
 }
@@ -399,6 +418,54 @@ export interface CollectBatch {
   nextCursor: CollectCursor | null;
   /** True when the batch came up short, i.e. the lap is done. */
   lapComplete: boolean;
+}
+
+/** The same pool COLLECT_IDS_SQL walks, as a count, plus the leads that have
+ *  fallen into the gap between the two selectors.
+ *
+ *  WHY (2026-09-12). The lane spent this whole cycle telling Casey, once an
+ *  hour, that its yield had collapsed because Brave was refusing and he should
+ *  raise the search plan's cap. Brave WAS refusing. It was not the binding
+ *  constraint. The collect pool had drained to 253 leads against a batch of
+ *  150, so four passes walked 571 lead-slots over 271 distinct leads and two of
+ *  them were byte-identical — the lane was re-walking its entire remaining book
+ *  twice a day. Raising the search cap would have bought 253 leads, not the
+ *  3,735 in `needs_contact`, and the alarm text said otherwise in so many words.
+ *
+ *  `stranded` is the reason those two numbers are so far apart, and it is the
+ *  bigger finding. COLLECT_IDS_SQL excludes a lead that has ANY contact point;
+ *  VERIFIABLE_IDS_SQL only selects leads that have an EMAIL contact point. A
+ *  lead the collector worked and came away from holding a website, a phone or a
+ *  social handle satisfies neither: collect will never look at it again and
+ *  verify can never rule on it. 2,778 of 3,735 `needs_contact` leads sit in that
+ *  gap, 2,281 of them carrying an already-resolved website — the expensive half
+ *  of the job, done, and unreachable by both halves of the lane.
+ *
+ *  Measuring it here rather than in the check-in keeps the definition next to
+ *  the two selectors it is derived from, so a change to either cannot leave the
+ *  alarm describing a pool that no longer exists. */
+export async function collectBookDepth(): Promise<{ pool: number; stranded: number }> {
+  const rows = await query<{ pool: string | number; stranded: string | number }>(
+    `SELECT
+       count(*) FILTER (
+         WHERE lc.outreach_status = ANY(ARRAY['no_email_found', 'email_invalid'])
+           AND lc.signal_score >= 6
+           AND NOT EXISTS (SELECT 1 FROM leads.contact_points cp WHERE cp.lead_id = lc.id)
+       ) AS pool,
+       count(*) FILTER (
+         WHERE EXISTS (SELECT 1 FROM leads.contact_points cp WHERE cp.lead_id = lc.id)
+           AND NOT EXISTS (
+             SELECT 1 FROM leads.contact_points cp
+              WHERE cp.lead_id = lc.id
+                AND cp.kind IN ('business_email', 'personal_email', 'youtube_email'))
+       ) AS stranded
+       FROM leads.lead_candidates lc
+      WHERE lc.review_status = 'needs_contact'
+        AND COALESCE(lc.do_not_contact, false) = false`,
+    [],
+  );
+  const r = rows[0];
+  return { pool: Number(r?.pool ?? 0), stranded: Number(r?.stranded ?? 0) };
 }
 
 export async function selectUntouchedBatch(
@@ -615,7 +682,10 @@ export async function runBloodhoundLane(opts: LaneOpts): Promise<void> {
       // A failed pass is not automatically a re-walkable one: a lap-closing
       // batch strands nobody, and a pass that still collected from a real share
       // of its leads did the work. Both cases advance. See rewindWaiver.
-      const waiver = rewindWaiver(reason, state.collectResume, lastCollectPassYield());
+      const waiver = rewindWaiver(
+        reason, state.collectResume, lastCollectPassYield(),
+        state.collectSearchDeadRewinds ?? 0,
+      );
       if (reason && !waiver && rewinds < cap) {
         state.collectCursor = state.collectResume.from ?? undefined;
         state.collectLaps = state.collectResume.laps;
@@ -700,6 +770,12 @@ export async function runBloodhoundLane(opts: LaneOpts): Promise<void> {
       state.lastCollectAt = new Date().toISOString();
       state.collectStartedAt = state.lastCollectAt;
       saveState(state);
+      // How much book is left, recorded on every dispatch so "the lane stopped
+      // producing" can be told apart from "the lane finished its book" without
+      // a database session. A pool at or under the batch size means this pass
+      // re-walked everything the collector can still see. Never fatal: a
+      // counting query that fails must not stop a pass that already spawned.
+      const depth = await collectBookDepth().catch(() => null);
       opts.log({
         event: 'bloodhound_collect',
         leads: ids.length,
@@ -707,6 +783,9 @@ export async function runBloodhoundLane(opts: LaneOpts): Promise<void> {
         cursor_tier: batch.nextCursor?.tier ?? null,
         lap_complete: batch.lapComplete,
         laps: state.collectLaps ?? 0,
+        pool_remaining: depth?.pool ?? null,
+        stranded_no_email: depth?.stranded ?? null,
+        book_drained: depth ? depth.pool <= opts.collectBatch : null,
       });
     } catch (e) {
       opts.log({ event: 'bloodhound_collect', error: e instanceof Error ? e.message : String(e) });

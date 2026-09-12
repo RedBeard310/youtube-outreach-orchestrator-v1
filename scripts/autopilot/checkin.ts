@@ -23,6 +23,7 @@ import { spawn, execSync } from 'node:child_process';
 import { summarizeToday, pacificDate } from './burn-ledger.js';
 import { countByReviewStatus } from '../../src/airtable.ts';
 import {
+  collectBookDepth,
   laneOptsFromEnv,
   runBloodhoundLane,
   runRecoveryDuringOpenRouterHalt,
@@ -1084,7 +1085,49 @@ async function main(): Promise<void> {
   // drained books above.
   const COLLECT_LOG = join(LOGS, 'bloodhound-collect.log');
   const NO_SITE_ALARM_PCT = Number(process.env.AUTOPILOT_NO_SITE_ALARM_PCT ?? 70);
-  if (existsSync(COLLECT_LOG)) {
+
+  // 7b-i. Is the collect BOOK the constraint, rather than website resolution?
+  //
+  // WHY (2026-09-12). Both alarms below blame the search plan whenever a Brave
+  // refusal line is in the log, and that line is now printed at the top of
+  // EVERY pass, so the attribution is effectively unconditional. Through the
+  // 24h to 2026-09-12T07:00Z they fired 24 times telling Casey to raise the
+  // Brave cap. Brave was refusing, but it was not what stopped the lane: the
+  // collect pool had drained to 253 leads against a batch of 150, so the lane
+  // re-walked its whole remaining book twice a day and two consecutive passes
+  // were byte-identical. Raising the cap would have bought 253 leads.
+  //
+  // An alarm that names the wrong remedy is worse than no alarm, because the
+  // remedy it names costs money. So measure the book first, and when the book
+  // is the binding constraint say so and suppress the two below — they are
+  // describing a real symptom of a cause they have wrong.
+  // The test is "does a day of passes cover the whole book more than once",
+  // NOT "is the pool smaller than one batch". At batch 150 on a 6h cadence the
+  // lane walks 600 lead-slots a day, so a 253-lead pool is re-walked roughly
+  // twice daily even though it is larger than a single batch — which is exactly
+  // the state that produced 571 lead-slots over 271 distinct leads on
+  // 2026-09-11/12. Deriving both numbers from laneOptsFromEnv keeps the alarm
+  // correct if either the batch or the cadence is retuned.
+  let bookDrained = false;
+  try {
+    const laneOpts = laneOptsFromEnv(process.env.EMAIL_OUTREACH_REPO_PATH ?? '', true, () => {});
+    const perDay = Math.max(1, Math.round(24 / laneOpts.collectIntervalHours)) * laneOpts.collectBatch;
+    const depth = await collectBookDepth();
+    bookDrained = depth.pool <= perDay;
+    if (bookDrained) {
+      const laps = (perDay / Math.max(1, depth.pool)).toFixed(1);
+      appendFileSync(OBSERVATIONS, JSON.stringify({
+        ts: new Date().toISOString(), kind: 'bloodhound_collect_book_drained',
+        pool_remaining: depth.pool, collect_batch: laneOpts.collectBatch,
+        lead_slots_per_day: perDay, relaps_per_day: Number(laps),
+        stranded_no_email: depth.stranded,
+        detail: `The recovery lane's collect pool is down to ${depth.pool} leads while the lane walks ${perDay} lead-slots a day, so it re-walks its whole remaining book about ${laps}x daily. This — not website resolution — is what caps its output, and the two site-resolution alarms are suppressed this run because they would name a search-plan top-up as the remedy. Raising the Brave cap buys ${depth.pool} leads, not the needs_contact pool. The leads are not gone: ${depth.stranded} needs_contact leads hold a contact point that is not an email, which excludes them from the collector (it skips any lead that has ANY contact point) AND from the verifier (it only rules on email-kind points). Reaching those is a code change, not a spend decision.`,
+      }) + '\n');
+      console.log(`[checkin ${day}] OBSERVATION bloodhound_collect_book_drained — pool ${depth.pool} vs ${perDay} lead-slots/day (${laps}x), ${depth.stranded} stranded`);
+    }
+  } catch { /* the book depth is a nicety; a DB hiccup must not mute 7c/7d */ }
+
+  if (existsSync(COLLECT_LOG) && !bookDrained) {
     try {
       // Per-lead lines look like: [recXXXX] "Name" site=(none) +0 pts, 9 skipped, 2 err
       // and each pass ends with:  Collected N contact points from M/K leads.
@@ -1148,7 +1191,7 @@ async function main(): Promise<void> {
   // OBSERVATION ONLY, never exit 7 — same reasoning as 7c. The remedy is a plan
   // top-up or new keys, which is a spend call a fix-agent must not make.
   const YIELD_DROP_ALARM_PCT = Number(process.env.AUTOPILOT_COLLECT_YIELD_DROP_PCT ?? 40);
-  if (existsSync(COLLECT_LOG)) {
+  if (existsSync(COLLECT_LOG) && !bookDrained) {
     try {
       const SUMMARY = /^Collected (\d+) contact points from (\d+)\/(\d+) leads\.$/;
       const passes: Array<{ points: number; hit: number; of: number; rate: number }> = [];

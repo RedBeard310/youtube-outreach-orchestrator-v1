@@ -326,6 +326,41 @@ test('rewindWaiver: a search-dead pass that collected nothing still rewinds', ()
   );
 });
 
+test('rewindWaiver: a second consecutive zero re-walk advances instead of pinning', () => {
+  // The real 2026-09-11/12 sequence. Pass three rewound once (rewinds -> 1);
+  // pass four was the identical 150-lead batch and collected nothing again.
+  assert.equal(
+    rewindWaiver('previous_pass_search_dead', { lapComplete: false }, { walked: 150, withPoints: 0 }, 0),
+    null,
+    'the FIRST zero still rewinds — that is the case the rewind exists for',
+  );
+  assert.equal(
+    rewindWaiver('previous_pass_search_dead', { lapComplete: false }, { walked: 150, withPoints: 0 }, 1),
+    'rewalk_produced_nothing',
+    'a re-walk that collected nothing must not be re-walked a third time',
+  );
+});
+
+test('rewindWaiver: the second-zero waiver does not leak into the other cases', () => {
+  // Under the floor but NOT zero: the pass collected something, so the evidence
+  // is ambiguous and the old patience applies however many rewinds deep we are.
+  assert.equal(
+    rewindWaiver('previous_pass_search_dead', { lapComplete: false }, { walked: 150, withPoints: 9 }, 5),
+    null,
+  );
+  // A truncated pass is a different failure: nobody walked those leads at all,
+  // so the search-dead re-walk budget must not speak for it.
+  assert.equal(
+    rewindWaiver('previous_pass_truncated', { lapComplete: false }, { walked: 150, withPoints: 0 }, 3),
+    null,
+  );
+  // And a pass that held its yield still advances for the older reason.
+  assert.equal(
+    rewindWaiver('previous_pass_search_dead', { lapComplete: false }, { walked: 150, withPoints: 40 }, 2),
+    'yield_held',
+  );
+});
+
 test('rewindWaiver: no yield evidence never waives, and a truncated pass ignores yield', () => {
   assert.equal(rewindWaiver('previous_pass_search_dead', { lapComplete: false }, null), null);
   // A child killed 30s in prints a high hit rate over the handful it reached.
