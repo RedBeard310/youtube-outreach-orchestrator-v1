@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lead Run Debrief — 2026-09-12</title>
+<style>
+  :root {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+      --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+      --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+    --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+    --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 40px 22px 80px; }
+  .eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); font-weight: 600; }
+  h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.12; margin: 10px 0 6px; text-wrap: balance; letter-spacing: -.02em; }
+  h2 { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); margin: 44px 0 16px; font-weight: 700; }
+  h3 { font-size: 18px; margin: 0 0 6px; letter-spacing: -.01em; }
+  p { margin: 0 0 14px; }
+  .lede { font-size: 18px; color: var(--ink-soft); max-width: 68ch; }
+  .tag { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--amber-soft); color: var(--amber); letter-spacing: .02em; }
+  .tag.ok { background: var(--teal-soft); color: var(--teal); }
+  .tag.bad { background: var(--red-soft); color: var(--red); }
+  .grid { display: grid; gap: 14px; }
+  .stats { grid-template-columns: repeat(4, 1fr); margin-top: 26px; }
+  @media (max-width: 720px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; box-shadow: var(--shadow); }
+  .stat .n { font-size: 30px; font-weight: 750; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .stat .l { font-size: 12.5px; color: var(--ink-soft); margin-top: 3px; }
+  .stat .s { font-size: 12px; margin-top: 8px; font-weight: 600; }
+  .up { color: var(--good); } .down { color: var(--red); } .warn { color: var(--amber); }
+  .accent-red { border-left: 3px solid var(--red); }
+  .accent-teal { border-left: 3px solid var(--teal); }
+  .accent-amber { border-left: 3px solid var(--amber); }
+
+  .strip { display: flex; align-items: flex-end; gap: 5px; height: 140px; padding: 14px 14px 10px; overflow-x: auto; }
+  .barwrap { flex: 1 0 22px; display: flex; flex-direction: column; align-items: center; gap: 5px; }
+  .bar { width: 100%; border-radius: 3px 3px 0 0; background: var(--teal); opacity: .9; }
+  .bar.low { background: var(--amber); }
+  .bar.today { background: var(--red); opacity: 1; }
+  .barlab { font-size: 10.5px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-soft); padding: 0 14px 14px; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+
+  .q { border-radius: 14px; padding: 20px 22px; margin-bottom: 14px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); }
+  .q .ask { font-size: 17px; font-weight: 700; color: var(--ink); margin-bottom: 10px; display: flex; gap: 10px; align-items: baseline; }
+  .q .ask .qn { color: var(--red); font-weight: 800; flex: 0 0 auto; }
+  .q.accent-teal .ask .qn { color: var(--teal); }
+  .q p { color: var(--ink-soft); }
+  .q b { color: var(--ink); }
+  .pill { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink); background: var(--panel-2); padding: 1px 7px; border-radius: 6px; border: 1px solid var(--line); white-space: nowrap; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+  th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); }
+  td .num { font-variant-numeric: tabular-nums; font-weight: 650; }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); box-shadow: var(--shadow); }
+  ol.recs { padding-left: 0; list-style: none; counter-reset: r; margin: 0; }
+  ol.recs li { counter-increment: r; position: relative; padding: 14px 16px 14px 52px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 10px; box-shadow: var(--shadow); }
+  ol.recs li::before { content: counter(r); position: absolute; left: 14px; top: 14px; width: 26px; height: 26px; border-radius: 8px; background: var(--teal-soft); color: var(--teal); font-weight: 800; font-size: 14px; display: grid; place-items: center; }
+  ol.recs b { color: var(--ink); }
+  .foot { margin-top: 46px; padding: 16px 18px; border-radius: 12px; background: var(--amber-soft); border: 1px solid var(--line); font-size: 14px; color: var(--ink-soft); }
+  .foot b { color: var(--ink); }
+  .muted { color: var(--ink-soft); font-size: 13.5px; }
+  code { background: var(--panel-2); border: 1px solid var(--line); border-radius: 5px; padding: 0 5px; font-size: .9em; }
+</style>
+
+<div class="wrap">
+
+  <div class="eyebrow">Lead Run Debrief · YouTube outreach</div>
+  <h1>2026-09-12 — the recovery lane has run out of leads to look at, and it has been blaming Brave</h1>
+  <p class="lede">Two leads parked, the worst day on record. For nine days the story has been that a $5 search plan is throttling the recovery lane. That was true, and it is no longer the main thing. The lane's collect queue is down to <b>253 leads</b>, and it walks 600 lead-slots a day, so it now re-reads its whole remaining book roughly twice every 24 hours. Four passes yesterday covered 571 slots across only 271 distinct leads, and two of them were the same 150 leads run twice. Meanwhile <b>2,778</b> of the 3,735 leads in <code>needs_contact</code> have fallen into a gap between the lane's two halves where nothing will ever look at them again.</p>
+  <div style="margin-top:14px"><span class="tag bad">COLLECT BOOK DRAINED</span> <span class="tag bad">2,778 LEADS STRANDED</span> <span class="tag">DISCOVERY PAUSED BY CASEY</span> <span class="tag">BRAVE STILL CAPPED</span></div>
+
+  <div class="grid stats">
+    <div class="card stat accent-red">
+      <div class="n">+2</div>
+      <div class="l">parked into <code>approved_hold</code></div>
+      <div class="s down">worst on record, down from 8 and from 627 on 09-03</div>
+    </div>
+    <div class="card stat accent-red">
+      <div class="n">253</div>
+      <div class="l">leads the collector can still see</div>
+      <div class="s down">against 600 lead-slots walked per day</div>
+    </div>
+    <div class="card stat accent-red">
+      <div class="n">2,778</div>
+      <div class="l">leads stranded between the two selectors</div>
+      <div class="s down">2,281 of them with a website already found</div>
+    </div>
+    <div class="card stat accent-amber">
+      <div class="n">4</div>
+      <div class="l">leads left in the verify queue</div>
+      <div class="s warn">6 passes ran, 30 lead-slots used of 1,200</div>
+    </div>
+  </div>
+
+  <h2>The shape of the day</h2>
+
+  <div class="card" style="padding:0">
+    <div class="strip">
+      <div class="barwrap"><div class="bar" style="height:10%"></div><div class="barlab">63</div></div>
+      <div class="barwrap"><div class="bar" style="height:28%"></div><div class="barlab">177</div></div>
+      <div class="barwrap"><div class="bar" style="height:100%"></div><div class="barlab">627</div></div>
+      <div class="barwrap"><div class="bar low" style="height:11%"></div><div class="barlab">71</div></div>
+      <div class="barwrap"><div class="bar low" style="height:11%"></div><div class="barlab">71</div></div>
+      <div class="barwrap"><div class="bar" style="height:24%"></div><div class="barlab">151</div></div>
+      <div class="barwrap"><div class="bar" style="height:78%"></div><div class="barlab">488</div></div>
+      <div class="barwrap"><div class="bar" style="height:23%"></div><div class="barlab">142</div></div>
+      <div class="barwrap"><div class="bar" style="height:21%"></div><div class="barlab">133</div></div>
+      <div class="barwrap"><div class="bar low" style="height:7%"></div><div class="barlab">44</div></div>
+      <div class="barwrap"><div class="bar low" style="height:2%"></div><div class="barlab">8</div></div>
+      <div class="barwrap"><div class="bar today" style="height:1%"></div><div class="barlab">2</div></div>
+    </div>
+    <div class="legend">
+      <span>Leads parked into <code>approved_hold</code> per cycle, 09-01 through 09-12 (today in red)</span>
+    </div>
+  </div>
+
+  <p class="muted" style="margin-top:14px">Discovery of new channels has been off since 09-08 on Casey's instruction, so the recovery lane is the only thing that can add a parked lead. Everything after 09-08 on that chart is the recovery lane alone.</p>
+
+  <h2>The funnel</h2>
+
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Stage</th><th>This cycle</th><th>Reading</th></tr></thead>
+      <tbody>
+        <tr><td>New channels discovered</td><td class="num">0</td><td>Intended. Paused by Casey on 09-08.</td></tr>
+        <tr><td><code>needs_contact</code> pool</td><td class="num">3,735</td><td>Fell by 2, exactly the number recovered.</td></tr>
+        <tr><td>— reachable by the collector</td><td class="num">253</td><td>19 have external links, 234 do not.</td></tr>
+        <tr><td>— stranded, no email contact point</td><td class="num">2,778</td><td>Invisible to both halves of the lane.</td></tr>
+        <tr><td>— already ruled on and failed</td><td class="num">704</td><td>Correctly retired. Nothing to do here.</td></tr>
+        <tr><td>Collect passes</td><td class="num">4</td><td>571 lead-slots over 271 distinct leads.</td></tr>
+        <tr><td>Contact points collected</td><td class="num">83</td><td>80 on pass one, 3 on pass two, 0 and 0 after.</td></tr>
+        <tr><td>Verify passes</td><td class="num">6</td><td>30 lead-slots used of a 1,200 capacity.</td></tr>
+        <tr><td>Parked into <code>approved_hold</code></td><td class="num">2</td><td>Pool 5,754 → 5,756.</td></tr>
+        <tr><td>Enrichment batches</td><td class="num">1</td><td>2 leads done, 0 failed. Idle the rest of the day.</td></tr>
+        <tr><td><code>npm run send</code></td><td class="num">0</td><td>Nothing ready. Exited clean.</td></tr>
+        <tr><td>Fatal signatures / halts / quota stops</td><td class="num">0</td><td>Nothing crashed. That is the problem.</td></tr>
+        <tr><td>Anthropic spend</td><td class="num">$0.00</td><td>Of a $150 hard ceiling.</td></tr>
+        <tr><td>OpenRouter</td><td class="num">$2.27/day</td><td>$58.70 left, about 26 days.</td></tr>
+        <tr><td>YouTube key pool</td><td class="num">15 / 66</td><td>50 out of quota, 1 suspended. Fifth identical morning.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>The three questions</h2>
+
+  <div class="q">
+    <div class="ask"><span class="qn">Q1</span><span>Why did only two leads park?</span></div>
+    <p>Because the recovery lane has almost nothing left to read. Its collect half picks leads out of <code>needs_contact</code> that have <b>no contact point of any kind</b>. That pool is now <span class="pill">253</span> leads. The lane runs four passes a day at 150 leads each, so it walks 600 lead-slots daily against a 253-lead book. It is reading the same leads over and over.</p>
+    <p>The logs say it plainly once you count them. Four collect passes covered <b>571 lead-slots</b> but only <b>271 distinct leads</b>. Passes three and four were handed a byte-identical list of 150. They returned <b>"Collected 0 contact points from 0/150 leads"</b> both times, which is what re-reading a lead you already read gets you.</p>
+    <p>The verify half is in the same state from the other direction: <b>6 passes, 30 lead-slots used out of 1,200 available</b>, and the queue now stands at <span class="pill">4</span> leads. Neither half is broken. Both have finished their work.</p>
+  </div>
+
+  <div class="q">
+    <div class="ask"><span class="qn">Q2</span><span>Where did the other 3,482 leads go?</span></div>
+    <p>They are still sitting in <code>needs_contact</code>, and nothing in the pipeline can reach them. This is the finding of the day and it is worth reading slowly.</p>
+    <p>The lane has two halves with two separate rules for picking leads. The collector skips any lead that <b>already has a contact point</b>, on the reasonable grounds that it has already been worked. The verifier only picks leads that have an <b>email</b> contact point, because an email is the only thing it can check.</p>
+    <p>A lead where the collector found a website, a phone number and an Instagram handle but no email satisfies neither rule. The collector will never look at it again. The verifier has nothing to rule on. <b>2,778 of the 3,735 leads are in exactly that position</b> — 74% of the pool, permanently parked in the gap between two sensible rules.</p>
+    <p>This is the same shape as the Apify double-billing bug on 09-06, where a channel that published no email looked identical to a channel nobody had checked. Here it is inverted: a lead that was checked and yielded something useless looks identical to a lead that is finished.</p>
+    <p><b>2,281 of those stranded leads carry a website contact point that is already stored.</b> Finding that website is the expensive step, the one Brave's cap is blocking. For those 2,281 it is already paid for and sitting in the database.</p>
+  </div>
+
+  <div class="q accent-teal">
+    <div class="ask"><span class="qn">Q3</span><span>So is raising the Brave cap still the top lever?</span></div>
+    <p>No, and the pipeline has been saying otherwise once an hour for a day. The two lane alarms both blame the search plan whenever a Brave refusal appears in the log, and that line is now printed at the top of <b>every single pass</b>, so the attribution had become automatic. They fired <b>24 times</b> in this cycle telling Casey to raise the cap or add keys.</p>
+    <p>Brave really is refusing, at <code>402 Usage limit exceeded</code> against the $5 monthly cap, and it does not reset until <b>1 October</b>. But raising it now buys the 253 leads the collector can still see, not the 3,735 the pool report shows. An alarm that names the wrong fix is worse than no alarm when the fix it names costs money.</p>
+    <p>Yesterday's rewind fix did work, for the record. The <code>lap_complete</code> waiver fired at 21:02Z and released the lane off the 58-lead tail it had been pinned to, and batch sizes went straight back to a full 150. The lane then re-pinned itself at the top of the book instead, for a different reason, which is fixed below.</p>
+  </div>
+
+  <h2>What broke → what's fixed</h2>
+
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>What happened</th><th>What shipped</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><b>The lane could not tell an empty book from a blocked one.</b> It had no idea how many leads it had left, so a drained queue and a search outage produced the same symptom, and the hourly check-in read it as the outage every time.</td>
+          <td><code>collectBookDepth()</code> counts the pool the collector actually walks, plus the stranded set, and every collect dispatch now logs <code>pool_remaining</code>, <code>stranded_no_email</code> and <code>book_drained</code>. Verified live against Postgres: 253 and 2,778.</td>
+        </tr>
+        <tr>
+          <td><b>The check-in told Casey 24 times to spend money on the wrong thing.</b> Both site-resolution alarms blamed the Brave plan unconditionally, because the refusal line they key on is now printed on every pass.</td>
+          <td>A new <code>bloodhound_collect_book_drained</code> observation fires when a day's passes cover the whole book more than once, and it <b>suppresses</b> the two older alarms when it does. Verified by re-running the check-in end to end: the new one fires with the right numbers, the old two go quiet.</td>
+        </tr>
+        <tr>
+          <td><b>A re-read that found nothing was re-read again, up to 48 times.</b> Passes three and four were the identical 150 leads and both collected zero. The search-dead budget had 46 more of those queued, which is about twelve days.</td>
+          <td><code>rewindWaiver</code> now waives the <b>second</b> consecutive zero. The first still rewinds, which preserves the case the rewind was written for (a pass whose child was killed never looked at its leads). Brave's cap is monthly, so a third identical attempt cannot come out differently.</td>
+        </tr>
+        <tr>
+          <td><b>Enrichment ran one batch of two leads and idled the rest of the day</b> — 383 "no pending inflow" checks. Zero failures.</td>
+          <td>Nothing to fix. Enrichment is healthy and starved. It eats what the recovery lane parks, and the recovery lane parked two.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p class="muted">Shipped in orchestrator <code>075e3b3</code>. Typecheck clean, 36 of 36 tests passing with 2 new ones covering the rewind rule, the book-depth query run live, and the check-in re-run end to end before commit.</p>
+
+  <h2>Recommended next — ranked</h2>
+
+  <ol class="recs">
+    <li><b>Build a second collect mode for the 2,778 stranded leads. This is the whole pipeline's top lever and it needs no spend.</b> 2,281 of them already have a website stored as a contact point. Re-running the site-scraping methods against that stored address skips resolution entirely, which means <b>zero Brave calls</b> — the exact thing the cap is blocking. The change is a selector that picks leads holding a non-email contact point, and a collect path that uses the stored website instead of searching for one. It is a code change, not a spend decision, and it is roughly nine times more leads than the collector's entire remaining book.</li>
+    <li><b>Decide whether the Brave cap is still worth raising.</b> It is no longer the first lever, but it is still the only route to a website for the 234 tier-1 leads in the remaining pool, and it will matter again the moment discovery resumes. The cap resets on <b>1 October</b> either way. Casey's spend call.</li>
+    <li><b>Settle the YouTube key pool question with one late-day probe.</b> Fifth consecutive morning reading 15 working / 50 out of quota / 1 suspended of 66, and a fourth straight cycle in which nothing of ours spent a unit overnight. Every one of those readings was taken about 20 minutes after the midnight-PT reset, so they remain <b>one measurement repeated</b>. One probe six or more hours after the reset, on a quiet day, costs 66 quota units and answers it. Worth doing before discovery resumes, not after.</li>
+    <li><b>Leave the 704 ruled-and-failed leads alone.</b> They have been checked and their addresses are dead. They are correctly retired and re-checking them spends ZeroBounce credits for nothing.</li>
+    <li><b>Nothing needs restarting.</b> No fatal signatures, no halted hours, no quota stops, no crashes. <code>npm run send</code> found nothing ready and exited clean. The loop is running and should stay running.</li>
+  </ol>
+
+  <div class="foot">
+    <b>Standing context.</b> Discovery of new channels is paused by Casey's instruction of 2026-09-08 and every stopped sweep, stale sweep state file and dry term pool is intended, not an incident. Sending email stays manual via <code>npm run send</code>. Nothing in this report touched a <code>.env</code> file, and no discovery lane was re-enabled or repaired.
+  </div>
+
+</div>
+</html>

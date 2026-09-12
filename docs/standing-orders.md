@@ -197,6 +197,60 @@ this is the shape to check first.**
 
 ## Change log
 
+- 2026-09-12 (debrief): **THE RECOVERY LANE HAS FINISHED ITS BOOK, AND 2,778 LEADS ARE
+  STRANDED IN A GAP BETWEEN ITS TWO SELECTORS. STOP PLANNING AGAINST THE 3,735.** Parking
+  fell **8 to 2**, the worst on record. The collect half selects `needs_contact` leads with
+  **no contact point of any kind**, and that pool is now **253** (19 tier-0, 234 tier-1)
+  while the lane walks **600 lead-slots a day**. So it re-reads its whole remaining book
+  ~2.4x daily: four passes covered **571 lead-slots over 271 distinct leads**, and passes
+  three and four were a **byte-identical 150-lead batch** returning `0 contact points from
+  0/150` both times. The verify half is done from the other end — **30 lead-slots used of
+  1,200** across 6 passes, queue **4 deep**.
+
+  **The gap is the finding.** `COLLECT_IDS_SQL` excludes any lead that has ANY contact
+  point; `VERIFIABLE_IDS_SQL` only takes leads with an EMAIL-kind point. A lead the
+  collector worked and came away from holding a website, a phone or a social handle but no
+  email satisfies **neither**, so nothing looks at it again. That is **2,778 of 3,735**
+  (74%): website 2,281, social 1,101, domain_info 1,056, phone 785. Another 704 were ruled
+  on and failed and are correctly retired. Same shape as the 09-06 Apify double-billing bug,
+  inverted: there a never-checked channel looked like a checked-and-empty one; here a
+  checked-and-useless lead looks like a finished one.
+
+  **`needs_contact` = 3,735 is NOT the recovery lane's runway and never was.** Quote 253.
+
+  **We spent a day recommending the wrong spend.** Both lane alarms blame the search plan
+  whenever a Brave refusal is in the log, and that line now prints at the top of EVERY pass,
+  so the attribution had gone unconditional — **24 firings** telling Casey to raise the cap.
+  Brave IS refusing (402, $5 monthly cap, resets **1 October**), but raising it buys **253**
+  leads, not 3,735. An alarm that names a remedy costing money must be sure the remedy is
+  the constraint.
+
+  **Yesterday's `lap_complete` waiver worked** — it fired at 21:02Z, released the 58-lead
+  tail and batches went back to a full 150 — **and then the lane re-pinned at the TOP of the
+  book.** A rewind with `resume.from = null` restarts the same lap, and the top of the book
+  is a stable set that yields zero while search is down.
+
+  Fixed in `075e3b3`: `collectBookDepth()` counts the pool and the stranded set in one query
+  beside the two selectors it derives from, logged on every dispatch as `pool_remaining` /
+  `stranded_no_email` / `book_drained`; a new `bloodhound_collect_book_drained` observation
+  fires when a day's passes cover the book more than once and **suppresses** the two
+  misattributing alarms; `rewindWaiver` waives the **second** consecutive zero re-walk (the
+  first still rewinds, which keeps the killed-child case the rewind exists for) — the
+  48-deep budget had 46 more identical passes queued, about twelve days. *Verified*: tsc
+  clean, 36/36 tests (2 new), the depth query run live against Postgres, the check-in re-run
+  end to end with the new alarm firing and the old two silent.
+
+  **#1 OPEN LEVER, NO SPEND: a second collect mode over the 2,778 stranded leads.** 2,281
+  already carry a stored `website` contact point, which is the expensive step Brave's cap
+  blocks, already paid for. A selector for leads holding a non-email contact point plus a
+  collect path that uses the stored site instead of resolving one makes **zero Brave calls**
+  and is roughly 9x the collector's entire remaining book. Code change, not a spend call.
+
+  **Key pool: fifth identical morning** (15 working / 50 exhausted / 1 blocked of 66) and a
+  fourth straight cycle with nothing of ours spending a unit overnight. All five readings
+  sat ~20 min past the reset, so per the 09-08 rule they remain **one measurement repeated**.
+  The untried discriminator is unchanged: **one probe 6+ hours after the reset**, 66 units.
+
 - 2026-09-11 (debrief): **A REWIND EXISTS TO RESCUE LEADS STRANDED BEHIND AN ADVANCED
   CURSOR. A BATCH THAT CLOSED ITS LAP STRANDED NOBODY.** Parking fell **44 to 8**, the
   second-worst day on record, because three of the cycle's four collect passes were handed
