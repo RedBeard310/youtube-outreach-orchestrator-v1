@@ -226,6 +226,34 @@ this is the shape to check first.**
 
 ## Change log
 
+- 2026-09-13 (Casey, in chat): **TAVILY IS OUT. BRAVE IS THE ONLY WEB SEARCH.** The email
+  finder searched Tavily when a channel links no website, and Tavily's plan was capped (the
+  432s in the pilot entry below). Casey's call: both are plain web search and Brave is
+  cheaper ($5 per 1,000 searches against Tavily's $8), so drop Tavily and use Brave. The
+  finder and the recovery lane now share `youtube-email-outreach-v1/src/search/brave.ts`,
+  which retires a key once its plan limit is spent. **Brave headroom now pays for email
+  finding too**, so a big finder run spends the same plan the recovery lane depends on.
+  Casey also put $50 on key _1 today, which answers again. Key _2 is still stuck at its $5
+  limit, and Brave's API never reports a balance.
+  *Verified:* typecheck clean, 153/153 tests (3 new), and a live run on 5 pilot leads whose
+  channels link no website and that had ended `no_email_found`: **all 5 now return an email
+  candidate** (none checked by ZeroBounce). Two needed a fix first. Brave ranks contact-data
+  broker pages (contactout.com, ninjaoutreach.com) first for "<name> email", those pages
+  block scraping, and the finder gave up, so brokers are now on the finder's skip list.
+  **Open risk, older than this change:** when search supplies the website, the finder takes
+  the top result with no check that the creator owns it. "Grow with Betty" (an Ethiopian
+  public-speaking trainer) came back as `linda@gardenbetty.com`, a stranger's gardening
+  site, and ZeroBounce would pass that address. The recovery lane already has the right
+  check (`websiteCandidateLooksOwned`) and the finder doesn't use it. Adding it before
+  finding emails past the pilot is Casey's call.
+  **Built twice, read this before merging v2:** a parallel session made the same swap on
+  `feat/v2-score-gates` (`fe6d3752d`) minutes before this one landed on the live branch
+  `recovery-retry-no-email` (`8979990fd`). A trial merge conflicts in 4 files
+  (`src/search/brave.ts`, `tests/brave-search.test.ts`, `src/email/finder-llm.ts`,
+  `src/bloodhound/db.ts`). Keep ONE Brave module when merging. The live one deletes
+  `tavily.ts`, carries the broker skip list and ran live on 5 leads. The v2 one carries the
+  null-email crash fix and a one-retry on a pure rate limit, both worth keeping.
+
 - 2026-09-13 (Casey order): **Score and work the 5,395 under-rated 10k+ leads.**
   New order at the top. Scored all 5,395 with the new `--ids-file` flag for
   **$0.66** of OpenRouter. Finance and coaching hold **176 whales, 171 strong 7s,
