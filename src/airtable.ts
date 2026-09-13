@@ -56,14 +56,16 @@ export interface Lead {
    *  (comment-sweep), "peer-comment:"/"peer-guest:" (peer-sweep). Used by
    *  debrief-data.ts to attribute daily discovery counts per method. */
   discovered_via: string | null;
-  /** True when this person is on the do-not-contact registry (`leads.do_not_contact`,
-   *  maintained by automator/scripts/dnc-sync.py). Set for anyone who asked us to
-   *  stop, declined, became a client, got free work, is mid-conversation, or whose
-   *  address bounced. NEVER compose or send to one of these. */
+  /** True when this person is blocked right now by the do-not-contact registry
+   *  (`leads.do_not_contact_active`, maintained by automator/scripts/dnc-sync.py): a
+   *  client, free work, a booked or held call, an abusive reply, a bounce, a hand block,
+   *  or a conversation that is still live. NEVER compose or send to one of these.
+   *  Since Operation Siege (2026-09-13) a decline or a stop request is NOT a block: it is a
+   *  no to the one offer it answered, and dnc-sync only records it. */
   do_not_contact: boolean;
-  /** Why they're suppressed: opted_out | hostile | client | free_work |
-   *  in_conversation | bounced | not_interested | manual. `not_interested` is the
-   *  only one that expires (45 days), and dnc-sync releases it on its own. */
+  /** Why they're blocked: client | free_work | had_call | hostile | bounced | manual |
+   *  in_conversation. in_conversation lasts while the thread is live (their message last,
+   *  or anything under 14 days old), and dnc-sync releases it on its own. */
   dnc_reason: string | null;
 }
 

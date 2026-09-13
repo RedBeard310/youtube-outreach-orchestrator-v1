@@ -121,11 +121,13 @@ Full detail: [automator/docs/dnc-sync.md](../automator/docs/dnc-sync.md).
   actually stops a send is per-lead in `youtube-email-outreach-v1/src/cli/outreach.ts`,
   once at the top of `runLead` and once more immediately before the SmartLead POST.
   Never remove either.
-- **Reasons are not interchangeable.** `opted_out` is permanent and legally load-
-  bearing. `not_interested` is a 45-day cooldown that releases itself, because
-  someone who said "not right now" never asked to be removed. `client`, `free_work`
-  and `in_conversation` are people we still talk to, just never by cold sequence, so
-  they are NOT pushed to SmartLead's block list.
+- **Reasons are not interchangeable.** Since Operation Siege (Casey, 2026-09-13;
+  automator/docs/siege.md), `not_interested` and `opted_out` block nobody: each is a no
+  to the one offer it answered, recorded so that offer is never repeated. The 45-day
+  cooldown is gone. `in_conversation` blocks only while the thread is live. `had_call`
+  (a booked or held call, no-show included), `client`, `free_work`, `bounced`,
+  `hostile` and `manual` are permanent. Only `hostile` is pushed to SmartLead's block
+  list; clients, free work and live conversations are people Casey still emails by hand.
 - **Suppressing someone by hand** means an entry in `automator/config/dnc-manual.json`,
   not a status change here. Releasing them means deleting the config entry AND the
   registry row; deleting only the config does nothing, on purpose.
