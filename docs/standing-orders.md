@@ -232,8 +232,17 @@ this is the shape to check first.**
   29 other 7+ and 311 sixes** (of 2,490). Gate change is on `feat/v2-score-gates`
   in both repos, tested, unmerged. A rolled-back dry run shows **1,671 leads
   newly pass the contact gate, 0 newly pass the hold gate** (none has a contact
-  counted yet) and **nobody who passed before is refused**. Next: a 50-lead
-  email-finder pilot on finance and coaching whales, then a report to Casey.
+  counted yet) and **nobody who passed before is refused**.
+  **Pilot, 50 finance and coaching whales** (`--stop-after verify`, run from the
+  branch worktree for its opt-in cost logs): **18 verified, 26 no email, 4
+  invalid, 2 failed**, at **$0.0015/lead OpenRouter** plus **0.48 ZeroBounce
+  checks/lead**. The free re-score gave all 18 the contact point (15 went 8 to 9,
+  3 went 9 to 10), and the new hold gate would admit exactly those 18. None moved
+  to `approved_hold`; that waits on Casey.
+  **Brave does not touch this path. Tavily does, and it is capped:** it answers
+  `432 exceeds your plan's set usage limit`, so the finder's "no linked website"
+  fallback search is dead. 25 of 48 traced finds hit the cap and 11 came up with
+  no website at all. Raising Tavily is Casey's spend call.
 
 - 2026-09-13 (debrief): **THE GAP IS CLOSED. The recovery lane's book went 251 → 3,028,
   and the 09-12 recommendation to "build a second collect mode" is DONE — but NOT by
