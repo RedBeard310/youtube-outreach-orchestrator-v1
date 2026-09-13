@@ -10,7 +10,7 @@ It turns a pile of scored YouTube-creator leads into either (a) cold outreach em
 
 ## Vocabulary (read this first)
 
-The whole system is a state machine over two Airtable fields. Everything below refers back to these.
+The whole system is a state machine over two fields on the lead table (`leads.lead_candidates` in Postgres). Everything below refers back to these.
 
 - **tick** — one run of the orchestrator. Reads the DB, advances eligible leads one stage, logs, exits.
 - **branch** — one of three independent work paths a tick runs (approved, D100, lead-finder).
@@ -32,14 +32,14 @@ pending → email_found → email_verified ─┬─(approved)→ enriched → e
 
 Each tick does four things ([src/cli/orchestrate.ts](src/cli/orchestrate.ts)):
 
-1. **Query** the lead base for `review_status in (approved, D100)` AND not-yet-terminal for that branch. *(deterministic Airtable read)*
+1. **Query** the lead table for `review_status in (approved, D100)` AND not-yet-terminal for that branch. *(deterministic database read)*
 2. **Bucket** leads into the approved branch vs. the D100 branch. *(deterministic)*
 3. **Drive each branch** by spawning the relevant downstream repo with `--lead-ids` for that batch, and waiting for it to finish. *(spawns child processes — all real work, including every AI/LLM call, happens inside those child repos, never here)*
 4. **Log** one JSONL line to `logs/orchestrator-<date>.jsonl`. *(deterministic)*
 
 ```
         ┌─────────────── tick ───────────────┐
-        │  read Airtable → bucket leads        │
+        │  read Postgres → bucket leads        │
         ▼                                      │
   approved branch          D100 branch         │   lead-finder branch
   (driveApproved)          (driveD100)         │   (driveLeadFinder)
@@ -48,9 +48,9 @@ Each tick does four things ([src/cli/orchestrate.ts](src/cli/orchestrate.ts)):
   full pipeline,           outreach --stop-    │   `npm run agent`
   --concurrency 4          after verify        │   (gated; default OFF)
         │                  step B (per lead):  │        │
-        ▼                  setup-airtable.ts?  │        ▼
+        ▼                  register-client.ts? │        ▼
   sent_to_smartlead        + run-channel.ts    │   new leads land in
-                           60s sleep between   │   Airtable for a
+                           60s sleep between   │   Postgres for a
                                 │              │   future tick
                                 ▼              │
                       deep_research_complete   │
@@ -59,7 +59,7 @@ Each tick does four things ([src/cli/orchestrate.ts](src/cli/orchestrate.ts)):
 The three branches:
 
 - **Approved** ([src/drivers/approved.ts](src/drivers/approved.ts)) — one shell-out: `npm run outreach -- --lead-ids <csv> --concurrency 4` in the email-outreach repo. That repo runs find → verify → enrich (Quick research) → compose → push to SmartLead. Terminal: `sent_to_smartlead`.
-- **D100** ([src/drivers/d100.ts](src/drivers/d100.ts)) — two steps. **Step A:** email-outreach `--stop-after verify` (find + verify only). **Step B**, per verified lead: derive a `slug` from `channel_name`; if the slug is new, bootstrap a per-prospect Airtable base via `setup-airtable.ts`; set `deep_research_in_progress`; run `run-channel.ts`; set `deep_research_complete` or `deep_research_failed`. Sleeps 60s between leads to respect YouTube's per-minute quota. This is the only branch that writes `outreach_status`.
+- **D100** ([src/drivers/d100.ts](src/drivers/d100.ts)) — two steps. **Step A:** email-outreach `--stop-after verify` (find + verify only). **Step B**, per verified lead: derive a `slug` from `channel_name`; if the slug is new, register the client via `register-client.ts` (a `research.clients` row plus a `clients.json` entry); set `deep_research_in_progress`; run `run-channel.ts`; set `deep_research_complete` or `deep_research_failed`. Sleeps 60s between leads to respect YouTube's per-minute quota. This is the only branch that writes `outreach_status`.
 - **Lead-finder** ([src/drivers/lead-finder.ts](src/drivers/lead-finder.ts)) — runs **last** so a long discovery run can't delay per-lead work. Default **paused**; see Modes.
 
 ## Modes
@@ -78,10 +78,10 @@ There is no "quick vs deep" mode *within* a tick — the branch a lead takes is 
 ## Operational behavior, safety, and verification
 
 - **Idempotent / safe to re-run.** Yes by design. The query excludes terminal leads, so re-running a tick only re-drives unfinished ones. This is also the entire retry strategy: there is **no in-tick retry** — a failed lead just gets picked up next tick.
-- **Failure handling.** `failed` and `deep_research_failed` are **non-terminal on purpose** — most failures here are transient (YouTube quota, Airtable timeouts), so they auto-retry forever. There's no failure-count cap in v1, so a genuinely broken lead loops indefinitely until fixed by hand. `deep_research_in_progress` *is* terminal — once set, a mid-flight run is never auto-restarted (stuck-in-progress leads need manual intervention).
+- **Failure handling.** `failed` and `deep_research_failed` are **non-terminal on purpose** — most failures here are transient (YouTube quota, network errors), so they auto-retry forever. There's no failure-count cap in v1, so a genuinely broken lead loops indefinitely until fixed by hand. `deep_research_in_progress` *is* terminal — once set, a mid-flight run is never auto-restarted (stuck-in-progress leads need manual intervention).
 - **Concurrency / locking.** Single-instance via a PID lockfile at `logs/.tick-lock` ([src/lock.ts](src/lock.ts)). If a tick (or manual finder) is already running, the new invocation no-ops. Stale locks (dead PID) are reclaimed automatically.
 - **Ordering.** Within a tick: approved → D100 → finder (finder last on purpose).
-- **Blast radius.** The orchestrator itself only **writes `outreach_status` on D100 leads** and **spawns child processes**. The expensive/irreversible effects live downstream: the approved branch causes real emails to be *loaded* into SmartLead (then sent on SmartLead's own schedule), and every branch spends API money. A newcomer's easiest mistakes: running a real `npm run tick` against a fat backlog (cost spike — see Cost), or running the one destructive helper script (`purge-host-gate-failed.ts`, which deletes Airtable rows).
+- **Blast radius.** The orchestrator itself only **writes `outreach_status` on D100 leads** and **spawns child processes**. The expensive/irreversible effects live downstream: the approved branch causes real emails to be *loaded* into SmartLead (then sent on SmartLead's own schedule), and every branch spends API money. A newcomer's easiest mistakes: running a real `npm run tick` against a fat backlog (cost spike — see Cost), or running the one destructive helper script (`purge-host-gate-failed.ts`, which deletes lead rows from Postgres).
 - **How to tell it worked.** Watch stdout, then read the JSONL line in `logs/orchestrator-<date>.jsonl` (fields: `approved_processed`, `d100_step_b_succeeded/_failed`, `finder_yield`, exit codes). **Do not** trust SmartLead's UI to confirm sends — it lags and over-reports; verify real sends with `youtube-email-outreach-v1/scripts/sl-sent-per-day.ts`. "Loaded into a campaign" ≠ "emailed."
 
 ## Running it / first-timer guide
@@ -116,11 +116,11 @@ npm run typecheck        # tsc --noEmit
 | `verify-status-vocab.mjs` | Confirm every `review_status` / `outreach_status` the orchestrator uses is in the database vocabulary | read-only |
 | **`purge-host-gate-failed.ts`** | **Export-then-DELETE** `host_name_low_confidence` failures (writes a verified JSON backup to `backups/` first) | **DESTRUCTIVE** |
 
-**Onboarding a new D100 prospect** is automatic — the D100 driver bootstraps the per-prospect base on first encounter. No manual step.
+**Onboarding a new D100 prospect** is automatic. The D100 driver registers the client on first encounter. No manual step.
 
 **Non-obvious things you'd learn the hard way:** (1) the schema prerequisite below; (2) the finder is paused by default — `npm run tick` will *not* find new leads; (3) `npm run tick` blocks until the downstream repos finish, which can be many minutes.
 
-**Schema prerequisite:** the `outreach_status` single-select on `lead_candidates` must already include `deep_research_in_progress`, `deep_research_complete`, `deep_research_failed`, or Airtable rejects the D100 writes and those leads stall at `email_verified`.
+**Schema prerequisite:** the lookup table `leads.vocab_lead_candidates_outreach_status` must already include `deep_research_in_progress`, `deep_research_complete`, `deep_research_failed`, or the D100 writes fail and those leads stall at `email_verified`. Check with `node scripts/verify-status-vocab.mjs`.
 
 ## External services
 
@@ -128,7 +128,7 @@ The orchestrator's *own* surface is tiny: it talks to exactly one external servi
 
 | Service | What it's for | Direction | Direct or transitive |
 |---|---|---|---|
-| **Airtable** | Reads all lead state; writes `outreach_status` for D100 leads | two-way | **direct** (only direct dependency) |
+| **Postgres** (`pipeline` database, through `pipeline-db`) | Reads all lead state; writes `outreach_status` for D100 leads | two-way | **direct** (only direct dependency) |
 | YouTube Data API v3 | Channel/video/search lookups in finder + enrichment | read | transitive (downstream repos) |
 | Anthropic API | Haiku scoring/classifiers; Opus compose | two-way | transitive |
 | ZeroBounce | Email verification | two-way | transitive |
@@ -143,7 +143,7 @@ The orchestrator's *own* surface is tiny: it talks to exactly one external servi
 | Repo | Relationship | How it connects |
 |---|---|---|
 | `youtube-email-outreach-v1` | **hard dependency** | shell-out: approved full pipeline, and D100 step A (`--stop-after verify`) |
-| `youtube-deep-research-v1` | **hard dependency** (D100 only) | shell-out: `setup-airtable.ts` (bootstrap) + `run-channel.ts` (deep research) |
+| `youtube-deep-research-v1` | **hard dependency** (D100 only) | shell-out: `register-client.ts` (bootstrap) + `run-channel.ts` (deep research) |
 | `youtube-lead-finder-v1` | **hard dependency** (finder branch) | shell-out: `npm run agent` |
 | `quick-youtube-channel-research-v1` | indirect | invoked *by* email-outreach during enrichment; orchestrator never calls it |
 
@@ -167,7 +167,7 @@ Time: a tick blocks until downstream finishes; D100 adds 60s/lead of deliberate 
 ## What downstream consumes the output
 
 - **Approved path →** SmartLead campaigns (emails loaded, sent on SmartLead's Mon–Thu 09:00–15:00 ET schedule). A human reviews replies.
-- **D100 path →** the per-prospect Airtable base populated by `youtube-deep-research-v1`; consumed by a human (and, eventually, a not-yet-built D100 compose agent).
+- **D100 path →** the prospect's rows in the `research` schema (keyed by `client_id`), populated by `youtube-deep-research-v1`; consumed by a human (and, eventually, a not-yet-built D100 compose agent).
 - The orchestrator's own JSONL logs are consumed only by humans / the helper scripts.
 
 ## Files, config, and credentials
@@ -177,7 +177,7 @@ Time: a tick blocks until downstream finishes; D100 adds 60s/lead of deliberate 
 | [src/cli/orchestrate.ts](src/cli/orchestrate.ts) | tick entry point (`npm run tick`) |
 | [src/cli/run-finder.ts](src/cli/run-finder.ts) | manual finder entry point (`npm run finder`) |
 | [src/drivers/](src/drivers/) | the three branch drivers |
-| [src/airtable.ts](src/airtable.ts) | lead query + status writes; the `ReviewStatus`/`OutreachStatus` enums |
+| [src/airtable.ts](src/airtable.ts) | lead query + status writes (talks to Postgres through `pipeline-db`, despite the file name); the `ReviewStatus`/`OutreachStatus` enums |
 | [src/lock.ts](src/lock.ts), [src/logger.ts](src/logger.ts), [src/run.ts](src/run.ts) | lockfile, JSONL logger, child-process spawner |
 | [.env](.env) / [.env.example](.env.example) | config & secrets (gitignored) |
 | `logs/orchestrator-*.jsonl` | per-tick structured logs |
@@ -186,7 +186,7 @@ Time: a tick blocks until downstream finishes; D100 adds 60s/lead of deliberate 
 | [scripts/](scripts/) | operational/diagnostic toolkit (see Running it) |
 | [orchestrator-spec.md](orchestrator-spec.md), [system-overview.md](system-overview.md), [CLAUDE.md](CLAUDE.md) | full spec / system context / operating contract |
 
-**Credentials required:** `AIRTABLE_PAT` (Airtable personal access token) + `LEAD_BASE_ID` (`appenY7r5jlZMRpJ0`). That's all the *orchestrator* needs. To actually run a tick end-to-end, the three downstream repos each need their own keys configured (Anthropic, YouTube/RapidAPI, ZeroBounce, Firecrawl, Supadata, SmartLead). Secrets load via `dotenv` from `.env`; on Casey's setup the real source of truth is `~/Claude/env-storage/.env`, exported through `~/.zshenv`.
+**Credentials required:** the database connection string, read from `/home/casey/.pipeline-db.env` on the VPS (or from `PIPELINE_DATABASE_URL` / `DATABASE_URL`). That's all the *orchestrator* needs. `src/airtable.ts` still throws if `AIRTABLE_PAT` or `LEAD_BASE_ID` is unset, but `pipeline-db` ignores both values. To actually run a tick end-to-end, the three downstream repos each need their own keys configured (Anthropic, YouTube/RapidAPI, ZeroBounce, Firecrawl, Supadata, SmartLead). Secrets load via `dotenv` from `.env`; on Casey's setup the real source of truth is `~/Claude/env-storage/.env`, exported through `~/.zshenv`.
 
 ## What's off vs. not built
 
@@ -205,7 +205,7 @@ Time: a tick blocks until downstream finishes; D100 adds 60s/lead of deliberate 
 | Decision | Why |
 |---|---|
 | Orchestrator owns **zero business logic**; only shells out | keeps it a ~thin, swappable coordinator; logic stays where it's tested |
-| **Polling, not webhooks** | simplicity for v1; Airtable is the single source of truth |
+| **Polling, not webhooks** | simplicity for v1; the lead database is the single source of truth |
 | `failed`/`deep_research_failed` made **non-terminal** (2026-05-24) | most failures are transient; auto-retry buys self-healing at the cost of unbounded retries on truly-broken leads |
 | D100 reuses `outreach_status` rather than a new field | Casey's call — filter by `review_status=D100` to disambiguate visually |
 | **Ticks made manual-only** (2026-06-01) | scheduled ticks silently no-fired (asleep Mac) and a stale env path was killing them; durable fix needs an always-on host |
@@ -215,7 +215,7 @@ Time: a tick blocks until downstream finishes; D100 adds 60s/lead of deliberate 
 
 ## Watch-outs and open questions
 
-- **Doc contradictions (code wins).** Two stale spots in [README.md](README.md): it describes a live 4-hour cron (actually disabled — [CLAUDE.md](CLAUDE.md) is authoritative), and its setup block names `AIRTABLE_API_KEY` + two repo paths, but the code reads **`AIRTABLE_PAT`** ([src/airtable.ts:65](src/airtable.ts#L65)) and `.env.example` defines **three** repo paths. Trust the code and `.env.example`.
+- **Doc contradiction (code wins).** [README.md](README.md) describes a live 4-hour cron. It's actually disabled, and [CLAUDE.md](CLAUDE.md) is authoritative.
 - **Unbounded retries = cost risk.** A backlog of `failed` leads re-drives every tick; one 119-lead backlog cost an estimated $20–100 in a single tick. No cap exists.
 - **`slugify` drift.** If `youtube-deep-research-v1` ever changes its slugify, D100 bootstrap lookups silently mismatch and re-create bases. They must stay identical.
 - **Synchronous & blocking.** A tick holds the lockfile and blocks until every child finishes; a hung downstream repo hangs the tick.
@@ -234,5 +234,5 @@ From [reminders.md](reminders.md) (parked, not built):
 - **Last orchestrator tick logged:** 2026-06-04 (`approved_processed=13`). No tick JSONL since — consistent with manual-only operation; recent send/finder activity ran via ad-hoc `.log` runs, not the tick logger.
 - **Last lead-finder run:** 2026-06-04, which discovered **1,079** new leads — 187 at `signal_score ≥ 6`, 170 of those with an identified host.
 - **Approved pipeline:** essentially drained (per CLAUDE.md); the ~268 `unreviewed` leads all score 4–5, below the ≥6 bar — *not* untapped volume. New volume comes from a fresh `npm run finder` run.
-- **Cron status:** both the 4-hour tick cron and the nightly enrichment-cleanup cron are **disabled**; both must be run by hand.
+- **Cron status:** the 4-hour tick cron is **disabled**, so ticks run by hand. The nightly enrichment cleanup was retired on 2026-08-12 and must not be run.
 - To refresh these numbers: `npx tsx scripts/pipeline-state.ts` (pipeline counts) and the most recent `logs/orchestrator-*.jsonl`.

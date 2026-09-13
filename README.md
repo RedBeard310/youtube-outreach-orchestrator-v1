@@ -1,6 +1,6 @@
 # youtube-outreach-orchestrator-v1
 
-Thin polling coordinator. Reads the lead Airtable base on a cron and shells out to the appropriate next-stage repo. Owns no business logic.
+Thin polling coordinator. Reads the lead table in Postgres (`leads.lead_candidates`) on a cron and shells out to the appropriate next-stage repo. Owns no business logic.
 
 See [CLAUDE.md](CLAUDE.md) for the operational contract and [orchestrator-spec.md](orchestrator-spec.md) for the full design.
 
@@ -9,8 +9,12 @@ See [CLAUDE.md](CLAUDE.md) for the operational contract and [orchestrator-spec.m
 ```bash
 npm install
 cp .env.example .env
-# Fill in AIRTABLE_API_KEY, EMAIL_OUTREACH_REPO_PATH, DEEP_RESEARCH_REPO_PATH
+# Fill in EMAIL_OUTREACH_REPO_PATH, DEEP_RESEARCH_REPO_PATH, LEAD_FINDER_REPO_PATH.
+# AIRTABLE_PAT and LEAD_BASE_ID must still be non-empty (src/airtable.ts checks them),
+# but the Postgres layer ignores their values.
 ```
+
+The database connection string is read from `/home/casey/.pipeline-db.env` on the VPS, or from `PIPELINE_DATABASE_URL` / `DATABASE_URL` if either is set. See [CLAUDE.md](CLAUDE.md) → "Database architecture (Postgres, since 2026-08-12)".
 
 ## Run a tick (prep)
 
@@ -58,12 +62,12 @@ The orchestrator self-handles re-entry via `logs/.tick-lock` — if a previous t
 
 ## Schema prerequisite
 
-Before running for real, add these singleSelect options to the `outreach_status` field on `lead_candidates` in Airtable (the orchestrator's d100 driver writes them):
+Before running for real, make sure the lookup table `leads.vocab_lead_candidates_outreach_status` in Postgres holds these `outreach_status` values (the orchestrator's d100 driver writes them):
 
 - `deep_research_in_progress`
 - `deep_research_complete`
 - `deep_research_failed`
 
-Without them, Airtable will reject the orchestrator's status writes and d100 leads will stay stuck at `email_verified`.
+Without them, the orchestrator's status writes fail and d100 leads stay stuck at `email_verified`. Check with `node scripts/verify-status-vocab.mjs`. It only reads, and it prints how to add any value that's missing.
 
-The approved-path parked statuses `ready_data_scraped` / `ready_no_data` do **not** need manual pre-creation — they're written by `youtube-email-outreach-v1` with `typecast: true`, so Airtable auto-creates the options on first write.
+The approved-path parked statuses `ready_data_scraped` / `ready_no_data` do **not** need adding by hand. They're written by `youtube-email-outreach-v1` with `typecast: true`, so `pipeline-db` adds a missing value to the lookup table on first write.

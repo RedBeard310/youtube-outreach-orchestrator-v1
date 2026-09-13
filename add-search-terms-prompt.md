@@ -16,7 +16,7 @@ I have an Excel sheet attached with new search terms — niches, sub-niches, ang
 
 ### Step 1 — bulk-add the terms
 
-Parse the attached sheet and write each term as a new row in `search_terms` (Airtable base `appenY7r5jlZMRpJ0`). For each new row:
+Parse the attached sheet and write each term as a new row in `search_terms` (`leads.search_terms` in the Postgres `pipeline` database). For each new row:
 
 - `term` — the search term itself, as-is from the sheet
 - `status` — `active`

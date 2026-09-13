@@ -7,7 +7,7 @@
 > Casey changes a priority in chat. (Created 2026-08-14 because day-to-day
 > instructions kept slipping between sessions.)
 
-Thin coordination loop. Polls Airtable on a cron, advances leads through whichever stage they're ready for by shelling out to existing repos. Owns no business logic of its own.
+Thin coordination loop. Polls the lead table in Postgres on a cron, advances leads through whichever stage they're ready for by shelling out to existing repos. Owns no business logic of its own.
 
 Full spec: [orchestrator-spec.md](orchestrator-spec.md). Read it before making non-trivial changes.
 
@@ -17,7 +17,7 @@ Full spec: [orchestrator-spec.md](orchestrator-spec.md). Read it before making n
 - **No direct skill calls.** The orchestrator calls `youtube-email-outreach-v1`; that repo routes compose to `5-ideas-email` / `nick-saraev-cold-email` via its own A/B variant system.
 - **Postgres is the state store** (since 2026-08-12; Airtable before that). The orchestrator reads `review_status` and `outreach_status` from `leads.lead_candidates` in the `pipeline` database and writes nothing directly — underlying repos write their own state. Access goes through the `pipeline-db` package, which presents the same interface the Airtable SDK did, so call sites read the same as they always did.
 - **Don't retry inside a tick.** Failed leads get picked up on the next tick automatically. Log non-zero exits, continue, don't stop the world.
-- **`failed` and `deep_research_failed` are non-terminal** (since 2026-05-24). The orchestrator auto-retries them on the next tick because most failures here are transient (YouTube quota, Airtable timeouts). No failure-count bounding in v1 — genuinely broken leads will loop until manually fixed. This is an intentional simplification, not an oversight.
+- **`failed` and `deep_research_failed` are non-terminal** (since 2026-05-24). The orchestrator auto-retries them on the next tick because most failures here are transient (YouTube quota, network errors). No failure-count bounding in v1 — genuinely broken leads will loop until manually fixed. This is an intentional simplification, not an oversight.
 - **Single-instance.** No concurrent ticks. Use a lockfile at `logs/.tick-lock`; if held, the new tick no-ops.
 - **Polling only.** No webhook server, queue, or event bus.
 
@@ -60,7 +60,7 @@ Lead-finder (interval-driven, runs LAST in the tick), plus two lead-driven branc
 
 - **Lead-finder branch** — shells out to `youtube-lead-finder-v1`'s `npm run agent`. Default: **paused** (`LEAD_FINDER_AUTO=false`). When auto is on, fires only if `LEAD_FINDER_INTERVAL_HOURS` (default 24) has elapsed since its last successful run. State tracked in `logs/lead-finder-state.json`. Manual on-demand trigger via `npm run finder` (always runs, bypasses both gates, acquires the same lockfile as `npm run tick`).
 
-Branched on `review_status` (case-sensitive — Airtable values are `approved` lowercase, `D100` uppercase):
+Branched on `review_status` (case-sensitive: the stored values are `approved` lowercase, `D100` uppercase):
 
 - `approved` → **the tick preps only.** Shell out to `youtube-email-outreach-v1` for find → verify → enrich (Quick research) with `--stop-after enrich`, then **park the lead at `outreach_status = "ready_data_scraped"`** (enriched, ready to write). Writing and sending the email are **deliberately decoupled from the tick** (since 2026-07-17) — see [Writing/sending is decoupled from the tick](#writingsending-is-decoupled-from-the-tick-since-2026-07-17). Fire the parked leads on demand with **`npm run send`** (compose → push to SmartLead, paused). Tick-terminal: `ready_data_scraped`. Overall-terminal: `outreach_status = "sent_to_smartlead"`.
 - `D100` → step A: `youtube-email-outreach-v1 --stop-after verify`; step B: per-lead invocation of `youtube-deep-research-v1`'s `scripts/run-channel.ts` (with auto-bootstrap via `scripts/register-client.ts` if the slug is new to `clients.json`). Each d100 lead is a `client_id` in the shared `research` schema; it used to be a whole Airtable base of its own. **No compose, no SmartLead in v1.** Terminal: `outreach_status = "deep_research_complete"`.
@@ -73,7 +73,7 @@ All other `review_status` values (`unreviewed`, `rejected`, `sent`, `below_thres
 
 ### `outreach_status` values
 
-The d100 path extends `outreach_status` rather than introducing a separate field (Casey's call — filter by `review_status=D100` in Airtable to disambiguate visually).
+The d100 path extends `outreach_status` rather than introducing a separate field (Casey's call: filter by `review_status=D100` in NocoDB to disambiguate visually).
 
 Persisted on the singleSelect:
 
@@ -99,7 +99,7 @@ Persisted on the singleSelect:
 
 ## What the orchestrator does each tick
 
-1. Query lead base for `review_status in (approved, d100)` AND not terminal for that branch.
+1. Query the lead table for `review_status in (approved, d100)` AND not terminal for that branch.
 2. Bucket by branch.
 3. For each branch, shell out to the next-stage repo with `--lead-ids` for that batch. Wait for completion.
 4. Write one JSONL line to `logs/orchestrator-<date>.jsonl`.
@@ -164,7 +164,7 @@ Connection string: `/home/casey/.pipeline-db.env`. Deliberately not in the share
 
 Browse the data in NocoDB at `db.contentgetsclients.com`.
 
-**What went away with the cap:** the 15-minute cleanup timer, the export-and-purge cycle, bank chunking at 100,000 characters per cell, the 10-records-per-request batching, and the 5-requests-per-second token bucket. All of it was tax paid to Airtable's limits.
+**What went away with the cap:** the 15-minute cleanup timer, the export-and-purge cycle, and the 5-requests-per-second token bucket. All of it was tax paid to Airtable's limits. Two small leftovers are still in the code and do no harm: the quick repo still splits long banks into rows of up to 90,000 characters, and the lead finder still updates some search terms in batches of 10.
 
 For the schema fields the orchestrator reads/writes, see [LEAD_CANDIDATES_SCHEMA.md](LEAD_CANDIDATES_SCHEMA.md) (paste from the email-outreach repo).
 
@@ -219,7 +219,7 @@ What each pass does (`src/drivers/campaign.ts`):
 3. **Adaptive discovery on fade (#3).** If a pass yields few fresh pitchable leads (`--fade-threshold`, default 12), the driver does NOT stop or grind — it shells `discover-veins.ts`, which asks Claude (grounded in the ICP + live term-performance table) to invent the next professions / sub-niches / phrasings, writes them as low-priority **probes** (`parent_term=probe:<date>`), and runs them. `evaluate-probes.ts` then promotes winners to the fresh tier and retires losers. Relentless by pivoting, not by brute force. Every choice logs to `logs/discovery-decisions.jsonl`. Fully autonomous; review the log after.
 4. **Finish:** final verify sweep → `promote-verified-to-hold.ts` (which now **auto-sweeps** dead-email score-≥6 leads into `needs_contact`, #5 — no separate manual step).
 
-Stops only on: target hit, `--max-runs` cap, or a **hard wall** (finder exits nonzero twice in a row → quota/keys exhausted or Airtable down). Transient single failures are shrugged off.
+Stops only on: target hit, `--max-runs` cap, or a **hard wall** (finder exits nonzero twice in a row → quota/keys exhausted or the database unreachable). Transient single failures are shrugged off.
 
 **Firm-tilt (#4)** lives in the finder (`src/scoring/firm_tilt.ts`): while the send path needs a verified email, firm-heavy niches (legal/tax/financial/RE/clinics) are run *slightly sooner* — a non-persisted selection nudge, NOT a filter. Coaches & personal brands keep **full eligibility** and still flow in (they pile into `needs_contact` for the future recovery engine — a coach who invests hours in YouTube is obviously reachable, we just can't auto-verify their email yet). Disable with `FIRM_TILT=false` once contact-recovery makes those emails reachable.
 
@@ -307,14 +307,15 @@ below for the campaign; `npm run campaign` by hand still works and shares the sa
 It existed for one reason: Airtable capped a base at 125,000 records, so the enrichment
 base had to be emptied on a schedule and its contents exported to JSON to avoid hitting
 the ceiling. Postgres has no such cap, so there is nothing to purge and nothing to
-export. Running it now would purge a database nothing writes to.
+export. Running it now would aim at the old Airtable base, which nothing writes to and whose plan was canceled on 2026-09-13.
 
 Everything it did is either unnecessary or already done:
 
 - **Purging runs older than 7 days** — unnecessary. Data accumulates; that was the point.
 - **The capacity valve at 80% of the cap** — no cap exists.
 - **Exporting purged runs to `Exported Leads in JSON/`** — the archive is now history, not
-  a live dependency. It has been loaded into Postgres and stays on disk.
+  a live dependency. It was loaded into Postgres. The folder was deleted on 2026-08-16 and
+  is kept in restic snapshot `710bc486`.
 - **Syncing that folder to Google Drive** — stopped with the timer.
 
 **The archives it produced were lossy, which is worth knowing.** `2026-06-08.json` holds
@@ -324,32 +325,29 @@ and never archived. The research itself is safe -- the on-disk bundles are compl
 compose reads from the bundle -- but a run whose rows were lost cannot be re-exported
 from the database. Nothing is purged now, so this stops here.
 
-## The archive is now a complete record of a run
+## Research banks are saved to the database (since 2026-07-30)
 
 Until 2026-07-30 the generated banks (enemies / insights / insights_analysis / offer /
 examples / bio) lived **only** as `researched/*.md` inside a bundle. Every other bundle
 file is a rendering of rows that already sit in the enrichment base, so it reached the
 JSON archive for free; the banks did not. "Is my research safe?" was a two-place question.
 
-Now the base has a **`banks` table** (`tblk9gbzjkiymX1fJ`) — an 11th table in the same
-base, not a new base. `export-run.ts` writes each bank into it after generation, and the
-cleanup exports and purges it like every other table.
+Now each bank is also saved as rows in **`enrichment.banks`** in Postgres. `export-run.ts`
+writes them after generation, and nothing purges them. (The table started on 2026-07-30
+as a `banks` table in the Airtable enrichment base and moved to Postgres with everything
+else on 2026-08-12.)
 
-- **It is rows, not columns on `channels`.** Airtable caps a long-text cell at 100,000
-  chars and 224 banks in the 2026-07 corpus exceed it (examples-bank peaks at 1.23 MB),
-  so a field-per-bank layout silently truncates ~7% of the corpus. Long banks split
-  across rows via `chunk_index`/`chunk_count`; `bank-rows.ts` does the split and rebuild.
-- **No `bank_kind` select.** Airtable's field PATCH refuses to add a choice to a live
-  singleSelect (bare 422), so every new bank type would have needed hand-editing, and
-  writing an unlisted value fails outright. `source_filename` determines the kind.
-- The 16 pre-existing archives were backfilled with 10,133 bank rows by
-  `youtube-email-outreach-v1/scripts/inject_banks_into_archives.py` (streaming, so it
-  survives 315 MB files; write-verify-swap, so originals are never mutated in place).
-  Injected rows carry a `recbf` id prefix plus `backfilled_at`/`backfilled_from` so
-  reconstructed rows are distinguishable from exported ones.
-- **`_full-base-purge-*.json` are a different schema** (`{kind, baseId, rowCounts,
-  tables}` — a flat dump of the whole base, no `runs` array). The injector detects and
-  skips them; treating one as a per-run archive would rewrite it as an empty shell.
+- **It is rows, not columns on `channels`.** Long banks are still split across rows via
+  `chunk_index`/`chunk_count`, and `bank-rows.ts` does the split and rebuild. The split
+  was built for Airtable's 100,000-character cell cap, which 224 banks in the 2026-07
+  corpus exceeded (examples-bank peaks at 1.23 MB). Postgres has no such cap, but the
+  code still splits at 90,000 characters.
+- **The kind comes from `source_filename`.** That rule dates from Airtable, whose field
+  PATCH refused to add a choice to a live singleSelect.
+- **The JSON archives are gone.** The `Exported Leads in JSON/` folder was deleted on
+  2026-08-16 and is kept in restic snapshot `710bc486`. It held the 16 older archives that
+  `youtube-email-outreach-v1/scripts/inject_banks_into_archives.py` backfilled with 10,133
+  bank rows, plus the `_full-base-purge-*.json` whole-base dumps.
 
 ## Operational gotchas (verified 2026-06-01)
 

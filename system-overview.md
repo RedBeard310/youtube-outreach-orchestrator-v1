@@ -2,15 +2,15 @@
 
 ## In one sentence
 
-The orchestrator advances any reviewed leads through either the full email pipeline into SmartLead (`approved`) or find/verify + deep research into a per-prospect Airtable base (`D100`). The lead-finder is part of the system but paused by default — you trigger discovery runs manually with `npm run finder` when you want new leads to review.
+The orchestrator advances any reviewed leads through either the full email pipeline into SmartLead (`approved`) or find/verify + deep research into the shared `research` schema in Postgres, one `client_id` per prospect (`D100`). The lead-finder is part of the system but paused by default — you trigger discovery runs manually with `npm run finder` when you want new leads to review.
 
-> **⚠️ Ticks are MANUAL-ONLY (since 2026-06-01).** The 4-hour `launchd` cron is **unloaded and disabled** (plist renamed `.disabled`) because the Mac is usually asleep or the repo closed at scheduled tick times, so scheduled ticks silently no-fired. Run ticks by hand with `npm run tick`. **Do not re-enable the cron unless Casey explicitly says so.** The nightly enrichment-cleanup cron (`com.caseybrown.airtable-cleanup`) is likewise disabled — cleanup is manual too (see [Cleanup behavior](#cleanup-behavior--what-gets-deleted-and-what-doesnt)).
+> **⚠️ Ticks are MANUAL-ONLY (since 2026-06-01).** The 4-hour `launchd` cron is **unloaded and disabled** (plist renamed `.disabled`) because the Mac is usually asleep or the repo closed at scheduled tick times, so scheduled ticks silently no-fired. Run ticks by hand with `npm run tick`. **Do not re-enable the cron unless Casey explicitly says so.** The enrichment cleanup (`com.caseybrown.airtable-cleanup`) was retired on 2026-08-12 and must not be run. It existed only to stay under Airtable's record cap, and Postgres has no cap (see [Cleanup behavior](#cleanup-behavior--what-gets-deleted-and-what-doesnt)).
 
 ## What the orchestrator (this repo) does
 
 Nothing fancy. When you run `npm run tick` (formerly every 4h via `launchd`, now manual) it:
 
-1. Queries Airtable for non-terminal `approved`/`D100` leads
+1. Queries Postgres (`leads.lead_candidates`) for non-terminal `approved`/`D100` leads
 2. Partitions them by review status and what step each needs next
 3. Shells out to the appropriate downstream repo (with `--lead-ids`, `--stop-after`, etc.)
 4. Optionally fires the lead-finder (default: off; can be enabled via `LEAD_FINDER_AUTO=true`)
@@ -24,10 +24,10 @@ No business logic, no retries inside a tick, no state of its own beyond a tick l
 | Repo | Role | Called by | How |
 |---|---|---|---|
 | `youtube-lead-finder-v1` | Discovers channels via ICP search terms; writes raw rows to `lead_candidates` with `review_status=unreviewed` | **Default: manual only** via `npm run finder` in the orchestrator repo. Auto-mode (every 24h) is available by setting `LEAD_FINDER_AUTO=true`. | `npm run agent` |
-| **`youtube-outreach-orchestrator-v1`** | Polls Airtable, dispatches stages | **Manual only** — `npm run tick` (the every-4h `launchd` cron is disabled, see warning above) | `npm run tick` |
+| **`youtube-outreach-orchestrator-v1`** | Polls Postgres, dispatches stages | **Manual only** — `npm run tick` (the every-4h `launchd` cron is disabled, see warning above) | `npm run tick` |
 | `youtube-email-outreach-v1` | Find email → verify → enrich (quick) → compose → push to SmartLead | Orchestrator | `npm run outreach -- --lead-ids ... [--stop-after verify]` |
-| `quick-youtube-channel-research-v1` | 9-stage quick enrichment, writes to shared scratch base | email-outreach (transitively) | Internal call |
-| `youtube-deep-research-v1` | 12-stage deep research, creates a new Airtable base per prospect | Orchestrator (D100 only) | `npx tsx scripts/setup-airtable.ts` then `npx tsx scripts/run-channel.ts` |
+| `quick-youtube-channel-research-v1` | 9-stage quick enrichment, writes to the `enrichment` schema in Postgres | email-outreach (transitively) | Internal call |
+| `youtube-deep-research-v1` | 12-stage deep research, writes to the `research` schema (one `client_id` per prospect) | Orchestrator (D100 only) | `npx tsx scripts/register-client.ts` then `npx tsx scripts/run-channel.ts` |
 | `5-ideas-email` skill | Compose variant A | email-outreach at compose time | Claude skill |
 | `nick-saraev-cold-email` skill | Compose variant B | email-outreach at compose time | Claude skill |
 
@@ -66,7 +66,7 @@ orchestrator step A → email-outreach with --stop-after verify
   ↓
 orchestrator step B → for each verified-email lead, sequentially with 60s spacing:
   slugify(channel_name) → check deep-research/clients.json
-  if new slug: setup-airtable.ts creates a fresh Airtable base + registers slug
+  if new slug: register-client.ts adds a research.clients row + a clients.json entry
   run-channel.ts <url> --client <slug> --business-model high_ticket_service
                        --research-purpose research_target
   → 12 stages: harvest → transcripts → comments → links → pages → classify
@@ -75,7 +75,7 @@ orchestrator step B → for each verified-email lead, sequentially with 60s spac
   ↓
 outreach_status = deep_research_complete
   ↓
-[data sits in the per-prospect base for your manual outreach later — no auto-compose in v1]
+[data sits in the research schema under the prospect's client_id for your manual outreach later; no auto-compose in v1]
 ```
 
 **Lead-finder branch** (default: paused; runs only when you manually trigger it):
@@ -83,13 +83,13 @@ outreach_status = deep_research_complete
 ```
 you → npm run finder (in the orchestrator repo)
   → shells out to npm run agent in youtube-lead-finder-v1
-  → reads "active" terms from the search_terms table in Airtable
+  → reads "active" terms from leads.search_terms in Postgres
      (~617 active terms as of 2026-06-01; pulls top N by priority_score per run, default 8)
   → searches YouTube for each, scores results, writes rows to
      lead_candidates with review_status=unreviewed
   → updates logs/lead-finder-state.json on success
   ↓
-[you review the new rows in Airtable and tag approved/D100/rejected/etc.]
+[you review the new rows in NocoDB (db.contentgetsclients.com) and tag approved/D100/rejected/etc.]
 ```
 
 **Mode summary:**
@@ -105,7 +105,7 @@ you → npm run finder (in the orchestrator repo)
 
 | API | What it's for | Cost shape | Bottleneck? |
 |---|---|---|---|
-| **Airtable** | All lead state; per-prospect D100 bases; enrichment scratch base | $25/mo Team plan, 10,000 records per base | No on records; **base count** could become one (D100 path creates one base per prospect) |
+| **Postgres** (`pipeline` database on a private Hetzner box, browsed in NocoDB) | All lead state (`leads`), quick enrichment (`enrichment`), deep research (`research`) | A private server with no per-record pricing. The Airtable plan was canceled 2026-09-13. | No: no record cap and no base count |
 | **YouTube Data API v3** | Channel/video/search lookups in finder + both enrichment pipelines | **`YOUTUBE_API_BACKEND=auto` (default since 2026-06-01): direct Google `YOUTUBE_API_KEY[_N]` keys first, RapidAPI mirror only as fallback when every direct key is dead.** Modes: `auto`/`direct`/`rapidapi`. | Direct keys: ~10k units/day each. The shared env bank holds **7 key slots as of 2026-07-31** (`YOUTUBE_API_KEY_1..7`; the old ~20- and ~225-key pools are history — see the [backend history](#why-rapidapi-not-direct-keys) note). Suspensions come and go — re-check every ~2 days with `youtube-email-outreach-v1/scripts/youtube-key-health.ts`. RapidAPI's 2000/window search bucket is the fallback ceiling. |
 | **Anthropic API** | Haiku for finder + classifiers; **Opus 4.7** for compose | Per-token. Opus ~60× Haiku | No, but compose is the priciest single call per lead |
 | **ZeroBounce** | Email verification | ~$0.001–0.003 per verification depending on tier | No |
@@ -144,12 +144,12 @@ Lead-finder is currently paused (`LEAD_FINDER_AUTO=false`) and runs only when yo
 | Data | Cleaned? | When | By |
 |---|---|---|---|
 | `lead_candidates` rows | **No** — kept forever | Never | (nothing) |
-| Enrichment scratch base intermediate rows (videos, transcripts, comments, etc.) | **Yes — but MANUAL now** | 24h after `outreach_status=sent_to_smartlead`, run by hand | `youtube-email-outreach-v1/scripts/airtable-cleanup.ts --auto` (nightly cron DISABLED — laptop asleep at 23:00; run it manually after each send batch, then roll up with `rollup-archived-runs.ts`) |
-| Enrichment scratch base `channels` table | **No** (preserved for dedup) | Never — but marked `data_removed=true` + `last_enriched_at` | Same cleanup script |
+| Quick enrichment rows in the `enrichment` schema (videos, transcripts, comments, etc.) | **No** (the cleanup was retired 2026-08-12) | Never | (nothing; `airtable-cleanup.ts` has been deleted) |
+| `enrichment.channels` table | **No** (preserved for dedup) | Never | (nothing) |
 | Local enrichment markdown bundles | **No** (kept on disk) | Never | (nothing) |
-| Per-prospect D100 Airtable bases | **No** | Never | (nothing) |
+| Deep research rows (`research` schema) | **No** | Never | (nothing) |
 
-So your `lead_candidates` table grows monotonically — but only when the lead-finder runs. **~3,139 rows as of 2026-06-01** (777 approved, ~503 of those loaded to SmartLead and essentially drained). **Zero growth** until you trigger `npm run finder` (auto-mode off). NOTE: the 268 "unreviewed" leads are NOT untapped volume — all 268 score 4–5 (below the ≥6 approval bar); everything ≥6 is already triaged. Real new volume comes from a fresh `npm run finder` run, not from the unreviewed queue (which is just below-threshold leftovers to reject or ignore). Airtable record cap was raised **50k→125k on 2026-05-30**, so plenty of headroom. NOTE: this is the *lead* base (`appenY7r5jlZMRpJ0`) — distinct from the *enrichment scratch* base (`appTvzwOiTLmqC5Mw`), which is the one that fills fast and needs the manual cleanup above.
+So your `lead_candidates` table grows monotonically — but only when the lead-finder runs. **~3,139 rows as of 2026-06-01** (777 approved, ~503 of those loaded to SmartLead and essentially drained). **Zero growth** until you trigger `npm run finder` (auto-mode off). NOTE: the 268 "unreviewed" leads are NOT untapped volume — all 268 score 4–5 (below the ≥6 approval bar); everything ≥6 is already triaged. Real new volume comes from a fresh `npm run finder` run, not from the unreviewed queue (which is just below-threshold leftovers to reject or ignore). Postgres has no record cap, so neither the lead table nor the `enrichment` schema needs cleaning. The Airtable caps went away with the 2026-08-12 move.
 
 ## Other costs / constraints worth knowing
 
@@ -166,10 +166,10 @@ So your `lead_candidates` table grows monotonically — but only when the lead-f
 
 ## `last_contacted_at` is polluted — do not trust it as a "we contacted them" signal
 
-Historically `last_contacted_at` was backfilled from `outreach_processed_at` (which updates on *every* Airtable write), which could leave never-sent leads carrying a bogus value. **The outreach pipeline selects leads by `review_status` + `outreach_status` only and never reads `last_contacted_at`** — so even when polluted it had zero effect on sending.
+Historically `last_contacted_at` was backfilled from `outreach_processed_at` (which, back in Airtable, updated on *every* write), which could leave never-sent leads carrying a bogus value. **The outreach pipeline selects leads by `review_status` + `outreach_status` only and never reads `last_contacted_at`** — so even when polluted it had zero effect on sending.
 
 **Verified clean 2026-06-01:** all 531 rows with `last_contacted_at` are `sent_to_smartlead`; **zero** never-sent leads carry the field. The redrive the earlier handoff flagged is effectively already done — no action needed. Going-forward stamping on push-success (one `sentAt` for both `outreach_processed_at` and `last_contacted_at`) is correct.
-- **Airtable base count.** Your workspace has a base-count limit by plan. The D100 path creates one new base per prospect. Worth checking your plan's base ceiling if you're driving toward hundreds of D100 prospects.
+- **No base-count ceiling.** Each D100 prospect is one `client_id` in the shared `research` schema, not a separate base, so hundreds of prospects need no plan change.
 - **Anthropic spend scales linearly with leads processed.** The Opus 4.7 compose call is the single heaviest line item per-lead on the approved path. If you ever need to cut cost, swapping compose to Sonnet 4.6 would be the highest-leverage knob (~5× cheaper, modest quality drop).
 
 ### Why RapidAPI, not direct keys

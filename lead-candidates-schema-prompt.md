@@ -4,13 +4,13 @@
 
 ---
 
-I'm building an orchestrator that drives this repo plus a deep-research repo. To wire the deep-research path correctly, I need an accurate map of the `lead_candidates` table on the lead Airtable base (`appenY7r5jlZMRpJ0`), specifically the fields **your repo reads or writes**.
+I'm building an orchestrator that drives this repo plus a deep-research repo. To wire the deep-research path correctly, I need an accurate map of the `lead_candidates` table (`leads.lead_candidates` in the Postgres `pipeline` database), specifically the fields **your repo reads or writes**.
 
-**Don't guess — read the source.** Look at your Airtable client code, type definitions, every place a field name appears as a string literal in your code. Walk the codebase systematically.
+**Don't guess — read the source.** Look at your database client code, type definitions, every place a field name appears as a string literal in your code. Walk the codebase systematically.
 
 ## What I need documented
 
-For each section, give exact field names (as they appear in Airtable formulas / your code), Airtable types (singleLineText, url, singleSelect with options, multipleSelects, dateTime, etc.), and a one-line description of what your repo does with each.
+For each section, give exact field names (as they appear in `filterByFormula` strings / your code), Postgres column types (text, integer, boolean, timestamptz, etc.; for a single-select column, list the allowed values from its `leads.vocab_*` lookup table), and a one-line description of what your repo does with each.
 
 ### 1. Channel-identifying fields
 

@@ -79,7 +79,7 @@ A field-by-field approach (sanitizing each channel attribute at extraction time)
 ## Constraints
 
 - Don't change scoring logic, prompts, or any other behavior. This is a sanitization-only fix.
-- Don't change anything outside the Anthropic call path. (Specifically, do **not** sanitize before writing channel data to Airtable — Airtable handles unicode fine; we only need sanitization at the Anthropic boundary.)
+- Don't change anything outside the Anthropic call path. (Specifically, do **not** sanitize before writing channel data to the database. We only need sanitization at the Anthropic boundary.)
 - Keep the diff small. Estimate ~30–50 lines including the helper, tests, and applying it at the call sites.
 
 ## When done

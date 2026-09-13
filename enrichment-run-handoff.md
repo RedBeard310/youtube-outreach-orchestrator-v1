@@ -73,7 +73,7 @@ Write the next 100 record ids (newline-separated) to a scratch file. Node snippe
 ```js
 // _make_ids.mjs  — run: node _make_ids.mjs > batch.ids ; then delete the script
 import 'dotenv/config';
-import Airtable from 'airtable';
+import Airtable from 'pipeline-db/sdk'; // Postgres, behind the old Airtable SDK interface
 import { writeFileSync } from 'node:fs';
 const base = new Airtable({ apiKey: process.env.AIRTABLE_PAT }).base(process.env.LEAD_BASE_ID);
 const LIMIT = 100;
@@ -206,7 +206,7 @@ Verdict: <one line — is the pace sustainable against the RapidAPI search bucke
 ## 7. Failure handling
 
 - Crashed leads (no `Total LLM cost` line, non-zero child exit — e.g. the first batch's `recZUef3bYIkSmmlw` / Amy Plano and `reciKMvvTGJ7iXFkY` / The Adviser Advantage) **stay at `email_verified`**, so the §3.1 selection re-picks them automatically next batch. No manual reset needed. If a specific lead crashes repeatedly, flag it for Casey rather than looping on it.
-- A whole-run hard failure (finder/quota/Airtable down) → stop, report what completed, don't force it.
+- A whole-run hard failure (finder/quota/database down) → stop, report what completed, don't force it.
 - **Idempotency:** a lead already at `ready_data_scraped` is skipped by the queue query, so re-running the batch selection never re-drives a done lead. Safe to re-run.
 
 ---
@@ -216,7 +216,7 @@ Verdict: <one line — is the pace sustainable against the RapidAPI search bucke
 | Thing | Where |
 |---|---|
 | Run command | `youtube-email-outreach-v1` → `npm run outreach -- --lead-ids-file <f> --concurrency 4 --stop-after enrich` |
-| Enrichment queue query | `AND({review_status}='approved_hold', {outreach_status}='email_verified')` on `lead_candidates` (`appenY7r5jlZMRpJ0`) |
+| Enrichment queue query | `AND({review_status}='approved_hold', {outreach_status}='email_verified')` on `leads.lead_candidates` (Postgres) |
 | Per-lead metrics | `youtube-email-outreach-v1/logs/enrichment-<leadId>-<ts>.log` → `Total LLM cost` / `Total YouTube quota used` |
 | RapidAPI meter | `youtube-lead-finder-v1/logs/quota-state.json` (`search` bucket = the tight one, 5,000) |
 | Autopilot control | halt flag `logs/autopilot-halt.flag` + `sudo systemctl stop/restart autopilot-campaign.service` |

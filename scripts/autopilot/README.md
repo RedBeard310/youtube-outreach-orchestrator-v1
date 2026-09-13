@@ -71,7 +71,7 @@ rm logs/autopilot-halt.flag && sudo systemctl restart autopilot-campaign   # res
 
 - `campaign-loop.sh` — relentless relaunch + quota-wait driver (no LLM)
 - `checkin.ts` / `checkin.sh` — hourly code health check + on-anomaly fix-agent
-- `debrief-data.ts` — grounded cycle metrics (Airtable + campaign JSONL)
+- `debrief-data.ts` — grounded cycle metrics (Postgres lead counts + campaign JSONL)
 - `debrief.sh` — daily report + self-improve agent
 - `burn-ledger.ts` — Anthropic cost accounting
 - `systemd/*` — the five unit files; `install.sh` deploys them

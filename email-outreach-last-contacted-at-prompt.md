@@ -23,7 +23,7 @@ That instruction got captured in the handoff but didn't ship in the code — eve
 
 ## What to fix
 
-**Find the code path that flips `outreach_status` to `sent_to_smartlead` after a successful SmartLead push.** Likely in `src/lib/smartlead.ts` or `src/lib/airtable.ts` or wherever the Airtable update for that transition happens. There should be a single `update(...)` call (or small handful) that sets `outreach_status` and `outreach_processed_at` on send success.
+**Find the code path that flips `outreach_status` to `sent_to_smartlead` after a successful SmartLead push.** Likely in `src/lib/smartlead.ts` or `src/lib/airtable.ts` or wherever the database update for that transition happens. There should be a single `update(...)` call (or small handful) that sets `outreach_status` and `outreach_processed_at` on send success.
 
 **Add `last_contacted_at: new Date().toISOString()` to the same fields object.** Same call, same transaction, same timestamp source — so the two fields can't drift relative to each other.
 
@@ -62,7 +62,7 @@ If SmartLead push is the only outbound event in this repo, then a single edit at
 
 ## What to verify before reporting back
 
-1. Grep for every Airtable update call in this repo that sets `outreach_status='sent_to_smartlead'` or `outreach_processed_at`. Confirm `last_contacted_at` is set in all of them and only in those.
+1. Grep for every database update call in this repo that sets `outreach_status='sent_to_smartlead'` or `outreach_processed_at`. Confirm `last_contacted_at` is set in all of them and only in those.
 2. Run a quick test — drive a single lead through send (or simulate by triggering the update path), then read the lead row and confirm `last_contacted_at` equals `outreach_processed_at` (within a few ms).
 3. Typecheck clean.
 
