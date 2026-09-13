@@ -242,7 +242,8 @@ this is the shape to check first.**
   **Brave does not touch this path. Tavily does, and it is capped:** it answers
   `432 exceeds your plan's set usage limit`, so the finder's "no linked website"
   fallback search is dead. 25 of 48 traced finds hit the cap and 11 came up with
-  no website at all. Raising Tavily is Casey's spend call.
+  no website at all. ~~Raising Tavily is Casey's spend call.~~ **Superseded the same day:
+  Casey dropped Tavily for Brave. See the entry above.**
 
 - 2026-09-13 (debrief): **THE GAP IS CLOSED. The recovery lane's book went 251 → 3,028,
   and the 09-12 recommendation to "build a second collect mode" is DONE — but NOT by

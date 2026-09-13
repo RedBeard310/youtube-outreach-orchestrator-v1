@@ -259,10 +259,18 @@ from 40 to 150 on 2026-09-02.
 **The whole lane rests on Brave Search, and Brave is metered** (learned the hard way
 2026-09-04). The collect pass resolves each creator's own website first, via
 `searchBrave()` in `youtube-email-outreach-v1/src/bloodhound/db.ts`, because **9 of its
-10 collection methods need one**. Both `BRAVE_SEARCH_API_KEY[_N]` keys sit on a plan with
-a **$5/month spending cap**; when it is reached they answer `402 Usage limit exceeded` and
-website resolution simply stops. Widening the collect batch 40 → 150 on 2026-09-02 burned
-that cap inside two days, and the next cycle parked **71 leads instead of 627**.
+10 collection methods need one**. Each `BRAVE_SEARCH_API_KEY[_N]` key sits on its own plan
+with its own **monthly spending limit**. A key past its limit answers `402 Usage limit
+exceeded`, and once every key does, website resolution simply stops. Widening the collect
+batch 40 → 150 on 2026-09-02 burned a $5 limit inside two days, and the next cycle parked
+**71 leads instead of 627**.
+
+**Since 2026-09-13 Brave is the only web search in the pipeline.** Casey dropped Tavily,
+which the email finder used for leads whose channel links no website, after its plan capped
+out: both are plain web search and Brave is cheaper ($5 per 1,000 searches against $8). Both
+callers now share `youtube-email-outreach-v1/src/search/brave.ts`, so Brave headroom pays
+for email finding as well as this lane. The same day Casey put $50 on key _1; key _2 stayed
+at its $5 limit. Brave's API never reports a balance, so count searches rather than asking.
 
 Read this before diagnosing a quiet recovery lane:
 
