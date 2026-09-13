@@ -1,5 +1,10 @@
 # Mac backfill handoff — approved_hold enrichment (written 2026-08-09, VPS side)
 
+> **History. Nobody should act on this brief (note added 2026-09-13).** It was written on
+> 2026-08-09, when the pipeline kept its data in Airtable. Storage moved to Postgres on
+> 2026-08-12, the 15-minute cleanup timer it describes is retired, and Airtable was
+> canceled on 2026-09-13.
+
 You are the Claude session in the **Mac clone** of `youtube-outreach-orchestrator-v1`.
 Casey has locked this plan: **the Mac runs the entire remaining backfill; the VPS
 handles only new inflow.** This doc is your complete brief. The VPS side is already
