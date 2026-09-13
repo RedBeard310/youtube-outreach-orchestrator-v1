@@ -186,7 +186,7 @@ Time: a tick blocks until downstream finishes; D100 adds 60s/lead of deliberate 
 | [scripts/](scripts/) | operational/diagnostic toolkit (see Running it) |
 | [orchestrator-spec.md](orchestrator-spec.md), [system-overview.md](system-overview.md), [CLAUDE.md](CLAUDE.md) | full spec / system context / operating contract |
 
-**Credentials required:** the database connection string, read from `/home/casey/.pipeline-db.env` on the VPS (or from `PIPELINE_DATABASE_URL` / `DATABASE_URL`). That's all the *orchestrator* needs. `src/airtable.ts` still throws if `AIRTABLE_PAT` or `LEAD_BASE_ID` is unset, but `pipeline-db` ignores both values. To actually run a tick end-to-end, the three downstream repos each need their own keys configured (Anthropic, YouTube/RapidAPI, ZeroBounce, Firecrawl, Supadata, SmartLead). Secrets load via `dotenv` from `.env`; on Casey's setup the real source of truth is `~/Claude/env-storage/.env`, exported through `~/.zshenv`.
+**Credentials required:** the database connection string, read from `/home/casey/.pipeline-db.env` on the VPS (or from `PIPELINE_DATABASE_URL` / `DATABASE_URL`). `AIRTABLE_PAT` and `LEAD_BASE_ID` must also be non-empty, because `src/airtable.ts` checks them, but `pipeline-db` ignores their values. To actually run a tick end-to-end, the three downstream repos each need their own keys configured (Anthropic, YouTube/RapidAPI, ZeroBounce, Firecrawl, Supadata, SmartLead). Secrets load via `dotenv` from `.env`; on Casey's setup the real source of truth is `~/Claude/env-storage/.env`, exported through `~/.zshenv`.
 
 ## What's off vs. not built
 

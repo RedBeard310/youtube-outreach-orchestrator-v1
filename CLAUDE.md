@@ -302,12 +302,12 @@ below for the campaign; `npm run campaign` by hand still works and shares the sa
 
 ## Enrichment cleanup is retired (since 2026-08-12)
 
-`enrichment-db-cleanup.timer` is **stopped and disabled**. Do not re-enable it.
+`enrichment-db-cleanup.timer` no longer exists on the VPS. Do not recreate it.
 
 It existed for one reason: Airtable capped a base at 125,000 records, so the enrichment
 base had to be emptied on a schedule and its contents exported to JSON to avoid hitting
 the ceiling. Postgres has no such cap, so there is nothing to purge and nothing to
-export. Running it now would aim at the old Airtable base, which nothing writes to and whose plan was canceled on 2026-09-13.
+export. The cleanup scripts (`airtable-cleanup.ts`, `airtable-purge-all.ts`) were deleted from youtube-email-outreach-v1 on 2026-08-12, so there is nothing left to run.
 
 Everything it did is either unnecessary or already done:
 
