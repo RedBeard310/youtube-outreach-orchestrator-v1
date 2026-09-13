@@ -197,6 +197,59 @@ this is the shape to check first.**
 
 ## Change log
 
+- 2026-09-13 (debrief): **THE GAP IS CLOSED. The recovery lane's book went 251 → 3,028,
+  and the 09-12 recommendation to "build a second collect mode" is DONE — but NOT by
+  building a second mode, so don't build one.** The day itself parked **0**, the first zero
+  on record, which is exactly what the 09-12 entry predicted. Its last six collect passes
+  spent **903 lead-slots on 253 distinct leads** (a 3.6× re-read) and produced **6 contact
+  points across 2 leads** in 24h.
+
+  **The fix was one clause, not a new lane.** `COLLECT_IDS_SQL` now excludes on the absence
+  of an **EMAIL** contact point instead of ANY contact point, which makes it the exact
+  complement of `VERIFIABLE_IDS_SQL` and leaves nowhere to fall between them. A second
+  collect mode would have been a parallel selector to keep in sync forever; this is the same
+  selector with the bug removed. Orchestrator **`e2d7b81`**. Verified live: **251 → 3,028**
+  (= 251 + 2,777 exactly), cursor paging contiguous with 0 overlap and no skips, 38/38 tests.
+
+  **Companion fix, and the reason this shipped while Brave is still dead:** the collector was
+  resolving a website, storing it, and never reading it back, so it re-bought the same answer
+  from Brave every pass and read the lead as siteless whenever Brave refused. `storedWebsite()`
+  in `youtube-email-outreach-v1/src/bloodhound/db.ts` (**`aa66cd69d`**) reads it back first.
+  **2,282 of the 2,780 recovered leads already have a website stored and only 950 have a link
+  in `external_links`**, so 1,332 workable leads looked barren purely because nobody re-read
+  the table. Tested with **both Brave keys blanked: 8/8 sites recovered, zero Brave calls.**
+  Tier is now "has a site to work with FOR FREE" (declared link **or** stored website), so
+  each lap spends its early passes on the leads that need no Brave at all.
+
+  **Third fix, an alarm that would have outlived its bug:** `collectBookDepth()` kept its own
+  copy of the old predicate, so it would have reported pool 251 against a real book of 3,028
+  forever, kept `bloodhound_collect_book_drained` firing, and kept suppressing the two
+  site-resolution alarms while naming a bug that had just been fixed. Both counts now derive
+  from the selector's own exclusion (**`8301c6d`**). Live: pool **3,028**, stranded **2,780 →
+  3**, alarm correctly silent. `stranded` keeps its job under an honest definition — leads
+  holding a non-email point that STILL cannot be collected — so **if it climbs again, a gap
+  has reopened and that is the number that says so.**
+
+  **BRAVE IS NOW WORTH PAYING FOR, and it was not this morning.** Same facts, flipped
+  ranking: a top-up bought **251** leads before the fix and buys the ~**1,332** leads in the
+  widened book with no stored site and no declared link after it. The $5/month cap is still
+  refusing (402 on every pass, **825 of 903 leads = 91%** resolved no website, resets
+  1 October). Still Casey's spend call.
+
+  **Quote 3,028 now, not 251 and not 3,735.** And the clock changed shape: with discovery
+  paused nothing replenishes `needs_contact`, so the widened book is about **five days** of
+  walking at 600 lead-slots a day. When it closes the recovery lane has genuinely finished
+  and enrichment plus Apify is all that is left. Lifting the discovery pause is Casey's word
+  alone, but that decision now has roughly a week on it rather than being open-ended.
+
+  **The lesson worth keeping: nothing faulted.** Every guard held, every process ran on
+  schedule, spend stayed at $0, and the day produced zero. A lane repeating itself is
+  indistinguishable from a lane working, from the outside, and the number that exposed it
+  (lead-slots ÷ distinct leads) is watched by no alarm. Building that alarm is ranked #5 and
+  was deliberately left for after the fix is observed working, so it is calibrated against a
+  lane in its normal state.
+  Full detail: `brain/lead-gen/runs/lead-run-2026-09-13.html`.
+
 - 2026-09-12 (debrief): **THE RECOVERY LANE HAS FINISHED ITS BOOK, AND 2,778 LEADS ARE
   STRANDED IN A GAP BETWEEN ITS TWO SELECTORS. STOP PLANNING AGAINST THE 3,735.** Parking
   fell **8 to 2**, the worst on record. The collect half selects `needs_contact` leads with
