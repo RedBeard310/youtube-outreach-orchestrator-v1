@@ -480,21 +480,35 @@ export interface CollectBatch {
  *
  *  Measuring it here rather than in the check-in keeps the definition next to
  *  the two selectors it is derived from, so a change to either cannot leave the
- *  alarm describing a pool that no longer exists. */
+ *  alarm describing a pool that no longer exists.
+ *
+ *  `pool` TRACKS THE SELECTOR, IT DOES NOT RESTATE IT (2026-09-13). When
+ *  COLLECT_IDS_SQL was widened to close the gap, this function's own copy of the
+ *  old predicate would have kept reporting 251 against a real book of 3,028 —
+ *  so `bookDrained` in checkin.ts would have fired forever, suppressing the
+ *  site-resolution alarms and naming a bug that had just been fixed. That is the
+ *  exact failure the paragraph above was written about, one layer up. So both
+ *  counts now derive from the same email-kind exclusion the selector uses.
+ *
+ *  `stranded` keeps its job by changing its definition to the honest one: leads
+ *  that hold a non-email contact point and STILL cannot be collected. Closing
+ *  the gap should take it to the handful that fail the score bar or carry an
+ *  outreach_status outside the lane, so if it climbs again a gap has reopened
+ *  and this is the number that says so. */
 export async function collectBookDepth(): Promise<{ pool: number; stranded: number }> {
-  const rows = await query<{ pool: string | number; stranded: string | number }>(
-    `SELECT
-       count(*) FILTER (
-         WHERE lc.outreach_status = ANY(ARRAY['no_email_found', 'email_invalid'])
-           AND lc.signal_score >= 6
-           AND NOT EXISTS (SELECT 1 FROM leads.contact_points cp WHERE cp.lead_id = lc.id)
-       ) AS pool,
-       count(*) FILTER (
-         WHERE EXISTS (SELECT 1 FROM leads.contact_points cp WHERE cp.lead_id = lc.id)
-           AND NOT EXISTS (
+  const inLane = `lc.outreach_status = ANY(ARRAY['no_email_found', 'email_invalid'])
+           AND lc.signal_score >= 6`;
+  const hasEmail = `EXISTS (
              SELECT 1 FROM leads.contact_points cp
               WHERE cp.lead_id = lc.id
-                AND cp.kind IN ('business_email', 'personal_email', 'youtube_email'))
+                AND cp.kind IN ('business_email', 'personal_email', 'youtube_email'))`;
+  const rows = await query<{ pool: string | number; stranded: string | number }>(
+    `SELECT
+       count(*) FILTER (WHERE ${inLane} AND NOT ${hasEmail}) AS pool,
+       count(*) FILTER (
+         WHERE EXISTS (SELECT 1 FROM leads.contact_points cp WHERE cp.lead_id = lc.id)
+           AND NOT ${hasEmail}
+           AND NOT (${inLane})
        ) AS stranded
        FROM leads.lead_candidates lc
       WHERE lc.review_status = 'needs_contact'
