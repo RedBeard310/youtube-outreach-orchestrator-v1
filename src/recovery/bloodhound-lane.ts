@@ -393,17 +393,54 @@ function pidAlive(pid: number | undefined): boolean {
  *  come back, a method is added, or new leads land mid-book — and it is also
  *  the self-healing property: no state file edit can strand the lane, because
  *  a missing or garbage cursor just starts a lap.
+ *
+ *  CLOSE THE GAP, DON'T WALK A 251-LEAD BOOK (2026-09-13). `NOT EXISTS (any
+ *  contact point)` is the same bug as 08-24 and 08-27 one more time: it reads
+ *  "we got SOMETHING for this lead" as "this lead is finished". It is not
+ *  finished until it has an EMAIL, because an email is the only thing that flips
+ *  it to `approved_hold`. A lead the collector came away from holding a website,
+ *  a phone or a social handle satisfied neither selector — collect would never
+ *  look at it again and verify could never rule on it. Measured this morning:
+ *  the collect pool had drained to **251** against a batch of 150, so the lane
+ *  re-walked its entire remaining book twice a day, added **6** contact points
+ *  in 24h and parked **0**, while **2,780** leads sat in that gap. All 2,780
+ *  clear the score bar and 2,777 carry the right `outreach_status`, so the
+ *  contact-point clause was the only thing hiding them.
+ *
+ *  So select on the absence of an EMAIL, which makes this selector the exact
+ *  complement of VERIFIABLE_IDS_SQL and leaves nowhere to fall between them. The
+ *  book goes 251 -> ~3,028, about five days per lap at 150 per 6h.
+ *
+ *  Re-walking a stranded lead is worth the walk because the expensive half of
+ *  its job is already done: 2,282 of them have a website stored, and the
+ *  companion fix in youtube-email-outreach-v1 (`storedWebsite` in
+ *  src/bloodhound/db.ts) now reads it back, so the nine website-dependent
+ *  methods run against it with no Brave call at all. That is also why this
+ *  widening is worth shipping on a day Brave is refusing rather than after the
+ *  cap is raised: it is the half of the lane that does not need Brave.
+ *
+ *  Hence the tier is now "does the collector have a site to work with, for
+ *  free", not "does the row have external_links" — a stored website counts, and
+ *  those leads are both the cheapest and the likeliest to yield. Re-tiering
+ *  reinterprets an in-flight cursor, which at worst starts the next lap from an
+ *  odd place; a lap boundary clears it and nothing is stranded, which is the
+ *  self-healing property the cursor was built for.
  */
 export const COLLECT_IDS_SQL = `WITH pool AS (
        SELECT lc.id,
-              CASE WHEN COALESCE(lc.external_links, '') NOT IN ('', '[]') THEN 0 ELSE 1 END AS tier,
+              CASE WHEN COALESCE(lc.external_links, '') NOT IN ('', '[]')
+                     OR EXISTS (SELECT 1 FROM leads.contact_points cp
+                                 WHERE cp.lead_id = lc.id AND cp.kind = 'website')
+                   THEN 0 ELSE 1 END AS tier,
               COALESCE(lc.first_discovered_at, 'infinity'::timestamptz) AS disc
          FROM leads.lead_candidates lc
         WHERE lc.review_status = 'needs_contact'
           AND lc.outreach_status = ANY(ARRAY['no_email_found', 'email_invalid'])
           AND lc.signal_score >= 6
           AND COALESCE(lc.do_not_contact, false) = false
-          AND NOT EXISTS (SELECT 1 FROM leads.contact_points cp WHERE cp.lead_id = lc.id)
+          AND NOT EXISTS (SELECT 1 FROM leads.contact_points cp
+                           WHERE cp.lead_id = lc.id
+                             AND cp.kind IN ('business_email', 'personal_email', 'youtube_email'))
      )
      SELECT id, tier, disc
        FROM pool

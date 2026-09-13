@@ -143,15 +143,45 @@ test('COLLECT_IDS_SQL: the cursor is one ascending 3-tuple comparison', () => {
   assert.match(COLLECT_IDS_SQL, /ORDER BY tier, disc, id/);
 });
 
-test('COLLECT_IDS_SQL: link-carrying leads sort first (9 of 11 methods need a site)', () => {
-  assert.match(COLLECT_IDS_SQL, /CASE WHEN COALESCE\(lc\.external_links, ''\) NOT IN \('', '\[\]'\) THEN 0 ELSE 1 END AS tier/);
+// A lead the collector can get a site for WITHOUT paying Brave sorts first,
+// because nine of the eleven methods need one. Since 2026-09-13 that means a
+// declared external link OR a website already stored on an earlier pass — the
+// stored one is what keeps the lane productive while Brave's cap is hit.
+test('COLLECT_IDS_SQL: leads with a free-to-resolve site sort first', () => {
+  assert.match(COLLECT_IDS_SQL, /CASE WHEN COALESCE\(lc\.external_links, ''\) NOT IN \('', '\[\]'\)/);
+  assert.match(COLLECT_IDS_SQL, /OR EXISTS \(SELECT 1 FROM leads\.contact_points cp[\s\S]*?cp\.kind = 'website'\)/);
+  assert.match(COLLECT_IDS_SQL, /THEN 0 ELSE 1 END AS tier/);
 });
 
 test('COLLECT_IDS_SQL: keeps the pool guards it inherited', () => {
   assert.match(COLLECT_IDS_SQL, /review_status = 'needs_contact'/);
   assert.match(COLLECT_IDS_SQL, /signal_score >= 6/);
   assert.match(COLLECT_IDS_SQL, /COALESCE\(lc\.do_not_contact, false\) = false/);
-  assert.match(COLLECT_IDS_SQL, /NOT EXISTS \(SELECT 1 FROM leads\.contact_points cp WHERE cp\.lead_id = lc\.id\)/);
+});
+
+// THE GAP IS THE BUG (2026-09-13). Excluding a lead that has ANY contact point
+// meant a lead holding a website, a phone or a social handle was invisible to
+// collect AND unrulable by verify: 2,780 leads sat there while the collect pool
+// ran at 251. This selector must exclude on the absence of an EMAIL only, which
+// makes it the exact complement of VERIFIABLE_IDS_SQL. If the bare form ever
+// comes back, so does the gap.
+test('COLLECT_IDS_SQL: excludes only leads that already have an EMAIL, not any contact point', () => {
+  assert.match(
+    COLLECT_IDS_SQL,
+    /NOT EXISTS \(SELECT 1 FROM leads\.contact_points cp[\s\S]*?cp\.kind IN \('business_email', 'personal_email', 'youtube_email'\)\)/,
+  );
+  assert.doesNotMatch(
+    COLLECT_IDS_SQL,
+    /NOT EXISTS \(SELECT 1 FROM leads\.contact_points cp WHERE cp\.lead_id = lc\.id\)/,
+  );
+});
+
+// The two selectors must agree on what "done" means, or a widened collect pass
+// just fills contact_points with points nobody ever checks.
+test('collect and verify selectors are complements: same email kinds on both sides', () => {
+  const kinds = /'business_email', 'personal_email', 'youtube_email'/;
+  assert.match(COLLECT_IDS_SQL, kinds);
+  assert.match(VERIFIABLE_IDS_SQL, kinds);
 });
 
 test('COLLECT_IDS_SQL: a null first_discovered_at still sorts, never drops out', () => {
