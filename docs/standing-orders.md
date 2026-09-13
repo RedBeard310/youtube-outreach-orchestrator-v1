@@ -6,6 +6,35 @@ cracks between sessions (Casey, 2026-08-14). When Casey changes a priority in
 chat, UPDATE THIS FILE in the same session — that is what "living" means.
 Keep the change log at the bottom.
 
+## ACTIVE as of 2026-09-13: score and work the 5,395 under-rated 10k+ leads
+
+**Casey, 2026-09-13.** 5,395 channels with 10k+ subscribers in a named niche had
+never had a Signal Score v2, because `automator/scripts/rescore-v2.py` only
+scored leads whose old `signal_score` was 6 or more, and the old score's view
+counts were unreliable. **This is not discovery.** The leads are already in the
+database, which fits the 09-08 order to put everything into the leads we have,
+so the discovery pause below stays on.
+
+- **The ids:** `automator/state/v2-batch-2026-09-13.ids`, finance and coaching
+  first. Score or re-score them with
+  `python3 scripts/rescore-v2.py --stage all --ids-file state/v2-batch-2026-09-13.ids`
+  (`--stage assemble` alone is free and re-counts newly found contacts). Use the
+  file, not `signal_score_v2 IS NULL`, which is empty for these leads now.
+- **Order of work:** finance and coaching first (whales, then strong 7s, then
+  other 7+, then 6s), then every other niche in the same order. When these leads
+  reach the recovery lane, their finance and coaching leads go to the front.
+- **New gate rules (Casey):** a lead may be worked for a contact at old score 6+
+  or v2 6+. A lead may enter `approved_hold` at old score 6+, or v2 7+ once the
+  score has been re-run with the verified email. Everyone who passed before still
+  passes. Built once, as Postgres functions, on branch `feat/v2-score-gates` in
+  `youtube-email-outreach-v1` and in this repo. **Not merged. Casey's word only.**
+- **Waiting on Casey:** merging that branch, email finding past the 50-lead
+  pilot, and moving any of these leads into `approved_hold`.
+- **Never, for this work:** email anyone, run `npm run send`, release the hold
+  pool, touch `automator/config/email-pause.json`, lift the discovery pause, score
+  the "Other" niche (41,000+ more 10k+ channels, a separate decision), write to
+  Notion, or work do_not_contact or bounced leads.
+
 ## PAUSED as of 2026-09-08: we are not looking for new channels
 
 **Casey, 2026-09-08: "Stop the process of the outreach orchestrator looking for
@@ -196,6 +225,15 @@ this is the shape to check first.**
 5. Anything in this file contradicted by what Casey said today? → update it.
 
 ## Change log
+
+- 2026-09-13 (Casey order): **Score and work the 5,395 under-rated 10k+ leads.**
+  New order at the top. Scored all 5,395 with the new `--ids-file` flag for
+  **$0.66** of OpenRouter. Finance and coaching hold **176 whales, 171 strong 7s,
+  29 other 7+ and 311 sixes** (of 2,490). Gate change is on `feat/v2-score-gates`
+  in both repos, tested, unmerged. A rolled-back dry run shows **1,671 leads
+  newly pass the contact gate, 0 newly pass the hold gate** (none has a contact
+  counted yet) and **nobody who passed before is refused**. Next: a 50-lead
+  email-finder pilot on finance and coaching whales, then a report to Casey.
 
 - 2026-09-13 (debrief): **THE GAP IS CLOSED. The recovery lane's book went 251 → 3,028,
   and the 09-12 recommendation to "build a second collect mode" is DONE — but NOT by
