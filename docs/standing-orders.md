@@ -244,6 +244,16 @@ this is the shape to check first.**
   fallback search is dead. 25 of 48 traced finds hit the cap and 11 came up with
   no website at all. ~~Raising Tavily is Casey's spend call.~~ **Superseded the same day:
   Casey dropped Tavily for Brave. See the entry above.**
+  **Casey's calls, later the same day:** merge the gates, promote the 18 pilot
+  leads, run email finding on finance and coaching only (635 leads in tier order,
+  the 170 out-of-category 6s last, plus the 2 pilot leads that crashed), and hold
+  the other 990 and all enrichment spend until that batch reports. "Risky" emails
+  do NOT earn v2's contact point for now, because sending is paused on inbox
+  placement. The finder's Brave swap and the null-email crash fix are on
+  `feat/v2-score-gates` (`fe6d3752d`); a live test found a site through Brave for
+  3 of 3 pilot leads that had none under Tavily. **Blocked, waiting on Casey:**
+  the session's permission check refused both applying migration 002 to the
+  `pipeline` database and the 635-lead email run, so nothing is merged or moved.
 
 - 2026-09-13 (debrief): **THE GAP IS CLOSED. The recovery lane's book went 251 → 3,028,
   and the 09-12 recommendation to "build a second collect mode" is DONE — but NOT by
