@@ -16,6 +16,7 @@ import {
   MAX_CONSECUTIVE_SEARCH_DEAD_REWINDS,
   VERIFIABLE_IDS_SQL,
   COLLECT_IDS_SQL,
+  IN_COLLECT_LANE_SQL,
   type LaneState,
 } from '../src/recovery/bloodhound-lane.ts';
 
@@ -153,9 +154,24 @@ test('COLLECT_IDS_SQL: leads with a free-to-resolve site sort first', () => {
   assert.match(COLLECT_IDS_SQL, /THEN 0 ELSE 1 END AS tier/);
 });
 
+// 2026-09-13: the score bar is leads.may_seek_contact(), defined once in
+// youtube-email-outreach-v1. A number typed out here is the copy that drifts.
+test('COLLECT_IDS_SQL and the book count call the shared score gate, never a number', () => {
+  assert.match(IN_COLLECT_LANE_SQL, /leads\.may_seek_contact\(lc\)/);
+  assert.ok(COLLECT_IDS_SQL.includes(IN_COLLECT_LANE_SQL));
+  assert.doesNotMatch(COLLECT_IDS_SQL, /signal_score(_v2)?\s*>=/);
+  assert.doesNotMatch(IN_COLLECT_LANE_SQL, /signal_score(_v2)?\s*>=/);
+});
+
+// Listed leads go two tiers ahead, and keep the free-site order inside that.
+// The cursor stays one 3-tuple, so a listed lead is still walked exactly once.
+test('COLLECT_IDS_SQL: leads on the recovery priority list sort ahead of the book', () => {
+  assert.match(COLLECT_IDS_SQL, /LEFT JOIN leads\.recovery_priority rp ON rp\.lead_id = lc\.id/);
+  assert.match(COLLECT_IDS_SQL, /CASE WHEN rp\.lead_id IS NOT NULL THEN -2 ELSE 0 END\s*\+ CASE WHEN/);
+});
+
 test('COLLECT_IDS_SQL: keeps the pool guards it inherited', () => {
   assert.match(COLLECT_IDS_SQL, /review_status = 'needs_contact'/);
-  assert.match(COLLECT_IDS_SQL, /signal_score >= 6/);
   assert.match(COLLECT_IDS_SQL, /COALESCE\(lc\.do_not_contact, false\) = false/);
 });
 

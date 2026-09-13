@@ -425,18 +425,40 @@ function pidAlive(pid: number | undefined): boolean {
  *  reinterprets an in-flight cursor, which at worst starts the next lap from an
  *  odd place; a lap boundary clears it and nothing is stranded, which is the
  *  self-healing property the cursor was built for.
+ *
+ *  THE SCORE BAR IS A FUNCTION CALL, NOT A NUMBER (2026-09-13). This selector
+ *  and collectBookDepth() used to say `lc.signal_score >= 6`. Casey widened the
+ *  bar to "old score 6+, or Signal Score v2 6+", and that rule now lives once, as
+ *  leads.may_seek_contact(), in youtube-email-outreach-v1's
+ *  src/bloodhound/migrations/002-lead-gates.sql. Bloodhound's verify guard reads
+ *  the same function, so this lane cannot hand the verifier a lead it then
+ *  refuses on score. The function and the priority table below must exist before
+ *  this code runs, so apply that migration first.
+ *
+ *  THE PRIORITY LIST GOES FIRST (2026-09-13). A lead listed in
+ *  leads.recovery_priority sorts two tiers ahead of the rest of the book and
+ *  keeps its free-site order inside that. Casey's first use is the finance and
+ *  coaching leads from the v2 scoring batch. It is data rather than a rule, so no
+ *  niche list or score is copied into this repo. One catch comes from the cursor:
+ *  a listed lead sorts BEHIND an in-flight cursor until the lap closes. When a
+ *  batch is listed mid-lap, clear `collectCursor` in the lane state file once and
+ *  the next pass starts from the top.
  */
+export const IN_COLLECT_LANE_SQL = `lc.outreach_status = ANY(ARRAY['no_email_found', 'email_invalid'])
+          AND leads.may_seek_contact(lc)`;
+
 export const COLLECT_IDS_SQL = `WITH pool AS (
        SELECT lc.id,
-              CASE WHEN COALESCE(lc.external_links, '') NOT IN ('', '[]')
+              CASE WHEN rp.lead_id IS NOT NULL THEN -2 ELSE 0 END
+              + CASE WHEN COALESCE(lc.external_links, '') NOT IN ('', '[]')
                      OR EXISTS (SELECT 1 FROM leads.contact_points cp
                                  WHERE cp.lead_id = lc.id AND cp.kind = 'website')
                    THEN 0 ELSE 1 END AS tier,
               COALESCE(lc.first_discovered_at, 'infinity'::timestamptz) AS disc
          FROM leads.lead_candidates lc
+         LEFT JOIN leads.recovery_priority rp ON rp.lead_id = lc.id
         WHERE lc.review_status = 'needs_contact'
-          AND lc.outreach_status = ANY(ARRAY['no_email_found', 'email_invalid'])
-          AND lc.signal_score >= 6
+          AND ${IN_COLLECT_LANE_SQL}
           AND COALESCE(lc.do_not_contact, false) = false
           AND NOT EXISTS (SELECT 1 FROM leads.contact_points cp
                            WHERE cp.lead_id = lc.id
@@ -496,8 +518,7 @@ export interface CollectBatch {
  *  outreach_status outside the lane, so if it climbs again a gap has reopened
  *  and this is the number that says so. */
 export async function collectBookDepth(): Promise<{ pool: number; stranded: number }> {
-  const inLane = `lc.outreach_status = ANY(ARRAY['no_email_found', 'email_invalid'])
-           AND lc.signal_score >= 6`;
+  const inLane = IN_COLLECT_LANE_SQL;
   const hasEmail = `EXISTS (
              SELECT 1 FROM leads.contact_points cp
               WHERE cp.lead_id = lc.id
