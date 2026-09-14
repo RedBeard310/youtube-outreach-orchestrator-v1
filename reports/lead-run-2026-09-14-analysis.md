@@ -5,7 +5,8 @@
 recovery lane collected **958 contact points** against 6 the day before, with Brave refusing on
 every pass. But the bottleneck moved one step to the right: **40 leads recovered a verified email
 and only 6 of them could park**, because the other 34 need a Signal Score v2 re-run with that
-email before the hold gate will take them, and no automated step does that.
+email before the hold gate will take them, and no automated step does that. The re-run is **free**
+and would clear all 34.
 
 ---
 
@@ -82,10 +83,18 @@ finish.
 The 18 pilot leads that parked today prove the route works: they also score under 6 on the old
 measure, and they parked because somebody ran the v2 re-score on them by hand.
 
-**Why it was not fixed here.** The re-score lives in `automator/scripts/rescore-v2.py`, outside
-the five repos this agent may modify. Running it spends OpenRouter credits against a balance with
-6.4 days left. And Casey's own standing orders hold the last run's 290 valid-email leads pending
-his word on exactly this kind of spend. It is a decision, not a defect. It is lever #1.
+**The blocking step is free, and every one of the 34 would clear the gate.** Read from the
+database rather than assumed: all 34 already carry a v2 score, so the paid classification stage
+has already run on them. **16 sit at v2 8, 10 at v2 7, 8 at v2 6, and all 34 have their contact
+component at 0.** `rescore-v2.py --stage assemble` is pure SQL with no model call; it adds the one
+contact point each lead has now earned, taking them to 9, 8 and 7 against a gate that wants 7.
+**34 of 34.**
+
+**Why it was still not done here.** The script lives in `automator`, outside the five repos this
+agent may modify, and it is a bulk lead write, which that repo's permission guard blocks without
+Casey's word. The question is not the cost of the re-score, which is zero. It is what parking
+starts: enrichment spend, which is the same reason Casey is holding the last run's 290 valid-email
+leads. A decision, not a defect. Lever #1.
 
 ---
 
@@ -171,15 +180,17 @@ this lane taught on 08-24, 08-27 and 09-13.
 ## 6. Ranked next levers
 
 1. **Decide whether the recovery lane may re-score a lead after its email verifies.** This is the
-   difference between the lane producing 6 parked leads a day and producing 40. 34 leads sit one
-   step short right now, and that number grows every cycle the lane runs well. A decision rather
-   than a fix, for two reasons: the re-score spends OpenRouter credits, and Casey already holds
-   290 valid-email leads pending his word on this kind of spend. If the answer is yes, the step
-   belongs inside the lane so it is never forgotten again.
+   difference between the lane producing 6 parked leads a day and producing 40. **The step itself
+   is free and would clear all 34:** every one is already classified, so `--stage assemble` makes
+   no model call, and adding the earned contact point takes 16 leads from v2 8 to 9, 10 from 7 to
+   8, and 8 from 6 to 7, against a gate that wants 7. What needs deciding is not the re-score's
+   cost but what parking triggers: enrichment spend, the same reason the last run's 290
+   valid-email leads are on hold. The backlog grows every cycle the lane runs well. If the answer
+   is yes, the step belongs inside the lane so it is never forgotten again.
 2. **Top up OpenRouter.** $48.68 at $7.65/day is **6.4 days**. The higher rate is the v2 scoring
    and email-finding work ordered on 09-13, and only two niches of that job are done, so it is
    more likely to hold than to fall. An empty balance stops enrichment, which is the entire point
-   of the discovery pause. The only item with a deadline, and lever #1 depends on it.
+   of the discovery pause. The only item with a deadline.
 3. **Probe Brave before spending on it.** Two different faults now wear one label: a `402` cap on
    key `_2`, and `no key answered (network or timeout)` on key `_1`, which Casey funded with $50
    on 09-13. Yesterday's recommendation to raise the cap assumed a single fault. One live call
