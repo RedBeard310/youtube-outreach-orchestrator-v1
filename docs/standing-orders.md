@@ -343,6 +343,19 @@ this is the shape to check first.**
   (the 34 plus 23 verified in that same run), assembled 57 with 0 kept, and parked
   **57 of 57**. Checked in the database: all 57 are `approved_hold` with v2 7 to 9,
   contact 1, a `valid` email, not DNC, and none cleared the old score bar.
+- 2026-09-14 13:15: **the 990-lead email run finished** (13:10, plus a retry of 12
+  network "fetch failed" errors). Final: **423 valid**, 69 risky, 337 no email, 160
+  invalid, 1 still failed. Cost: $2.28 OpenRouter ($0.0023 per lead, above the
+  $1.70 estimate), 830 ZeroBounce checks, 1,363 Brave searches (about $6.80 of key
+  _1), 0 Brave refusals. Re-scored (free, 0 kept by the new guard): **all 423
+  valid-email leads pass `leads.may_enter_hold`**, split 198 outside a client
+  category, 144 doctor, 32 coach, 22 legal, 19 agency, 5 financial, 3 consultant.
+  **Not promoted: waiting on Casey** (enrichment spend). The 497 no-email or invalid
+  leads went to `needs_contact` in normal book order, not the priority list (that
+  was for finance and coaching only).
+  **Enrichment is the slow step.** `backfill-chain` took the 290 as one batch at
+  12:20 and runs about 20 leads an hour, so they finish around 02:00 UTC 09-15. The
+  57 lane parks are queued behind them.
 
 - 2026-09-13 (debrief): **THE GAP IS CLOSED. The recovery lane's book went 251 → 3,028,
   and the 09-12 recommendation to "build a second collect mode" is DONE — but NOT by
