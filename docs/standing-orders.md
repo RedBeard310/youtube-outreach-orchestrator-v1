@@ -41,9 +41,15 @@ so the discovery pause below stays on.
   that step, so they stop one cheap step short. The 18 pilot leads that parked the
   same day prove the route works, by hand. **Decide whether the lane may re-score a
   lead after its email verifies** — it is the difference between roughly 6 parked a
-  day and 40, and the backlog grows every cycle the lane runs well. It is the same
-  spend call as the 290 above, which is why no agent has run it. Full detail:
-  `casey-assistant/brain/lead-gen/runs/lead-run-2026-09-14-analysis.md` §3.
+  day and 40, and the backlog grows every cycle the lane runs well.
+  **The step is free and clears all 34.** Read from the database: every one is
+  already classified (16 at v2 8, 10 at v2 7, 8 at v2 6, **all with
+  `signal_v2_components.contact = 0`**), so `rescore-v2.py --stage assemble
+  --ids-file <ids>` makes no model call, and the contact point each has now earned
+  takes them to 9 / 8 / 7 against a gate that wants 7. No agent has run it because
+  it is a bulk lead write in `automator` (permission-guarded), and because what
+  parking starts is **enrichment spend** — the same call as the 290 above. Full
+  detail: `casey-assistant/brain/lead-gen/runs/lead-run-2026-09-14-analysis.md` §3.
 - **Never, for this work:** email anyone, run `npm run send`, release the hold
   pool, touch `automator/config/email-pause.json`, lift the discovery pause, score
   the "Other" niche (41,000+ more 10k+ channels, a separate decision), write to
