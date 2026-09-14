@@ -12,6 +12,7 @@ import {
   lastCollectPassSearchDead,
   lastCollectPassYield,
   rewindWaiver,
+  collectRewalk,
   MAX_CONSECUTIVE_REWINDS,
   MAX_CONSECUTIVE_SEARCH_DEAD_REWINDS,
   VERIFIABLE_IDS_SQL,
@@ -426,4 +427,62 @@ test('state written before 2026-09-11 carries no lapComplete and rewinds as befo
     rewindWaiver('previous_pass_search_dead', legacy, { walked: 58, withPoints: 0 }),
     null,
   );
+});
+
+// --- collectRewalk: is the lane re-reading leads it already read? -----------
+// Added 2026-09-14. collectBookDepth PREDICTS repetition from a drained pool;
+// this MEASURES it, so it also catches a pinned cursor with a large book behind
+// it. See the 7b-ii block in scripts/autopilot/checkin.ts.
+
+function collectPass(ids: string[]): string {
+  const lines = ids.map((id) => `[${id}] "Some Channel" site=https://example.com/ +3 pts, 1 skipped, 0 err`);
+  lines.push(`Collected ${ids.length * 3} contact points from ${ids.length}/${ids.length} leads.`);
+  return lines.join('\n');
+}
+const idRange = (from: number, count: number) =>
+  Array.from({ length: count }, (_, i) => `rec${String(from + i).padStart(8, '0')}`);
+
+test('collectRewalk: a clean forward walk scores 1.0', () => {
+  const log = [collectPass(idRange(0, 10)), collectPass(idRange(10, 10)), collectPass(idRange(20, 10))].join('\n');
+  const r = collectRewalk(log, 3);
+  assert.deepEqual(r, { slots: 30, distinct: 30, ratio: 1 });
+});
+
+test('collectRewalk: identical passes score by how many times each lead was re-read', () => {
+  const same = collectPass(idRange(0, 10));
+  const r = collectRewalk([same, same, same].join('\n'), 3);
+  assert.equal(r?.slots, 30);
+  assert.equal(r?.distinct, 10);
+  // 0.333 is far below the 0.7 alarm ratio — this is the 2026-09-11 rewind loop.
+  assert.ok(r!.ratio < 0.7);
+});
+
+test('collectRewalk: the 2026-09-12 shape (571 slots, 271 distinct) trips the 0.7 alarm', () => {
+  // Two fresh passes then two re-reads of the first, the walking-in-place shape.
+  const a = collectPass(idRange(0, 150));
+  const b = collectPass(idRange(150, 121));
+  const r = collectRewalk([a, b, a, a].join('\n'), 4);
+  assert.equal(r?.slots, 571);
+  assert.equal(r?.distinct, 271);
+  assert.ok(r!.ratio < 0.7, 'must alarm');
+});
+
+test('collectRewalk: the window is the last N passes only, not the whole log', () => {
+  const old = collectPass(idRange(0, 10));
+  const log = [old, old, collectPass(idRange(50, 10)), collectPass(idRange(60, 10))].join('\n');
+  // The two repeated passes are older than the window and must not drag it down.
+  const r = collectRewalk(log, 2);
+  assert.deepEqual(r, { slots: 20, distinct: 20, ratio: 1 });
+});
+
+test('collectRewalk: too few completed passes is null, not a clean walk', () => {
+  assert.equal(collectRewalk(collectPass(idRange(0, 10)), 4), null);
+  assert.equal(collectRewalk('', 4), null);
+});
+
+test('collectRewalk: a pass still running is not counted (no summary line yet)', () => {
+  const partial = idRange(99, 5).map((id) => `[${id}] "X" site=(none) +0 pts, 9 skipped, 0 err`).join('\n');
+  const log = [collectPass(idRange(0, 10)), collectPass(idRange(10, 10)), partial].join('\n');
+  const r = collectRewalk(log, 2);
+  assert.deepEqual(r, { slots: 20, distinct: 20, ratio: 1 });
 });

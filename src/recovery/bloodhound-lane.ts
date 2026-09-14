@@ -881,3 +881,41 @@ function runBloodhound(
     child.on('error', () => { clearTimeout(watchdog); resolvePromise({ exit_code: null }); });
   });
 }
+
+/**
+ * How much of the last `passes` completed collect passes was NEW work.
+ *
+ * The collect log carries no timestamps, so the window is taken by pass count
+ * rather than by clock. Only COMPLETED passes are counted: a pass still running
+ * has a partial sample, and the front of a batch is not representative of it.
+ *
+ * Returns null when the log holds fewer than `passes` completed passes — too
+ * short a sample to judge, which is not the same as a clean walk.
+ *
+ * Added 2026-09-14. `collectBookDepth` infers repetition from the pool being
+ * smaller than a day of lead-slots; that prediction only holds while the cursor
+ * advances. This measures repetition directly, so it also catches the lane
+ * pinning its walk with a large book behind it (the 2026-09-11 rewind loop, and
+ * the re-pin at the top of the book that followed it).
+ */
+export function collectRewalk(
+  logText: string,
+  passes: number,
+): { slots: number; distinct: number; ratio: number } | null {
+  const lines = logText.split('\n');
+  const isSummary = (l: string) => /^Collected \d+ contact points from \d+\/\d+ leads\.$/.test(l.trim());
+  const ends: number[] = [];
+  for (let i = 0; i < lines.length; i++) if (isSummary(lines[i]!)) ends.push(i);
+  if (passes < 1 || ends.length < passes) return null;
+  // Start just past the summary of the pass BEFORE the window, so the first
+  // sampled pass contributes its own per-lead lines and no earlier ones.
+  const before = ends.length > passes ? ends[ends.length - passes - 1]! : -1;
+  const window = lines.slice(before + 1, ends[ends.length - 1]! + 1);
+  const ids: string[] = [];
+  for (const l of window) {
+    const m = /^\[(rec\w+)\]/.exec(l);
+    if (m) ids.push(m[1]!);
+  }
+  const distinct = new Set(ids).size;
+  return { slots: ids.length, distinct, ratio: ids.length === 0 ? 1 : distinct / ids.length };
+}

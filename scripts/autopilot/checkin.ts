@@ -24,6 +24,7 @@ import { summarizeToday, pacificDate } from './burn-ledger.js';
 import { countByReviewStatus } from '../../src/airtable.ts';
 import {
   collectBookDepth,
+  collectRewalk,
   laneOptsFromEnv,
   runBloodhoundLane,
   runRecoveryDuringOpenRouterHalt,
@@ -1126,6 +1127,53 @@ async function main(): Promise<void> {
       console.log(`[checkin ${day}] OBSERVATION bloodhound_collect_book_drained — pool ${depth.pool} vs ${perDay} lead-slots/day (${laps}x), ${depth.stranded} stranded`);
     }
   } catch { /* the book depth is a nicety; a DB hiccup must not mute 7c/7d */ }
+
+  // 7b-ii. Is the lane WALKING IN PLACE — re-reading leads it already read?
+  //
+  // WHY (2026-09-14). 7b-i infers repetition from the pool being smaller than a
+  // day of lead-slots. That is a prediction, and it only holds when the cursor
+  // is advancing normally. The lane's other failure mode leaves the pool large
+  // and pins the walk anyway: on 2026-09-11 a rewind loop replayed one batch
+  // with 46 more identical passes queued, and after that was fixed the walk
+  // re-pinned at the top of the book instead. With the pool now at ~3,400
+  // against 600 lead-slots a day, `bookDrained` is false, so every pass could
+  // re-read the same 150 leads and 7b-i would stay silent the whole time.
+  //
+  // So measure it instead of predicting it: count the distinct lead ids the
+  // last day of passes actually touched, against the lead-slots they spent.
+  // This is the number that exposed 2026-09-12 (571 slots over 271 distinct
+  // leads) and no check watched it — every other guard here watches faults and
+  // yield, and a lane repeating itself has neither. The 2026-09-13 debrief left
+  // this deliberately unbuilt so it could be written against a lane in its
+  // normal state; the 24h to 2026-09-14T07:00Z walked 516 slots over 516
+  // distinct leads, a ratio of 1.00, which is what normal looks like.
+  //
+  // Suppressed when 7b-i is already firing: a drained book explains repetition
+  // completely, and two alarms for one cause is how the 2026-09-12 misattribution
+  // happened in the first place.
+  const REWALK_ALARM_RATIO = Number(process.env.AUTOPILOT_REWALK_ALARM_RATIO ?? 0.7);
+  if (existsSync(COLLECT_LOG) && !bookDrained) {
+    try {
+      const laneOpts = laneOptsFromEnv(process.env.EMAIL_OUTREACH_REPO_PATH ?? '', true, () => {});
+      const passesPerDay = Math.max(1, Math.round(24 / laneOpts.collectIntervalHours));
+      // The collect log carries no timestamps, so take the last day's worth of
+      // COMPLETED passes by count. Derived from the cadence so a retune of the
+      // interval keeps the window at one day.
+      const walk = collectRewalk(readFileSync(COLLECT_LOG, 'utf8'), passesPerDay);
+      // A short sample makes the ratio noisy; one full batch is the floor.
+      if (walk && walk.slots >= laneOpts.collectBatch && walk.ratio < REWALK_ALARM_RATIO) {
+        const rereads = (walk.slots / Math.max(1, walk.distinct)).toFixed(1);
+        appendFileSync(OBSERVATIONS, JSON.stringify({
+          ts: new Date().toISOString(), kind: 'bloodhound_collect_walking_in_place',
+          lead_slots: walk.slots, distinct_leads: walk.distinct, ratio: Number(walk.ratio.toFixed(3)),
+          rereads_per_lead: Number(rereads), passes_sampled: passesPerDay,
+          alarm_ratio: REWALK_ALARM_RATIO,
+          detail: `The recovery lane's last ${passesPerDay} collect passes spent ${walk.slots} lead-slots on only ${walk.distinct} distinct leads (${rereads}x re-read, alarm below ${REWALK_ALARM_RATIO}). The collect book is NOT drained, so this is the cursor failing to advance rather than the lane running out of work — check logs/bloodhound-lane-state.json for a collectCursor that has not moved and for collectRewinds/collectSearchDeadRewinds climbing, and check campaign-<date>.jsonl for repeated "rewound" events on the same cursor. Spending money on search keys or Apify will not fix this: the lane is paying to re-read leads it has already read. Nothing is faulting, which is why no other check sees it.`,
+        }) + '\n');
+        console.log(`[checkin ${day}] OBSERVATION bloodhound_collect_walking_in_place — ${walk.slots} lead-slots over ${walk.distinct} distinct leads (${rereads}x)`);
+      }
+    } catch { /* an unreadable collect log is not an incident */ }
+  }
 
   if (existsSync(COLLECT_LOG) && !bookDrained) {
     try {
