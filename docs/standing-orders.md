@@ -279,9 +279,14 @@ this is the shape to check first.**
   do NOT earn v2's contact point for now, because sending is paused on inbox
   placement. The finder's Brave swap and the null-email crash fix are on
   `feat/v2-score-gates` (`fe6d3752d`); a live test found a site through Brave for
-  3 of 3 pilot leads that had none under Tavily. **Blocked, waiting on Casey:**
-  the session's permission check refused both applying migration 002 to the
-  `pipeline` database and the 635-lead email run, so nothing is merged or moved.
+  3 of 3 pilot leads that had none under Tavily.
+- 2026-09-14 (with Casey's explicit permission): **the v2 gates are LIVE.**
+  Migration 002 applied to `pipeline` (0 previously passing leads refused). Email
+  repo merged at `520c9dd48`; a parallel session had already shipped its own Brave
+  switch on the live branch, so that version was kept and mine was dropped, leaving
+  only the gates, the null-email crash fix and the two opt-in cost logs. Orchestrator
+  merged too. **The 18 verified pilot leads are in `approved_hold`.** The 637-lead
+  finance and coaching email run started 02:03Z from the tested branch copy.
 
 - 2026-09-13 (debrief): **THE GAP IS CLOSED. The recovery lane's book went 251 → 3,028,
   and the 09-12 recommendation to "build a second collect mode" is DONE — but NOT by
