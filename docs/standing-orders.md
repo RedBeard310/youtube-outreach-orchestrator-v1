@@ -339,6 +339,10 @@ this is the shape to check first.**
   Orchestrator `737bcd2` and automator `807acac` are pushed with origin identical;
   lane tests 50/50, tsc clean, scorer tests 6/6. A dry run from the branch picked
   exactly the 34 stuck leads, and all 34 have cached verdicts in the live file.
+  **First live run, 13:02:** verify checked 43 leads, then the re-score pass took 57
+  (the 34 plus 23 verified in that same run), assembled 57 with 0 kept, and parked
+  **57 of 57**. Checked in the database: all 57 are `approved_hold` with v2 7 to 9,
+  contact 1, a `valid` email, not DNC, and none cleared the old score bar.
 
 - 2026-09-13 (debrief): **THE GAP IS CLOSED. The recovery lane's book went 251 → 3,028,
   and the 09-12 recommendation to "build a second collect mode" is DONE — but NOT by
