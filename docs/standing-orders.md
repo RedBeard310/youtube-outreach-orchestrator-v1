@@ -31,25 +31,25 @@ so the discovery pause below stays on.
 - **Done:** the 18 pilot leads are in `approved_hold`. Email finding ran on 637
   finance and coaching leads, and the 315 without a working email went to the
   recovery lane's front.
-- **Waiting on Casey:** moving the run's 290 valid-email leads into `approved_hold`
-  (that starts enrichment spend), and email finding for the other 990 niches.
-- **The same question, arriving from the recovery lane (2026-09-14).** The lane now
-  recovers leads that score under the old bar, because the contact gate was widened.
-  In the 24h to 09-14 it verified **40 good emails and only 6 could park**: the other
-  **34 all score under 6 on the old measure**, and the hold gate needs a v2 re-score
-  run **after** the email verifies before it will take them. Nothing in the lane runs
-  that step, so they stop one cheap step short. The 18 pilot leads that parked the
-  same day prove the route works, by hand. **Decide whether the lane may re-score a
-  lead after its email verifies** — it is the difference between roughly 6 parked a
-  day and 40, and the backlog grows every cycle the lane runs well.
-  **The step is free and clears all 34.** Read from the database: every one is
-  already classified (16 at v2 8, 10 at v2 7, 8 at v2 6, **all with
-  `signal_v2_components.contact = 0`**), so `rescore-v2.py --stage assemble
-  --ids-file <ids>` makes no model call, and the contact point each has now earned
-  takes them to 9 / 8 / 7 against a gate that wants 7. No agent has run it because
-  it is a bulk lead write in `automator` (permission-guarded), and because what
-  parking starts is **enrichment spend** — the same call as the 290 above. Full
-  detail: `casey-assistant/brain/lead-gen/runs/lead-run-2026-09-14-analysis.md` §3.
+- **Casey, 2026-09-14, three yeses:** the run's 290 valid-email leads went to
+  `approved_hold` at 12:06 (enrichment spend approved, about $50 estimated), email
+  finding started on the other 990 leads at 12:06, and the recovery lane now
+  re-scores its own verified leads.
+- **The lane re-scores verified leads by itself** (live 2026-09-14, orchestrator
+  `737bcd2`, automator `807acac`). Each hourly `recovery-lane` run picks
+  `needs_contact` leads whose email verified `valid` while their v2 score still has
+  contact = 0 and `leads.may_enter_hold` refuses them. It runs `rescore-v2.py
+  --stage assemble` on those (free, no model call), then
+  `promote-verified-to-hold.ts --no-sweep`, and logs `bloodhound_rescore` with
+  `leads` and `parked`. This closes the 09-14 gap where the lane verified 40 good
+  emails in a day and parked 6. Assemble now skips a lead that was classified before
+  but has no cached verdict, where it used to write "outside" over the real
+  category. So the same leads returning every hour with 0 parked means the verdict
+  cache went stale (prompt or model changed). `--stage classify` on those ids fixes
+  it, and that stage spends OpenRouter.
+- **Waiting on Casey:** moving the 990 run's valid-email leads into `approved_hold`
+  once it reports (more enrichment spend). Leads verified outside the lane, like
+  these, still need the re-score by hand.
 - **Never, for this work:** email anyone, run `npm run send`, release the hold
   pool, touch `automator/config/email-pause.json`, lift the discovery pause, score
   the "Other" niche (41,000+ more 10k+ channels, a separate decision), write to
@@ -329,6 +329,16 @@ this is the shape to check first.**
   02:37, so nothing was lost. Fixed by aborting the rebase and pushing `520c9dd48`,
   which leaves origin and the live branch identical. Rule: push right after merging
   into any live checkout.
+- 2026-09-14 ~12:30, **Casey said yes to all three calls.** (1) 290 valid-email
+  leads from the 637 run moved to `approved_hold` at 12:06 (290 of 290, none
+  skipped), so enrichment picks them up. The 32 risky ones stay out. (2) Email
+  finding started at 12:06 on the other 990 leads of the 5,395 batch, in tier
+  order (191 whales, 204 strong 7s, 49 other 7+, 546 sixes). All 990 had a blank
+  `outreach_status` and none were DNC. Logs are in the session scratchpad. (3) The
+  recovery lane now re-scores its own verified leads hourly (see the ACTIVE section).
+  Orchestrator `737bcd2` and automator `807acac` are pushed with origin identical;
+  lane tests 50/50, tsc clean, scorer tests 6/6. A dry run from the branch picked
+  exactly the 34 stuck leads, and all 34 have cached verdicts in the live file.
 
 - 2026-09-13 (debrief): **THE GAP IS CLOSED. The recovery lane's book went 251 → 3,028,
   and the 09-12 recommendation to "build a second collect mode" is DONE — but NOT by
