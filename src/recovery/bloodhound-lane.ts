@@ -22,7 +22,7 @@ import { spawn } from 'node:child_process';
 import {
   closeSync, existsSync, mkdirSync, openSync, readFileSync, readSync, statSync, writeFileSync,
 } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { query } from 'pipeline-db';
 
 /** Where the collect walk has got to in the current lap. See COLLECT_IDS_SQL. */
@@ -624,9 +624,59 @@ export async function selectVerifiableIds(limit: number): Promise<string[]> {
   return rows.map((r) => r.id);
 }
 
+/** Lane leads whose email has verified but whose v2 score has not counted it.
+ *
+ *  WHY THIS EXISTS (2026-09-14). Widening the contact gate to Signal Score v2
+ *  let the lane work leads the old score under-rated. When one of them
+ *  verifies, `leads.may_enter_hold` still refuses it: its v2 route wants 7+
+ *  WITH the contact point counted, and that point is only added when
+ *  `automator/scripts/rescore-v2.py --stage assemble` runs again. Nothing ran
+ *  it, so in the 24h to 09-14 the lane verified 40 good emails and parked 6.
+ *  Casey said yes to re-scoring them automatically.
+ *
+ *  No score bar is typed here. The gate is the shared function, and the
+ *  contact test mirrors the scorer's own rule: a `valid` result earns the
+ *  point and a `risky` one never does. A lead leaves this set once assemble
+ *  writes contact = 1, whether or not it then clears the gate, so a lead the
+ *  re-score still leaves short is not re-scored every hour. The exception is a
+ *  lead assemble declines to touch (no cached verdict); it comes back hourly
+ *  and shows in the log as leads with no parks. */
+export const RESCORE_IDS_SQL = `SELECT lc.id
+       FROM leads.lead_candidates lc
+      WHERE lc.review_status = 'needs_contact'
+        AND lc.outreach_status = 'email_verified'
+        AND lc.email_verification_result = 'valid'
+        AND lc.signal_score_v2 IS NOT NULL
+        AND COALESCE(lc.signal_v2_components ->> 'contact', '0') = '0'
+        AND NOT leads.may_enter_hold(lc)
+        AND COALESCE(lc.do_not_contact, false) = false
+      ORDER BY lc.id
+      LIMIT $1`;
+
+export async function selectRescoreIds(limit: number): Promise<string[]> {
+  const rows = await query<{ id: string }>(RESCORE_IDS_SQL, [limit]);
+  return rows.map((r) => r.id);
+}
+
+/** The promote script refuses any ids file that does not end in `.txt`. */
+export const RESCORE_IDS_PATH = join('logs', 'bloodhound-rescore-ids.txt');
+
+/** The two commands the re-score pass runs, in order. Pinned by a test:
+ *  `--stage assemble` is the free stage, while `classify` and `all` spend
+ *  OpenRouter credit. `--no-sweep` keeps the promote step to the leads it was
+ *  handed. */
+export function rescoreCommands(idsFile: string): { rescore: string[]; promote: string[] } {
+  return {
+    rescore: ['python3', 'scripts/rescore-v2.py', '--stage', 'assemble', '--ids-file', idsFile],
+    promote: ['npx', 'tsx', 'scripts/promote-verified-to-hold.ts', idsFile, '--no-sweep'],
+  };
+}
+
 export interface LaneOpts {
   dryRun: boolean;
   emailRepoPath: string;
+  automatorRepoPath: string;
+  rescoreBatch: number;
   collectIntervalHours: number;
   verifyIntervalHours: number;
   collectBatch: number;
@@ -680,6 +730,10 @@ export function laneOptsFromEnv(
     // whole book against a 4,015-credit balance.
     collectBatch: Math.floor(numEnv('BLOODHOUND_COLLECT_BATCH', 150)),
     verifyBatch: Math.floor(numEnv('BLOODHOUND_VERIFY_BATCH', 200)),
+    // A path is configuration, not a secret, so it gets a committed default
+    // (the same reasoning as DEFAULT_EMAIL_REPO in src/cli/run-recovery.ts).
+    automatorRepoPath: process.env.AUTOMATOR_REPO_PATH?.trim() || '/home/casey/repos/automator',
+    rescoreBatch: Math.floor(numEnv('BLOODHOUND_RESCORE_BATCH', 500)),
     log,
   };
 }
@@ -719,6 +773,16 @@ export async function runBloodhoundLane(opts: LaneOpts): Promise<void> {
     } catch (e) {
       opts.log({ event: 'bloodhound_verify', error: e instanceof Error ? e.message : String(e) });
     }
+  }
+
+  // --- re-score pass (free): verified lane leads the v2 hold gate is waiting on ---
+  // Runs on every invocation rather than a cadence: the selector is one cheap
+  // query that is empty most hours. It sits after verify so a lead verified in
+  // this run parks in this run.
+  try {
+    await runRescorePass(opts);
+  } catch (e) {
+    opts.log({ event: 'bloodhound_rescore', error: e instanceof Error ? e.message : String(e) });
   }
 
   // --- collect pass (free; detached so the session keeps moving) ---
@@ -874,11 +938,59 @@ function runBloodhound(
   extraArgs: string[],
   timeoutMs = 20 * 60_000,
 ): Promise<{ exit_code: number | null }> {
+  return runChild(['npm', 'run', 'bloodhound', '--', ...extraArgs], cwd, timeoutMs);
+}
+
+/** Awaited child process with the same watchdog: a kill or a spawn failure
+ * reports a non-zero exit instead of hanging or throwing. */
+function runChild(
+  argv: string[],
+  cwd: string,
+  timeoutMs: number,
+): Promise<{ exit_code: number | null }> {
   return new Promise((resolvePromise) => {
-    const child = spawn('npm', ['run', 'bloodhound', '--', ...extraArgs], { cwd, stdio: 'inherit' });
+    const child = spawn(argv[0], argv.slice(1), { cwd, stdio: 'inherit' });
     const watchdog = setTimeout(() => { child.kill('SIGTERM'); }, timeoutMs);
     child.on('exit', (code) => { clearTimeout(watchdog); resolvePromise({ exit_code: code }); });
     child.on('error', () => { clearTimeout(watchdog); resolvePromise({ exit_code: null }); });
+  });
+}
+
+/** Re-score the lane's verified leads (free), then park the ones that now
+ * clear the hold gate. See RESCORE_IDS_SQL for why. */
+async function runRescorePass(opts: LaneOpts): Promise<void> {
+  const ids = await selectRescoreIds(opts.rescoreBatch);
+  if (ids.length === 0) return;
+  if (opts.dryRun) {
+    opts.log({ event: 'bloodhound_rescore', dry_run: true, leads: ids.length });
+    return;
+  }
+  if (!existsSync(join(opts.automatorRepoPath, 'scripts', 'rescore-v2.py'))) {
+    opts.log({ event: 'bloodhound_rescore', leads: ids.length, skipped: 'automator_repo_missing', path: opts.automatorRepoPath });
+    return;
+  }
+  mkdirSync('logs', { recursive: true });
+  const idsFile = resolve(RESCORE_IDS_PATH);
+  writeFileSync(idsFile, ids.join('\n') + '\n');
+  const cmd = rescoreCommands(idsFile);
+  const rescore = await runChild(cmd.rescore, opts.automatorRepoPath, 5 * 60_000);
+  if (rescore.exit_code !== 0) {
+    // rescore-v2.py exits 1 when another run holds its lock; next hour retries.
+    opts.log({ event: 'bloodhound_rescore', leads: ids.length, rescore_exit: rescore.exit_code });
+    return;
+  }
+  const promote = await runChild(cmd.promote, opts.emailRepoPath, 5 * 60_000);
+  const parked = await query<{ n: number }>(
+    `SELECT count(*)::int AS n FROM leads.lead_candidates
+      WHERE id = ANY($1) AND review_status = 'approved_hold'`,
+    [ids],
+  );
+  opts.log({
+    event: 'bloodhound_rescore',
+    leads: ids.length,
+    rescore_exit: 0,
+    promote_exit: promote.exit_code,
+    parked: parked[0]?.n ?? 0,
   });
 }
 

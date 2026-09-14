@@ -18,6 +18,9 @@ import {
   VERIFIABLE_IDS_SQL,
   COLLECT_IDS_SQL,
   IN_COLLECT_LANE_SQL,
+  RESCORE_IDS_SQL,
+  RESCORE_IDS_PATH,
+  rescoreCommands,
   type LaneState,
 } from '../src/recovery/bloodhound-lane.ts';
 
@@ -485,4 +488,49 @@ test('collectRewalk: a pass still running is not counted (no summary line yet)',
   const log = [collectPass(idRange(0, 10)), collectPass(idRange(10, 10)), partial].join('\n');
   const r = collectRewalk(log, 2);
   assert.deepEqual(r, { slots: 20, distinct: 20, ratio: 1 });
+});
+
+// 2026-09-14: the lane verified 40 good emails in a day and parked 6, because
+// leads admitted on Signal Score v2 need a re-score after verifying before the
+// hold gate counts their contact point. The re-score pass closes that gap.
+test('rescore selector calls the shared hold gate, never a score number', () => {
+  assert.match(RESCORE_IDS_SQL, /NOT leads\.may_enter_hold\(lc\)/);
+  assert.doesNotMatch(RESCORE_IDS_SQL, /signal_score(_v2)?\s*>=?\s*\d/);
+});
+
+test('rescore selector takes only verified-valid lane leads still missing the contact point', () => {
+  assert.match(RESCORE_IDS_SQL, /review_status = 'needs_contact'/);
+  assert.match(RESCORE_IDS_SQL, /outreach_status = 'email_verified'/);
+  // Risky never earns the v2 contact point (Casey, 2026-09-13), so re-scoring
+  // a risky lead would change nothing and repeat every hour.
+  assert.match(RESCORE_IDS_SQL, /email_verification_result = 'valid'/);
+  assert.match(RESCORE_IDS_SQL, /signal_score_v2 IS NOT NULL/);
+  assert.match(RESCORE_IDS_SQL, /->> 'contact', '0'\) = '0'/);
+  assert.match(RESCORE_IDS_SQL, /COALESCE\(lc\.do_not_contact, false\) = false/);
+  assert.match(RESCORE_IDS_SQL, /LIMIT \$1/);
+});
+
+test('rescore pass runs only the free assemble stage, then promotes just those leads', () => {
+  const { rescore, promote } = rescoreCommands('/abs/ids.txt');
+  assert.deepEqual(rescore.slice(0, 4), ['python3', 'scripts/rescore-v2.py', '--stage', 'assemble']);
+  assert.ok(!rescore.includes('classify') && !rescore.includes('all'), 'classify spends OpenRouter credit');
+  assert.ok(rescore.includes('/abs/ids.txt'));
+  assert.ok(promote.includes('/abs/ids.txt'));
+  assert.ok(promote.includes('--no-sweep'));
+  assert.match(RESCORE_IDS_PATH, /\.txt$/);
+});
+
+test('laneOptsFromEnv: automator path and rescore batch have committed defaults', () => {
+  const saved = { ...process.env };
+  try {
+    delete process.env.AUTOMATOR_REPO_PATH;
+    process.env.BLOODHOUND_RESCORE_BATCH = 'nope';
+    const opts = laneOptsFromEnv('/tmp/repo', true, () => {});
+    assert.equal(opts.automatorRepoPath, '/home/casey/repos/automator');
+    assert.equal(opts.rescoreBatch, 500);
+    process.env.AUTOMATOR_REPO_PATH = '  /srv/automator ';
+    assert.equal(laneOptsFromEnv('/tmp/repo', true, () => {}).automatorRepoPath, '/srv/automator');
+  } finally {
+    process.env = saved;
+  }
 });
