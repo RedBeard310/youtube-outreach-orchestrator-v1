@@ -26,10 +26,13 @@ so the discovery pause below stays on.
 - **New gate rules (Casey):** a lead may be worked for a contact at old score 6+
   or v2 6+. A lead may enter `approved_hold` at old score 6+, or v2 7+ once the
   score has been re-run with the verified email. Everyone who passed before still
-  passes. Built once, as Postgres functions, on branch `feat/v2-score-gates` in
-  `youtube-email-outreach-v1` and in this repo. **Not merged. Casey's word only.**
-- **Waiting on Casey:** merging that branch, email finding past the 50-lead
-  pilot, and moving any of these leads into `approved_hold`.
+  passes. Built once, as Postgres functions (`leads.may_seek_contact`,
+  `leads.may_enter_hold`). **Live since 2026-09-14 in both repos, with Casey's word.**
+- **Done:** the 18 pilot leads are in `approved_hold`. Email finding ran on 637
+  finance and coaching leads, and the 315 without a working email went to the
+  recovery lane's front.
+- **Waiting on Casey:** moving the run's 290 valid-email leads into `approved_hold`
+  (that starts enrichment spend), and email finding for the other 990 niches.
 - **Never, for this work:** email anyone, run `npm run send`, release the hold
   pool, touch `automator/config/email-pause.json`, lift the discovery pause, score
   the "Other" niche (41,000+ more 10k+ channels, a separate decision), write to
@@ -287,6 +290,28 @@ this is the shape to check first.**
   only the gates, the null-email crash fix and the two opt-in cost logs. Orchestrator
   merged too. **The 18 verified pilot leads are in `approved_hold`.** The 637-lead
   finance and coaching email run started 02:03Z from the tested branch copy.
+- 2026-09-14 ~03:00: **the 637-lead run finished at 02:50 with 0 crashes.** 322
+  verified (290 valid, 32 risky), 228 no email, 87 invalid. Cost: $1.08 OpenRouter
+  ($0.0017 per lead), 486 ZeroBounce checks, 907 Brave searches (about $4.50 of key
+  _1's $50). 42 searches came back "refused by both keys: 402". The run's copy of
+  `brave.ts` reports only the last key's status, so these are probably key _1 rate
+  limits hidden behind key _2's cap (assumed, not verified). A live search from the
+  live checkout answered fine at 02:55.
+  **Re-scored (`--stage assemble`, free): all 290 valid-email leads now pass
+  `leads.may_enter_hold`** (193 finance, coaching or consultant, 96 outside, 1
+  doctor). **Not promoted.** Promotion starts enrichment spend, so it waits on Casey.
+  The 32 risky ones stay out, per his call.
+  **Recovery lane:** at 02:53 the sweep moved 346 leads to `needs_contact`. 315 came
+  from this run, and 31 are older leads the new v2 gate admits. The lane had no
+  collect cursor and its lap was complete, so the 03:00 pass starts from the top,
+  where the priority list puts these leads.
+  **Incident, fixed:** the email-repo merge sat unpushed, so auto-sync's `git pull
+  --rebase` re-applied it every run. It hit the same conflict each time, which left
+  conflict markers in the live files about half the time from ~02:05 to 02:54. One
+  backfill batch crashed on it at 02:27, and the chain retried the same 18 ids at
+  02:37, so nothing was lost. Fixed by aborting the rebase and pushing `520c9dd48`,
+  which leaves origin and the live branch identical. Rule: push right after merging
+  into any live checkout.
 
 - 2026-09-13 (debrief): **THE GAP IS CLOSED. The recovery lane's book went 251 → 3,028,
   and the 09-12 recommendation to "build a second collect mode" is DONE — but NOT by
