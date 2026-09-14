@@ -33,6 +33,17 @@ so the discovery pause below stays on.
   recovery lane's front.
 - **Waiting on Casey:** moving the run's 290 valid-email leads into `approved_hold`
   (that starts enrichment spend), and email finding for the other 990 niches.
+- **The same question, arriving from the recovery lane (2026-09-14).** The lane now
+  recovers leads that score under the old bar, because the contact gate was widened.
+  In the 24h to 09-14 it verified **40 good emails and only 6 could park**: the other
+  **34 all score under 6 on the old measure**, and the hold gate needs a v2 re-score
+  run **after** the email verifies before it will take them. Nothing in the lane runs
+  that step, so they stop one cheap step short. The 18 pilot leads that parked the
+  same day prove the route works, by hand. **Decide whether the lane may re-score a
+  lead after its email verifies** — it is the difference between roughly 6 parked a
+  day and 40, and the backlog grows every cycle the lane runs well. It is the same
+  spend call as the 290 above, which is why no agent has run it. Full detail:
+  `casey-assistant/brain/lead-gen/runs/lead-run-2026-09-14-analysis.md` §3.
 - **Never, for this work:** email anyone, run `npm run send`, release the hold
   pool, touch `automator/config/email-pause.json`, lift the discovery pause, score
   the "Other" niche (41,000+ more 10k+ channels, a separate decision), write to

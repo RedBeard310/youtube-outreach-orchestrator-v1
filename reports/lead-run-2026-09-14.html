@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lead Run Debrief — 2026-09-14</title>
+<style>
+  :root {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --good-soft: #1f8a5b18; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+      --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+      --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --good-soft: #55c48c1c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --good-soft: #1f8a5b18; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+    --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+    --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --good-soft: #55c48c1c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 40px 22px 80px; }
+  .eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); font-weight: 600; }
+  h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.12; margin: 10px 0 6px; text-wrap: balance; letter-spacing: -.02em; }
+  h2 { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); margin: 44px 0 16px; font-weight: 700; }
+  h3 { font-size: 18px; margin: 0 0 6px; letter-spacing: -.01em; }
+  p { margin: 0 0 14px; }
+  .lede { font-size: 18px; color: var(--ink-soft); max-width: 68ch; }
+  .tag { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--amber-soft); color: var(--amber); letter-spacing: .02em; }
+  .tag.ok { background: var(--teal-soft); color: var(--teal); }
+  .tag.bad { background: var(--red-soft); color: var(--red); }
+  .tag.good { background: var(--good-soft); color: var(--good); }
+  .grid { display: grid; gap: 14px; }
+  .stats { grid-template-columns: repeat(4, 1fr); margin-top: 26px; }
+  @media (max-width: 720px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; box-shadow: var(--shadow); }
+  .stat .n { font-size: 30px; font-weight: 750; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .stat .l { font-size: 12.5px; color: var(--ink-soft); margin-top: 3px; }
+  .stat .s { font-size: 12px; margin-top: 8px; font-weight: 600; }
+  .up { color: var(--good); } .down { color: var(--red); } .warn { color: var(--amber); }
+  .accent-red { border-left: 3px solid var(--red); }
+  .accent-teal { border-left: 3px solid var(--teal); }
+  .accent-amber { border-left: 3px solid var(--amber); }
+  .accent-good { border-left: 3px solid var(--good); }
+
+  .strip { display: flex; align-items: flex-end; gap: 5px; height: 140px; padding: 14px 14px 10px; overflow-x: auto; }
+  .barwrap { flex: 1 0 22px; display: flex; flex-direction: column; align-items: center; gap: 5px; }
+  .bar { width: 100%; border-radius: 3px 3px 0 0; background: var(--teal); opacity: .9; }
+  .bar.low { background: var(--amber); }
+  .bar.today { background: var(--red); opacity: 1; }
+  .bar.zero { background: var(--red); opacity: 1; min-height: 2px; }
+  .barlab { font-size: 10.5px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-soft); padding: 0 14px 14px; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+
+  .q { border-radius: 14px; padding: 20px 22px; margin-bottom: 14px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); }
+  .q .ask { font-size: 17px; font-weight: 700; color: var(--ink); margin-bottom: 10px; display: flex; gap: 10px; align-items: baseline; }
+  .q .ask .qn { color: var(--red); font-weight: 800; flex: 0 0 auto; }
+  .q.accent-teal .ask .qn { color: var(--teal); }
+  .q.accent-good .ask .qn { color: var(--good); }
+  .q p { color: var(--ink-soft); }
+  .q b { color: var(--ink); }
+  .pill { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink); background: var(--panel-2); padding: 1px 7px; border-radius: 6px; border: 1px solid var(--line); white-space: nowrap; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+  th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); }
+  td .num { font-variant-numeric: tabular-nums; font-weight: 650; }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); box-shadow: var(--shadow); }
+  ol.recs { padding-left: 0; list-style: none; counter-reset: r; margin: 0; }
+  ol.recs li { counter-increment: r; position: relative; padding: 14px 16px 14px 52px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 10px; box-shadow: var(--shadow); }
+  ol.recs li::before { content: counter(r); position: absolute; left: 14px; top: 14px; width: 26px; height: 26px; border-radius: 8px; background: var(--teal-soft); color: var(--teal); font-weight: 800; font-size: 14px; display: grid; place-items: center; }
+  ol.recs b { color: var(--ink); }
+  .foot { margin-top: 46px; padding: 16px 18px; border-radius: 12px; background: var(--amber-soft); border: 1px solid var(--line); font-size: 14px; color: var(--ink-soft); }
+  .foot b { color: var(--ink); }
+  .muted { color: var(--ink-soft); font-size: 13.5px; }
+  code { background: var(--panel-2); border: 1px solid var(--line); border-radius: 5px; padding: 0 5px; font-size: .9em; }
+</style>
+
+<div class="wrap">
+
+  <div class="eyebrow">Lead Run Debrief · YouTube outreach</div>
+  <h1>2026-09-14 — the collect fix worked, and the bottleneck moved one step to the right</h1>
+  <p class="lede">Yesterday's debrief made one falsifiable prediction: close the gap between the recovery lane's two queries, let it re-read websites it had already paid for, and contact points should climb well past 6 a day <b>without touching Brave</b>. Brave was not touched and refused on every pass. The lane collected <b>958 contact points</b>, and its last pass pulled 771 of them off 145 of 150 leads. That part is settled. What the day also shows is where the lane now stops: <b>40 leads got a verified email and only 6 of them could park</b>, because the other 34 need a Signal Score v2 re-run with that email before the hold gate will take them, and nothing runs that step.</p>
+  <div style="margin-top:14px"><span class="tag good">958 CONTACT POINTS, WAS 6</span> <span class="tag good">NO-SITE RATE 91% → 13%</span> <span class="tag bad">34 GOOD EMAILS STUCK AT THE GATE</span> <span class="tag">DISCOVERY PAUSED BY CASEY</span> <span class="tag bad">SENDING PAUSED SINCE 09-10</span></div>
+
+  <div class="grid stats">
+    <div class="card stat accent-good">
+      <div class="n">958</div>
+      <div class="l">contact points collected</div>
+      <div class="s up">was 6 across 2 leads yesterday</div>
+    </div>
+    <div class="card stat accent-good">
+      <div class="n">13%</div>
+      <div class="l">of leads resolved no website, last pass</div>
+      <div class="s up">was 91%, and Brave is still refusing</div>
+    </div>
+    <div class="card stat accent-red">
+      <div class="n">34</div>
+      <div class="l">verified emails that could not park</div>
+      <div class="s down">of 40 recovered. All need a v2 re-score</div>
+    </div>
+    <div class="card stat accent-amber">
+      <div class="n">6.4 days</div>
+      <div class="l">of OpenRouter runway left</div>
+      <div class="s warn">was 24 days. Spend tripled to $7.65/day</div>
+    </div>
+  </div>
+
+  <h2>The shape of the day</h2>
+
+  <div class="card" style="padding:0">
+    <div class="strip">
+      <div class="barwrap"><div class="bar" style="height:10%"></div><div class="barlab">63</div></div>
+      <div class="barwrap"><div class="bar" style="height:28%"></div><div class="barlab">177</div></div>
+      <div class="barwrap"><div class="bar" style="height:100%"></div><div class="barlab">627</div></div>
+      <div class="barwrap"><div class="bar low" style="height:11%"></div><div class="barlab">71</div></div>
+      <div class="barwrap"><div class="bar low" style="height:11%"></div><div class="barlab">71</div></div>
+      <div class="barwrap"><div class="bar" style="height:24%"></div><div class="barlab">151</div></div>
+      <div class="barwrap"><div class="bar" style="height:78%"></div><div class="barlab">488</div></div>
+      <div class="barwrap"><div class="bar" style="height:23%"></div><div class="barlab">142</div></div>
+      <div class="barwrap"><div class="bar" style="height:21%"></div><div class="barlab">133</div></div>
+      <div class="barwrap"><div class="bar low" style="height:7%"></div><div class="barlab">44</div></div>
+      <div class="barwrap"><div class="bar low" style="height:2%"></div><div class="barlab">8</div></div>
+      <div class="barwrap"><div class="bar low" style="height:1%"></div><div class="barlab">2</div></div>
+      <div class="barwrap"><div class="bar zero" style="height:1%"></div><div class="barlab">0</div></div>
+      <div class="barwrap"><div class="bar today" style="height:5%"></div><div class="barlab">24</div></div>
+    </div>
+    <div class="legend">
+      <span>Leads parked into <code>approved_hold</code> per cycle, 09-01 through 09-14 (today in red)</span>
+    </div>
+  </div>
+
+  <p class="muted" style="margin-top:14px">The 24 splits cleanly and the split is the story. <b>6</b> came from the recovery lane, out of 40 leads whose emails verified good. The other <b>18</b> are the v2 pilot batch Casey approved on 09-13, which had nothing to do with the lane. So the lane's own contribution to parking was 6, on a day it did more collection work than any day since the Brave cap hit.</p>
+
+  <h2>The funnel, end to end</h2>
+
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Stage</th><th>This cycle</th><th>Prior</th><th>Reading</th></tr></thead>
+      <tbody>
+        <tr><td>New channels discovered</td><td class="num">0</td><td class="num">0</td><td>Intended. Paused by Casey on 09-08.</td></tr>
+        <tr><td><code>needs_contact</code> pool</td><td class="num">4,077</td><td class="num">3,735</td><td><b>+342, none of it new channels.</b> See Q3.</td></tr>
+        <tr><td>— reachable by the collector</td><td class="num">3,311</td><td class="num">251</td><td>A 13× book. Yesterday's fix.</td></tr>
+        <tr><td>— stranded between the two selectors</td><td class="num">3</td><td class="num">2,780</td><td>The gap is closed and stayed closed.</td></tr>
+        <tr><td>Collect passes / lead-slots</td><td class="num">4 / 516</td><td class="num">6 / 903</td><td>Cadence unchanged.</td></tr>
+        <tr><td>— distinct leads walked</td><td class="num">516 (1.00)</td><td class="num">253 (0.28)</td><td>No repetition at all. Yesterday, a 3.6× re-read.</td></tr>
+        <tr><td>Leads resolving no website, last pass</td><td class="num">19 / 150</td><td class="num">825 / 903</td><td>13% against 91%. Healthy is ~15%.</td></tr>
+        <tr><td><b>Contact points collected</b></td><td class="num">958</td><td class="num">6</td><td>Across <b>183</b> leads.</td></tr>
+        <tr><td>— of which are email addresses</td><td class="num">94</td><td class="num">0</td><td><b>10%.</b> The rest: 365 social, 299 website, 81 phone.</td></tr>
+        <tr><td>Leads that yielded any email</td><td class="num">66 / 183</td><td class="num">0</td><td>36% of worked leads.</td></tr>
+        <tr><td>— whose email verified good</td><td class="num">40 / 66</td><td class="num">0</td><td>61%. A healthy verify rate.</td></tr>
+        <tr><td><b>— that reached <code>approved_hold</code></b></td><td class="num">6 / 40</td><td class="num">0</td><td><b>15%. This is the new bottleneck.</b></td></tr>
+        <tr><td>Verify queue depth, now</td><td class="num">4</td><td class="num">4</td><td>Drained. The verifier ruled on all it could.</td></tr>
+        <tr><td>Parked into <code>approved_hold</code></td><td class="num">24</td><td class="num">0</td><td>6 from the lane, 18 from the v2 pilot batch.</td></tr>
+        <tr><td><code>npm run send</code></td><td class="num">0 of 3</td><td class="num">0</td><td><b>Composed 3, sent 0, damaged 3 rows.</b> Fixed below.</td></tr>
+        <tr><td>Fatal signatures / halts / quota stops</td><td class="num">0</td><td class="num">0</td><td>Nothing crashed.</td></tr>
+        <tr><td>Anthropic spend</td><td class="num">$0.00</td><td class="num">$0.00</td><td>Of a $150 hard ceiling.</td></tr>
+        <tr><td>OpenRouter</td><td class="num">$7.65/day</td><td class="num">$2.37/day</td><td><b>$48.68 left, about 6.4 days.</b></td></tr>
+        <tr><td>YouTube key pool</td><td class="num">15 / 66</td><td class="num">15 / 66</td><td>50 out of quota, 1 suspended. Idle anyway.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>The three questions</h2>
+
+  <div class="q accent-good">
+    <div class="ask"><span class="qn">Q1</span><span>Did yesterday's fix work?</span></div>
+    <p>Completely, and the shape of the evidence is what makes it convincing rather than just encouraging.</p>
+    <p>The prediction was deliberately falsifiable: widening the collect book puts leads that <i>already have a website stored</i> at the front of each lap, the collector reads that site back instead of re-buying it, so yield should climb <b>while Brave stays dead</b>. Brave stayed dead, refusing on all four passes. The no-website rate walked down across the day as the cursor reached the reused-website tier: <span class="pill">91%</span> → <span class="pill">74%</span> → <span class="pill">88%</span> → <span class="pill">13%</span>.</p>
+    <p>The last pass collected <b>771 contact points from 145 of 150 leads</b>. The best pass of the fully-funded era was 885 points off 148 leads, so the lane is back at roughly its old ceiling while buying nothing.</p>
+    <p>The repetition measure confirms it from the other side: <b>516 lead-slots on 516 distinct leads</b>, a ratio of 1.00, against 253 over 903 yesterday. Every slot went to a lead the lane had not seen.</p>
+  </div>
+
+  <div class="q accent-red">
+    <div class="ask"><span class="qn">Q2</span><span>Then why did the lane only park 6?</span></div>
+    <p>Because a collected contact point is not an email, and a verified email is not yet a parked lead. Both gaps are large, and the second one is new.</p>
+    <p><b>958 points came off 183 leads, but only 94 of them are email addresses.</b> The rest are social profiles (365), websites (299), phone numbers (81) and domain records. Useful for a human, useless to a lane whose only exit is a verified email. 66 of the 183 leads yielded an email at all, and <b>40 of those verified good</b>, a 61% verify rate that is perfectly healthy.</p>
+    <p>Then 34 of those 40 stopped dead. They are still sitting in <code>needs_contact</code> with a good, verified email attached. Checked against the database: <b>not one of the 34 has an old signal score of 6 or more, and all 6 that did park do.</b> That is the v2 hold gate working exactly as written. Casey's rule is that a lead enters <code>approved_hold</code> at old score 6+, <b>or</b> v2 7+ <i>once the score has been re-run with the verified email</i>. Nothing in the lane runs that re-score, so a lead that arrives under the old bar recovers its email and then stops one cheap step short of the finish.</p>
+    <p>The 18 pilot leads that parked today came through that same door, and they prove the route works: they also score under 6 on the old measure, and they parked because somebody ran the v2 re-score on them by hand.</p>
+  </div>
+
+  <div class="q accent-teal">
+    <div class="ask"><span class="qn">Q3</span><span>Where did 342 new <code>needs_contact</code> leads come from with discovery off?</span></div>
+    <p>From re-scoring leads we already own, not from finding anyone. This is the 09-13 standing order landing, and it is worth stating plainly because a rising pool with discovery paused looks, at a glance, exactly like discovery having restarted itself.</p>
+    <p>5,395 channels with 10k+ subscribers had never been given a Signal Score v2, because the re-scoring script only looked at leads already at old score 6+. Casey's widened gate went live in both repos this morning: a lead may be <i>worked for a contact</i> at old score 6+ or v2 6+. That moved 342 already-owned leads into the lane's reach.</p>
+    <p>Checked rather than assumed: every arrival was first discovered between May and September, most of them in July and August. No channel was discovered, no sweep ran, no timer was touched.</p>
+    <p>It also resets a clock from yesterday. The lane was described as having about five days of book left with nothing replenishing it. It now holds <b>3,311</b> leads, and the refill source has barely started, since only the finance and coaching slices have been scored.</p>
+  </div>
+
+  <h2>What broke → what's fixed</h2>
+
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>What broke</th><th>Evidence</th><th>Fix</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><b><code>npm run send</code> wrote three emails into a fleet that has been paused since 09-10, then marked all three leads <code>failed</code>.</b> The pause is enforced at the SmartLead POST, which is the very last thing a send does, so every lead was composed in full first.</td>
+          <td>3 leads, 3 LLM calls, 59 seconds, 0 sent. All three rows went from <code>ready_data_scraped</code> to <code>failed</code> with the pause text as the error, which drops a fully prepped lead <i>out</i> of the send queue for a condition that says nothing about the lead.</td>
+          <td><b>Fixed.</b> Email repo <code>f124b1bb6</code>. A run that will push now reads the pause <b>before</b> composing anything and stops with nothing spent and no row touched. The per-lead guard stays as the last line of defence, but it no longer writes <code>failed</code> for a pause and it halts the batch instead of composing the rest. <b>The three damaged rows were repaired</b> to <code>email_drafted</code> with drafts intact, so they send the moment Casey lifts the pause.</td>
+        </tr>
+        <tr>
+          <td><b>Nothing watched the lane for repetition.</b> This is the exact blind spot that let 09-08 through 09-13 run unseen.</td>
+          <td>The existing book-depth alarm <i>predicts</i> repetition from a drained pool, and that prediction only holds while the cursor advances. With the book at 3,311 against 600 lead-slots a day, a pinned cursor could re-read the same 150 leads indefinitely and that alarm would stay silent throughout.</td>
+          <td><b>Fixed.</b> Orchestrator <code>bb0a319</code>. The check-in now measures distinct leads against lead-slots over the last day of passes and fires <code>bloodhound_collect_walking_in_place</code> below a 0.7 ratio, naming the cursor rather than a spend remedy. Suppressed when the book-drained alarm is already firing, so one cause never gets two names. This was lever #5 yesterday, held back so it could be written against a healthy lane, and today's 1.00 is that baseline.</td>
+        </tr>
+        <tr>
+          <td><b>34 leads with a verified email cannot leave <code>needs_contact</code>.</b> The v2 hold gate needs a re-score run <i>after</i> the email verifies, and no automated step does that.</td>
+          <td>40 leads recovered a good email this cycle. 6 parked, all with old score 6+. The 34 that did not park are all under 6. The 18 pilot leads that parked today are also under 6 and got there by a hand-run re-score.</td>
+          <td><b>Not fixed, and deliberately so.</b> The re-score lives in <code>automator</code>, outside the five repos this agent may modify, and running it spends OpenRouter credits on a balance with 6.4 days left. Casey's standing orders also hold the 290 valid-email leads from the last run pending his word. This is a decision, not a defect. It is lever #1 below.</td>
+        </tr>
+        <tr>
+          <td><b>Brave's failure mode changed and nobody would have noticed.</b> The first three passes logged <code>402 Usage limit exceeded</code>. The last logged <code>no key answered (network or timeout)</code>.</td>
+          <td>Key <code>_1</code> was funded with $50 on 09-13 and was answering 200. A timeout is not a spending cap, so the funded key is failing for a different reason than the capped one.</td>
+          <td><b>Not fixed, flagged.</b> It cost nothing today because the reused-website path carried the passes. But "Brave is down" now covers two different faults, and a top-up cures only one of them. Worth a single live probe before any spend.</td>
+        </tr>
+        <tr>
+          <td><b>OpenRouter spend tripled and runway fell from 24 days to 6.4.</b></td>
+          <td>$2.37/day → <b>$7.65/day</b>, balance $48.68. The finder's own log accounts for $0.02 of it, so the spend is the v2 re-scoring batch and the email-finding run over 637 finance and coaching leads.</td>
+          <td><b>No action taken. This is a spend decision.</b> The work causing it is exactly what Casey ordered on 09-13, so the rate is expected. The runway is the problem, not the rate: an empty balance stops enrichment, which is the only lane still producing.</td>
+        </tr>
+        <tr>
+          <td>Nothing else. No crash, no halt, no quota stop, no runaway Anthropic spend.</td>
+          <td>0 fatal signatures, 0 halted hours, $0.00 Anthropic against a $150 ceiling.</td>
+          <td>No action. The YouTube key pool at 15 of 66 is irrelevant while discovery is paused, and the paused sweeps are the intended state.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p class="muted" style="margin-top:14px"><b>A note on the send failure.</b> This is the third time this pipeline has paid for a compose and then refused at the push: a missing campaign id on 09-09, and the email pause twice over. The guard was correct every time, and sat at the end of the pipeline every time. The lesson is not about the guard, it is about where a refusal is <i>read</i>. A condition that will refuse every lead in a batch identically should be read before the first one costs anything.</p>
+
+  <h2>Recommended next — ranked</h2>
+
+  <ol class="recs">
+    <li><b>Decide whether the recovery lane may re-score a lead after its email verifies.</b> This is the difference between the lane producing 6 parked leads a day and producing 40. 34 leads are sitting one step short right now, and that number grows every cycle the lane runs well. It is a decision rather than a fix for two reasons: the re-score spends OpenRouter credits, and Casey already has 290 valid-email leads held pending his word on exactly this kind of spend. If the answer is yes, the step belongs inside the lane so it is never forgotten again.</li>
+    <li><b>Top up OpenRouter. 6.4 days of runway, and it funds the only lane that is producing.</b> $48.68 at $7.65/day. The higher burn is the v2 scoring and email-finding work ordered on 09-13, and only two niches of that job are done, so the rate is more likely to hold than to fall. If the balance empties, enrichment stops, and enrichment is the entire point of the discovery pause. The only item here with a deadline, and lever #1 above depends on it.</li>
+    <li><b>Probe Brave before spending on it.</b> Two different faults now wear one label: a <code>402</code> cap on key <code>_2</code>, and a timeout on the funded key <code>_1</code>. Yesterday's recommendation to raise the cap assumed a single fault. One live call settles it. Not urgent while the lane routes around Brave entirely, but it returns for the roughly 1,300 book leads with no site to reuse.</li>
+    <li><b>Decide what "placement improves" means for lifting the send pause.</b> Off since 09-10 at 7% spam on the best inbox. Prepped leads are stacking behind it: 3 today with drafts already written, and more coming. Nothing is lost while they wait and nothing is gained. Casey's call alone, and no agent should touch <code>config/email-pause.json</code>.</li>
+    <li><b>Leave the collect half alone now.</b> It is doing its job at full rate, the stranded count is 3 and stable, and the new repeat-walk alarm will say so if the cursor ever pins. Every remaining constraint today sits downstream of it.</li>
+  </ol>
+
+  <div class="foot">
+    <b>Standing orders honoured.</b> Discovery of new channels stayed off. No sweep, refill timer, keyword harvest or campaign service was re-enabled, restarted or repaired, and <code>logs/discovery-paused.flag</code> was read but not modified. The paused lanes, the stale sweep state files and the zero new channels are the intended state and are not reported as faults anywhere above. The rise in <code>needs_contact</code> is re-scoring, not discovery. No <code>.env</code> file was read or written, and <code>config/email-pause.json</code> was read but never modified. No re-score was run and no held lead was promoted, both being Casey's spend decisions. No halt flag was written and the loop was left running: nothing today was unsafe to leave running. <b>Spend:</b> $0.00 Anthropic, no metered LLM API credits used by this session.
+  </div>
+
+</div>
+</html>
