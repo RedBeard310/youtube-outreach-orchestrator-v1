@@ -57,6 +57,21 @@ so the discovery pause below stays on.
   daily quota. The backlog is about 590 leads (the chain's pool of 167 plus the 423),
   roughly $95 at an estimated 16 to 17 cents a lead. **Adding credits is Casey's
   call. The chain picks the failed leads back up by itself once credits land.**
+  **Update 2026-09-15 (debrief): the chain no longer grinds while the account is
+  empty.** By 07:06 UTC it had launched nine doomed batches over nine hours,
+  1,635 lead attempts, and finished off all 66 YouTube keys, because each lead
+  pays for its YouTube harvest and its Decodo transcripts before dying at stage 4
+  on the 402. It had a preflight gate for Supadata/Decodo and one for the YouTube
+  pool, and none for the third paid dependency. Orchestrator `78b1284` adds
+  `openrouter_ok()` to `scripts/backfill/chain.sh`: it probes the credits endpoint
+  before every batch and waits below `BACKFILL_MIN_OPENROUTER_USD` (default $1).
+  It fails open, so only OpenRouter itself saying the balance is low stops it. The
+  same commit gives the hourly check-in a `backfill_chain_stalled` observation,
+  because twelve check-ins ran through the outage printing `healthy` (nothing
+  watched the chain at all). **Nothing about the remedy changed: credits are still
+  Casey's call, and the backlog is still about 642 leads.** What changed is that
+  waiting for him now costs nothing. Full detail:
+  `brain/lead-gen/runs/lead-run-2026-09-15.html`.
 - **Never, for this work:** email anyone, run `npm run send`, release the hold
   pool, touch `automator/config/email-pause.json`, lift the discovery pause, score
   the "Other" niche (41,000+ more 10k+ channels, a separate decision), write to
