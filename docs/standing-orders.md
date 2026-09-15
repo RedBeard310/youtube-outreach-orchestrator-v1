@@ -50,7 +50,13 @@ so the discovery pause below stays on.
 - **Casey, 2026-09-15:** the 990 run's 423 valid-email leads went to
   `approved_hold` at 02:59 UTC (enrichment spend approved, about $72 estimated).
   Leads verified outside the lane, like these, still need the re-score by hand.
-- **BLOCKED since 2026-09-14 ~22:10 UTC: the OpenRouter account is empty.** Read
+- **RESOLVED 2026-09-15: Casey added $300 of OpenRouter credit** (balance $299.81 at
+  14:34 UTC). The 14:34 batch was the first to run with the credit in place: 0
+  failures after 10 minutes and $0.33 spent. The 13:07 batch still failed 499 of
+  499, because its credit probe errored, the gate let it through, and it ran before
+  the top-up. One key (`OPENROUTER_API_KEY`, no per-key limit) feeds every repo, so
+  the credit reaches enrichment. History of the outage follows.
+- **Was BLOCKED from 2026-09-14 ~22:10 UTC: the OpenRouter account was empty.** Read
   from `GET /api/v1/credits`: $1,310 bought, $1,310.19 used. Enrichment has failed
   every lead since 22:26, yet `chain.log` records each batch as `exit=0 done=0
   failed=88` (98 later). The failing retries also run the YouTube key pool to its
@@ -387,6 +393,16 @@ this is the shape to check first.**
   retry by themselves. The lane's hourly re-score kept working (57 parked at 13:02,
   2 at 17:02, 1 at 01:01) because it makes no model call. Waiting on Casey to add
   credits. The backlog is about 590 leads, roughly $95 (estimate).
+- 2026-09-15 ~14:50 UTC: **Casey added $300 of OpenRouter credit, and enrichment is
+  running again.** Balance was $299.81 at 14:34. The 14:34 batch (500 of a pool of
+  603) had 0 failures and $0.33 spent after 13 minutes, with 10 bundle folders
+  started. Checked while confirming: only one OpenRouter key exists across the
+  pipeline and it has no per-key limit, and last night's second 402 wording ("would
+  exceed your available credits given your current in-flight requests") was the same
+  empty account. The "(Haiku)" in the quick repo's export log is a stale label, since
+  `models.json` sends the examples bank to `openrouter:deepseek/deepseek-v3.2`. At the
+  290 batch's pace (about 29 leads an hour) the pool takes about 20 hours, which puts
+  the finish around 11:00 UTC 09-16. Rough cost is $97 (estimate).
 
 - 2026-09-13 (debrief): **THE GAP IS CLOSED. The recovery lane's book went 251 → 3,028,
   and the 09-12 recommendation to "build a second collect mode" is DONE — but NOT by
