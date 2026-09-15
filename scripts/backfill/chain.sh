@@ -110,6 +110,61 @@ for (const [name, value] of Object.entries(process.env)) {
   [ "$code" = "200" ]
 }
 
+# OpenRouter credit preflight (added 2026-09-15 after the 09-14/15 burn).
+#
+# WHY. Every enrichment lead ends at an OpenRouter call, and the account ran dry
+# at 2026-09-14T22:10Z. The chain had no idea: it kept launching batches, each
+# lead ran stage 1 (YouTube harvest) and stage 2 (Decodo transcripts, paid) and
+# then died at stage 4 on `openrouter HTTP 402`. Nine batches, ~1,635 lead
+# attempts, every one exit=0 done=0 — so the hard-wall guard never saw it, and
+# the zero-progress guard read it as a generic "infra outage", refunded the
+# attempts and retried an hour later, forever. It also escalated: the pool grew
+# to 590 when Casey promoted the 423, so the last two batches were 500 leads
+# failing 499 apiece, two hours each. By 06:26Z all 66 YouTube keys were
+# exhausted and the streak had passed BACKFILL_ZERO_REFUND_MAX, so real leads
+# started counting attempts against a fault that had nothing to do with them.
+#
+# The two gates above already have exactly this shape for the other two paid
+# dependencies. This is the third one, and it was the only dependency of the
+# three with no gate. Same contract: probe before every batch, WAIT while the
+# account is empty, self-clear the moment credits land (the chain picks the
+# failed leads back up by itself, they never leave the pool).
+#
+# Fail OPEN, deliberately: a probe we could not complete (no key, network error,
+# non-200, unparseable body) is not proof of anything, so it returns OK and the
+# batch runs. Same rule the check-in's credit probe uses. The only thing that
+# stops the chain is OpenRouter itself saying the balance is below the floor.
+# The probe costs nothing — /credits is not a billed endpoint.
+openrouter_ok() {
+  local out
+  out=$(node -e '
+const { existsSync } = require("fs");
+const { homedir } = require("os");
+const { join } = require("path");
+const dotenv = require("/home/casey/repos/quick-youtube-channel-research-v1/node_modules/dotenv");
+const shared = [process.env.SHARED_ENV_FILE, join(homedir(),"Claude","env-storage",".env"), join(homedir(),"env-storage",".env")].filter(Boolean).find((p)=>existsSync(p));
+if (shared) dotenv.config({ path: shared });
+const key=(process.env.OPENROUTER_API_KEY||"").trim();
+const floor=Number(process.env.BACKFILL_MIN_OPENROUTER_USD||"1");
+(async()=>{
+  if(!key){console.log("OK nokey");return;}
+  try{
+    const r=await fetch("https://openrouter.ai/api/v1/credits",{headers:{authorization:`Bearer ${key}`},signal:AbortSignal.timeout(20000)});
+    if(!r.ok){console.log("OK probe-http-"+r.status);return;}
+    const body=await r.json();
+    const granted=Number(body?.data?.total_credits), used=Number(body?.data?.total_usage);
+    if(!Number.isFinite(granted)||!Number.isFinite(used)){console.log("OK probe-unparseable");return;}
+    const left=granted-used;
+    console.log(left<floor ? `DRY ${left.toFixed(2)} ${floor.toFixed(2)}` : `OK ${left.toFixed(2)}`);
+  }catch{console.log("OK probe-error");}
+})();
+' 2>/dev/null)
+  case "$out" in
+    DRY*) OPENROUTER_STATE="$out"; return 1 ;;
+    *) OPENROUTER_STATE="$out"; return 0 ;;
+  esac
+}
+
 SELF_MTIME="$(stat -c %Y "$0" 2>/dev/null || echo 0)"
 
 log "chain started (pid $$, batch size ${BACKFILL_BATCH_SIZE:-500})"
@@ -122,6 +177,7 @@ log "no batch running — chain taking over"
 
 consec_fail=0
 zero_streak=0
+OPENROUTER_STATE="unprobed"   # set -u is on; openrouter_ok() assigns it before any read
 while true; do
   if [ -f "$HALT" ]; then
     log "halt flag present — stopping"
@@ -167,6 +223,15 @@ while true; do
       sleep 1800
     done
     log "supadata is back — resuming batches"
+  fi
+
+  if ! openrouter_ok; then
+    log "openrouter account out of credits (${OPENROUTER_STATE}) — waiting (probe every 30m, silent until it clears; leads stay in the pool)"
+    while ! openrouter_ok; do
+      [ -f "$HALT" ] && { log "halt flag present — stopping"; exit 0; }
+      sleep 1800
+    done
+    log "openrouter credits are back (${OPENROUTER_STATE}) — resuming batches"
   fi
 
   # YouTube quota gate (2026-08-10, generalized same day for backend=auto):

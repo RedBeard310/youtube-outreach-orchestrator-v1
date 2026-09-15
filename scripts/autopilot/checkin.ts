@@ -1282,6 +1282,99 @@ async function main(): Promise<void> {
     } catch { /* an unreadable collect log is not an incident */ }
   }
 
+  // 7e. The enrichment backfill chain is producing nothing.
+  //
+  // WHY (2026-09-15). Until today this check-in did not look at the backfill
+  // chain at all — the line below claims "enrichment lanes still checked" and
+  // nothing checked them. That was survivable while discovery ran. It is not
+  // now: with every sweep off, enrichment IS the pipeline, and it is the one
+  // lane whose failure nothing was watching.
+  //
+  // What it cost. OpenRouter ran dry at 2026-09-14T22:10Z. Each enrichment lead
+  // still ran its YouTube harvest and its paid Decodo transcripts before dying
+  // at stage 4 on `openrouter HTTP 402`. The chain logged nine batches of
+  // `exit=0 done=0` across nine hours — ~1,635 lead attempts — and every guard
+  // it owns read the shape correctly as "an infra outage" and retried. Nobody
+  // was told. Twelve hourly check-ins ran in that window and every one printed
+  // `healthy`, because a chain that fails wholesale touches none of the signals
+  // this file reads.
+  //
+  // The chain now has an OpenRouter preflight (scripts/backfill/chain.sh) so the
+  // burn cannot repeat, but a gate that waits silently is its own hazard: the
+  // 08-25 and 08-30 halts both sat un-noticed past their own repair. So this
+  // reports the stall whatever its cause, reading the chain's own log rather
+  // than guessing at one — including the new WAITING state.
+  //
+  // OBSERVATION ONLY, never exit 7. Every cause seen so far ends in a spend call
+  // or a secrets change, neither of which a fix-agent may make.
+  const CHAIN_LOG = process.env.BACKFILL_CHAIN_LOG || join(LOGS, 'backfill-2026-07', 'chain.log');
+  const CHAIN_STALL_HOURS = Number(process.env.AUTOPILOT_CHAIN_STALL_HOURS ?? 3);
+  if (existsSync(CHAIN_LOG)) {
+    try {
+      const since = Date.now() - CHAIN_STALL_HOURS * 3600_000;
+      const LINE = /^\[([0-9T:\-]+Z)\]\s+(.*)$/;
+      const batches: Array<{ done: number; failed: number }> = [];
+      let waitingFor: string | null = null;
+      let progressed = false;
+      for (const raw of readFileSync(CHAIN_LOG, 'utf8').split('\n').slice(-400)) {
+        const m = LINE.exec(raw.trim());
+        if (!m) continue;
+        const ts = Date.parse(m[1]!);
+        if (!Number.isFinite(ts) || ts < since) continue;
+        const text = m[2]!;
+        const fin = /^batch finished: exit=\d+ done=(\d+) failed=(\d+)/.exec(text);
+        if (fin) {
+          const done = Number(fin[1]), failed = Number(fin[2]);
+          batches.push({ done, failed });
+          if (done > 0) progressed = true;
+          continue;
+        }
+        // The three preflight gates each log "<dep> ... — waiting"; keep the newest.
+        if (/—\s*waiting\b/.test(text)) waitingFor = text;
+        if (/resuming batches$/.test(text)) waitingFor = null;
+      }
+      const zeroBatches = batches.filter((b) => b.done === 0 && b.failed >= 2);
+      const attempts = zeroBatches.reduce((n, b) => n + b.failed, 0);
+      const stalled = !progressed && (zeroBatches.length >= 2 || waitingFor !== null);
+      if (stalled) {
+        // Name the cause from the newest batch run log rather than inferring it.
+        let cause = waitingFor
+          ? `The chain is holding at a preflight gate: "${waitingFor}". It resumes by itself when that dependency comes back; nothing is lost, the leads stay in the pool.`
+          : 'No preflight gate is holding it, so read the newest batch run log in logs/backfill-2026-07/ for the failure text.';
+        if (!waitingFor) {
+          // Newest by MTIME, and only the chain's own `batch-*` logs. A plain
+          // name sort picked `probe-100-run.log` — a stray hand-run from months
+          // back that sorts after every `batch-<date>` — and named the cause off
+          // a file the chain never wrote.
+          const dir = join(LOGS, 'backfill-2026-07');
+          const newest = readdirSync(dir)
+            .filter((f) => f.startsWith('batch-') && f.endsWith('-run.log'))
+            .map((f) => ({ f, t: statSync(join(dir, f)).mtimeMs }))
+            .sort((a, b) => a.t - b.t)
+            .pop()?.f;
+          if (newest) {
+            const body = readFileSync(join(dir, newest), 'utf8').slice(-200_000);
+            const SIGS: Array<[RegExp, string]> = [
+              [/openrouter HTTP 402/, 'OpenRouter is out of credits (HTTP 402) — every lead dies at the bank stage after paying for its YouTube and transcript work. Adding credits is Casey\'s call; the chain picks the failed leads back up by itself.'],
+              [/direct YouTube key\(s\) exhausted/, 'The YouTube key pool is exhausted — the chain has a gate for this, so check the gate before the pool.'],
+              [/invalid byte sequence for encoding "UTF8"/, 'A NUL byte in scraped text is killing leads individually (the 09-11 class) — not a whole-lane outage.'],
+              [/is not set|ENRICHMENT_REPO_PATH/, 'A config variable is missing — the 09-02 and 09-09 shape. Check the repo\'s generated .env and the env-storage fragment.'],
+            ];
+            const hit = SIGS.find(([re]) => re.test(body));
+            cause = hit ? hit[1] : `${cause} Newest run log: ${newest}.`;
+          }
+        }
+        appendFileSync(OBSERVATIONS, JSON.stringify({
+          ts: new Date().toISOString(), kind: 'backfill_chain_stalled',
+          window_hours: CHAIN_STALL_HOURS, zero_batches: zeroBatches.length,
+          lead_attempts_burned: attempts, waiting: waitingFor, parked,
+          detail: `The enrichment backfill chain has completed no work in the last ${CHAIN_STALL_HOURS}h (${zeroBatches.length} batch(es) done=0, ${attempts} lead attempts, ${waitingFor ? 'currently waiting at a preflight gate' : 'not gated'}). With discovery paused this is the pipeline's only throughput. ${cause} Not escalating — the remedy is a spend or secrets call a fix-agent cannot make.`,
+        }) + '\n');
+        console.log(`[checkin ${day}] OBSERVATION backfill_chain_stalled — ${zeroBatches.length} zero batch(es), ${attempts} attempts, ${waitingFor ? 'gated' : 'ungated'}`);
+      }
+    } catch { /* an unreadable chain log is not an incident */ }
+  }
+
   // Discovery is paused on Casey's instruction, so anything that only describes a
   // stopped lane is expected, not an anomaly. Everything else still escalates.
   if (discoveryPaused) {
