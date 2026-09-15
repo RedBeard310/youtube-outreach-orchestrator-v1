@@ -47,9 +47,16 @@ so the discovery pause below stays on.
   category. So the same leads returning every hour with 0 parked means the verdict
   cache went stale (prompt or model changed). `--stage classify` on those ids fixes
   it, and that stage spends OpenRouter.
-- **Waiting on Casey:** moving the 990 run's valid-email leads into `approved_hold`
-  once it reports (more enrichment spend). Leads verified outside the lane, like
-  these, still need the re-score by hand.
+- **Casey, 2026-09-15:** the 990 run's 423 valid-email leads went to
+  `approved_hold` at 02:59 UTC (enrichment spend approved, about $72 estimated).
+  Leads verified outside the lane, like these, still need the re-score by hand.
+- **BLOCKED since 2026-09-14 ~22:10 UTC: the OpenRouter account is empty.** Read
+  from `GET /api/v1/credits`: $1,310 bought, $1,310.19 used. Enrichment has failed
+  every lead since 22:26, yet `chain.log` records each batch as `exit=0 done=0
+  failed=88` (98 later). The failing retries also run the YouTube key pool to its
+  daily quota. The backlog is about 590 leads (the chain's pool of 167 plus the 423),
+  roughly $95 at an estimated 16 to 17 cents a lead. **Adding credits is Casey's
+  call. The chain picks the failed leads back up by itself once credits land.**
 - **Never, for this work:** email anyone, run `npm run send`, release the hold
   pool, touch `automator/config/email-pause.json`, lift the discovery pause, score
   the "Other" niche (41,000+ more 10k+ channels, a separate decision), write to
@@ -356,6 +363,15 @@ this is the shape to check first.**
   **Enrichment is the slow step.** `backfill-chain` took the 290 as one batch at
   12:20 and runs about 20 leads an hour, so they finish around 02:00 UTC 09-15. The
   57 lane parks are queued behind them.
+- 2026-09-15 03:00 UTC: **Casey said yes, so the 423 are in `approved_hold`**
+  (dry run 423 of 423 first, none skipped, none DNC after the Operation Siege merge).
+  The same check found **enrichment dead since 22:26 UTC 09-14: OpenRouter is out
+  of credits** ($1,310 bought, $1,310.19 used). The 290 batch finished 264 and lost
+  its last 26 to the empty account. Every batch since has logged `exit=0 done=0
+  failed=88` or `98`. Nothing is lost: failed leads stay in the chain's pool and
+  retry by themselves. The lane's hourly re-score kept working (57 parked at 13:02,
+  2 at 17:02, 1 at 01:01) because it makes no model call. Waiting on Casey to add
+  credits. The backlog is about 590 leads, roughly $95 (estimate).
 
 - 2026-09-13 (debrief): **THE GAP IS CLOSED. The recovery lane's book went 251 → 3,028,
   and the 09-12 recommendation to "build a second collect mode" is DONE — but NOT by
