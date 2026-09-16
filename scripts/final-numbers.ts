@@ -1,6 +1,6 @@
-import 'dotenv/config'; import Airtable from 'pipeline-db/sdk';
+import 'dotenv/config'; import PipelineDb from 'pipeline-db/sdk';
 (async()=>{
-  const lb=new Airtable({apiKey:process.env.AIRTABLE_PAT!}).base(process.env.LEAD_BASE_ID!);
+  const lb=new PipelineDb().base(process.env.LEAD_BASE_ID!);
   const hold=await lb('lead_candidates').select({filterByFormula:`{review_status}='approved_hold'`,fields:['signal_score']}).all();
   const newToday=await lb('lead_candidates').select({filterByFormula:`AND(IS_AFTER(CREATED_TIME(),'2026-07-08T17:14:00Z'),{review_status}='approved_hold')`,fields:['signal_score']}).all();
   const dayAll=await lb('lead_candidates').select({filterByFormula:`IS_AFTER(CREATED_TIME(),'2026-07-08T17:14:00Z')`,fields:['signal_score','review_status','outreach_status']}).all();

@@ -1,17 +1,16 @@
 // Look up one or more emails in the lead base and print channel_url/_name.
-// Usage: npx tsx scripts/airtable-email-lookup.ts email1 [email2 ...]
+// Usage: npx tsx scripts/email-lookup.ts email1 [email2 ...]
 import 'dotenv/config';
-import Airtable from 'pipeline-db/sdk';
+import PipelineDb from 'pipeline-db/sdk';
 
-const apiKey = process.env.AIRTABLE_PAT;
 const baseId = process.env.LEAD_BASE_ID;
 const table = process.env.LEAD_TABLE_NAME ?? 'lead_candidates';
-if (!apiKey || !baseId) throw new Error('AIRTABLE_PAT / LEAD_BASE_ID not set');
+if (!baseId) throw new Error('LEAD_BASE_ID not set');
 
 const emails = process.argv.slice(2).map((e) => e.toLowerCase().trim()).filter(Boolean);
 if (emails.length === 0) throw new Error('pass at least one email');
 
-const base = new Airtable({ apiKey }).base(baseId);
+const base = new PipelineDb().base(baseId);
 
 // One pass over the base, building a lowercase-email -> records map.
 const map = new Map<string, Array<{ url: string; name: string; review: string; outreach: string }>>();

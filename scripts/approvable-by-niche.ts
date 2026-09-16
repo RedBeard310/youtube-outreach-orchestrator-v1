@@ -1,7 +1,7 @@
 import 'dotenv/config';
-import Airtable from 'pipeline-db/sdk';
+import PipelineDb from 'pipeline-db/sdk';
 async function main() {
-  const base = new Airtable({ apiKey: process.env.AIRTABLE_PAT! }).base(process.env.LEAD_BASE_ID!);
+  const base = new PipelineDb().base(process.env.LEAD_BASE_ID!);
   const recs = await base('lead_candidates').select({
     filterByFormula: `AND({review_status}='unreviewed', {signal_score}>=6)`,
     fields: ['niche_category','signal_score']

@@ -4,15 +4,14 @@
 import 'dotenv/config';
 import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import Airtable from 'pipeline-db/sdk';
+import PipelineDb from 'pipeline-db/sdk';
 
-const apiKey = process.env.AIRTABLE_PAT;
 const baseId = process.env.LEAD_BASE_ID;
 const table = process.env.LEAD_TABLE_NAME ?? 'lead_candidates';
-if (!apiKey || !baseId) throw new Error('AIRTABLE_PAT / LEAD_BASE_ID not set');
+if (!baseId) throw new Error('LEAD_BASE_ID not set');
 
 const apply = process.argv.includes('--apply'); // dry-run unless --apply
-const base = new Airtable({ apiKey }).base(baseId);
+const base = new PipelineDb().base(baseId);
 
 const records = await base(table)
   .select({ filterByFormula: `{outreach_status}='failed'` })
@@ -58,13 +57,7 @@ if (!apply) {
   process.exit(0);
 }
 
-// --- DELETE in batches of 10 (Airtable limit) ---
+// --- DELETE (pipeline-db removes the whole id list in one DELETE statement) ---
 const ids = toDelete.map((r) => r.id);
-let deleted = 0;
-for (let i = 0; i < ids.length; i += 10) {
-  const batch = ids.slice(i, i + 10);
-  await base(table).destroy(batch);
-  deleted += batch.length;
-  console.log(`  deleted ${deleted}/${ids.length}`);
-}
-console.log(`\n✓ Deleted ${deleted} host-gate leads. Backup: ${backupPath}`);
+await base(table).destroy(ids);
+console.log(`\n✓ Deleted ${ids.length} host-gate leads. Backup: ${backupPath}`);

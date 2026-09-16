@@ -333,7 +333,7 @@ function hoursSinceAnyHarvest(): number {
 }
 
 // Fire scripts/keyword-harvest.ts in the finder repo, detached, if we haven't harvested
-// within the cooldown. Fire-and-forget: the harvest writes fresh probe terms to Airtable
+// within the cooldown. Fire-and-forget: the harvest writes fresh probe terms to Postgres
 // that the next campaign pass consumes; the check-in must stay fast and free, so it does not
 // wait on the result. Returns true if a harvest was launched.
 function kickKeywordHarvest(reason: string): boolean {
@@ -595,8 +595,8 @@ async function main(): Promise<void> {
       // it had already self-healed by the time the agent ran) burns money for nothing —
       // only escalate when the log does NOT show that benign cause.
       //
-      // Same reasoning applies to transient infra blips (Airtable/YouTube 503 SERVICE_UNAVAILABLE,
-      // network errors, etc — 2026-07-29): campaign.ts always runs its finalization sequence
+      // Same reasoning applies to transient infra blips (database errors, YouTube 503 SERVICE_UNAVAILABLE,
+      // network errors, etc.; added 2026-07-29): campaign.ts always runs its finalization sequence
       // (final verify sweep → promote → auto-sweep → evaluate probes → "[campaign] DONE") after
       // the hard-wall stop, whether the underlying cause was benign or not. A session log that
       // reaches "[campaign] DONE" proves the session actually completed and campaign-loop.sh has
@@ -628,7 +628,7 @@ async function main(): Promise<void> {
   //    intermittently exhausting, "No active terms to process") also satisfies "finder exits
   //    0 while parked is flat" and false-positives as a broken verify/park path when nothing
   //    is actually broken (2026-07-15) — that legitimate case is the term_starvation heartbeat
-  //    below, not this alarm. Uses the live Airtable count vs a rolling history file (robust
+  //    below, not this alarm. Uses the live Postgres count vs a rolling history file (robust
   //    across long sessions).
   let parked: number | null = null;
   try {
@@ -647,7 +647,7 @@ async function main(): Promise<void> {
       });
     }
   } catch (e) {
-    // Airtable blip — do NOT treat as an anomaly (transient); just note it.
+    // Database blip: do NOT treat as an anomaly (transient); just note it.
     console.log(`[checkin ${day}] note: approved_hold count unavailable (${e instanceof Error ? e.message : String(e)})`);
   }
 
@@ -784,7 +784,7 @@ async function main(): Promise<void> {
   // graph-sweep and peer-sweep (every 4h) and comment-sweep runs on its own daily
   // timer, so a state file untouched well past its own cadence means the automation
   // itself broke (timer disabled, script erroring, systemd unit removed), not just
-  // "between refills." Deliberately independent of Airtable/campaign.jsonl, both of
+  // "between refills." Deliberately independent of the database and campaign.jsonl, both of
   // which this check must survive to be useful.
   function isEnabled(unit: string): boolean | null {
     try { return execSync(`systemctl is-enabled ${unit}`, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }).trim() === 'enabled'; }

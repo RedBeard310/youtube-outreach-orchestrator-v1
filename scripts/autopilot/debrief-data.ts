@@ -2,7 +2,7 @@
 //
 // Emits a compact JSON snapshot of the cycle (midnight-PT → now) so the daily debrief
 // agent writes a report grounded in real numbers, not guesses. Reuses the campaign's own
-// Airtable helpers + the campaign JSONL. Prints JSON to stdout; also writes it to
+// database helpers (src/airtable.ts, Postgres via pipeline-db) + the campaign JSONL. Prints JSON to stdout; also writes it to
 // logs/autopilot-debrief-<pacific-date>.json.
 
 import 'dotenv/config';
@@ -21,8 +21,8 @@ const FINDER_REPO = '/home/casey/repos/youtube-lead-finder-v1';
 // these show up in campaign.jsonl (that's the keyword engine only), so without this
 // a stalled daemon is invisible to the daily report — exactly how graph-sweep sat
 // idle 8 days (2026-08-01 -> 2026-08-09) before anyone noticed. Deliberately reads
-// only local state/systemd, no Airtable calls — cheap, and can't itself be the thing
-// that's broken if Airtable is having a bad day.
+// only local state/systemd, no database calls, so it's cheap and can't itself be the thing
+// that's broken if the database is having a bad day.
 function serviceActive(name: string): boolean | null {
   try {
     return execSync(`systemctl is-active ${name}`, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }).trim() === 'active';
@@ -278,7 +278,7 @@ export function priorAdvanceSource(priorDate: string, logsDir: string = LOGS): R
 // happening. This reads each daemon's own session logs for the cycle and reports
 // how many seeds it actually advanced, plus why it stopped if it stopped.
 //
-// Local files only, same as above: no Airtable, no network, can't itself fail.
+// Local files only, same as above: no database, no network, can't itself fail.
 const SWEEP_SESSION_DIRS: Record<string, string> = {
   recommended_videos_feed: 'graph-sweep-sessions',
   video_graph_sweep: 'video-graph-sweep-sessions',
@@ -691,8 +691,8 @@ function fatalSignaturesToday(sinceMs: number): string[] {
           // `finder_hard_wall` on a stop the check-in already ruled benign & self-healing:
           //  • 086affb (2026-07-19): benign on plain term-supply exhaustion ("No active terms to
           //    process") — routine drought the campaign-loop backs off 30min and retries.
-          //  • benignFinalized (2026-07-29): benign on a transient infra blip (Airtable/YouTube
-          //    503 SERVICE_UNAVAILABLE, network error, etc.) that ALREADY self-healed — proven
+          //  • benignFinalized (2026-07-29): benign on a transient infra blip (database error,
+          //    YouTube 503 SERVICE_UNAVAILABLE, network error, etc.) that ALREADY self-healed — proven
           //    when the SAME session still ran its finalization sequence to "[campaign] DONE"
           //    AFTER the hard-wall stop. campaign.ts always finalizes (final verify → promote →
           //    evaluate-probes → DONE) whether the cause was benign or not, so reaching DONE means
@@ -809,7 +809,7 @@ function ongoingEpisodeStart(obs: Obs[], kind: string, sinceMs: number, maxGapH 
   return start;
 }
 
-// Net-new channels the finder actually WROTE to Airtable this cycle — summed from the finder
+// Net-new channels the finder actually WROTE to the database this cycle — summed from the finder
 // RUN SUMMARY ("New channels written: N") across the session logs. This is the finder's OWN
 // authoritative count of fresh FINDING, and it exists because the two finding-ish figures
 // already in this snapshot both MISLEAD:

@@ -1,7 +1,7 @@
-import 'dotenv/config'; import Airtable from 'pipeline-db/sdk';
+import 'dotenv/config'; import PipelineDb from 'pipeline-db/sdk';
 const sleep=(ms:number)=>new Promise(r=>setTimeout(r,ms));
 async function run(){
-  const lb=new Airtable({apiKey:process.env.AIRTABLE_PAT!}).base(process.env.LEAD_BASE_ID!);
+  const lb=new PipelineDb().base(process.env.LEAD_BASE_ID!);
   const recs=await lb('lead_candidates').select({filterByFormula:`IS_AFTER(CREATED_TIME(),'2026-07-08T17:14:00Z')`,fields:['niche_category','signal_score','review_status']}).all();
   const s6=recs.filter(r=>Number(r.get('signal_score')??0)>=6);
   const demo=recs.filter(r=>String(r.get('review_status'))==='demo_niche_excluded');

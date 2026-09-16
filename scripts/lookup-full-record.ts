@@ -1,16 +1,15 @@
 // Dump full record(s) for an email in the lead base, incl. createdTime.
 import 'dotenv/config';
-import Airtable from 'pipeline-db/sdk';
+import PipelineDb from 'pipeline-db/sdk';
 
-const apiKey = process.env.AIRTABLE_PAT;
 const baseId = process.env.LEAD_BASE_ID;
 const table = process.env.LEAD_TABLE_NAME ?? 'lead_candidates';
-if (!apiKey || !baseId) throw new Error('AIRTABLE_PAT / LEAD_BASE_ID not set');
+if (!baseId) throw new Error('LEAD_BASE_ID not set');
 
 const email = (process.argv[2] ?? '').toLowerCase().trim();
 if (!email) throw new Error('pass an email');
 
-const base = new Airtable({ apiKey }).base(baseId);
+const base = new PipelineDb().base(baseId);
 const hits: any[] = [];
 await base(table)
   .select({ filterByFormula: `LOWER({email_address}) = '${email}'` })

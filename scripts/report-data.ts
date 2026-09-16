@@ -1,6 +1,6 @@
-import 'dotenv/config'; import Airtable from 'pipeline-db/sdk';
+import 'dotenv/config'; import PipelineDb from 'pipeline-db/sdk';
 (async()=>{
-  const lb=new Airtable({apiKey:process.env.AIRTABLE_PAT!}).base(process.env.LEAD_BASE_ID!);
+  const lb=new PipelineDb().base(process.env.LEAD_BASE_ID!);
   // parked TODAY (created since 17:14 AND now approved_hold)
   const parked=await lb('lead_candidates').select({filterByFormula:`AND(IS_AFTER(CREATED_TIME(),'2026-07-08T17:14:00Z'),{review_status}='approved_hold')`,fields:['niche_category','signal_score']}).all();
   const bn:Record<string,{n:number;sum:number}>={};

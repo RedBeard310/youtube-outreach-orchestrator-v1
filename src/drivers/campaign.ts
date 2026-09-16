@@ -15,7 +15,7 @@
 //
 // "Relentless" = it does not stop on low yield; it pivots (discovery). It stops
 // only on the target, a run cap, or a hard wall (finder exiting nonzero twice in a
-// row — quota/keys exhausted, Airtable down). Every decision is logged to
+// row: quota/keys exhausted, database down). Every decision is logged to
 // logs/campaign-<date>.jsonl.
 
 import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
@@ -771,13 +771,13 @@ export async function driveCampaign(opts: CampaignOpts): Promise<void> {
     const finder = await runFinderPasses(opts, effectiveConcurrency);
     lastPassMin = (Date.now() - passStart) / 60000;
 
-    // Hard-wall detection: finder exiting nonzero twice in a row => quota/keys/Airtable.
+    // Hard-wall detection: finder exiting nonzero twice in a row => quota/keys/database.
     if (!opts.dryRun && finder.exit_code !== 0 && finder.exit_code !== null) {
       consecutiveFinderFailures++;
       // Finder exit 3 = benign term-supply exhaustion ("No active terms to process"),
       // NOT an infra hard wall. Label the stop by its real cause so debriefs and the
       // hourly check-in can tell a dry term pool (harvest/discovery couldn't refill —
-      // self-heals on the next harvest/back-off) apart from a genuine quota/keys/Airtable
+      // self-heals on the next harvest/back-off) apart from a genuine quota/keys/database
       // failure (needs a human). Prior to this, all 23 of the 2026-08-01 supply-exhaustion
       // stops logged as an indistinguishable "hard wall (quota/keys/Airtable)".
       const supplyExhausted = finder.exit_code === 3;
@@ -787,7 +787,7 @@ export async function driveCampaign(opts: CampaignOpts): Promise<void> {
         console.error(
           supplyExhausted
             ? `[campaign] two consecutive term-supply-exhausted passes — the active term pool is dry (harvest/discovery could not refill it). Stopping; the loop back-off + next keyword harvest refill it.`
-            : `[campaign] two consecutive finder failures — likely a hard wall (quota/keys/Airtable). Stopping.`,
+            : `[campaign] two consecutive finder failures — likely a hard wall (quota/keys/database). Stopping.`,
         );
         log({ event: 'hard_stop', run, reason });
         break;

@@ -1,8 +1,8 @@
 import 'dotenv/config';
-import Airtable from 'pipeline-db/sdk';
+import PipelineDb from 'pipeline-db/sdk';
 
 async function main() {
-  const base = new Airtable({ apiKey: process.env.AIRTABLE_PAT! }).base(process.env.LEAD_BASE_ID!);
+  const base = new PipelineDb().base(process.env.LEAD_BASE_ID!);
   const table = process.env.LEAD_TABLE_NAME ?? 'lead_candidates';
   // Approved + failed + bundle exists + email valid OR risky
   const formula = `AND({review_status}='approved', {outreach_status}='failed', NOT({enrichment_bundle_path}=''), OR({email_verification_result}='valid', {email_verification_result}='risky'))`;

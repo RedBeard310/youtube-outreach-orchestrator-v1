@@ -1,4 +1,4 @@
-import Airtable, { type FieldSet } from 'pipeline-db/sdk';
+import PipelineDb, { type FieldSet } from 'pipeline-db/sdk';
 
 // Must match leads.vocab_lead_candidates_review_status in Postgres. The two
 // lanes below were live for weeks but missing from this type, so every call site
@@ -80,7 +80,7 @@ const NOT_SUPPRESSED = `NOT({do_not_contact})`;
 
 // Note: `failed` and `deep_research_failed` are intentionally NOT terminal.
 // The orchestrator auto-retries them on the next tick (most failures here are
-// transient — YouTube quota, Airtable timeouts, etc.). For genuinely broken
+// transient: YouTube quota, database timeouts, etc.). For genuinely broken
 // leads, that means we'll keep re-driving them indefinitely; that's the
 // accepted trade-off (no failure-count bounding in v1).
 //
@@ -120,18 +120,19 @@ const D100_TERMINAL = new Set<OutreachStatus>([
   'email_invalid',
 ]);
 
+// pipeline-db finds the Postgres connection string on its own, so no API token is
+// needed. LEAD_BASE_ID is the old Airtable base id; pipeline-db accepts it and ignores it.
 function getBase() {
-  const apiKey = process.env.AIRTABLE_PAT;
   const baseId = process.env.LEAD_BASE_ID;
-  if (!apiKey) throw new Error('AIRTABLE_PAT is not set');
   if (!baseId) throw new Error('LEAD_BASE_ID is not set');
-  return new Airtable({ apiKey }).base(baseId);
+  return new PipelineDb().base(baseId);
 }
 
-// Airtable throws transient 5xx "Try again" errors under load. They abort a
-// call mid-pass even though the request would succeed on a retry — and when
-// that call is the post-run yield query, the run's JSONL line ends up with a
-// null breakdown (the "logging gap" seen on 2026-07-08). Wrap the hot reads so
+// A database call can fail on a passing blip (a dropped connection or a timeout).
+// Before the 2026-08-12 move to Postgres, Airtable threw transient 5xx "Try again"
+// errors under load. Either kind aborts a call mid-pass even though a retry would
+// succeed, and when that call is the post-run yield query, the run's JSONL line ends
+// up with a null breakdown (the "logging gap" seen on 2026-07-08). Wrap the hot reads so
 // a blip retries instead of propagating. Writes are safe to retry too: a lead
 // update is idempotent (same id + same fields). Rate-limit (429) and 5xx are
 // retried; a 422/permission error is not — those won't fix themselves.
@@ -151,7 +152,7 @@ async function withRetry<T>(op: () => Promise<T>, label: string, attempts = 5): 
       const msg = err instanceof Error ? err.message : String(err);
       if (i === attempts || !RETRYABLE.test(msg)) throw err;
       const backoffMs = Math.min(1000 * 2 ** (i - 1), 15000);
-      console.error(`[airtable] ${label} attempt ${i}/${attempts} failed (${msg}); retrying in ${backoffMs}ms`);
+      console.error(`[db] ${label} attempt ${i}/${attempts} failed (${msg}); retrying in ${backoffMs}ms`);
       await new Promise(r => setTimeout(r, backoffMs));
     }
   }

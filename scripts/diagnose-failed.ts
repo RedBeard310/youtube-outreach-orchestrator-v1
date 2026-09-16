@@ -2,14 +2,13 @@
 // so we can tell transient/recoverable failures (quota, timeouts) apart from
 // terminal ones (no email, rejected email, no host). Prints a table + buckets.
 import 'dotenv/config';
-import Airtable from 'pipeline-db/sdk';
+import PipelineDb from 'pipeline-db/sdk';
 
-const apiKey = process.env.AIRTABLE_PAT;
 const baseId = process.env.LEAD_BASE_ID;
 const table = process.env.LEAD_TABLE_NAME ?? 'lead_candidates';
-if (!apiKey || !baseId) throw new Error('AIRTABLE_PAT / LEAD_BASE_ID not set');
+if (!baseId) throw new Error('LEAD_BASE_ID not set');
 
-const base = new Airtable({ apiKey }).base(baseId);
+const base = new PipelineDb().base(baseId);
 
 const records = await base(table)
   .select({ filterByFormula: `{outreach_status}='failed'` })

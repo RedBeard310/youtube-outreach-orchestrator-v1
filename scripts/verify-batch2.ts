@@ -1,8 +1,8 @@
 import 'dotenv/config';
-import Airtable from 'pipeline-db/sdk';
+import PipelineDb from 'pipeline-db/sdk';
 
 async function main() {
-  const base = new Airtable({ apiKey: process.env.AIRTABLE_PAT! }).base(process.env.LEAD_BASE_ID!);
+  const base = new PipelineDb().base(process.env.LEAD_BASE_ID!);
   const table = process.env.LEAD_TABLE_NAME ?? 'lead_candidates';
   const ids = ['recYJUlvdC7L9ARu1','recbZOvkglb831pYw','recSmB4vUqzjYluJM','recSipAGg29M9TA26','recXb1AuYELmbnsM1','recQrgrpeR559OaKK','recbBjIgE5Sww1bYL','recU1xR915IM758Ax','recQfKxjIBAKpSCkE','recUhScToPjhdB4iT','recJ4hY6EZKlpNo6F','recWprnnnSrZvDBUI','recbYE1GJ8vCyJWem','recZNs4wBiNB4JaNi','recQJpn7JjS7Br0JH','recYGRbHFVMyf5dsz','recC1z9Mb5fMSZRHR','recNKzErTOODP0Rrn','recIN5MIc8AWapbKm','recbVkoSICF78Cjrd','recLYiGHs7MffKYY6','recQoeMl0FTQ13DxM','recQ4dLDThv9m11aq','recLaXQ1Jj36OWcme'];
   let sent=0, gated=0, mismatches=0, missing=0;

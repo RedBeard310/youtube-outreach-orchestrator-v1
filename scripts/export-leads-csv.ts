@@ -1,13 +1,13 @@
 // Export selected lead_candidates fields to CSV.
 // Usage: npx tsx scripts/export-leads-csv.ts [outfile.csv]
 import 'dotenv/config';
-import Airtable from 'pipeline-db/sdk';
+import PipelineDb from 'pipeline-db/sdk';
 import { writeFileSync } from 'node:fs';
 
-const base = new Airtable({ apiKey: process.env.AIRTABLE_PAT! }).base(process.env.LEAD_BASE_ID!);
+const base = new PipelineDb().base(process.env.LEAD_BASE_ID!);
 const table = process.env.LEAD_TABLE_NAME ?? 'lead_candidates';
 
-// [CSV header, Airtable field name]
+// [CSV header, lead_candidates column name]
 const COLS: [string, string][] = [
   ['hostname', 'host_first_name'],
   ['email_address', 'email_address'],

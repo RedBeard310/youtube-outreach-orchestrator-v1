@@ -1,6 +1,6 @@
-import 'dotenv/config'; import Airtable from 'pipeline-db/sdk';
+import 'dotenv/config'; import PipelineDb from 'pipeline-db/sdk';
 (async()=>{
-  const lb=new Airtable({apiKey:process.env.AIRTABLE_PAT!}).base(process.env.LEAD_BASE_ID!);
+  const lb=new PipelineDb().base(process.env.LEAD_BASE_ID!);
   const nc=await lb('lead_candidates').select({filterByFormula:`{review_status}='needs_contact'`,fields:['outreach_status']}).all();
   const os:Record<string,number>={}; for(const r of nc){const k=String(r.get('outreach_status')??'?');os[k]=(os[k]??0)+1;}
   console.log(`review_status='needs_contact': ${nc.length}`, os);

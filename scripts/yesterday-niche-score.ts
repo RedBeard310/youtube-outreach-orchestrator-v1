@@ -1,7 +1,7 @@
 import 'dotenv/config';
-import Airtable from 'pipeline-db/sdk';
+import PipelineDb from 'pipeline-db/sdk';
 (async()=>{
-  const lb = new Airtable({ apiKey: process.env.AIRTABLE_PAT! }).base(process.env.LEAD_BASE_ID!);
+  const lb = new PipelineDb().base(process.env.LEAD_BASE_ID!);
   const recs = await lb('lead_candidates').select({
     filterByFormula: `IS_AFTER(CREATED_TIME(), '2026-07-07T00:00:00Z')`,
     fields: ['niche_category','signal_score','review_status','outreach_status']
