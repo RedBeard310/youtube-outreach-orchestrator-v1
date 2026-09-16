@@ -603,7 +603,28 @@ export async function selectUntouchedIds(limit: number): Promise<string[]> {
  *  of the 09-01/02 cycle). On a queue that is ~38 leads deep, one immortal row
  *  is 3% of it. The companion fix in youtube-email-outreach-v1's
  *  `saveContactPoints` stops new ones being written; this predicate is what
- *  makes the rows already in the table stop coming back, with no backfill. */
+ *  makes the rows already in the table stop coming back, with no backfill.
+ *
+ *  THE SAME CLASS, THIRD INSTANCE (2026-09-16): the two marks are written per
+ *  ROW, but the verifier rules on an ADDRESS. A lead routinely holds the same
+ *  address twice under two kinds, because two collection methods found it — the
+ *  About-tab button writes `youtube_email` and the website scrape writes
+ *  `business_email`. ZeroBounce is asked once, the verdict is stamped on the row
+ *  the verifier was handed, and the duplicate row keeps both marks empty
+ *  forever. So the lead re-selects every pass, is re-checked at the cost of a
+ *  ZeroBounce credit, and the stamp lands on the already-stamped row again.
+ *  Measured on the cycle ending 2026-09-16: the verify queue was FOUR leads deep
+ *  and all four were this shape, so every pass of that day spent its credits
+ *  re-ruling four addresses already ruled undeliverable — one of them since
+ *  08-24, twenty-three days of it. A drained queue and a jammed queue read
+ *  identically from the outside; the tell is the same ids in every pass.
+ *
+ *  The fix is to ask the question the verifier actually answers: has THIS
+ *  ADDRESS been ruled on for this lead, by any row. Self-healing on the rows
+ *  already in the table, so no backfill, and it retires nobody new — verified
+ *  live against Postgres, 966 unruled email rows across the whole table and
+ *  exactly 16 newly excluded, all of them duplicates of a ruled address. A lead
+ *  holding a second, genuinely unruled address still selects. */
 export const VERIFIABLE_IDS_SQL = `SELECT lc.id
        FROM leads.lead_candidates lc
        JOIN leads.contact_points cp ON cp.lead_id = lc.id
@@ -614,6 +635,14 @@ export const VERIFIABLE_IDS_SQL = `SELECT lc.id
         AND COALESCE(cp.verified, false) = false
         AND cp.verified_at IS NULL
         AND COALESCE(cp.notes, '') NOT LIKE '%[ownership:%'
+        AND NOT EXISTS (
+              SELECT 1
+                FROM leads.contact_points ruled
+               WHERE ruled.lead_id = cp.lead_id
+                 AND lower(ruled.value) = lower(cp.value)
+                 AND (ruled.verified_at IS NOT NULL
+                      OR COALESCE(ruled.verified, false) = true
+                      OR COALESCE(ruled.notes, '') LIKE '%[ownership:%'))
         AND COALESCE(lc.do_not_contact, false) = false
       GROUP BY lc.id, lc.first_discovered_at
       ORDER BY lc.first_discovered_at ASC NULLS LAST

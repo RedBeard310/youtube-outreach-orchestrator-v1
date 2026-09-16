@@ -225,9 +225,31 @@ while true; do
     log "supadata is back — resuming batches"
   fi
 
+  # Fail-open is the right rule for ENTERING the wait and the wrong rule for
+  # LEAVING it (2026-09-16). On 09-15 the gate held correctly from 08:07Z on a
+  # definite `DRY -0.19`, then at 13:07Z the probe itself errored, `openrouter_ok`
+  # returned OK because an unfinished probe proves nothing, and the chain launched
+  # a 500-lead batch into an account that was still empty — 499 leads paid for
+  # their YouTube harvest and their Decodo transcripts and died at stage 4 on the
+  # same 402. Credits did not actually land until ~14:34Z.
+  #
+  # The asymmetry is the point. Before the wait we have no evidence, so we run.
+  # Inside the wait we hold OpenRouter's own word that the balance is below the
+  # floor, and a probe we could not complete is not evidence against it. So only
+  # a CONFIRMED `OK <balance>` releases the gate; an unprobeable answer keeps
+  # waiting and costs nothing (the leads never leave the pool). `OK nokey` also
+  # holds: if the key vanished mid-outage, running the batch cannot help.
+  openrouter_confirmed_ok() {
+    openrouter_ok || return 1
+    case "$OPENROUTER_STATE" in
+      "OK "[0-9-]*) return 0 ;;   # a real balance, read from /credits
+      *) return 1 ;;              # OK nokey / OK probe-* — unproven, keep waiting
+    esac
+  }
+
   if ! openrouter_ok; then
     log "openrouter account out of credits (${OPENROUTER_STATE}) — waiting (probe every 30m, silent until it clears; leads stay in the pool)"
-    while ! openrouter_ok; do
+    while ! openrouter_confirmed_ok; do
       [ -f "$HALT" ] && { log "halt flag present — stopping"; exit 0; }
       sleep 1800
     done

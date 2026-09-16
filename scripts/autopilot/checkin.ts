@@ -155,13 +155,35 @@ function recentFinderStats(n: number): { total: number; failed: number; zeroYiel
 }
 
 // The 1-2 most-recent session logs the campaign-loop wrote (fallback: console logs).
+//
+// "Most recent" is not the same as "recent" (2026-09-16). All three callers ask
+// what is happening NOW — is a fatal signature live, is autocomplete blocked
+// right now — and every one of them reads whatever file happens to sort first,
+// however old it is. With the campaign stopped since 09-08 the newest session
+// log has been frozen for eight days, so the hourly check-in kept re-diagnosing
+// a dead file and wrote `finder_hard_wall_benign` 24 times a day into the
+// observations log, every day, about a run that ended last week. The noise is
+// the cheap half of the problem: that particular line is benign and carved out
+// before the fix-agent is reached, but any OTHER pattern in the same frozen file
+// would page the paid agent hourly, forever, over a campaign that is not running.
+//
+// A session log nobody has written to in MAX_SESSION_LOG_AGE_HOURS cannot
+// describe live behaviour, so drop it. mtime moves while a campaign is writing,
+// so an actually-running session is never excluded, and the window self-heals
+// the moment discovery resumes and a new log starts.
+const MAX_SESSION_LOG_AGE_HOURS = Number(process.env.MAX_SESSION_LOG_AGE_HOURS || '48');
+
 function recentSessionLogs(n = 2): string[] {
   const dirs = [join(LOGS, 'autopilot-sessions'), LOGS];
   const cands: string[] = [];
+  const cutoff = Date.now() - MAX_SESSION_LOG_AGE_HOURS * 3600_000;
   for (const d of dirs) {
     if (!existsSync(d)) continue;
     for (const f of readdirSync(d)) {
-      if (/session-.*\.log$/.test(f) || /campaign-console-.*\.log$/.test(f)) cands.push(join(d, f));
+      if (!/session-.*\.log$/.test(f) && !/campaign-console-.*\.log$/.test(f)) continue;
+      const p = join(d, f);
+      try { if (statSync(p).mtimeMs < cutoff) continue; } catch { continue; }
+      cands.push(p);
     }
   }
   return cands.sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs).slice(0, n);

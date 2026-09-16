@@ -101,6 +101,31 @@ test('verify selector excludes contact points already ruled on', () => {
   assert.match(VERIFIABLE_IDS_SQL, /COALESCE\(lc\.do_not_contact, false\) = false/);
 });
 
+// 2026-09-16, the same class a third time. The two marks above are written per
+// ROW; the verifier rules on an ADDRESS. A lead holding the same address twice
+// under two kinds (About-tab button → youtube_email, website scrape →
+// business_email) gets one row stamped and one left blank forever, so it
+// re-selects every pass and buys another ZeroBounce credit. On the cycle ending
+// 2026-09-16 the entire four-lead verify queue was this shape, one of them
+// running since 08-24. The exclusion has to ask whether THIS ADDRESS was ruled
+// on for this lead, by any row.
+test('verify selector retires an address ruled on under a different contact kind', () => {
+  const exclusion = VERIFIABLE_IDS_SQL.match(/AND NOT EXISTS \([\s\S]*?\)\)/);
+  assert.ok(exclusion, 'the duplicate-address exclusion is missing');
+  const sql = exclusion[0];
+
+  // Same lead, same address, ignoring case and ignoring the contact kind.
+  assert.match(sql, /ruled\.lead_id = cp\.lead_id/);
+  assert.match(sql, /lower\(ruled\.value\) = lower\(cp\.value\)/);
+  assert.doesNotMatch(sql, /ruled\.kind/);
+
+  // "Ruled on" must mean exactly what the per-row test above means, or the two
+  // halves disagree and a lead lands in the gap between them.
+  assert.match(sql, /ruled\.verified_at IS NOT NULL/);
+  assert.match(sql, /COALESCE\(ruled\.verified, false\) = true/);
+  assert.match(sql, /COALESCE\(ruled\.notes, ''\) LIKE '%\[ownership:%'/);
+});
+
 test('OpenRouter credit halt still runs the independent recovery lane', async () => {
   let runs = 0;
   const ran = await runRecoveryDuringOpenRouterHalt(
