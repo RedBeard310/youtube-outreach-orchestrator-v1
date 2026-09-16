@@ -111,7 +111,7 @@ npm run typecheck        # tsc --noEmit
 | Script | Purpose | Mutates? |
 |---|---|---|
 | `pipeline-state.ts`, `diagnose-failed.ts`, `check-ready-for-email.ts`, `quality-check-ready.ts`, `check-today.ts`, `check-recent.ts`, `count-recent-loaded.ts` | Count / categorize leads by status (pipeline health, stuck-`failed` triage) | read-only |
-| `airtable-email-lookup.ts`, `sample-email.ts`, `check-bundle-coverage.ts` | Look up emails / sample composed copy / check enrichment coverage | read-only |
+| `email-lookup.ts`, `sample-email.ts`, `check-bundle-coverage.ts` | Look up emails / sample composed copy / check enrichment coverage | read-only |
 | `pick-pilot.ts`, `pick-batch2.ts`, `verify-batch2.ts`, `check-pilot-status.ts` | Select & verify ad-hoc lead batches for pilot sends | read-only |
 | `verify-status-vocab.mjs` | Confirm every `review_status` / `outreach_status` the orchestrator uses is in the database vocabulary | read-only |
 | **`purge-host-gate-failed.ts`** | **Export-then-DELETE** `host_name_low_confidence` failures (writes a verified JSON backup to `backups/` first) | **DESTRUCTIVE** |
@@ -186,7 +186,7 @@ Time: a tick blocks until downstream finishes; D100 adds 60s/lead of deliberate 
 | [scripts/](scripts/) | operational/diagnostic toolkit (see Running it) |
 | [orchestrator-spec.md](orchestrator-spec.md), [system-overview.md](system-overview.md), [CLAUDE.md](CLAUDE.md) | full spec / system context / operating contract |
 
-**Credentials required:** the database connection string, read from `/home/casey/.pipeline-db.env` on the VPS (or from `PIPELINE_DATABASE_URL` / `DATABASE_URL`). `AIRTABLE_PAT` and `LEAD_BASE_ID` must also be non-empty, because `src/airtable.ts` checks them, but `pipeline-db` ignores their values. To actually run a tick end-to-end, the three downstream repos each need their own keys configured (Anthropic, YouTube/RapidAPI, ZeroBounce, Firecrawl, Supadata, SmartLead). Secrets load via `dotenv` from `.env`; on Casey's setup the real source of truth is `~/Claude/env-storage/.env`, exported through `~/.zshenv`.
+**Credentials required:** the database connection string, read from `/home/casey/.pipeline-db.env` on the VPS (or from `PIPELINE_DATABASE_URL` / `DATABASE_URL`). `LEAD_BASE_ID` must also be non-empty, because `src/airtable.ts` checks it, but `pipeline-db` ignores its value. No Airtable token is needed. To actually run a tick end-to-end, the three downstream repos each need their own keys configured (Anthropic, YouTube/RapidAPI, ZeroBounce, Firecrawl, Supadata, SmartLead). Secrets load via `dotenv` from `.env`; on Casey's setup the real source of truth is `~/Claude/env-storage/.env`, exported through `~/.zshenv`.
 
 ## What's off vs. not built
 

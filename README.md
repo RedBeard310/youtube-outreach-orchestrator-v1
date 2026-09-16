@@ -10,8 +10,8 @@ See [CLAUDE.md](CLAUDE.md) for the operational contract and [orchestrator-spec.m
 npm install
 cp .env.example .env
 # Fill in EMAIL_OUTREACH_REPO_PATH, DEEP_RESEARCH_REPO_PATH, LEAD_FINDER_REPO_PATH.
-# AIRTABLE_PAT and LEAD_BASE_ID must still be non-empty (src/airtable.ts checks them),
-# but the Postgres layer ignores their values.
+# LEAD_BASE_ID must still be non-empty (src/airtable.ts checks it),
+# but the Postgres layer ignores its value.
 ```
 
 The database connection string is read from `/home/casey/.pipeline-db.env` on the VPS, or from `PIPELINE_DATABASE_URL` / `DATABASE_URL` if either is set. See [CLAUDE.md](CLAUDE.md) → "Database architecture (Postgres, since 2026-08-12)".
