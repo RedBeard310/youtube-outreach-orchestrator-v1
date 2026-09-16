@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lead Run Debrief — 2026-09-16</title>
+<style>
+  :root {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --good-soft: #1f8a5b18; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+      --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+      --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --good-soft: #55c48c1c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --good-soft: #1f8a5b18; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+    --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+    --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --good-soft: #55c48c1c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 40px 22px 80px; }
+  .eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); font-weight: 600; }
+  h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.12; margin: 10px 0 6px; text-wrap: balance; letter-spacing: -.02em; }
+  h2 { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); margin: 44px 0 16px; font-weight: 700; }
+  h3 { font-size: 18px; margin: 0 0 6px; letter-spacing: -.01em; }
+  p { margin: 0 0 14px; }
+  .lede { font-size: 18px; color: var(--ink-soft); max-width: 68ch; }
+  .tag { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--amber-soft); color: var(--amber); letter-spacing: .02em; }
+  .tag.ok { background: var(--teal-soft); color: var(--teal); }
+  .tag.bad { background: var(--red-soft); color: var(--red); }
+  .tag.good { background: var(--good-soft); color: var(--good); }
+  .grid { display: grid; gap: 14px; }
+  .stats { grid-template-columns: repeat(4, 1fr); margin-top: 26px; }
+  @media (max-width: 720px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; box-shadow: var(--shadow); }
+  .stat .n { font-size: 30px; font-weight: 750; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .stat .l { font-size: 12.5px; color: var(--ink-soft); margin-top: 3px; }
+  .stat .s { font-size: 12px; margin-top: 8px; font-weight: 600; }
+  .up { color: var(--good); } .down { color: var(--red); } .warn { color: var(--amber); }
+  .accent-red { border-left: 3px solid var(--red); }
+  .accent-teal { border-left: 3px solid var(--teal); }
+  .accent-amber { border-left: 3px solid var(--amber); }
+  .accent-good { border-left: 3px solid var(--good); }
+
+  .strip { display: flex; align-items: flex-end; gap: 5px; height: 140px; padding: 14px 14px 10px; overflow-x: auto; }
+  .barwrap { flex: 1 0 22px; display: flex; flex-direction: column; align-items: center; gap: 5px; }
+  .bar { width: 100%; border-radius: 3px 3px 0 0; background: var(--teal); opacity: .9; }
+  .bar.low { background: var(--amber); }
+  .bar.today { background: var(--good); opacity: 1; }
+  .bar.zero { background: var(--red); opacity: 1; min-height: 2px; }
+  .barlab { font-size: 10.5px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-soft); padding: 0 14px 14px; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+
+  .q { border-radius: 14px; padding: 20px 22px; margin-bottom: 14px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); }
+  .q .ask { font-size: 17px; font-weight: 700; color: var(--ink); margin-bottom: 10px; display: flex; gap: 10px; align-items: baseline; }
+  .q .ask .qn { color: var(--red); font-weight: 800; flex: 0 0 auto; }
+  .q.accent-teal .ask .qn { color: var(--teal); }
+  .q.accent-good .ask .qn { color: var(--good); }
+  .q p { color: var(--ink-soft); }
+  .q b { color: var(--ink); }
+  .pill { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink); background: var(--panel-2); padding: 1px 7px; border-radius: 6px; border: 1px solid var(--line); white-space: nowrap; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+  th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); }
+  td .num { font-variant-numeric: tabular-nums; font-weight: 650; }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); box-shadow: var(--shadow); }
+  ol.recs { padding-left: 0; list-style: none; counter-reset: r; margin: 0; }
+  ol.recs li { counter-increment: r; position: relative; padding: 14px 16px 14px 52px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 10px; box-shadow: var(--shadow); }
+  ol.recs li::before { content: counter(r); position: absolute; left: 14px; top: 14px; width: 26px; height: 26px; border-radius: 8px; background: var(--teal-soft); color: var(--teal); font-weight: 800; font-size: 14px; display: grid; place-items: center; }
+  ol.recs b { color: var(--ink); }
+  .foot { margin-top: 46px; padding: 16px 18px; border-radius: 12px; background: var(--amber-soft); border: 1px solid var(--line); font-size: 14px; color: var(--ink-soft); }
+  .foot b { color: var(--ink); }
+  .muted { color: var(--ink-soft); font-size: 13.5px; }
+  code { background: var(--panel-2); border: 1px solid var(--line); border-radius: 5px; padding: 0 5px; font-size: .9em; }
+</style>
+
+
+<div class="wrap">
+
+  <div class="eyebrow">Lead Run Debrief · YouTube outreach</div>
+  <h1>2026-09-16 — the credit top-up worked, and enrichment had its best day of the pause</h1>
+  <p class="lede">One batch ran for seventeen hours straight and finished <b>410 enriched leads with zero failures</b>, at roughly <b>ten cents a lead</b>. That is what the discovery pause was for, and it is the first full day it has actually delivered. The shelf of leads that are researched and ready to write now stands at <b>6,192</b>. Two things cost us anyway: the new credit gate held correctly for five free hours and then let a 500-lead batch die because its own probe errored, and the recovery lane's verify half turned out to be jammed on four dead addresses it has been re-buying for weeks. Both are fixed and verified.</p>
+  <div style="margin-top:14px"><span class="tag good">410 ENRICHED, 0 FAILURES</span> <span class="tag good">6,192 READY TO WRITE</span> <span class="tag ok">14 EMAILS SENT AT 07:20</span> <span class="tag bad">1 DOOMED BATCH, 499 LEADS</span> <span class="tag">DISCOVERY PAUSED BY CASEY</span></div>
+
+  <div class="grid stats">
+    <div class="card stat accent-good">
+      <div class="n">410</div>
+      <div class="l">leads enriched, one 17-hour batch</div>
+      <div class="s up">0 failures. Best day since the pause began</div>
+    </div>
+    <div class="card stat accent-good">
+      <div class="n">6,192</div>
+      <div class="l">leads researched and ready to write</div>
+      <div class="s up">held on Casey's word, not on anything broken</div>
+    </div>
+    <div class="card stat accent-teal">
+      <div class="n">$0.10</div>
+      <div class="l">OpenRouter cost per enriched lead</div>
+      <div class="s up">the working estimate was 16 to 17 cents</div>
+    </div>
+    <div class="card stat accent-amber">
+      <div class="n">+40</div>
+      <div class="l">new leads parked into <code>approved_hold</code></div>
+      <div class="s warn">all of it the recovery lane. 6,569 → 6,609</div>
+    </div>
+  </div>
+
+  <h2>The shape of the day</h2>
+  <div class="card" style="padding:0">
+    <div class="strip">
+      <div class="barwrap"><div class="bar low" style="height:28%"></div><div class="barlab">9</div></div>
+      <div class="barwrap"><div class="bar" style="height:78%"></div><div class="barlab">25</div></div>
+      <div class="barwrap"><div class="bar" style="height:84%"></div><div class="barlab">27</div></div>
+      <div class="barwrap"><div class="bar" style="height:88%"></div><div class="barlab">28</div></div>
+      <div class="barwrap"><div class="bar" style="height:66%"></div><div class="barlab">21</div></div>
+      <div class="barwrap"><div class="bar" style="height:88%"></div><div class="barlab">28</div></div>
+      <div class="barwrap"><div class="bar today" style="height:100%"></div><div class="barlab">32</div></div>
+      <div class="barwrap"><div class="bar" style="height:75%"></div><div class="barlab">24</div></div>
+      <div class="barwrap"><div class="bar" style="height:88%"></div><div class="barlab">28</div></div>
+      <div class="barwrap"><div class="bar" style="height:84%"></div><div class="barlab">27</div></div>
+      <div class="barwrap"><div class="bar" style="height:97%"></div><div class="barlab">31</div></div>
+      <div class="barwrap"><div class="bar" style="height:56%"></div><div class="barlab">18</div></div>
+      <div class="barwrap"><div class="bar" style="height:69%"></div><div class="barlab">22</div></div>
+      <div class="barwrap"><div class="bar" style="height:66%"></div><div class="barlab">21</div></div>
+      <div class="barwrap"><div class="bar" style="height:66%"></div><div class="barlab">21</div></div>
+      <div class="barwrap"><div class="bar" style="height:72%"></div><div class="barlab">23</div></div>
+      <div class="barwrap"><div class="bar" style="height:66%"></div><div class="barlab">21</div></div>
+    </div>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--teal)"></span>enriched leads finished, one bar per hour, 14:00Z to 07:00Z</span>
+      <span><span class="dot" style="background:var(--amber)"></span>the batch's first partial hour</span>
+    </div>
+  </div>
+  <p class="muted">Flat and boring, which is the good version. The batch launched at 14:34Z, settled at about 24 leads an hour and never faltered. It is still running as this is written, which is why the last hour of the cycle is not drawn.</p>
+
+  <h2>The three questions</h2>
+
+  <div class="q accent-good">
+    <div class="ask"><span class="qn">Q1</span><span>Did Casey's $300 actually fix enrichment?</span></div>
+    <p><b>Yes, completely, and it is cheaper than we thought.</b> The batch that started at 14:34Z has produced <span class="pill">410 finished leads</span> with <span class="pill">0 failures</span> in seventeen hours. Compare that with the day before, when nine batches produced nothing at all.</p>
+    <p>The OpenRouter account meter read <span class="pill">$41.10</span> for the day against those 410 leads, so the real price is about <b>ten cents a lead</b>. The estimate we have been quoting is 16 to 17 cents. That matters for the number in front of Casey: the remaining pool of <b>278 leads costs roughly $28, not $45</b>, and the whole 603-lead backlog was going to come in near <b>$60 rather than the $97</b> written in the standing orders. The balance is <span class="pill">$258.71</span>, which at the current rate is about six days, and most of that rate is this backlog draining rather than a permanent burn.</p>
+    <p><b>What it buys, in plain terms.</b> 6,192 leads are now researched, bundled and ready for someone to write an email. That shelf is the entire point of pausing discovery, and it is waiting on Casey to release it, not on any machine.</p>
+  </div>
+
+  <div class="q accent-red">
+    <div class="ask"><span class="qn">Q2</span><span>Yesterday's credit gate shipped. Why did a 500-lead batch still die?</span></div>
+    <p><b>Because the gate was right about when to start waiting and wrong about when to stop.</b> It held from 08:07Z on a definite reading of <code>DRY -0.19</code>, and those five hours cost nothing at all, exactly as designed. Then at 13:07Z the probe itself failed to complete. The rule says an unfinished probe proves nothing, so it returned OK, and the chain launched 500 leads into an account that was still empty. <span class="pill">499 of them failed</span>. Each one had already paid for its YouTube harvest and its Decodo transcripts before dying at the last step. The credits did not really land until about 14:34Z.</p>
+    <p>The asymmetry is the whole lesson. <b>Before you start waiting you have no evidence, so you run.</b> Once you are waiting you are holding OpenRouter's own word that the balance is below the floor, and a probe you could not finish is not evidence against that word. <b>Fixed:</b> only a confirmed balance reading releases the gate now. An unreadable answer keeps waiting, which costs nothing, because the leads never leave the pool.</p>
+  </div>
+
+  <div class="q accent-red">
+    <div class="ask"><span class="qn">Q3</span><span>Why is the recovery lane parking so little?</span></div>
+    <p>Part of it is honest arithmetic. The lane ran three collect passes of 150 and six verify passes, and parked <b>40 leads</b>. With discovery off, that is the only source of new leads, and 40 is normal for a lane working through a book of 3,711 with a capped search plan.</p>
+    <p><b>But the verify half was not working at all, and had not been for weeks.</b> Every verify pass this cycle was handed the same four leads. All six of them. Running the selector by hand against the database returned <b>those four leads and nothing else</b>, so the entire verify queue was four permanently stuck rows.</p>
+    <p>The cause is the same bug class this selector has now been bitten by three times. <b>The marks that say "somebody already ruled on this" are written on a row, but ZeroBounce rules on an address.</b> A lead often holds the same address twice under two labels, because two different collection methods found it: the About-tab button saves it as a YouTube email and the website scrape saves it as a business email. ZeroBounce gets asked once, the verdict lands on the row the tool was handed, and the twin row stays blank forever. So the lead comes back every pass and buys another credit to re-learn that <code>info@shanesmithlaw.com</code> is undeliverable, which it has been re-learning since <b>24 August</b>.</p>
+    <p><b>Fixed and verified live.</b> The selector now asks whether this address was ruled on for this lead by any row. Against the real database: 966 unruled email rows across the whole table, exactly <b>16 newly excluded</b>, every one a duplicate of an address already ruled on, and a lead holding a second genuinely unchecked address still selects. No backfill needed.</p>
+  </div>
+
+  <h2>The key-pool question answered itself, by accident</h2>
+  <div class="card accent-teal">
+    <p>This is the <b>ninth consecutive morning</b> reading <span class="pill">15 working / 50 out of quota / 1 blocked of 66</span>. Four previous debriefs called for a probe six hours after the reset to tell "slow refill" apart from "quota cut," and nobody ran it.</p>
+    <p><b>The last nine days ran the experiment anyway, from the other direction.</b> On 09-11 through 09-13 nothing of ours spent a single YouTube unit overnight. This cycle we spent heavily: 410 enrichment leads plus roughly 1,500 doomed lead attempts, all of which pay for a YouTube harvest. <b>The morning reading did not move by one key.</b> It cannot be our spending, because our spending went from nothing to a lot and the number stayed identical. And it cannot be a slow refill either, because 50 keys cannot be drained in the twenty minutes between the reset and the probe.</p>
+    <p><b>So the quota on those 50 projects was cut, and buying more keys from those accounts buys nothing.</b> This only bites when discovery resumes, because keyword search costs 100 units a call while enrichment runs on 1-unit calls. Worth settling before Casey lifts the pause, not after. <code>audit-key-projects.sh</code> in the finder names the projects and costs no quota.</p>
+  </div>
+
+  <h2>What broke, and what is fixed</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Issue</th><th>What was actually happening</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr class="fix"><td>Credit gate released on an unreadable probe</td><td>Fail-open is right for entering the wait and wrong for leaving it. Cost one 500-lead batch, 499 leads' worth of YouTube and transcript spend</td><td class="up">Fixed: only a confirmed balance resumes the chain. <code>d7c75bc</code></td></tr>
+        <tr class="fix"><td>Verify queue jammed on four dead addresses</td><td>The "already ruled on" marks are per row; the verifier rules per address. A duplicate row under a second label never gets stamped, so the lead is immortal</td><td class="up">Fixed: address-level exclusion, verified against the live database. <code>d7c75bc</code></td></tr>
+        <tr class="fix"><td>Hourly check-in diagnosing a dead file</td><td>It reads the newest session log whatever its age. The campaign stopped 09-08, so it re-diagnosed a frozen week-old log 24 times a day</td><td class="up">Fixed: session logs older than 48 hours are ignored. <code>d7c75bc</code></td></tr>
+        <tr><td>The 6,192 ready leads are not being written</td><td>Nothing is broken. <code>approved_hold</code> is Casey's deliberate parking status and the send path only draws from <code>approved</code></td><td class="warn">Casey's call, see lever 1</td></tr>
+        <tr><td>Apify recovery lane idle all cycle</td><td>$16.11 left, $10 held in reserve, a batch of 100 needs $7.02. It has rested since 09-06 and resets 30 September</td><td class="warn">Casey's spend call, unchanged</td></tr>
+        <tr><td>Brave search plan still capped</td><td>Key _2 sits at its $5 limit. Nine of the recovery lane's ten collection methods want a website first</td><td class="warn">Casey's spend call, unchanged</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Recommended next, ranked</h2>
+  <ol class="recs">
+    <li><b>Decide what happens to the 6,192 ready leads.</b> They are researched, bundled and one command away from a written email, and they have been accumulating for a month. Meanwhile the send path fires about 14 a day because it only draws from the small <code>approved</code> trickle. This is now by far the largest thing in the pipeline and it is waiting on a decision, not on work. Release a slice with <code>hold-batch.ts --release</code> and it flows.</li>
+    <li><b>Let the backfill finish, then decide whether the chain stays on.</b> 278 leads are left, about $28 and half a day. After that enrichment has nothing to eat, and the pause redirects resources into a lane with no queue.</li>
+    <li><b>Settle the key pool before lifting the pause.</b> Nine identical mornings across a hundredfold swing in our own spending says the quota on 50 projects was cut. Run <code>audit-key-projects.sh</code>, confirm which projects, and stop counting those keys as capacity.</li>
+    <li><b>Watch the verify queue refill.</b> With the four zombies retired the queue should show real leads again within a pass or two. If it sits empty, the collect half is genuinely out of email candidates and Brave's cap is the binding constraint rather than a contributing one.</li>
+    <li><b>An alarm on an immortal selector.</b> Three times now a selector has re-handed the same ids forever, and each time it was found by a person reading a log. The number that exposes it is simple: distinct ids divided by lead-slots spent, per lane, per day. Below a threshold the lane is re-reading itself. Deliberately not built today, so it can be calibrated against a lane that has just been unjammed.</li>
+  </ol>
+
+  <div class="foot">
+    <b>Status:</b> everything is running and nothing needs a human. The backfill chain has been up 23 hours and is mid-batch. The recovery lane, Apify, do-not-contact sync, the hourly check-in and the debrief timer are all active. <b>Discovery stays paused on Casey's 09-08 order</b> and no sweep, timer or flag was touched. Anthropic spend for the cycle was <b>$0</b>. No fatal error signatures. 14 emails were composed and pushed to SmartLead at 07:20Z, just past the cycle boundary, all of them from the <code>approved</code> lane.
+  </div>
+
+</div>

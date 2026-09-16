@@ -274,6 +274,71 @@ this is the shape to check first.**
 
 ## Change log
 
+- 2026-09-16 (debrief): **THE TOP-UP WORKED AND ENRICHMENT IS NEARLY FINISHED. 410 LEADS
+  THROUGH IN 17 HOURS WITH ZERO FAILURES, AT 10 CENTS A LEAD.** The 14:34Z batch settled at
+  about 24 leads an hour and held it all night. **Correct three cost numbers in the ACTIVE
+  section above:** measured against the OpenRouter account meter ($41.10 for the day ÷ 410
+  leads) the real price is **$0.100 a lead**, not the 16 to 17 cents estimated on 09-15. So
+  the remaining **278 leads cost about $28**, and the whole 603-lead backlog was going to be
+  about **$60, not $97**. Balance $258.71. Do not sum the run log's own per-stage dollar
+  markers ($56.55) — a bank's cost is printed twice, per stage and again in the export summary.
+  **The output is a shelf of 6,192 leads at `approved_hold` + `ready_data_scraped`**: researched,
+  bundled, one command from a written email, held on Casey's word and nothing else. The send
+  path fires ~14/day because it only draws from the small `review_status = approved` lane
+  (11 `ready_data_scraped` + 3 `email_drafted` = exactly the 14 pushed at 07:20Z). **That shelf
+  is now the largest thing in the pipeline and it is waiting on a decision, not on work.**
+
+  **Yesterday's credit gate held for five free hours and then lost a 500-lead batch to its own
+  probe.** It waited correctly from 08:07Z on a definite `DRY -0.19`. At 13:07Z the probe
+  errored, the fail-open rule returned OK, and 499 of 500 leads died after paying for their
+  YouTube harvest and Decodo transcripts. Credits did not land until ~14:34Z. **Fail-open is
+  right for ENTERING the wait and wrong for LEAVING it:** before the wait there is no evidence,
+  so run; inside it you hold OpenRouter's own word that the balance is under the floor, and a
+  probe you could not finish is not evidence against that word. Fixed in `d7c75bc` — only a
+  confirmed balance resumes the chain; `OK probe-error`, `OK probe-http-*`, `OK probe-unparseable`
+  and `OK nokey` keep waiting, which costs nothing because the leads never leave the pool.
+
+  **THE RECOVERY LANE'S VERIFY HALF WAS JAMMED ON FOUR DEAD ADDRESSES AND HAD BEEN FOR WEEKS.**
+  All six verify passes this cycle were handed the same four ids, and `VERIFIABLE_IDS_SQL` run by
+  hand returned **those four and nothing else** — the whole queue was four immortal rows. Third
+  instance of one bug class (08-24, 09-02, now): **the marks that say "already ruled on" are
+  written per ROW, but ZeroBounce rules per ADDRESS.** A lead routinely holds the same address
+  twice under two kinds, because two methods found it — the About-tab button writes
+  `youtube_email`, the website scrape writes `business_email`. One row gets stamped, the twin
+  stays blank forever, the lead re-selects every pass and buys another credit.
+  `rec8xHAFcSVZNKs1N` has been re-buying the verdict on `info@shanesmithlaw.com` **since
+  24 August**; three others were re-stamped at 07:00:36-38 this morning over yesterday's stamps,
+  which is the direct proof a credit is spent every pass. Fixed in `d7c75bc` with an
+  address-level exclusion. *Verified live:* 966 unruled email rows table-wide, **exactly 16 newly
+  excluded**, all duplicates of an already-ruled address; a rolled-back transaction test covering
+  fresh-selects / ruled-duplicate-stops / second-unruled-address-returns; 51/51 tests, tsc clean.
+  **No new gap** — a lead whose every address is ruled on already satisfied neither selector,
+  which is the intended retired state. **A drained queue and a jammed queue read identically from
+  outside; the tell is the same ids in every pass.**
+
+  **THE KEY-POOL QUESTION IS ANSWERED. STOP ASKING FOR THE 6-HOUR PROBE.** Ninth consecutive
+  morning at **15 working / 50 exhausted / 1 blocked of 66**. The last nine days ran the
+  experiment from the other side: 09-11 through 09-13 nothing of ours spent a single unit
+  overnight, and this cycle we spent heavily (410 enrichment leads plus ~1,500 doomed attempts,
+  every one paying a YouTube harvest). **The reading did not move by one key.** That kills both
+  explanations: not our spending, which swung a hundredfold; and not a late refill, because 50
+  keys carry ~500,000 units and the probe sits 20 minutes past the reset, a window in which the
+  chain runs about eight leads. **The quota on those 50 projects was cut, and more keys from those
+  accounts buy nothing.** Harmless while discovery is paused (enrichment runs on 1-unit calls);
+  binding the moment it resumes (a keyword search costs 100). Settle which projects with
+  `youtube-lead-finder-v1/scripts/audit-key-projects.sh` before Casey lifts the pause, not after.
+
+  **Third fix, noise that would have outlived its cause:** the hourly check-in wrote
+  `finder_hard_wall_benign` **24 times a day for eight days** about `session-20260908T152322Z.log`,
+  a campaign log frozen since the pause. `recentSessionLogs()` took whatever sorted newest with no
+  age test, while all three callers ask what is happening *now*. That pattern is carved out as
+  benign before the paid fix-agent is reached, but **any other pattern in the same frozen file
+  would page that agent hourly, forever, about a campaign that is not running.** Fixed in
+  `d7c75bc`: logs untouched for `MAX_SESSION_LOG_AGE_HOURS` (48) are ignored, which never excludes
+  a live campaign and self-heals when discovery resumes.
+
+  Full detail: `brain/lead-gen/runs/lead-run-2026-09-16.html`.
+
 - 2026-09-13 (Casey, in chat): **TAVILY IS OUT. BRAVE IS THE ONLY WEB SEARCH.** The email
   finder searched Tavily when a channel links no website, and Tavily's plan was capped (the
   432s in the pilot entry below). Casey's call: both are plain web search and Brave is
