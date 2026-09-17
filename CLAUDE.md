@@ -166,7 +166,7 @@ Connection string: `/home/casey/.pipeline-db.env`. Deliberately not in the share
 
 Browse the data in NocoDB at `db.contentgetsclients.com`.
 
-**What went away with the cap:** the 15-minute cleanup timer, the export-and-purge cycle, and the 5-requests-per-second token bucket. All of it was tax paid to Airtable's limits. Two small leftovers are still in the code and do no harm: the quick repo still splits long banks into rows of up to 90,000 characters, and the lead finder still updates some search terms in batches of 10.
+**What went away with the cap:** the 15-minute cleanup timer, the export-and-purge cycle, and the 5-requests-per-second token bucket. All of it was tax paid to Airtable's limits. Two leftovers came out of the code on 2026-09-13: the quick repo stopped splitting long banks across rows, and the lead finder's `src/` code stopped updating search terms in batches of 10. Some one-off lead-finder scripts still update search terms 10 at a time, which does no harm.
 
 For the schema fields the orchestrator reads/writes, see [LEAD_CANDIDATES_SCHEMA.md](LEAD_CANDIDATES_SCHEMA.md) (paste from the email-outreach repo).
 
@@ -347,11 +347,14 @@ writes them after generation, and nothing purges them. (The table started on 202
 as a `banks` table in the Airtable enrichment base and moved to Postgres with everything
 else on 2026-08-12.)
 
-- **It is rows, not columns on `channels`.** Long banks are still split across rows via
-  `chunk_index`/`chunk_count`, and `bank-rows.ts` does the split and rebuild. The split
+- **It is rows, not columns on `channels`.** Long banks used to be split across rows via
+  `chunk_index`/`chunk_count`, and `bank-rows.ts` still joins a bank split that way. The split
   was built for Airtable's 100,000-character cell cap, which 224 banks in the 2026-07
-  corpus exceeded (examples-bank peaks at 1.23 MB). Postgres has no such cap, but the
-  code still splits at 90,000 characters.
+  corpus exceeded (examples-bank peaks at 1.23 MB). Postgres has no such cap, and the code
+  stopped splitting on 2026-09-13. Each bank is one row, which a unique index on `channel_id`
+  and `source_filename` enforces. `chunk_index` and `chunk_count` are 1 on 21,160 rows and
+  empty on the other 22,824, which record the old part count in `rebuilt_from_chunks`: 1 on
+  22,550 banks that were never split, and 2 to 14 on the other 274 (counted 2026-09-13).
 - **The kind comes from `source_filename`.** That rule dates from Airtable, whose field
   PATCH refused to add a choice to a live singleSelect.
 - **The JSON archives are gone.** The `Exported Leads in JSON/` folder was deleted on
