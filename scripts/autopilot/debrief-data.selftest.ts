@@ -1,4 +1,4 @@
-import { classifyKeyProbe, isVerifiedOrBeyond, laneYield, priorAdvanceSource, priorSeedsAdvanced, priorSeedsWalked, reconcileAdvanced, sessionSeedsAdvanced, sessionStartMs, walkRateTrend } from './debrief-data.ts';
+import { classifyKeyProbe, missingDebriefs, isVerifiedOrBeyond, laneYield, priorAdvanceSource, priorSeedsAdvanced, priorSeedsWalked, reconcileAdvanced, sessionSeedsAdvanced, sessionStartMs, walkRateTrend } from './debrief-data.ts';
 let fail = 0;
 const ok = (name: string, got: unknown, want: unknown) => {
   const pass = JSON.stringify(got) === JSON.stringify(want);
@@ -151,6 +151,19 @@ ok('a burst limit is transient, never a retirement', classifyKeyProbe(429, 'rate
 ok('a bad key string is its own verdict',
   classifyKeyProbe(400, '{"error":{"errors":[{"reason":"keyInvalid"}],"message":"Bad Request"}}'), 'invalid');
 ok('anything unrecognised stays unrecognised', classifyKeyProbe(500, 'backend error'), 'other');
+
+// missingDebriefs — the window, not the contents. A far-future date has no report
+// for any of its seven prior days, so the whole window comes back, which pins the
+// two things that can silently go wrong: the count, and today never appearing in
+// its own missing list (the agent reading this is the one about to write it).
+const future = missingDebriefs('2099-01-08');
+ok('a cycle is never listed as missing its own report', future.some((m) => m.date === '2099-01-08'), false);
+ok('seven completed cycles, newest first',
+  future.map((m) => m.date),
+  ['2099-01-07', '2099-01-06', '2099-01-05', '2099-01-04', '2099-01-03', '2099-01-02', '2099-01-01']);
+ok('no metrics and no flag for a cycle that never ran',
+  future[0], { date: '2099-01-07', has_metrics: false, reason: null });
+console.log(`     (live: ${JSON.stringify(missingDebriefs(new Date().toISOString().slice(0, 10)).map((m) => m.date))})`);
 
 console.log(fail === 0 ? '\nALL PASS' : `\n${fail} FAILED`);
 process.exit(fail === 0 ? 0 : 1);

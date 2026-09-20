@@ -105,6 +105,65 @@ if [ -s "$OUT" ]; then
     --note "daily debrief+improve $DATE" || true
 fi
 
+# THE RUN CHECKS ITS OWN WORK (2026-09-20). This script ends in an unconditional
+# `exit 0` — correct, because a missed report must never stop the timer — but for
+# three cycles running (09-17, 09-18, 09-19) that made a total failure look like a
+# success. Each of those days `claude -p` returned in ~130ms with
+# `"is_error":true, "result":"Failed to authenticate: OAuth session expired..."`,
+# the grounded metrics were gathered, no report was written, systemd logged three
+# clean runs, and nothing anywhere said a debrief was missing. Three cycles of
+# history are simply gone.
+#
+# A failed login cannot be retried from in here, so this does the two things that
+# can be done: say so loudly NOW, and leave a durable mark so the next run that
+# DOES work is handed the gap (debrief-data.ts reads these flags into
+# `missing_debriefs`). Still exit 0.
+HTML="$BRAIN/brain/lead-gen/runs/lead-run-$DATE.html"
+MISSING_FLAG="$REPO/logs/autopilot-debrief-missing-$DATE.flag"
+fail_reason=""
+if [ "$agent_rc" -ne 0 ]; then
+  fail_reason="the debrief agent exited $agent_rc (124 = hit the 1h timeout)"
+elif [ ! -s "$OUT" ]; then
+  fail_reason="the debrief agent wrote no result JSON at all"
+elif grep -q '"is_error":true' "$OUT" 2>/dev/null; then
+  agent_err="$(python3 -c '
+import json, sys
+try:
+    print((json.load(open(sys.argv[1])).get("result") or "(no result field)")[:300])
+except Exception as e:
+    print(f"(unreadable result JSON: {e})")
+' "$OUT" 2>/dev/null)"
+  fail_reason="the debrief agent returned an error: ${agent_err:-unknown}"
+fi
+# Belt and braces: an agent can report success and still not have written the
+# report (the 08-17/08-18 shape). Only trust the file, and only after the publish
+# step below has had its chance — so this check runs again at the very end.
+if [ -n "$fail_reason" ]; then
+  printf '%s\n' \
+    "$(date -u +%Y-%m-%dT%H:%M:%SZ) cycle $DATE has no debrief." \
+    "Reason: $fail_reason" \
+    "Agent result JSON: $OUT" \
+    "The grounded metrics for this cycle are still at $DATA_FILE — a later run can write the report from them." \
+    > "$MISSING_FLAG"
+  printf '%s\n' "$(python3 -c '
+import json, sys, datetime
+print(json.dumps({
+  "ts": datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z"),
+  "kind": "autopilot_debrief_failed",
+  "day": sys.argv[1],
+  "summary": f"No debrief was written for cycle {sys.argv[1]}: {sys.argv[2]}",
+  "detail": (
+    "scripts/autopilot/debrief.sh always exits 0 so a bad cycle cannot stop the timer, which "
+    "is why three failures in a row (2026-09-17/18/19) looked like three clean runs. The "
+    "grounded metrics JSON for this cycle exists and a later run can write the report from it. "
+    "If the reason names an expired OAuth session, the fix is a human re-login on the VPS — "
+    "nothing in the pipeline can refresh it, and no Anthropic API key may be used instead."
+  ),
+  "free": True,
+}))' "$DATE" "$fail_reason")" >> "$REPO/logs/autopilot-observations.jsonl"
+  echo "[debrief.sh] NO DEBRIEF WRITTEN for $DATE — $fail_reason (flagged at $MISSING_FLAG)"
+fi
+
 # Backstop: publish and mirror even if the agent skipped or half-finished task 2. Idempotent
 # (a no-op when origin/main already carries the debrief byte for byte), and it reads the
 # files from the brain worktree OR from origin/main. The old version here was a bare
@@ -114,6 +173,22 @@ fi
 # Casey wants every report gathered under reports/ as well (2026-07-13).
 "$REPO/scripts/autopilot/publish-brain-debrief.sh" "$DATE" || \
   echo "[debrief.sh] WARN: publish/mirror step reported a problem for $DATE"
+
+# Second look, after publish had its chance: the file is the only proof. An agent
+# that reports success and writes nothing leaves exactly the same hole as one that
+# never authenticated, so both end up flagged the same way. Conversely, a run that
+# was flagged above but whose report is on disk anyway clears its own flag.
+if [ -s "$HTML" ]; then
+  rm -f "$MISSING_FLAG"
+elif [ ! -f "$MISSING_FLAG" ]; then
+  printf '%s\n' \
+    "$(date -u +%Y-%m-%dT%H:%M:%SZ) cycle $DATE has no debrief." \
+    "Reason: the agent reported success but $HTML does not exist." \
+    "Agent result JSON: $OUT" \
+    "The grounded metrics for this cycle are still at $DATA_FILE — a later run can write the report from them." \
+    > "$MISSING_FLAG"
+  echo "[debrief.sh] NO DEBRIEF WRITTEN for $DATE — agent reported success but wrote no report (flagged at $MISSING_FLAG)"
+fi
 
 echo "[debrief.sh] debrief agent finished (rc=$agent_rc); cost recorded from $OUT"
 exit 0

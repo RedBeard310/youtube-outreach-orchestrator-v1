@@ -664,6 +664,42 @@ function parkedAtCycleStart(sinceISO: string): number | null {
   return inCycle.length ? inCycle[0].parked : null;
 }
 
+// Which recent cycles have no debrief in the brain (2026-09-20).
+//
+// WHY. debrief.sh ends in an unconditional `exit 0` so a bad cycle can never stop
+// the timer. That is right, and it is also why 2026-09-17, -18 and -19 each looked
+// like a clean run: `claude -p` came back in ~130ms with "Failed to authenticate:
+// OAuth session expired and could not be refreshed", no report was written, and
+// nothing said so. Three cycles of history went missing in plain sight.
+//
+// The gatherer runs BEFORE the agent, so it is the one place that can tell the
+// agent what earlier cycles are still owed. Every date listed here has a grounded
+// metrics file on disk, so a later run can write the report from real numbers
+// rather than guesses. Deliberately reads only the filesystem: no database call,
+// no cost, and it cannot itself be the thing that is broken.
+export function missingDebriefs(today: string): Array<{ date: string; has_metrics: boolean; reason: string | null }> {
+  const RUNS = '/home/casey/repos/casey-assistant/brain/lead-gen/runs';
+  const out: Array<{ date: string; has_metrics: boolean; reason: string | null }> = [];
+  const todayMs = Date.parse(`${today}T12:00:00Z`);
+  if (Number.isNaN(todayMs)) return out;
+  // The last 7 completed cycles. Today's own report does not exist yet — the agent
+  // that reads this is the one about to write it — so start one day back.
+  for (let back = 1; back <= 7; back++) {
+    const d = new Date(todayMs - back * 86_400_000).toISOString().slice(0, 10);
+    if (existsSync(join(RUNS, `lead-run-${d}.html`))) continue;
+    const flag = join(LOGS, `autopilot-debrief-missing-${d}.flag`);
+    let reason: string | null = null;
+    if (existsSync(flag)) {
+      try {
+        reason = (readFileSync(flag, 'utf8').split('\n').find((l) => l.startsWith('Reason: ')) ?? '')
+          .replace(/^Reason: /, '').trim() || null;
+      } catch { /* a flag we cannot read is still a flag */ }
+    }
+    out.push({ date: d, has_metrics: existsSync(join(LOGS, `autopilot-debrief-${d}.json`)), reason });
+  }
+  return out;
+}
+
 const FATAL_PATTERNS: Array<[string, RegExp]> = [
   ['module_not_found', /ERR_MODULE_NOT_FOUND|Cannot find package/],
   ['missing_skill', /ENOENT[^\n]*\.claude\/skills/],
@@ -1260,6 +1296,7 @@ async function main(): Promise<void> {
     supply_health: supplyHealth,
     halt: haltHealth(sinceMs, Date.parse(untilISO)),
     fatal_signatures_today: fatalSignaturesToday(sinceMs),
+    missing_debriefs: missingDebriefs(date),
     references: {
       prior_debrief_html: '/home/casey/repos/casey-assistant/brain/lead-gen/runs/lead-run-2026-07-10.html',
       index_md: '/home/casey/repos/casey-assistant/brain/lead-gen/INDEX.md',
