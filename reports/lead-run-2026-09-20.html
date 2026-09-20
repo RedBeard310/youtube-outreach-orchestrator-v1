@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lead Run Debrief — 2026-09-20</title>
+<style>
+  :root {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --good-soft: #1f8a5b18; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+      --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+      --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --good-soft: #55c48c1c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --good-soft: #1f8a5b18; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+    --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+    --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --good-soft: #55c48c1c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 40px 22px 80px; }
+  .eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); font-weight: 600; }
+  h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.12; margin: 10px 0 6px; text-wrap: balance; letter-spacing: -.02em; }
+  h2 { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); margin: 44px 0 16px; font-weight: 700; }
+  h3 { font-size: 18px; margin: 0 0 6px; letter-spacing: -.01em; }
+  p { margin: 0 0 14px; }
+  .lede { font-size: 18px; color: var(--ink-soft); max-width: 68ch; }
+  .tag { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--amber-soft); color: var(--amber); letter-spacing: .02em; }
+  .tag.ok { background: var(--teal-soft); color: var(--teal); }
+  .tag.bad { background: var(--red-soft); color: var(--red); }
+  .tag.good { background: var(--good-soft); color: var(--good); }
+  .grid { display: grid; gap: 14px; }
+  .stats { grid-template-columns: repeat(4, 1fr); margin-top: 26px; }
+  @media (max-width: 720px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; box-shadow: var(--shadow); }
+  .stat .n { font-size: 30px; font-weight: 750; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .stat .l { font-size: 12.5px; color: var(--ink-soft); margin-top: 3px; }
+  .stat .s { font-size: 12px; margin-top: 8px; font-weight: 600; }
+  .up { color: var(--good); } .down { color: var(--red); } .warn { color: var(--amber); }
+  .accent-red { border-left: 3px solid var(--red); }
+  .accent-teal { border-left: 3px solid var(--teal); }
+  .accent-amber { border-left: 3px solid var(--amber); }
+  .accent-good { border-left: 3px solid var(--good); }
+
+  .strip { display: flex; align-items: flex-end; gap: 5px; height: 140px; padding: 14px 14px 10px; overflow-x: auto; }
+  .barwrap { flex: 1 0 22px; display: flex; flex-direction: column; align-items: center; gap: 5px; }
+  .bar { width: 100%; border-radius: 3px 3px 0 0; background: var(--teal); opacity: .9; }
+  .bar.low { background: var(--amber); }
+  .bar.today { background: var(--good); opacity: 1; }
+  .bar.zero { background: var(--red); opacity: 1; min-height: 2px; }
+  .barlab { font-size: 10.5px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-soft); padding: 0 14px 14px; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+
+  .q { border-radius: 14px; padding: 20px 22px; margin-bottom: 14px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); }
+  .q .ask { font-size: 17px; font-weight: 700; color: var(--ink); margin-bottom: 10px; display: flex; gap: 10px; align-items: baseline; }
+  .q .ask .qn { color: var(--red); font-weight: 800; flex: 0 0 auto; }
+  .q.accent-teal .ask .qn { color: var(--teal); }
+  .q.accent-good .ask .qn { color: var(--good); }
+  .q p { color: var(--ink-soft); }
+  .q b { color: var(--ink); }
+  .pill { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink); background: var(--panel-2); padding: 1px 7px; border-radius: 6px; border: 1px solid var(--line); white-space: nowrap; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+  th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); }
+  td .num { font-variant-numeric: tabular-nums; font-weight: 650; }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); box-shadow: var(--shadow); }
+  ol.recs { padding-left: 0; list-style: none; counter-reset: r; margin: 0; }
+  ol.recs li { counter-increment: r; position: relative; padding: 14px 16px 14px 52px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 10px; box-shadow: var(--shadow); }
+  ol.recs li::before { content: counter(r); position: absolute; left: 14px; top: 14px; width: 26px; height: 26px; border-radius: 8px; background: var(--teal-soft); color: var(--teal); font-weight: 800; font-size: 14px; display: grid; place-items: center; }
+  ol.recs b { color: var(--ink); }
+  .foot { margin-top: 46px; padding: 16px 18px; border-radius: 12px; background: var(--amber-soft); border: 1px solid var(--line); font-size: 14px; color: var(--ink-soft); }
+  .foot b { color: var(--ink); }
+  .muted { color: var(--ink-soft); font-size: 13.5px; }
+  code { background: var(--panel-2); border: 1px solid var(--line); border-radius: 5px; padding: 0 5px; font-size: .9em; }
+</style>
+
+
+<div class="wrap">
+
+  <div class="eyebrow">Lead Run Debrief · YouTube outreach</div>
+  <h1>2026-09-20 — the enrichment backlog is finished, and the shelf has nowhere to go</h1>
+  <p class="lede">The job the discovery pause was called for is done. <b>6,484 of the 6,751 parked leads are researched and ready to write</b>, which is 96% of the pool. The enrichment chain worked for <b>2 hours 42 minutes</b> out of twenty-four and spent the rest of the day idle, not because it broke but because it has run out of backlog: it now only enriches what arrived that day. The recovery lane had its best ordinary day of the pause, <b>+64 parked</b>, more than double the 25 a day it had been managing. And none of it can leave the building: outgoing email has been paused since 2026-09-10 on spam placement, so the 07:20 send attempt was refused before it composed anything, for the eleventh day running.</p>
+  <div style="margin-top:14px"><span class="tag good">+64 PARKED, BEST SINCE 09-15</span> <span class="tag good">6,484 READY TO WRITE</span> <span class="tag bad">0 EMAILS SENT, DAY 11</span> <span class="tag">BRAVE RESOLUTION 1% → 42%</span> <span class="tag">DISCOVERY PAUSED BY CASEY</span></div>
+
+  <div class="grid stats">
+    <div class="card stat accent-good">
+      <div class="n">+64</div>
+      <div class="l">leads parked into <code>approved_hold</code></div>
+      <div class="s up">6,687 → 6,751. Was 25 a day all week</div>
+    </div>
+    <div class="card stat accent-good">
+      <div class="n">6,484</div>
+      <div class="l">leads researched and ready to write</div>
+      <div class="s up">96% of the parked pool. Backlog cleared</div>
+    </div>
+    <div class="card stat accent-red">
+      <div class="n">0</div>
+      <div class="l">emails actually sent</div>
+      <div class="s down">14 attempted, refused by the 09-10 pause</div>
+    </div>
+    <div class="card stat accent-amber">
+      <div class="n">42%</div>
+      <div class="l">recovery-lane leads with no website found</div>
+      <div class="s warn">was 1% five passes ago. Brave is running out</div>
+    </div>
+  </div>
+
+  <h2>The shape of the day</h2>
+  <div class="card" style="padding:0">
+    <div class="strip">
+      <div class="barwrap"><div class="bar zero" style="height:2%"></div><div class="barlab">0</div></div>
+      <div class="barwrap"><div class="bar zero" style="height:2%"></div><div class="barlab">0</div></div>
+      <div class="barwrap"><div class="bar zero" style="height:2%"></div><div class="barlab">0</div></div>
+      <div class="barwrap"><div class="bar low" style="height:20%"></div><div class="barlab">5</div></div>
+      <div class="barwrap"><div class="bar zero" style="height:2%"></div><div class="barlab">0</div></div>
+      <div class="barwrap"><div class="bar zero" style="height:2%"></div><div class="barlab">0</div></div>
+      <div class="barwrap"><div class="bar zero" style="height:2%"></div><div class="barlab">0</div></div>
+      <div class="barwrap"><div class="bar today" style="height:100%"></div><div class="barlab">25</div></div>
+      <div class="barwrap"><div class="bar zero" style="height:2%"></div><div class="barlab">0</div></div>
+      <div class="barwrap"><div class="bar zero" style="height:2%"></div><div class="barlab">0</div></div>
+      <div class="barwrap"><div class="bar zero" style="height:2%"></div><div class="barlab">0</div></div>
+      <div class="barwrap"><div class="bar zero" style="height:2%"></div><div class="barlab">0</div></div>
+      <div class="barwrap"><div class="bar zero" style="height:2%"></div><div class="barlab">0</div></div>
+      <div class="barwrap"><div class="bar zero" style="height:2%"></div><div class="barlab">0</div></div>
+      <div class="barwrap"><div class="bar" style="height:76%"></div><div class="barlab">19</div></div>
+      <div class="barwrap"><div class="bar zero" style="height:2%"></div><div class="barlab">0</div></div>
+      <div class="barwrap"><div class="bar zero" style="height:2%"></div><div class="barlab">0</div></div>
+      <div class="barwrap"><div class="bar zero" style="height:2%"></div><div class="barlab">0</div></div>
+      <div class="barwrap"><div class="bar zero" style="height:2%"></div><div class="barlab">0</div></div>
+      <div class="barwrap"><div class="bar zero" style="height:2%"></div><div class="barlab">0</div></div>
+      <div class="barwrap"><div class="bar zero" style="height:2%"></div><div class="barlab">0</div></div>
+      <div class="barwrap"><div class="bar" style="height:60%"></div><div class="barlab">15</div></div>
+      <div class="barwrap"><div class="bar zero" style="height:2%"></div><div class="barlab">0</div></div>
+      <div class="barwrap"><div class="bar zero" style="height:2%"></div><div class="barlab">0</div></div>
+    </div>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--teal)"></span>leads enriched, one bar per hour, 07:00Z to 07:00Z</span>
+      <span><span class="dot" style="background:var(--red)"></span>chain idle: no pending inflow</span>
+    </div>
+  </div>
+  <p class="muted">Four short batches — 5, 25, 19 and 15 leads — and twenty-one hours of nothing. On 09-16 this same chain ran a single batch for seventeen straight hours and finished 410 leads. The difference is not speed. It is that there is almost nothing left to enrich.</p>
+
+  <h2>The three questions</h2>
+
+  <div class="q accent-good">
+    <div class="ask"><span class="qn">1</span><span>Did the day add anything to the pile?</span></div>
+    <p>Yes, and more than any ordinary day since the pause began. <b>+64 leads</b> parked into <code>approved_hold</code>, taking the pool from <span class="pill">6,687</span> to <span class="pill">6,751</span>, while <code>needs_contact</code> fell by exactly the same 64, to <span class="pill">4,335</span>. Every day this week had been landing 25 to 28.</p>
+    <p>The Bloodhound recovery lane accounts for <b>55 of the 64</b>. It walked three collect passes of 150 leads each, tested <b>103 addresses</b> at ZeroBounce and flipped 55 of them through the re-score into the parked pool. Both halves of the lane roughly doubled: earlier in the week a verify pass was testing 8 to 19 addresses, this cycle's four passes tested 8, 32, 38 and 25. The other 9 parks are not attributable from the logs; the Apify lane was resting all cycle, so they are not from there.</p>
+  </div>
+
+  <div class="q accent-good">
+    <div class="ask"><span class="qn">2</span><span>Is enrichment keeping up?</span></div>
+    <p>It has caught up completely, which is a different thing and easy to misread. The chain enriched <b>64 leads with zero failures</b> across four batches, then logged <code>no pending inflow — idling</code> after every one of them. Its candidate pool reads <b>84, of which 69 are permanently excluded</b> — leads that have failed enrichment before and are not retried. So the real queue at the end of the day was about fifteen leads.</p>
+    <p>The shelf now stands at <b>6,484 leads at <code>ready_data_scraped</code></b>, 96% of everything parked. Another 127 sit at <code>failed</code> and 6 at <code>email_invalid</code>. Enrichment is no longer the constraint on anything. It finishes each day's arrivals within hours and waits.</p>
+  </div>
+
+  <div class="q">
+    <div class="ask"><span class="qn">3</span><span>Did anything leave?</span></div>
+    <p>No. The daily 07:20 send fired at <b>14 leads</b> and was stopped before it composed a word: <i>"outgoing email is PAUSED (since 2026-09-10). Fleet-wide spam placement. The best inbox is still putting 7% in spam, and the rest are worse."</i> Nothing composed, nothing spent, no lead touched. That is the gate doing its job, and it has now done it eleven days in a row.</p>
+    <p>So the picture is a warehouse with the loading door shut. <b>6,484 finished leads</b> are waiting, the pile grows by roughly 64 a day, and the only thing that empties it is Casey lifting the pause in <code>automator/config/email-pause.json</code>. No script, gate or timer may flip it back, by design.</p>
+  </div>
+
+  <h2>Brave Search is running out, and the alarms cannot see it yet</h2>
+  <p>The recovery lane resolves each creator's own website first, because nine of its ten collection methods need one. That resolution is a Brave Search call, and Brave bills against a monthly cap per key. Over the last five collect passes the share of leads where no website could be found went:</p>
+
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Collect pass</th><th>Leads with no website</th><th>Brave refusal logged</th></tr></thead>
+      <tbody>
+        <tr><td>7 passes before 09-18</td><td><span class="num">1–4%</span></td><td>none</td></tr>
+        <tr><td>09-18 late</td><td><span class="num">4%</span></td><td>yes</td></tr>
+        <tr><td>09-19 06:01Z</td><td><span class="num">14%</span></td><td>yes</td></tr>
+        <tr><td>09-19 13:01Z</td><td><span class="num">43%</span></td><td>yes</td></tr>
+        <tr><td>09-19 20:01Z</td><td><span class="num">35%</span></td><td>yes</td></tr>
+        <tr><td>09-20 02:01Z</td><td><span class="num">42%</span></td><td>yes</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p style="margin-top:14px">Each of those five passes opens with the line <code>All 2 Brave Search API key(s) refused: 402 Usage limit exceeded</code>. Key <code>_1</code> got $50 on 09-13 and key <code>_2</code> has sat at its $5 cap since. At $5 per 1,000 searches, a week of 150-lead passes is roughly what that buys.</p>
+
+  <p><b>Neither existing alarm fired, and both were right by their own rules.</b> The collapse alarm needs 70% no-website; we are at 42%. The yield alarm needs a 40% fall in leads-that-produced-contact-points; yield actually held, at 99 and 114 of 150. The lane is finding contact points from channel links and other methods while the website half of it quietly dies. That is why the day looked good and the trend does not. It is a spend decision, not a bug, so nothing was changed in code for it.</p>
+
+  <h2>What broke, and what is fixed</h2>
+
+  <div class="q accent-red">
+    <div class="ask"><span class="qn">✗</span><span>Three debriefs never got written, and the timer looked healthy the whole time</span></div>
+    <p>The 09-17, 09-18 and 09-19 debriefs do not exist. In each case <code>claude -p</code> came back in about 130 milliseconds with <i>"Failed to authenticate: OAuth session expired and could not be refreshed"</i>. The grounded metrics file was written each day, the agent never ran, and <code>debrief.sh</code> exits 0 no matter what, so systemd recorded three clean successes. Nothing anywhere said a report was missing.</p>
+    <p><b>Fixed.</b> <code>debrief.sh</code> now checks its own work: if the agent returns an error, or the report file for that date is still absent afterwards, it writes <code>logs/autopilot-debrief-missing-&lt;date&gt;.flag</code>, appends an observation to the autopilot observation log, and says so loudly in the journal. And <code>debrief-data.ts</code> now carries a <code>missing_debriefs</code> list of the last seven cycle dates with no report in the brain, so the next agent that does run is told about the gap and can fill it.</p>
+  </div>
+
+  <div class="q accent-red">
+    <div class="ask"><span class="qn">✗</span><span>The Apify email-recovery lane has been resting on money it could spend</span></div>
+    <p>Apify endspec is the highest-yield contact-recovery method we have: it solves the captcha behind YouTube's "View email address" button, and 59% of every channel it runs becomes a usable lead. It has not run since <b>2026-09-06</b>. Twelve times a day, for fourteen days, it has logged <code>resting: $16.1132 left, $10 reserved, batch of 100 needs $7.02</code> and exited.</p>
+    <p>The arithmetic never changes: $16.11 minus the $10 reserve is $6.11, a batch of 100 costs $7.02, so the check fails forever. The reserve is deliberate and correct. The fixed batch size was not. <b>Fixed:</b> the loop now sizes the batch to what is actually spendable, down to a floor of 25 channels, and only rests when even the floor will not fit. On today's ledger that is <b>87 channels</b>, about 51 expected recoveries, without touching the reserve.</p>
+  </div>
+
+  <div class="q accent-amber">
+    <div class="ask"><span class="qn">!</span><span>Something runs a live send every time an agent opens this repo</span></div>
+    <p>Worth naming even though it caused no harm. The 07:20 send is not a timer and not a cron job. It fires inside the debrief unit's own process tree at the moment the debrief agent starts, and it has attempted 14 leads every day since 09-15. Today it was refused by the email pause, as it has been every time.</p>
+    <p>I could not find the configuration that triggers it — there are no hooks in any settings file I could read. It is harmless while the pause holds. <b>If Casey lifts the pause, the next debrief agent will send 14 leads at 07:20 without anyone asking it to.</b> Nothing was changed for this; finding and removing the trigger needs a human who knows where it was put.</p>
+  </div>
+
+  <h2>Everything else was quiet</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Lane</th><th>State</th><th>Reading</th></tr></thead>
+      <tbody>
+        <tr><td>Discovery (all sweeps, finder, keyword harvest)</td><td>Paused by Casey since 09-08</td><td>0 new channels. Intended, not an incident</td></tr>
+        <tr><td>Enrichment chain</td><td>Running, inflow-bound</td><td>64 enriched, 0 failed, idle 21 of 24 hours</td></tr>
+        <tr><td>Recovery lane (Bloodhound)</td><td>Running</td><td>3 collect passes, 103 verified, 55 parked. Pool 3,495 left</td></tr>
+        <tr><td>Apify endspec</td><td>Resting on budget</td><td>14 days idle. Fixed today, should run next tick</td></tr>
+        <tr><td>Anthropic spend</td><td>$0</td><td>Subscription only, as designed</td></tr>
+        <tr><td>OpenRouter</td><td>$7.71/day, $223.71 left</td><td>29 days of runway</td></tr>
+        <tr><td>YouTube key pool</td><td>15 working of 66</td><td>Settled question: quota was cut on 50 projects. Irrelevant while discovery is paused</td></tr>
+        <tr><td>Fatal error signatures</td><td>None</td><td>Clean cycle</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Recommended next, ranked</h2>
+  <ol class="recs">
+    <li><b>Decide what happens to 6,484 finished leads.</b> This is now the only number that matters. Enrichment has cleared its backlog, the shelf grows about 64 a day, and the exit has been shut for eleven days on spam placement. Either placement gets fixed and the door opens, or the pile keeps growing against nothing. Everything below is small by comparison.</li>
+    <li><b>Put money on a Brave key, or accept a slower recovery lane.</b> Website resolution went from 1% failing to 42% failing in five passes, and both alarms are below their thresholds so nothing will tell you again until it is much worse. $5 buys 1,000 searches; a 150-lead pass uses roughly 150. Key <code>_2</code> is still capped at $5 from before.</li>
+    <li><b>Watch the Apify lane actually run.</b> The fix went in today and the next tick is the test. Expect one batch of 87 channels, then resting again until the Apify billing cycle resets. If two batches come back over $0.20 per recovered lead the lane halts itself, which is the designed behaviour, not a fault.</li>
+    <li><b>Do not read "64 enriched" as a collapse from 410.</b> Same chain, same speed, no backlog. If you want the enrichment throughput back, the only thing that creates work for it is new arrivals: the recovery lane, Apify, or lifting the discovery pause.</li>
+    <li><b>Find whatever fires <code>npm run send</code> on session start.</b> Low urgency while the pause holds, high urgency the moment it lifts.</li>
+  </ol>
+
+  <div class="foot">
+    <b>Status caveat.</b> Everything in <code>approved_hold</code> is parked, not sent. Outgoing email has been paused since 2026-09-10 and only Casey lifts it. Discovery of new channels has been paused since 2026-09-08 and only Casey lifts that. Both pauses held correctly all cycle.
+  </div>
+
+</div>
+</html>

@@ -197,6 +197,11 @@ everything up to "parked, ready to write" is automatic.
 
 ## Parked pools waiting on Casey (don't touch without his word)
 
+> **Numbers below are from 2026-09-02 and are stale. Live at 2026-09-20T07:00Z:
+> `needs_contact` 4,335 and falling, `approved_hold` 6,751 of which 6,484 already
+> carry an enrichment bundle (96%) — the enrichment backlog is finished, not
+> "nearly clear". The 09-02 reasoning still holds; only the counts moved.**
+
 - `needs_contact` (4,951 at 2026-09-02): recovery engine **BUILT AND RUNNING**
   since Casey merged it 2026-08-23 (`1bea933`). Live lane inside the campaign's
   finish block; recovered leads park into `approved_hold`, so it feeds the pool
@@ -273,6 +278,48 @@ this is the shape to check first.**
 5. Anything in this file contradicted by what Casey said today? → update it.
 
 ## Change log
+
+- 2026-09-20 (debrief): **THE ENRICHMENT BACKLOG IS FINISHED. 6,484 OF THE 6,751 PARKED
+  LEADS (96%) ARE RESEARCHED AND READY TO WRITE.** The chain now works **2h42m out of every
+  24h** — four batches, 64 leads, 0 failures, `no pending inflow — idling` after every one.
+  Its pool reads 84 of which **69 are permanently excluded**, so the real queue is about
+  fifteen leads. **Do not read "64 enriched" as a collapse from 09-16's 410:** same chain,
+  same speed, no backlog. The only things that create work for it now are new arrivals (the
+  recovery lane, Apify, or lifting the discovery pause). **The shelf is the whole story and
+  it is waiting on a decision, not on work** — it grows ~64/day against a loading door that
+  has been shut eleven days (`automator/config/email-pause.json`, fleet-wide spam placement
+  since 09-10; the 07:20 send attempted 14 and sent 0, refused before composing).
+  **+64 parked** (6,687 → **6,751**), the best ordinary day of the pause and 2.5× the 25/day
+  of the preceding week; **55 of it the recovery lane**, whose verify half roughly doubled
+  (8/32/38/25 addresses a pass against 8–19 earlier in the week, flip rate ~53%). No repo
+  shipped code between 09-16 and now, so that is the collect cursor reaching a better slice
+  of its book — watch it rather than explain it. **BRAVE IS CAPPING OUT AND BOTH ALARMS ARE
+  CORRECTLY SILENT:** website resolution failures went **1–4% → 42% across five collect
+  passes**, every one opening on `All 2 Brave Search API key(s) refused: 402`. The collapse
+  alarm needs 70% and the yield alarm needs a 40% yield fall, and yield actually held (99 and
+  114 of 150) because the other methods carry it. **Nothing was changed in code for this — it
+  is a spend decision** ($5 per 1,000 searches, ~150 a pass; key `_1` got $50 on 09-13, key
+  `_2` is still capped at $5). **THREE DEBRIEFS WERE NEVER WRITTEN AND THE TIMER REPORTED
+  SUCCESS:** 09-17, 09-18 and 09-19 each returned in ~130ms with `Failed to authenticate:
+  OAuth session expired and could not be refreshed`; `debrief.sh` ends in an unconditional
+  `exit 0`, so systemd logged three clean runs. Fixed (`ea28451`): the script now checks its
+  own work, writes `logs/autopilot-debrief-missing-<date>.flag` plus an
+  `autopilot_debrief_failed` observation, says so loudly, and `debrief-data.ts` emits
+  **`missing_debriefs`** for the last 7 cycles so the next working agent is handed the gap.
+  A failed login still needs a human re-login on the VPS; no Anthropic API key may be used
+  instead. **THE APIFY LANE HAD BEEN RESTING ON MONEY IT COULD SPEND FOR 14 DAYS** — twelve
+  log lines a day since 09-06 reading `resting: $16.1132 left, $10 reserved, batch of 100
+  needs $7.02`, arithmetic that could never pass before the billing cycle rolls on 30 Sep.
+  The $10 reserve was right; the fixed batch of 100 was the bug. Fixed (email repo
+  `30f0bedce`): the loop sizes its batch to the spendable balance, floored at 25 so the
+  price-ceiling strike logic keeps an honest sample. On today's ledger that is **87 channels,
+  ~51 expected recoveries**, without touching the reserve. **UNRESOLVED, WORTH KNOWING:
+  something fires a live `npm run send` every time an agent opens this repo** — not a timer,
+  not a cron; it runs inside the debrief unit's process tree the moment the agent starts, 14
+  leads a day since 09-15, its output spliced into the agent's own prompt (the signature of a
+  session-start hook), and **no hook exists in any settings file that could be read**. Harmless
+  only because the pause refuses it. **If the email pause lifts, the next debrief agent sends
+  14 leads at 07:20 without being asked.** Find the trigger before lifting the pause.
 
 - 2026-09-16 (debrief): **THE TOP-UP WORKED AND ENRICHMENT IS NEARLY FINISHED. 410 LEADS
   THROUGH IN 17 HOURS WITH ZERO FAILURES, AT 10 CENTS A LEAD.** The 14:34Z batch settled at
