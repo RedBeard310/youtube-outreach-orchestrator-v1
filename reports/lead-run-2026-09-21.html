@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lead Run Debrief - 2026-09-21</title>
+<style>
+  :root {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --good-soft: #1f8a5b18; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+      --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+      --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --good-soft: #55c48c1c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --good-soft: #1f8a5b18; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+    --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+    --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --good-soft: #55c48c1c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 40px 22px 80px; }
+  .eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); font-weight: 600; }
+  h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.12; margin: 10px 0 6px; text-wrap: balance; letter-spacing: -.02em; }
+  h2 { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); margin: 44px 0 16px; font-weight: 700; }
+  h3 { font-size: 18px; margin: 0 0 6px; letter-spacing: -.01em; }
+  p { margin: 0 0 14px; }
+  .lede { font-size: 18px; color: var(--ink-soft); max-width: 68ch; }
+  .tag { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--amber-soft); color: var(--amber); letter-spacing: .02em; }
+  .tag.ok { background: var(--teal-soft); color: var(--teal); }
+  .tag.bad { background: var(--red-soft); color: var(--red); }
+  .tag.good { background: var(--good-soft); color: var(--good); }
+  .grid { display: grid; gap: 14px; }
+  .stats { grid-template-columns: repeat(4, 1fr); margin-top: 26px; }
+  @media (max-width: 720px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; box-shadow: var(--shadow); }
+  .stat .n { font-size: 30px; font-weight: 750; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .stat .l { font-size: 12.5px; color: var(--ink-soft); margin-top: 3px; }
+  .stat .s { font-size: 12px; margin-top: 8px; font-weight: 600; }
+  .up { color: var(--good); } .down { color: var(--red); } .warn { color: var(--amber); }
+  .accent-red { border-left: 3px solid var(--red); }
+  .accent-teal { border-left: 3px solid var(--teal); }
+  .accent-amber { border-left: 3px solid var(--amber); }
+  .accent-good { border-left: 3px solid var(--good); }
+
+  .strip { display: flex; align-items: flex-end; gap: 5px; height: 140px; padding: 14px 14px 10px; overflow-x: auto; }
+  .barwrap { flex: 1 0 22px; display: flex; flex-direction: column; align-items: center; gap: 5px; }
+  .bar { width: 100%; border-radius: 3px 3px 0 0; background: var(--teal); opacity: .9; }
+  .bar.low { background: var(--amber); }
+  .bar.today { background: var(--good); opacity: 1; }
+  .bar.zero { background: var(--red); opacity: 1; min-height: 2px; }
+  .barlab { font-size: 10.5px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-soft); padding: 0 14px 14px; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+
+  .q { border-radius: 14px; padding: 20px 22px; margin-bottom: 14px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); }
+  .q .ask { font-size: 17px; font-weight: 700; color: var(--ink); margin-bottom: 10px; display: flex; gap: 10px; align-items: baseline; }
+  .q .ask .qn { color: var(--red); font-weight: 800; flex: 0 0 auto; }
+  .q.accent-teal .ask .qn { color: var(--teal); }
+  .q.accent-good .ask .qn { color: var(--good); }
+  .q p { color: var(--ink-soft); }
+  .q b { color: var(--ink); }
+  .pill { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink); background: var(--panel-2); padding: 1px 7px; border-radius: 6px; border: 1px solid var(--line); white-space: nowrap; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+  th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); }
+  td .num { font-variant-numeric: tabular-nums; font-weight: 650; }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); box-shadow: var(--shadow); }
+  ol.recs { padding-left: 0; list-style: none; counter-reset: r; margin: 0; }
+  ol.recs li { counter-increment: r; position: relative; padding: 14px 16px 14px 52px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 10px; box-shadow: var(--shadow); }
+  ol.recs li::before { content: counter(r); position: absolute; left: 14px; top: 14px; width: 26px; height: 26px; border-radius: 8px; background: var(--teal-soft); color: var(--teal); font-weight: 800; font-size: 14px; display: grid; place-items: center; }
+  ol.recs b { color: var(--ink); }
+  .foot { margin-top: 46px; padding: 16px 18px; border-radius: 12px; background: var(--amber-soft); border: 1px solid var(--line); font-size: 14px; color: var(--ink-soft); }
+  .foot b { color: var(--ink); }
+  .muted { color: var(--ink-soft); font-size: 13.5px; }
+  code { background: var(--panel-2); border: 1px solid var(--line); border-radius: 5px; padding: 0 5px; font-size: .9em; }
+</style>
+
+
+
+<div class="wrap">
+
+  <div class="eyebrow">Lead Run Debrief · YouTube outreach</div>
+  <h1>2026-09-21: the best day of the pause, and the recovery lane fell by two thirds</h1>
+  <p class="lede">Two things happened and they point opposite ways. Yesterday's one-line fix to the Apify lane woke it up after fourteen days idle, and in 52 minutes it recovered <b>62 leads</b> at ten cents each. That made today the biggest day since the discovery pause began, <b>+95 parked</b>. Underneath it, the Bloodhound recovery lane, which is the only lane that produces leads every day, fell from 55 parks to <b>19</b>. Brave Search is the reason, and it has now crossed the line where the alarms can see it: website resolution failed for <b>78%</b> of leads on the last collect pass. The Apify money is spent until the billing cycle resets on 30 September, so tomorrow the pipeline goes back to the sinking lane on its own.</p>
+  <div style="margin-top:14px"><span class="tag good">+95 PARKED, BEST OF THE PAUSE</span> <span class="tag bad">RECOVERY LANE 55 → 19</span> <span class="tag bad">BRAVE 78% FAILING</span> <span class="tag good">APIFY FIX PAID OFF IN 52 MIN</span> <span class="tag bad">0 EMAILS SENT, DAY 12</span></div>
+
+  <div class="grid stats">
+    <div class="card stat accent-good">
+      <div class="n">+95</div>
+      <div class="l">leads parked into <code>approved_hold</code></div>
+      <div class="s up">6,751 → 6,846. Previous best of the pause was 64</div>
+    </div>
+    <div class="card stat accent-good">
+      <div class="n">62</div>
+      <div class="l">of those 95 came from one Apify batch</div>
+      <div class="s up">$0.099 per recovered lead. First run since 09-06</div>
+    </div>
+    <div class="card stat accent-red">
+      <div class="n">19</div>
+      <div class="l">parks from the daily recovery lane</div>
+      <div class="s down">Was 55 yesterday. Down 65% in one cycle</div>
+    </div>
+    <div class="card stat accent-red">
+      <div class="n">78%</div>
+      <div class="l">recovery-lane leads with no website found</div>
+      <div class="s down">42% yesterday, 1% a week ago. Brave is out of plan</div>
+    </div>
+  </div>
+
+  <h2>The shape of the day</h2>
+  <div class="card" style="padding:0">
+    <div class="strip">
+      <div class="barwrap"><div class="bar zero" style="height:2%"></div><div class="barlab">0</div></div>
+      <div class="barwrap"><div class="bar zero" style="height:2%"></div><div class="barlab">0</div></div>
+      <div class="barwrap"><div class="bar low" style="height:29%"></div><div class="barlab">8</div></div>
+      <div class="barwrap"><div class="bar today" style="height:100%"></div><div class="barlab">28</div></div>
+      <div class="barwrap"><div class="bar" style="height:79%"></div><div class="barlab">22</div></div>
+      <div class="barwrap"><div class="bar" style="height:50%"></div><div class="barlab">14</div></div>
+      <div class="barwrap"><div class="bar zero" style="height:2%"></div><div class="barlab">0</div></div>
+      <div class="barwrap"><div class="bar zero" style="height:2%"></div><div class="barlab">0</div></div>
+      <div class="barwrap"><div class="bar zero" style="height:2%"></div><div class="barlab">0</div></div>
+      <div class="barwrap"><div class="bar zero" style="height:2%"></div><div class="barlab">0</div></div>
+      <div class="barwrap"><div class="bar zero" style="height:2%"></div><div class="barlab">0</div></div>
+      <div class="barwrap"><div class="bar zero" style="height:2%"></div><div class="barlab">0</div></div>
+      <div class="barwrap"><div class="bar" style="height:39%"></div><div class="barlab">11</div></div>
+      <div class="barwrap"><div class="bar zero" style="height:2%"></div><div class="barlab">0</div></div>
+      <div class="barwrap"><div class="bar zero" style="height:2%"></div><div class="barlab">0</div></div>
+      <div class="barwrap"><div class="bar zero" style="height:2%"></div><div class="barlab">0</div></div>
+      <div class="barwrap"><div class="bar zero" style="height:2%"></div><div class="barlab">0</div></div>
+      <div class="barwrap"><div class="bar zero" style="height:2%"></div><div class="barlab">0</div></div>
+      <div class="barwrap"><div class="bar zero" style="height:2%"></div><div class="barlab">0</div></div>
+      <div class="barwrap"><div class="bar zero" style="height:2%"></div><div class="barlab">0</div></div>
+      <div class="barwrap"><div class="bar low" style="height:14%"></div><div class="barlab">4</div></div>
+      <div class="barwrap"><div class="bar zero" style="height:2%"></div><div class="barlab">0</div></div>
+      <div class="barwrap"><div class="bar zero" style="height:2%"></div><div class="barlab">0</div></div>
+      <div class="barwrap"><div class="bar zero" style="height:2%"></div><div class="barlab">0</div></div>
+    </div>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--teal)"></span>leads enriched, one bar per hour, 07:00Z to 07:00Z</span>
+      <span><span class="dot" style="background:var(--red)"></span>chain idle: no pending inflow</span>
+    </div>
+  </div>
+  <p class="muted">The tall block in the morning is the Apify batch arriving. Apify finished at 09:13Z, the enrichment chain picked the 62 new leads up at 09:40Z and had them all researched by 12:32Z. That handoff is the part of the pipeline that works without anyone watching it: 86 leads enriched in four batches, zero failures, about four and a quarter hours of work in twenty-four.</p>
+
+  <h2>The three questions</h2>
+
+  <div class="q accent-good">
+    <div class="ask"><span class="qn">1</span><span>Did the day add anything to the pile?</span></div>
+    <p>More than any day since the pause began. <b>+95 leads</b> parked into <code>approved_hold</code>, taking the pool from <span class="pill">6,751</span> to <span class="pill">6,846</span>, while <code>needs_contact</code> fell to <span class="pill">4,241</span>. The previous best of the pause was yesterday's 64, and the week before that was running at 25 a day.</p>
+    <p><b>62 of the 95 came from a single Apify batch</b>, and 19 came from the recovery lane's own re-score. The other 14 are not attributable from the logs. So the day's record is one batch of money being spent, not the pipeline getting faster.</p>
+  </div>
+
+  <div class="q accent-red">
+    <div class="ask"><span class="qn">2</span><span>Is the lane that runs every day still working?</span></div>
+    <p>It is shrinking, and the Apify batch hid it. The Bloodhound lane parked <b>19</b> against yesterday's 55. Its verify half tested <b>43 leads across three passes</b> against yesterday's 103 across four, and three more verify passes ran and were handed nothing at all: <code>skipped: no_pending_email_points</code> at 08:00, 15:01 and 23:01.</p>
+    <p>An empty verify queue is not a verify problem. The collect half in front of it produces the email addresses, and its hit rate across the cycle's four passes went <b>45%, 44%, 26%, 30%</b>, against a normal of about 46%. It is finding fewer emails because it is finding fewer websites, which is the next section.</p>
+  </div>
+
+  <div class="q">
+    <div class="ask"><span class="qn">3</span><span>Did anything leave?</span></div>
+    <p>No, for the twelfth day. The 07:20 send fired at <b>15 leads</b> and sent none. I checked this in the database rather than trusting the exit code: <b>zero leads reached <code>sent_to_smartlead</code></b> in the whole cycle. The email pause set on 2026-09-10 refused the batch before it composed a word, which is exactly what it is for.</p>
+    <p>The shelf is now <b>6,570 leads researched and ready to write</b>, 96% of everything parked, up from 6,484 yesterday. It grows every day and nothing takes anything off it.</p>
+  </div>
+
+  <h2>Brave Search has crossed the line, and both alarms fired</h2>
+  <p>The recovery lane resolves each creator's own website first, because nine of its ten collection methods need one. That is a Brave Search call, and each key bills against its own monthly cap. Yesterday's debrief recorded resolution failing for 42% of leads and noted that neither alarm could fire yet. Today it went past both thresholds:</p>
+
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Collect pass</th><th>No website found</th><th>Leads that produced a contact point</th><th>Alarm</th></tr></thead>
+      <tbody>
+        <tr><td>09-20 02:01Z</td><td><span class="num">42%</span></td><td><span class="num">99 of 150</span> (66%)</td><td>silent, correctly</td></tr>
+        <tr><td>09-20 09:01Z</td><td><span class="num">61%</span></td><td><span class="num">68 of 150</span> (45%)</td><td>silent, correctly</td></tr>
+        <tr><td>09-20 16:01Z</td><td><span class="num">60%</span></td><td><span class="num">66 of 150</span> (44%)</td><td>silent, correctly</td></tr>
+        <tr><td>09-20 23:01Z</td><td><span class="num">74%</span></td><td><span class="num">39 of 150</span> (26%)</td><td><b>both fired</b></td></tr>
+        <tr><td>09-21 06:01Z</td><td><span class="num">78%</span></td><td><span class="num">31 of 104</span> (30%)</td><td>collapse alarm fired</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p style="margin-top:14px">Every one of those passes opens with <code>All 2 Brave Search API key(s) refused: 402 Usage limit exceeded</code>. Key <code>_1</code> got $50 on 09-13 and key <code>_2</code> has sat at its $5 cap since. Brave's API never reports a balance, so the only way to know is to count searches, and a 150-lead pass uses about 150 of them.</p>
+  <p><b>The alarms did their job and there is nothing to fix in them for this.</b> The remedy is money, and a fix agent is not allowed to spend money. What it costs to do nothing is now measurable: the lane went from 55 parks to 19 in one cycle, and yesterday's 62-lead Apify batch is not repeatable until the Apify billing cycle rolls on 30 September.</p>
+
+  <h2>What broke, and what is fixed</h2>
+
+  <div class="q accent-good">
+    <div class="ask"><span class="qn">✓</span><span>Yesterday's Apify fix paid for itself in 52 minutes</span></div>
+    <p>The lane had been logging <code>resting: $16.11 left, $10 reserved, batch of 100 needs $7.02</code> twelve times a day since 09-06, arithmetic that could never pass. Yesterday's fix sized the batch to what is actually spendable instead of a fixed 100.</p>
+    <p>At 08:21Z it launched <b>87 channels</b>, found published emails for <b>78</b>, ran 80 ZeroBounce checks and flipped <b>62 leads into <code>approved_hold</code></b> at <b>$0.099 per recovered lead</b>, half the $0.20 ceiling that halts the lane. Then it went back to resting with $10.01 left, which is the reserve it must not touch, so it will not run again until the billing cycle resets on 30 September. The prediction in yesterday's debrief was 87 channels and about 51 recoveries. It got 62.</p>
+  </div>
+
+  <div class="q accent-red">
+    <div class="ask"><span class="qn">✗</span><span>The alarm built to catch a slide was being silenced by the slide</span></div>
+    <p>On 09-10 the fixed 70%-no-website alarm slept through a ten-pass slide, so a second alarm was added that judges the lane against its own recent normal: the median hit rate of the eight passes behind the newest one. That baseline has the mirror-image flaw. A slide walks into its own baseline.</p>
+    <p>Measured against this repo's real collect log: a lane pinned at 28%, about 60% of normal, reads as a 37% fall on its first pass, 24% by the third and <b>0% by the fifth</b>. That is roughly thirty hours from degraded to invisible, after which a lane running at well under half strength looks perfectly healthy. Today's own passes were already walking it down: the alarm fired seven times on the 26% pass and then went quiet for the 30% pass behind it.</p>
+    <p><b>Fixed</b> in the orchestrator (<code>da4b849</code>). The baseline is now the higher of the short-window median and a 32-pass median, which is about eight days at the current cadence. A cliff is still caught immediately by the short window; a slow slide can no longer erase the memory of what normal was. A genuine permanent change, the book thinning to its hard tail, still ages out by itself after eight days rather than alarming forever.</p>
+    <p>The same commit stops both lane alarms repeating. They judge the last <i>completed</i> collect pass, the check-in runs hourly and the lane collects every six hours, so one bad pass was re-reported every hour: this cycle logged 9 copies of the collapse alarm and 7 of the yield alarm about exactly <b>two</b> passes. They now key on the pass, so each fires once per pass, four times a day, for as long as the condition lasts. Verified by running the check-in twice against the live logs: it fired once, then stayed silent, and exited healthy.</p>
+  </div>
+
+  <div class="q accent-amber">
+    <div class="ask"><span class="qn">!</span><span>Three debriefs are still missing, and the new field caught them</span></div>
+    <p>Yesterday's fix works. The grounded metrics now carry a <code>missing_debriefs</code> list, and it correctly names <b>09-17, 09-18 and 09-19</b>, each with metrics on disk and no report ever written because the agent's login had expired. Today's agent authenticated normally, so the fault was the login, not the script.</p>
+    <p>Those three reports are still absent. Their metrics files exist, so they can be written after the fact, but that is a decision about whether it is worth the time rather than something to do silently.</p>
+  </div>
+
+  <div class="q accent-amber">
+    <div class="ask"><span class="qn">!</span><span>The session-start send fired again, at 15 leads</span></div>
+    <p>Unchanged from yesterday and still unexplained. Something runs a live <code>npm run send</code> the moment an agent opens this repo, inside the debrief unit's own process tree, and no hook exists in any settings file that can be read. It attempted 14 yesterday and 15 today, and the email pause refused both.</p>
+    <p>It is harmless only because the pause holds. <b>If the pause lifts before the trigger is found, the next debrief agent sends whatever is ready at 07:20 without being asked.</b></p>
+  </div>
+
+  <h2>Everything else was quiet</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Lane</th><th>State</th><th>Reading</th></tr></thead>
+      <tbody>
+        <tr><td>Discovery (all sweeps, finder, keyword harvest)</td><td>Paused by Casey since 09-08</td><td>0 new channels. Intended, not an incident</td></tr>
+        <tr><td>Enrichment chain</td><td>Running, inflow-bound</td><td>86 leads, 4 batches, <b>0 failures</b>, busy 4h15m of 24h</td></tr>
+        <tr><td>Recovery lane, collect half</td><td>Running, starved of websites</td><td>4 passes, 554 lead-slots. Lap 5 closed at 06:01Z, lap 6 open. Book 3,360 left, stranded 3</td></tr>
+        <tr><td>Recovery lane, verify half</td><td>Running, under-fed</td><td>43 leads tested over 3 passes, 3 more passes handed nothing</td></tr>
+        <tr><td>Apify endspec</td><td>Ran once, now at its reserve</td><td>62 recovered at $0.099 each. Resting until 30 Sep</td></tr>
+        <tr><td>Send path</td><td>Refused by the 09-10 pause</td><td>15 attempted, <b>0 sent</b>, confirmed in the database</td></tr>
+        <tr><td>Anthropic spend</td><td>$0.00 of a $150 ceiling</td><td>Subscription only, as designed</td></tr>
+        <tr><td>OpenRouter</td><td>$9.80/day, $213.90 left</td><td>21.8 days of runway</td></tr>
+        <tr><td>YouTube key pool</td><td>15 working of 66</td><td>Fourteenth identical morning. Settled question, irrelevant while discovery is paused</td></tr>
+        <tr><td>Fatal signatures, halts, quota stops</td><td>None</td><td>Clean cycle</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Recommended next, ranked</h2>
+  <ol class="recs">
+    <li><b>Put money on Brave, or watch the recovery lane keep sinking.</b> This moved from second place to first because it now has a price on it. The lane fell 55 parks to 19 in one cycle, website resolution is failing for 78% of leads, and the Apify batch that covered for it today cannot run again until 30 September. $5 buys 1,000 searches and a pass uses about 150. Key <code>_2</code> has been stuck at its $5 cap since before 09-13.</li>
+    <li><b>Decide what happens to 6,570 finished leads.</b> Still the biggest number in the pipeline and still waiting on a decision rather than on work. The shelf grows daily, the loading door has been shut twelve days on spam placement, and nothing else changes that.</li>
+    <li><b>Expect tomorrow to look like 19, not 95.</b> Apify is at its reserve and the lane is the only daily producer left. If tomorrow lands near 19 that is the real rate, not a regression.</li>
+    <li><b>Decide whether the 09-17, 09-18 and 09-19 debriefs get written after the fact.</b> The metrics exist, so it is possible. It is three days of narrative about a period nothing much happened in.</li>
+    <li><b>Find whatever fires <code>npm run send</code> on session start.</b> Low urgency while the pause holds, high the moment it lifts.</li>
+  </ol>
+
+  <div class="foot">
+    <b>Status caveat.</b> Everything in <code>approved_hold</code> is parked, not sent. Outgoing email has been paused since 2026-09-10 and only Casey lifts it. Discovery of new channels has been paused since 2026-09-08 and only Casey lifts that. Both pauses held correctly all cycle.
+  </div>
+
+</div>
+</html>

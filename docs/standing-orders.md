@@ -197,8 +197,8 @@ everything up to "parked, ready to write" is automatic.
 
 ## Parked pools waiting on Casey (don't touch without his word)
 
-> **Numbers below are from 2026-09-02 and are stale. Live at 2026-09-20T07:00Z:
-> `needs_contact` 4,335 and falling, `approved_hold` 6,751 of which 6,484 already
+> **Numbers below are from 2026-09-02 and are stale. Live at 2026-09-21T07:00Z:
+> `needs_contact` 4,241 and falling, `approved_hold` 6,846 of which 6,570 already
 > carry an enrichment bundle (96%) — the enrichment backlog is finished, not
 > "nearly clear". The 09-02 reasoning still holds; only the counts moved.**
 
@@ -278,6 +278,45 @@ this is the shape to check first.**
 5. Anything in this file contradicted by what Casey said today? → update it.
 
 ## Change log
+
+- 2026-09-21 (debrief): **THE BEST DAY OF THE PAUSE (+95 PARKED, 6,751 → 6,846) IS ONE BATCH
+  OF MONEY, AND IT HID THE DAILY LANE FALLING BY TWO THIRDS.** **62 of the 95 came from a
+  single Apify batch** — yesterday's batch-sizing fix (`30f0bedce`) woke the lane after 14
+  days and paid for itself in 52 minutes: 87 channels, 78 emails found, 80 ZeroBounce checks,
+  **62 parked at $0.099 a recovered lead** (half the $0.20 self-halt ceiling; the 09-20
+  prediction was ~51). **It is now back at its $10 reserve with $0.0054 spendable and CANNOT
+  run again until the Apify billing cycle rolls 30 Sep.** Enrichment took the 62 as inflow 27
+  minutes later and finished them by 12:32Z: **86 leads, 4 batches, 0 failures**, shelf
+  6,484 → **6,570 ready to write (96%)**. **BLOODHOUND FELL 55 → 19 PARKS** and the batch
+  masked it: verify tested **43 leads over 3 passes** against yesterday's 103 over 4, and
+  **three more verify passes were handed nothing at all** (`no_pending_email_points` at
+  08:00, 15:01, 23:01Z). That is not a verify problem — the collect half's hit rate went
+  **45, 44, 26, 30%** across four passes against a lane normal near 46%. **BRAVE CROSSED BOTH
+  ALARM THRESHOLDS**: website resolution failed **61, 60, 74, 78%**, every pass opening on
+  `All 2 Brave Search API key(s) refused: 402`. `bloodhound_site_resolution_collapsed` fired
+  from 23:11Z (70% bar) and `bloodhound_collect_yield_degraded` on the 26% pass (48% fall
+  against a 50% baseline). **Nothing in the alarms needs fixing for that — the remedy is a
+  spend call** ($5 per 1,000 searches, ~150 a pass; key `_1` funded 09-13, key `_2` still at
+  its $5 cap) **and it now has a price on it: expect ~19/day, not 95, until Brave is funded.**
+  Lap 5 of the collect book CLOSED at 06:01Z (104-lead short batch), lap 6 open, book 3,360,
+  stranded 3. **SHIPPED (`da4b849`): THE ALARM BUILT TO CATCH A SLIDE WAS BEING SILENCED BY
+  THE SLIDE.** The 09-10 relative alarm baselines on the median of the 8 passes behind the
+  newest, so a slide walks into its own baseline: simulated on the real collect log, a lane
+  pinned at 28% (≈60% of normal) reads **37% fall → 24% by pass 3 → 0% by pass 5**, about
+  thirty hours from degraded to invisible. It was already happening (7 firings on the 26%
+  pass, then silence for the 30% pass behind it). The baseline is now the **higher of the
+  short-window median and a 32-pass (≈8-day) median** — a cliff still fires instantly, a slow
+  slide cannot erase the memory of normal, and a genuinely changed regime still ages out by
+  itself. Same commit keys both lane alarms on the pass they judge, ending the hourly
+  re-report (**9 + 7 firings about exactly 2 passes** this cycle; same class as the 09-16
+  `finder_hard_wall_benign` noise, one layer up). *Verified:* tsc clean, **63/63** tests (7
+  new, incl. the erosion regression and a settled-regime case that must NOT alarm), check-in
+  run twice end to end on live logs (fired once, then silent, exited `healthy`).
+  **STILL OPEN:** the 09-17/18/19 debriefs remain unwritten (the new `missing_debriefs` field
+  named all three correctly — the fix works; today's agent authenticated fine, so the fault
+  was the expired login), and the unexplained session-start `npm run send` fired again at
+  **15 leads, 0 sent** (confirmed in Postgres: nothing reached `sent_to_smartlead` all cycle).
+  Full detail: `brain/lead-gen/runs/lead-run-2026-09-21.html`.
 
 - 2026-09-20 (debrief): **THE ENRICHMENT BACKLOG IS FINISHED. 6,484 OF THE 6,751 PARKED
   LEADS (96%) ARE RESEARCHED AND READY TO WRITE.** The chain now works **2h42m out of every
