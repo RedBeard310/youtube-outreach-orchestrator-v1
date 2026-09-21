@@ -24,7 +24,9 @@ import { summarizeToday, pacificDate } from './burn-ledger.js';
 import { countByReviewStatus } from '../../src/airtable.ts';
 import {
   collectBookDepth,
+  collectPasses,
   collectRewalk,
+  collectYield,
   laneOptsFromEnv,
   runBloodhoundLane,
   runRecoveryDuringOpenRouterHalt,
@@ -100,6 +102,38 @@ const FATAL_PATTERNS = [
   CONSECUTIVE_FINDER_FAILURES,
   /FAILED: ENOENT/,
 ];
+
+// Has this alarm already been logged about this exact artefact?
+//
+// WHY (2026-09-21). The two recovery-lane alarms judge the last COMPLETED
+// collect pass, and the check-in runs hourly while the lane collects every 6
+// hours. So a single bad pass was re-reported every hour until the next one
+// finished: this cycle logged bloodhound_site_resolution_collapsed 9 times and
+// bloodhound_collect_yield_degraded 7 times about exactly TWO passes. Nothing
+// is learned on the second through ninth copy, and it makes "how many times did
+// this fire" useless as a measure of how bad a day was — the number counts
+// check-ins, not events. Same class as the finder_hard_wall_benign noise fixed
+// 2026-09-16, one layer up: there the input was stale, here the input is
+// current and the *report* repeats.
+//
+// Keyed on the pass, not on a clock window, so the alarm still fires once per
+// pass (4x a day at the current cadence) for as long as the condition holds —
+// it loses the repetition, not the signal.
+function alreadyObserved(kind: string, passKey: string): boolean {
+  if (!existsSync(OBSERVATIONS)) return false;
+  try {
+    const lines = readFileSync(OBSERVATIONS, 'utf8').split('\n');
+    for (let i = lines.length - 1; i >= 0; i--) {
+      const raw = lines[i]!.trim();
+      if (!raw || !raw.includes(`"${kind}"`)) continue;
+      let o: Record<string, unknown>;
+      try { o = JSON.parse(raw); } catch { continue; }
+      if (o.kind !== kind) continue;
+      return o.pass_key === passKey; // the newest of this kind decides
+    }
+  } catch { /* an unreadable observations log must not suppress an alarm */ }
+  return false;
+}
 
 function readEvents(file: string): Array<Record<string, unknown>> {
   const out: Array<Record<string, unknown>> = [];
@@ -1222,7 +1256,10 @@ async function main(): Promise<void> {
         const MIN_SAMPLE = 30;
         if (withSite.length >= MIN_SAMPLE) {
           const pct = (noSite.length / withSite.length) * 100;
-          if (pct >= NO_SITE_ALARM_PCT) {
+          // Identifies the pass, not just its shape: two passes can produce a
+          // byte-identical summary line, and the count is monotone.
+          const passKey = `${collectPasses(readFileSync(COLLECT_LOG, 'utf8')).length}:${summary}`;
+          if (pct >= NO_SITE_ALARM_PCT && !alreadyObserved('bloodhound_site_resolution_collapsed', passKey)) {
             const braveRefused = pass.some((l) => l.includes('Brave Search API key')) ||
               lines.slice(start).some((l) => l.includes('Brave Search API key'));
             const cause = braveRefused
@@ -1230,7 +1267,7 @@ async function main(): Promise<void> {
               : 'No Brave refusal line was logged, so this is either a new failure mode in website resolution or a genuinely site-less slice of the backlog. Check the collect log before assuming the backlog.';
             appendFileSync(OBSERVATIONS, JSON.stringify({
               ts: new Date().toISOString(), kind: 'bloodhound_site_resolution_collapsed',
-              no_site: noSite.length, sampled: withSite.length, pct: Number(pct.toFixed(1)), summary,
+              no_site: noSite.length, sampled: withSite.length, pct: Number(pct.toFixed(1)), summary, pass_key: passKey,
               detail: `The recovery lane's last completed collect pass resolved NO website for ${noSite.length} of ${withSite.length} leads (${pct.toFixed(0)}%, alarm at ${NO_SITE_ALARM_PCT}%). 9 of its 10 collection methods need a website, so its yield collapses and the verify half starves on an empty queue — this is what took 2026-09-04 from 627 parked to 71. Pass summary: "${summary}". ${cause} Not escalating — the remedy is a spend call a fix-agent cannot make.`,
             }) + '\n');
             console.log(`[checkin ${day}] OBSERVATION bloodhound_site_resolution_collapsed — ${noSite.length}/${withSite.length} (${pct.toFixed(0)}%) leads resolved no website`);
@@ -1260,46 +1297,40 @@ async function main(): Promise<void> {
   //
   // OBSERVATION ONLY, never exit 7 — same reasoning as 7c. The remedy is a plan
   // top-up or new keys, which is a spend call a fix-agent must not make.
+  //
+  // 2026-09-21: the baseline is no longer the trailing median alone — a slide
+  // walked into it and silenced this alarm in about thirty hours. See
+  // collectYield() in src/recovery/bloodhound-lane.ts for the measurement and
+  // the simulation that showed it.
   const YIELD_DROP_ALARM_PCT = Number(process.env.AUTOPILOT_COLLECT_YIELD_DROP_PCT ?? 40);
   if (existsSync(COLLECT_LOG) && !bookDrained) {
     try {
-      const SUMMARY = /^Collected (\d+) contact points from (\d+)\/(\d+) leads\.$/;
-      const passes: Array<{ points: number; hit: number; of: number; rate: number }> = [];
-      // Widen past the 400-line window above: one pass is ~150 lines, and the
-      // baseline needs several passes behind the newest one.
-      for (const raw of readFileSync(COLLECT_LOG, 'utf8').split('\n').slice(-2000)) {
-        const m = SUMMARY.exec(raw.trim());
-        if (!m) continue;
-        const hit = Number(m[2]), of = Number(m[3]);
-        if (of > 0) passes.push({ points: Number(m[1]), hit, of, rate: hit / of });
-      }
-      const MIN_PASS_SAMPLE = 30;
-      const MIN_BASELINE_PASSES = 3;
-      const recent = passes.slice(-9).filter((p) => p.of >= MIN_PASS_SAMPLE);
-      const current = recent[recent.length - 1];
-      const prior = recent.slice(0, -1);
-      if (current && prior.length >= MIN_BASELINE_PASSES) {
-        const sorted = prior.map((p) => p.rate).sort((a, b) => a - b);
-        const mid = Math.floor(sorted.length / 2);
-        const baseline = sorted.length % 2 ? sorted[mid]! : (sorted[mid - 1]! + sorted[mid]!) / 2;
-        const dropPct = baseline > 0 ? (1 - current.rate / baseline) * 100 : 0;
-        if (baseline > 0 && dropPct >= YIELD_DROP_ALARM_PCT) {
-          const braveRefused = readFileSync(COLLECT_LOG, 'utf8')
-            .split('\n').slice(-400).some((l) => l.includes('Brave Search API key'));
-          const cause = braveRefused
-            ? 'The lane logged a Brave Search refusal, so website resolution is the likely cause: raise the plan cap or add BRAVE_SEARCH_API_KEY[_N] keys.'
-            : 'No Brave refusal line was logged, so check the collect log for a new failure mode before assuming the backlog thinned.';
-          appendFileSync(OBSERVATIONS, JSON.stringify({
-            ts: new Date().toISOString(), kind: 'bloodhound_collect_yield_degraded',
-            current_hit: current.hit, current_of: current.of,
-            current_rate_pct: Number((current.rate * 100).toFixed(1)),
-            baseline_rate_pct: Number((baseline * 100).toFixed(1)),
-            drop_pct: Number(dropPct.toFixed(1)), baseline_passes: prior.length,
-            contact_points: current.points,
-            detail: `The recovery lane's last collect pass produced contact points for ${current.hit} of ${current.of} leads (${(current.rate * 100).toFixed(0)}%), against a ${prior.length}-pass median of ${(baseline * 100).toFixed(0)}% — a ${dropPct.toFixed(0)}% relative fall, alarm at ${YIELD_DROP_ALARM_PCT}%. This is the recovery lane's throughput, and while discovery is paused it is the only source of new parked leads. ${cause} Not escalating — the remedy is a spend call a fix-agent cannot make.`,
-          }) + '\n');
-          console.log(`[checkin ${day}] OBSERVATION bloodhound_collect_yield_degraded — ${current.hit}/${current.of} (${(current.rate * 100).toFixed(0)}%) vs ${(baseline * 100).toFixed(0)}% baseline, down ${dropPct.toFixed(0)}%`);
-        }
+      const logText = readFileSync(COLLECT_LOG, 'utf8');
+      const y = collectYield(logText);
+      const passKey = y ? `${y.passIndex}:${y.current.summary}` : null;
+      if (y && passKey && y.dropPct >= YIELD_DROP_ALARM_PCT &&
+          !alreadyObserved('bloodhound_collect_yield_degraded', passKey)) {
+        const braveRefused = logText.split('\n').slice(-400).some((l) => l.includes('Brave Search API key'));
+        const cause = braveRefused
+          ? 'The lane logged a Brave Search refusal, so website resolution is the likely cause: raise the plan cap or add BRAVE_SEARCH_API_KEY[_N] keys.'
+          : 'No Brave refusal line was logged, so check the collect log for a new failure mode before assuming the backlog thinned.';
+        const memory = y.baselineSource === 'long'
+          ? ` The short ${y.shortPasses}-pass median has already sagged to ${((y.baselineShort ?? 0) * 100).toFixed(0)}%, so the baseline is being held up by the ${y.longPasses}-pass one — the slide has been running long enough to start erasing its own evidence.`
+          : '';
+        appendFileSync(OBSERVATIONS, JSON.stringify({
+          ts: new Date().toISOString(), kind: 'bloodhound_collect_yield_degraded',
+          current_hit: y.current.hit, current_of: y.current.of,
+          current_rate_pct: Number((y.current.rate * 100).toFixed(1)),
+          baseline_rate_pct: Number((y.baseline * 100).toFixed(1)),
+          baseline_source: y.baselineSource,
+          baseline_short_pct: y.baselineShort === null ? null : Number((y.baselineShort * 100).toFixed(1)),
+          baseline_long_pct: y.baselineLong === null ? null : Number((y.baselineLong * 100).toFixed(1)),
+          drop_pct: Number(y.dropPct.toFixed(1)),
+          baseline_passes: y.baselineSource === 'long' ? y.longPasses : y.shortPasses,
+          contact_points: y.current.points, pass_key: passKey,
+          detail: `The recovery lane's last collect pass produced contact points for ${y.current.hit} of ${y.current.of} leads (${(y.current.rate * 100).toFixed(0)}%), against a ${y.baselineSource === 'long' ? y.longPasses : y.shortPasses}-pass median of ${(y.baseline * 100).toFixed(0)}% — a ${y.dropPct.toFixed(0)}% relative fall, alarm at ${YIELD_DROP_ALARM_PCT}%.${memory} This is the recovery lane's throughput, and while discovery is paused it is the only source of new parked leads. ${cause} Not escalating — the remedy is a spend call a fix-agent cannot make.`,
+        }) + '\n');
+        console.log(`[checkin ${day}] OBSERVATION bloodhound_collect_yield_degraded — ${y.current.hit}/${y.current.of} (${(y.current.rate * 100).toFixed(0)}%) vs ${(y.baseline * 100).toFixed(0)}% ${y.baselineSource} baseline, down ${y.dropPct.toFixed(0)}%`);
       }
     } catch { /* an unreadable collect log is not an incident */ }
   }

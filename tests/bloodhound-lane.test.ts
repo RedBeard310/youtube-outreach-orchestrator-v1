@@ -13,6 +13,8 @@ import {
   lastCollectPassYield,
   rewindWaiver,
   collectRewalk,
+  collectPasses,
+  collectYield,
   MAX_CONSECUTIVE_REWINDS,
   MAX_CONSECUTIVE_SEARCH_DEAD_REWINDS,
   VERIFIABLE_IDS_SQL,
@@ -513,6 +515,69 @@ test('collectRewalk: a pass still running is not counted (no summary line yet)',
   const log = [collectPass(idRange(0, 10)), collectPass(idRange(10, 10)), partial].join('\n');
   const r = collectRewalk(log, 2);
   assert.deepEqual(r, { slots: 20, distinct: 20, ratio: 1 });
+});
+
+// --- collectYield: has the lane's own hit rate fallen, and does the baseline
+// --- survive a slow slide?  Added 2026-09-21 (see the function's own comment).
+
+/** A pass of `of` leads where `hit` of them produced a contact point. */
+function yieldPass(hit: number, of: number): string {
+  const lines: string[] = [];
+  for (let i = 0; i < of; i++) {
+    lines.push(i < hit
+      ? `[rec${i}] "X" site=https://example.com/ +3 pts, 1 skipped, 0 err`
+      : `[rec${i}] "X" site=(none) +0 pts, 9 skipped, 0 err`);
+  }
+  lines.push(`Collected ${hit * 3} contact points from ${hit}/${of} leads.`);
+  return lines.join('\n');
+}
+const yieldLog = (...passes: Array<[number, number]>) =>
+  passes.map(([h, o]) => yieldPass(h, o)).join('\n');
+
+test('collectYield: a healthy pass is not a drop', () => {
+  const y = collectYield(yieldLog([75, 150], [72, 150], [78, 150], [74, 150]));
+  assert.equal(y?.current.hit, 74);
+  assert.ok(y!.dropPct < 10, `expected a small drop, got ${y!.dropPct}`);
+});
+
+test('collectYield: a cliff is caught by the short window', () => {
+  const y = collectYield(yieldLog([75, 150], [72, 150], [78, 150], [20, 150]));
+  assert.ok(y!.dropPct >= 40, `expected an alarm-sized fall, got ${y!.dropPct}`);
+  assert.equal(y?.baselineSource, 'short');
+});
+
+test('collectYield: a short batch is too noisy to judge and is skipped', () => {
+  // The tail of a lap: 12 leads. It must not become the "current" pass.
+  const y = collectYield(yieldLog([75, 150], [72, 150], [78, 150], [74, 150], [1, 12]));
+  assert.equal(y?.current.of, 150);
+  assert.equal(collectPasses(yieldLog([1, 12])).length, 0);
+});
+
+test('collectYield: too few passes to compare is null, not a clean reading', () => {
+  assert.equal(collectYield(yieldLog([75, 150], [72, 150])), null);
+  assert.equal(collectYield(''), null);
+});
+
+// THE REGRESSION THIS FUNCTION EXISTS FOR. Under the old rule (median of the 8
+// passes behind the newest) a lane pinned at ~60% of normal read as a 0% fall
+// within five passes, because the degraded passes became the baseline. The long
+// window has to hold the memory of the healthy regime.
+test('collectYield: a sustained slide cannot erase its own baseline', () => {
+  const healthy: Array<[number, number]> = Array.from({ length: 20 }, () => [105, 150]);
+  const slid: Array<[number, number]> = Array.from({ length: 8 }, () => [39, 150]);
+  const y = collectYield(yieldLog(...healthy, ...slid));
+  // Eight degraded passes have completely taken over the 8-pass short window...
+  assert.equal(Number((y!.baselineShort! * 100).toFixed(0)), 26);
+  // ...so the long window is what keeps the reading honest.
+  assert.equal(y?.baselineSource, 'long');
+  assert.ok(y!.dropPct >= 40, `slide must still alarm, got ${y!.dropPct.toFixed(0)}%`);
+});
+
+test('collectYield: a permanently changed regime ages out instead of alarming forever', () => {
+  // Same slide, but now it IS the lane's normal — nothing healthy left in the
+  // long window either. Self-healing: the alarm goes quiet on its own.
+  const y = collectYield(yieldLog(...Array.from({ length: 40 }, () => [39, 150] as [number, number])));
+  assert.ok(y!.dropPct < 40, `a settled regime must not alarm, got ${y!.dropPct.toFixed(0)}%`);
 });
 
 // 2026-09-14: the lane verified 40 good emails in a day and parked 6, because

@@ -1060,3 +1060,101 @@ export function collectRewalk(
   const distinct = new Set(ids).size;
   return { slots: ids.length, distinct, ratio: ids.length === 0 ? 1 : distinct / ids.length };
 }
+
+/** One completed collect pass, read off its summary line. */
+export type CollectPass = { points: number; hit: number; of: number; rate: number; summary: string };
+
+/** Every COMPLETED pass in a collect log, oldest first. A pass still running has
+ *  written no summary line yet and is deliberately not counted. */
+export function collectPasses(logText: string, minSample = 30): CollectPass[] {
+  const SUMMARY = /^Collected (\d+) contact points from (\d+)\/(\d+) leads\.$/;
+  const out: CollectPass[] = [];
+  for (const raw of logText.split('\n')) {
+    const line = raw.trim();
+    const m = SUMMARY.exec(line);
+    if (!m) continue;
+    const hit = Number(m[2]), of = Number(m[3]);
+    // A short batch makes the hit rate noisy — it is the tail of a lap, not a
+    // sample of the lane.
+    if (of < minSample) continue;
+    out.push({ points: Number(m[1]), hit, of, rate: hit / of, summary: line });
+  }
+  return out;
+}
+
+/**
+ * How far the newest completed collect pass has fallen below the lane's own
+ * normal hit rate, and how confident that comparison is.
+ *
+ * WHY THIS IS NOT JUST A TRAILING MEDIAN (2026-09-21). The 2026-09-10 fix
+ * replaced a fixed 70%-no-website floor with a relative test, because the floor
+ * was calibrated to a total outage and slept through a ten-pass slide. The
+ * relative test has the mirror-image blind spot: its baseline is the median of
+ * the eight passes behind the newest one, so a slide walks INTO its own
+ * baseline. Simulated against this log, a lane pinned at 28% (about 60% of
+ * normal) reads as a 37% fall on its first pass, 24% by the third, and **0% by
+ * the fifth** — roughly thirty hours to total blindness, after which a lane
+ * running at well under half strength is indistinguishable from a healthy one.
+ * This cycle's own passes went 45, 44, 26, 30% and the alarm was already
+ * quietening on the fourth.
+ *
+ * So the baseline remembers longer: it is the HIGHER of the short-window median
+ * (fast to notice a cliff) and a long-window median (slow to forget what normal
+ * was). Thirty-two passes is about eight days at the 6-hourly cadence, so a
+ * genuine permanent regime change — the book thinning to its hard tail — still
+ * ages out by itself rather than alarming forever, which is the self-healing
+ * property the fixed floor never had.
+ *
+ * Returns null when the log holds too few completed passes to compare against.
+ */
+export function collectYield(
+  logText: string,
+  opts: {
+    shortWindow?: number;
+    longWindow?: number;
+    minSample?: number;
+    minBaselinePasses?: number;
+  } = {},
+): {
+  current: CollectPass;
+  passIndex: number;
+  baseline: number;
+  baselineShort: number | null;
+  baselineLong: number | null;
+  baselineSource: 'short' | 'long';
+  shortPasses: number;
+  longPasses: number;
+  dropPct: number;
+} | null {
+  const shortWindow = opts.shortWindow ?? 8;
+  const longWindow = opts.longWindow ?? 32;
+  const minBaselinePasses = opts.minBaselinePasses ?? 3;
+  const passes = collectPasses(logText, opts.minSample ?? 30);
+  const current = passes[passes.length - 1];
+  if (!current) return null;
+  const prior = passes.slice(0, -1);
+  if (prior.length < minBaselinePasses) return null;
+  const median = (xs: number[]): number | null => {
+    if (xs.length < minBaselinePasses) return null;
+    const s = [...xs].sort((a, b) => a - b);
+    const mid = Math.floor(s.length / 2);
+    return s.length % 2 ? s[mid]! : (s[mid - 1]! + s[mid]!) / 2;
+  };
+  const shortPrior = prior.slice(-shortWindow).map((p) => p.rate);
+  const longPrior = prior.slice(-longWindow).map((p) => p.rate);
+  const baselineShort = median(shortPrior);
+  const baselineLong = median(longPrior);
+  const baseline = Math.max(baselineShort ?? 0, baselineLong ?? 0);
+  if (!(baseline > 0)) return null;
+  return {
+    current,
+    passIndex: passes.length,
+    baseline,
+    baselineShort,
+    baselineLong,
+    baselineSource: baseline === baselineShort ? 'short' : 'long',
+    shortPasses: shortPrior.length,
+    longPasses: longPrior.length,
+    dropPct: (1 - current.rate / baseline) * 100,
+  };
+}
