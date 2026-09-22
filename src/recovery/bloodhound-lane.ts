@@ -1158,3 +1158,106 @@ export function collectYield(
     dropPct: (1 - current.rate / baseline) * 100,
   };
 }
+
+/**
+ * What the newest judged collect pass can say about WHY it yielded what it did.
+ *
+ * WHY (2026-09-22). Both lane alarms decide whether to blame the search plan by
+ * asking whether the string "Brave Search API key" appears anywhere in the tail
+ * of the log. One key has sat permanently at its $5 cap since early September,
+ * so that line now prints at the top of EVERY pass and the test is always true.
+ * On 2026-09-21 the lane's hit rate fell 45% -> 8% -> 5% -> 1% and all three
+ * firings told Casey to raise the search cap, while those same three passes
+ * resolved a website for 93%, 79% and 79% of their leads. Website resolution
+ * was working. The money would have bought nothing.
+ *
+ * This is the third outing of one bug class: 2026-09-12 (24 firings blaming
+ * Brave for a drained book), 2026-09-13 (`collectBookDepth` keeping its own copy
+ * of a predicate it was meant to track), and now this. The rule those wrote down
+ * — an alarm that names a remedy costing money must be sure the remedy is the
+ * constraint — needs evidence from the pass being judged, not from the file it
+ * happens to sit in. The 09-12 fix did suppress the misattribution, but only via
+ * `bookDrained`, which needs the day's passes to cover the pool more than once.
+ * The book is 3,347 and a day covers 0.18 of it, so that suppressor cannot fire
+ * here, and the misattribution walked straight back in through the gap.
+ *
+ * Two readings, both free, both from lines the log already carries:
+ *
+ *  - `noSitePct`, over THIS pass only. If the pass resolved sites, website
+ *    resolution is not what broke, whatever the Brave line says.
+ *  - `rewalkPct`, the share of the pass's leads this log has collected from
+ *    before. The collect book is walked in laps, and since 2026-09-13 it
+ *    deliberately keeps leads that already hold a non-email contact point. That
+ *    was right for the FIRST walk, where the expensive half of the job was
+ *    already paid for. It says nothing about the second: a lap that re-reads
+ *    3,000 mined-out leads yields near zero, which is the shape of 09-21 (lap 5
+ *    closed at 06:01Z; the three passes behind it were 100% re-walk and produced
+ *    27, 19 and 1 contact points against a lap-5 normal of 200-500).
+ *
+ * `rewalkPct` is measured against the whole log rather than a window, which is
+ * what makes it a lap-scale reading and not a restatement of `collectRewalk`
+ * (that one asks whether a stuck cursor is re-reading inside a day, and was
+ * correctly silent at 1.36x while this sat at 100%). A rotated or truncated log
+ * shortens the history, so the reading can only ever under-claim a re-walk.
+ *
+ * Returns null when the newest judged pass is too small a sample to attribute.
+ */
+export function collectPassAttribution(
+  logText: string,
+  opts: { minSample?: number } = {},
+): {
+  sampled: number;
+  noSite: number;
+  noSitePct: number;
+  /** Leads whose site resolved, and how many of those produced any point. */
+  resolvedSampled: number;
+  resolvedHit: number;
+  seenBefore: number;
+  rewalkPct: number;
+  historyPasses: number;
+} | null {
+  const minSample = opts.minSample ?? 30;
+  const lines = logText.split('\n');
+  const SUMMARY = /^Collected \d+ contact points from \d+\/(\d+) leads\.$/;
+  const ends: Array<{ at: number; of: number }> = [];
+  for (let i = 0; i < lines.length; i++) {
+    const m = SUMMARY.exec(lines[i]!.trim());
+    if (m) ends.push({ at: i, of: Number(m[1]) });
+  }
+  // Judge the same pass collectYield judges: the newest COMPLETED one big enough
+  // to read. A short batch is the tail of a lap, not a sample of the lane.
+  let pick = -1;
+  for (let i = ends.length - 1; i >= 0; i--) {
+    if (ends[i]!.of >= minSample) { pick = i; break; }
+  }
+  if (pick < 0) return null;
+  const start = pick === 0 ? 0 : ends[pick - 1]!.at + 1;
+  const LEAD = /^\[(rec\w+)\].* site=(\S+)/;
+  const ids: string[] = [];
+  let noSite = 0, resolvedSampled = 0, resolvedHit = 0;
+  for (const raw of lines.slice(start, ends[pick]!.at)) {
+    const m = LEAD.exec(raw.trim());
+    if (!m) continue;
+    ids.push(m[1]!);
+    const scored = /\+([1-9]\d*) pts/.test(raw);
+    if (m[2] === '(none)') noSite++;
+    else { resolvedSampled++; if (scored) resolvedHit++; }
+  }
+  if (ids.length < minSample) return null;
+  const before = new Set<string>();
+  for (const raw of lines.slice(0, start)) {
+    const m = /^\[(rec\w+)\]/.exec(raw.trim());
+    if (m) before.add(m[1]!);
+  }
+  const seenBefore = ids.filter((id) => before.has(id)).length;
+  return {
+    sampled: ids.length,
+    noSite,
+    noSitePct: (noSite / ids.length) * 100,
+    resolvedSampled,
+    resolvedHit,
+    seenBefore,
+    rewalkPct: (seenBefore / ids.length) * 100,
+    historyPasses: pick,
+  };
+}

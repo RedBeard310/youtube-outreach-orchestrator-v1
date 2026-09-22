@@ -15,6 +15,7 @@ import {
   collectRewalk,
   collectPasses,
   collectYield,
+  collectPassAttribution,
   MAX_CONSECUTIVE_REWINDS,
   MAX_CONSECUTIVE_SEARCH_DEAD_REWINDS,
   VERIFIABLE_IDS_SQL,
@@ -623,4 +624,87 @@ test('laneOptsFromEnv: automator path and rescore batch have committed defaults'
   } finally {
     process.env = saved;
   }
+});
+
+// --- collectPassAttribution: is the search plan really the constraint, or is
+// --- the lane re-reading a book it has already mined?  Added 2026-09-22.
+
+/** A pass of `of` leads. `hit` of them score; `none` of them resolve no site. */
+function attPass(ids: string[], opts: { hit: number; none: number }): string {
+  const lines = ids.map((id, i) => {
+    const site = i < opts.none ? '(none)' : 'https://example.com/';
+    const pts = i >= opts.none && i < opts.none + opts.hit ? 3 : 0;
+    return `[${id}] "X" site=${site} +${pts} pts, 1 skipped, 0 err`;
+  });
+  lines.push(`Collected ${opts.hit * 3} contact points from ${opts.hit}/${ids.length} leads.`);
+  return lines.join('\n');
+}
+const attIds = (start: number, n: number) =>
+  Array.from({ length: n }, (_, i) => `rec${String(start + i).padStart(6, 'a')}`);
+
+test('collectPassAttribution: sites resolving means resolution is not the cause', () => {
+  // The 2026-09-21 shape: 79% of leads resolved a site, and almost none scored.
+  const log = [
+    attPass(attIds(0, 40), { hit: 20, none: 4 }),
+    attPass(attIds(100, 40), { hit: 1, none: 8 }),
+  ].join('\n');
+  const a = collectPassAttribution(log)!;
+  assert.equal(a.sampled, 40);
+  assert.equal(a.noSite, 8);
+  assert.equal(Number(a.noSitePct.toFixed(0)), 20);
+  assert.equal(a.resolvedSampled, 32);
+  assert.equal(a.resolvedHit, 1);
+});
+
+// THE REGRESSION THIS EXISTS FOR. Three alarms on 2026-09-21 told Casey to raise
+// the Brave cap about passes that had resolved sites for 79-93% of their leads,
+// because the only test was "does the log tail mention Brave". The pass's own
+// leads have to be the evidence.
+test('collectPassAttribution: a fully re-walked pass is named as a re-walk', () => {
+  const ids = attIds(0, 40);
+  const log = [
+    attPass(ids, { hit: 25, none: 2 }),
+    attPass(attIds(500, 40), { hit: 22, none: 2 }),
+    attPass(ids, { hit: 1, none: 2 }), // lap 2 over the same leads
+  ].join('\n');
+  const a = collectPassAttribution(log)!;
+  assert.equal(a.seenBefore, 40);
+  assert.equal(a.rewalkPct, 100);
+  assert.ok(a.noSitePct < 70, 'resolution is healthy, so spend is not the remedy');
+});
+
+test('collectPassAttribution: a fresh lap is not a re-walk', () => {
+  const log = [
+    attPass(attIds(0, 40), { hit: 25, none: 2 }),
+    attPass(attIds(500, 40), { hit: 22, none: 2 }),
+  ].join('\n');
+  const a = collectPassAttribution(log)!;
+  assert.equal(a.seenBefore, 0);
+  assert.equal(a.rewalkPct, 0);
+});
+
+test('collectPassAttribution: a real resolution outage still reads as one', () => {
+  const log = [
+    attPass(attIds(0, 40), { hit: 25, none: 2 }),
+    attPass(attIds(500, 40), { hit: 2, none: 36 }),
+  ].join('\n');
+  const a = collectPassAttribution(log)!;
+  assert.ok(a.noSitePct >= 70, `expected an outage reading, got ${a.noSitePct}`);
+});
+
+test('collectPassAttribution: judges the same pass collectYield judges', () => {
+  // A 12-lead lap tail must not become the judged pass for either function.
+  const log = [
+    attPass(attIds(0, 40), { hit: 25, none: 2 }),
+    attPass(attIds(500, 40), { hit: 1, none: 2 }),
+    attPass(attIds(900, 12), { hit: 0, none: 1 }),
+  ].join('\n');
+  const a = collectPassAttribution(log)!;
+  assert.equal(a.sampled, 40);
+  assert.equal(a.resolvedHit, 1);
+});
+
+test('collectPassAttribution: too small a sample is null, not a clean reading', () => {
+  assert.equal(collectPassAttribution(''), null);
+  assert.equal(collectPassAttribution(attPass(attIds(0, 12), { hit: 1, none: 1 })), null);
 });

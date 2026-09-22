@@ -24,6 +24,7 @@ import { summarizeToday, pacificDate } from './burn-ledger.js';
 import { countByReviewStatus } from '../../src/airtable.ts';
 import {
   collectBookDepth,
+  collectPassAttribution,
   collectPasses,
   collectRewalk,
   collectYield,
@@ -1303,6 +1304,11 @@ async function main(): Promise<void> {
   // collectYield() in src/recovery/bloodhound-lane.ts for the measurement and
   // the simulation that showed it.
   const YIELD_DROP_ALARM_PCT = Number(process.env.AUTOPILOT_COLLECT_YIELD_DROP_PCT ?? 40);
+  // A pass is called a re-walk once most of its batch is leads this log has
+  // already collected from. Deliberately high: the point is to be sure before
+  // telling Casey his money would buy nothing, and a genuine lap of fresh leads
+  // sits near zero, not near the bar.
+  const REWALK_CAUSE_PCT = Number(process.env.AUTOPILOT_COLLECT_REWALK_CAUSE_PCT ?? 80);
   if (existsSync(COLLECT_LOG) && !bookDrained) {
     try {
       const logText = readFileSync(COLLECT_LOG, 'utf8');
@@ -1310,10 +1316,36 @@ async function main(): Promise<void> {
       const passKey = y ? `${y.passIndex}:${y.current.summary}` : null;
       if (y && passKey && y.dropPct >= YIELD_DROP_ALARM_PCT &&
           !alreadyObserved('bloodhound_collect_yield_degraded', passKey)) {
+        // ATTRIBUTE FROM THE PASS BEING JUDGED, NOT FROM THE FILE IT SITS IN
+        // (2026-09-22). This used to blame the search plan whenever the string
+        // "Brave Search API key" appeared in the log tail. One key has sat at
+        // its cap since early September, so that line prints on every pass and
+        // the test was always true. On 09-21 it fired three times telling Casey
+        // to raise the cap about three passes that resolved sites for 93%, 79%
+        // and 79% of their leads. See collectPassAttribution() for the reading
+        // and for why `bookDrained` could not suppress this one.
         const braveRefused = logText.split('\n').slice(-400).some((l) => l.includes('Brave Search API key'));
-        const cause = braveRefused
-          ? 'The lane logged a Brave Search refusal, so website resolution is the likely cause: raise the plan cap or add BRAVE_SEARCH_API_KEY[_N] keys.'
-          : 'No Brave refusal line was logged, so check the collect log for a new failure mode before assuming the backlog thinned.';
+        const att = collectPassAttribution(logText);
+        const resolutionDown = att !== null && att.noSitePct >= NO_SITE_ALARM_PCT;
+        const spendWouldHelp = att === null || resolutionDown;
+        let cause: string;
+        if (att && !resolutionDown) {
+          const rewalking = att.rewalkPct >= REWALK_CAUSE_PCT;
+          cause = `Website resolution is NOT what broke here: this pass resolved a site for ${att.resolvedSampled} of ${att.sampled} leads (${(100 - att.noSitePct).toFixed(0)}%).` +
+            (braveRefused
+              ? ' A Brave refusal line is printed on every pass because one key sits permanently at its monthly cap, so it is not evidence about this pass and raising the cap would not have changed it.'
+              : '') +
+            (rewalking
+              ? ` ${att.seenBefore} of the ${att.sampled} leads (${att.rewalkPct.toFixed(0)}%) have been collected from before in this log, and only ${att.resolvedHit} of the ${att.resolvedSampled} with a working site produced anything — the lane is re-walking a book it has already mined. The constraint is leads to walk, not search credit.`
+              : ' Check the collect log for a new failure mode in the collection methods themselves before assuming the backlog thinned.');
+        } else if (braveRefused) {
+          cause = `This pass resolved no website for ${att ? `${att.noSite} of ${att.sampled} leads (${att.noSitePct.toFixed(0)}%)` : 'most of its leads'} and the lane logged a Brave Search refusal, so the search plan is the cause: raise the plan cap or add BRAVE_SEARCH_API_KEY[_N] keys.`;
+        } else {
+          cause = 'No Brave refusal line was logged, so check the collect log for a new failure mode before assuming the backlog thinned.';
+        }
+        const escalation = spendWouldHelp
+          ? 'Not escalating — the remedy is a spend call a fix-agent cannot make.'
+          : 'Not escalating — nothing is faulting, and no code change makes a mined-out book yield again.';
         const memory = y.baselineSource === 'long'
           ? ` The short ${y.shortPasses}-pass median has already sagged to ${((y.baselineShort ?? 0) * 100).toFixed(0)}%, so the baseline is being held up by the ${y.longPasses}-pass one — the slide has been running long enough to start erasing its own evidence.`
           : '';
@@ -1328,7 +1360,13 @@ async function main(): Promise<void> {
           drop_pct: Number(y.dropPct.toFixed(1)),
           baseline_passes: y.baselineSource === 'long' ? y.longPasses : y.shortPasses,
           contact_points: y.current.points, pass_key: passKey,
-          detail: `The recovery lane's last collect pass produced contact points for ${y.current.hit} of ${y.current.of} leads (${(y.current.rate * 100).toFixed(0)}%), against a ${y.baselineSource === 'long' ? y.longPasses : y.shortPasses}-pass median of ${(y.baseline * 100).toFixed(0)}% — a ${y.dropPct.toFixed(0)}% relative fall, alarm at ${YIELD_DROP_ALARM_PCT}%.${memory} This is the recovery lane's throughput, and while discovery is paused it is the only source of new parked leads. ${cause} Not escalating — the remedy is a spend call a fix-agent cannot make.`,
+          pass_no_site_pct: att === null ? null : Number(att.noSitePct.toFixed(1)),
+          pass_rewalk_pct: att === null ? null : Number(att.rewalkPct.toFixed(1)),
+          pass_resolved_hit: att?.resolvedHit ?? null,
+          pass_resolved_sampled: att?.resolvedSampled ?? null,
+          brave_refusal_logged: braveRefused,
+          attributed_to: att === null ? 'unknown' : resolutionDown ? 'site_resolution' : att.rewalkPct >= REWALK_CAUSE_PCT ? 'book_rewalk' : 'unexplained',
+          detail: `The recovery lane's last collect pass produced contact points for ${y.current.hit} of ${y.current.of} leads (${(y.current.rate * 100).toFixed(0)}%), against a ${y.baselineSource === 'long' ? y.longPasses : y.shortPasses}-pass median of ${(y.baseline * 100).toFixed(0)}% — a ${y.dropPct.toFixed(0)}% relative fall, alarm at ${YIELD_DROP_ALARM_PCT}%.${memory} This is the recovery lane's throughput, and while discovery is paused it is the only source of new parked leads. ${cause} ${escalation}`,
         }) + '\n');
         console.log(`[checkin ${day}] OBSERVATION bloodhound_collect_yield_degraded — ${y.current.hit}/${y.current.of} (${(y.current.rate * 100).toFixed(0)}%) vs ${(y.baseline * 100).toFixed(0)}% ${y.baselineSource} baseline, down ${y.dropPct.toFixed(0)}%`);
       }
