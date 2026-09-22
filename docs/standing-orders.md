@@ -197,10 +197,14 @@ everything up to "parked, ready to write" is automatic.
 
 ## Parked pools waiting on Casey (don't touch without his word)
 
-> **Numbers below are from 2026-09-02 and are stale. Live at 2026-09-21T07:00Z:
-> `needs_contact` 4,241 and falling, `approved_hold` 6,846 of which 6,570 already
+> **Numbers below are from 2026-09-02 and are stale. Live at 2026-09-22T07:00Z:
+> `needs_contact` 4,243 and now FLAT, `approved_hold` 6,853 of which 6,586 already
 > carry an enrichment bundle (96%) — the enrichment backlog is finished, not
-> "nearly clear". The 09-02 reasoning still holds; only the counts moved.**
+> "nearly clear". The 09-02 reasoning about collect throughput being the
+> bottleneck no longer holds: as of 2026-09-22 the collect BOOK is the
+> bottleneck. 3,016 of its 3,347 leads have already been worked and emptied and
+> only 331 have never been touched, so widening the batch buys nothing. See the
+> 09-22 change-log entry.**
 
 - `needs_contact` (4,951 at 2026-09-02): recovery engine **BUILT AND RUNNING**
   since Casey merged it 2026-08-23 (`1bea933`). Live lane inside the campaign's
@@ -278,6 +282,46 @@ this is the shape to check first.**
 5. Anything in this file contradicted by what Casey said today? → update it.
 
 ## Change log
+
+- 2026-09-22 (debrief): **THE RECOVERY LANE HAS READ ITS WHOLE BOOK AND STARTED IT AGAIN, AND THE
+  ALARM BLAMED BRAVE FOR IT.** **+7 parked** (6,846 → **6,853**), the weakest ordinary day of the
+  pause. Lap 5 closed 06:01Z on 09-21; lap 6 opened at the top of the book and **every lead in the
+  last two passes had been read before (150 of 150, twice over)**. Hit rate **8, 5, 1%**; the lane
+  collected **47 contact points against 1,063 the day before**, 15 of them emails. **The book is
+  3,347 leads of which 3,016 already hold a non-email contact point** — worked on an earlier lap
+  and already emptied — **and only 331 have never yielded anything**, about half a day of walking.
+  The 09-13 widening's argument ("the expensive half is already paid for") was right for the FIRST
+  walk and says nothing about the second. **WEBSITE RESOLUTION ACTUALLY RECOVERED THIS CYCLE**
+  (failures **7, 21, 21%** against 09-21's 61-78%, because the top of the book has sites stored
+  from an earlier lap and `storedWebsite()` reads them back free) **and yield collapsed anyway:
+  1 of the 119 leads with a working site produced anything** on the final pass. **Yet all three
+  `bloodhound_collect_yield_degraded` firings told Casey to raise the Brave cap.** The only test
+  behind that sentence was whether `Brave Search API key` appeared in the log tail, and one key has
+  sat at its $5 cap since early September, so that line prints at the top of EVERY pass. A test
+  that is always true is not a test. **Third outing of one bug class** (09-12's 24 firings blaming
+  Brave for a drained book; 09-13's `collectBookDepth` keeping a private copy of a predicate it was
+  meant to track). The 09-12 suppressor could not fire: it needs the day's passes to cover the book
+  more than once, and a day covers **0.18** of 3,347. The guard was written against the instance,
+  not the class. **SHIPPED (`9dc4eb6`): `collectPassAttribution()`** reads the judged pass's OWN
+  no-site rate and its re-read share (whole-log, so it is a lap-scale reading and not a restatement
+  of `collectRewalk`, which sat correctly silent at 1.36× while this read 100%). The alarm now
+  picks between `site_resolution` / `book_rewalk` / `unexplained`, records the readings in the
+  observation, and stops naming a spend when spending would not help. *Verified:* tsc clean,
+  **69/69** tests (6 new, incl. a real-outage case that must STILL alarm so the fix cannot silence
+  the alarm it came from), check-in run end to end on live logs, exited `healthy`.
+  **YESTERDAY'S `da4b849` PROVED ITSELF THE NEXT DAY:** the 02:11Z firing used the 32-pass baseline
+  (45%) because the short 8-pass one had already sagged to **37%**, and per-pass keying held
+  (3 alarms, 3 distinct passes, no hourly repeats against 7 + 9 the day before).
+  **CORRECT THE 09-21 ENTRY BELOW: "expect ~19/day, not 95, until Brave is funded" was wrong in its
+  reasoning.** The lane fell to 7 and funding Brave would not have prevented it. Brave still
+  matters but is smaller than it looked: of the 3,347 book leads, **620 need a paid search** for a
+  website and 2,727 already have one stored or linked. Rank it BELOW the book problem and the shelf
+  decision. **#1 LEVER IS CASEY'S CALL, AND NO CODE CHANGE TOUCHES IT: lift the discovery pause,
+  fund Apify when its billing cycle rolls 30 Sep, or accept single-digit days.** Enrichment took
+  15 leads in 4 batches with 0 failures and idled after every one; shelf **6,586 ready to write**
+  (96%). The session-start `npm run send` fired again at **18 leads, 0 sent** (14 on 09-20, 15 on
+  09-21 — the number is climbing), and 09-17/18/19 remain unwritten. Full detail:
+  `brain/lead-gen/runs/lead-run-2026-09-22.html`.
 
 - 2026-09-21 (debrief): **THE BEST DAY OF THE PAUSE (+95 PARKED, 6,751 → 6,846) IS ONE BATCH
   OF MONEY, AND IT HID THE DAILY LANE FALLING BY TWO THIRDS.** **62 of the 95 came from a
