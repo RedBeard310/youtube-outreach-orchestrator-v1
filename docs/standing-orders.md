@@ -283,6 +283,53 @@ this is the shape to check first.**
 
 ## Change log
 
+- 2026-09-23 (debrief): **THE FIRST DAY THE PIPELINE PRODUCED NOTHING, AND NOTHING WAS BROKEN.**
+  **+0 parked** (6,853 → **6,853**), the first zero on record. Every pool ended exactly the size it
+  started: `needs_contact` **4,243 flat**, shelf **6,586 flat** (all three queried against Postgres,
+  not read off a log). **0 fatal signatures, 0 halts, 0 quota stops, $0.00 Anthropic**, OpenRouter
+  $1.10/day with $210.16 left. Every timer fired on schedule and found nothing in front of it.
+  **THE RECOVERY LANE SPENT 600 LEAD SLOTS TO MOVE 4 LEADS OUT OF ITS BOOK** (3,348 → 3,344), which
+  is 150 readings per lead gained. It is on **lap 6**, and a lap is a second reading: a lead that
+  gives up a phone or a social handle but no email **stays in the book by definition**, so the next
+  lap re-reads it and gets the same answer. Hit rates **0, 3, 4, 4%** against a 32-pass median of
+  45%; **29 contact points** all cycle against 47 on 09-22 and 1,063 on 09-20. `stranded` held at
+  **3**, so no gap reopened. **Verify tested 6 addresses in 24h** and four of its eight passes were
+  handed nothing at all — that is a SYMPTOM, not the problem: verify can only test what collect
+  finds, so fixing verify changes nothing. **ENRICHMENT RAN 0 BATCHES** because its real queue is
+  one lead (pool 70, 69 permanently excluded); **do not read that as a collapse from 09-16's 410.**
+  **BRAVE DID NOT CAUSE THIS.** Resolution ran **79, 98, 99, 98%** across the four passes and yield
+  collapsed anyway: on the worst pass **0 of the 119 leads with a working website produced a single
+  contact point**. **YESTERDAY'S `9dc4eb6` PROVED ITSELF WITHIN A DAY:** all **4**
+  `bloodhound_collect_yield_degraded` firings attributed to `book_rewalk` and **none blamed Brave**,
+  against three wrong spend recommendations the day before. **SHIPPED (`0874d8a`): A THIRD ALARM
+  FIRED 13 IDENTICAL TIMES AND BLAMED A FAULT ITS OWN STATE FILE REFUTED.**
+  `bloodhound_collect_walking_in_place` reported ONE window **13 times** between 08:11 and 20:11
+  (600 slots / 305 distinct / 0.508, byte-identical) and asserted *"the cursor is failing to
+  advance"* while the lane state read `collectRewinds: 0`, `collectSearchDeadRewinds: 0` and a
+  cursor that had moved. The real cause was the lap boundary and **it cleared itself** two passes
+  later, back to a clean 1.00, with nobody touching anything. Two faults in one alarm: it was left
+  out of the 09-21 per-pass keying fix (`da4b849`), and it named a remedy without testing whether
+  that remedy was the constraint — **fourth outing of that class** (09-12, 09-13, 09-22). It is now
+  keyed on the window it judges, and `collectRewalkCause()` reads the cause off
+  `logs/bloodhound-lane-state.json`, picking between `cursor_pinned` / `rewind_loop` / `lap_rewalk`
+  / `unexplained` and recording the readings behind the choice in the observation. A **rise** in a
+  rewind counter counts, not a standing one, because the counters are lifetime totals and one
+  historical rewind would otherwise read as a live loop forever (the same "always true, so not a
+  test" shape as the Brave line). *Verified:* tsc clean, **70/70** tests (7 new, incl. a
+  genuinely-pinned-cursor case that must STILL alarm so the fix cannot silence the fault it came
+  from, and a standing-vs-rising counter case), run against the real lane state and the real 09-22
+  window (now reads `lap_rewalk`), check-in run end to end on live logs, exited `healthy`.
+  **#1 AND #2 LEVERS ARE BOTH CASEY'S CALL AND NEITHER IS CODE: decide what happens to the 6,586
+  finished leads (14 days behind a shut door), and decide the discovery pause — about half a day of
+  unread leads remains, after which zero days are the NORMAL state, not an anomaly.** Then Apify
+  rolls 30 Sep (62 parks at $0.099 last run). **Brave ranks 4th: it buys attempts at the 620 book
+  leads with no site on file, most already read once.** The session-start `npm run send` fired again
+  at **18 leads, 0 sent** (14 on 09-20, 15 on 09-21, 18 on 09-22 and again today), and 09-17/18/19
+  remain unwritten. **The lesson: a pipeline with nothing left to do and a broken one look identical
+  from outside. The only numbers that told them apart were the size of the book and how much of it
+  had been read before, and nobody alarms on those.** Full detail:
+  `brain/lead-gen/runs/lead-run-2026-09-23.html`.
+
 - 2026-09-22 (debrief): **THE RECOVERY LANE HAS READ ITS WHOLE BOOK AND STARTED IT AGAIN, AND THE
   ALARM BLAMED BRAVE FOR IT.** **+7 parked** (6,846 → **6,853**), the weakest ordinary day of the
   pause. Lap 5 closed 06:01Z on 09-21; lap 6 opened at the top of the book and **every lead in the
