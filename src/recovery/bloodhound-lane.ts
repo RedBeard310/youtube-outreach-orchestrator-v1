@@ -1061,6 +1061,84 @@ export function collectRewalk(
   return { slots: ids.length, distinct, ratio: ids.length === 0 ? 1 : distinct / ids.length };
 }
 
+/** Why the collect walk is repeating itself. `cursor_pinned` and `rewind_loop`
+ *  are faults with a fix; `lap_rewalk` is the lane legitimately reading a book
+ *  it has already mined, which no code change and no spend improves. */
+export type RewalkCause = 'cursor_pinned' | 'rewind_loop' | 'lap_rewalk' | 'unexplained';
+
+/** The readings a previous `bloodhound_collect_walking_in_place` observation
+ *  carried, so a rise in the rewind counters can be told from a standing count. */
+export type RewalkPrev = {
+  collect_rewinds?: unknown;
+  collect_search_dead_rewinds?: unknown;
+  collect_cursor?: unknown;
+};
+
+/** The lane's cursor as one comparable string, or null when it holds none. */
+export function collectCursorKey(state: LaneState): string | null {
+  const c = state.collectCursor;
+  return c ? `${c.tier}:${c.disc}:${c.id}` : null;
+}
+
+/**
+ * WHY (2026-09-23). The walking-in-place alarm asserted ONE cause in its own
+ * text — "this is the cursor failing to advance ... check collectRewinds /
+ * collectSearchDeadRewinds climbing" — and on 2026-09-22 it said that twelve
+ * times while the lane state said `collectRewinds: 0`,
+ * `collectSearchDeadRewinds: 0` and a cursor that had moved. The real cause was
+ * the lap-6 boundary: leads that yield no contact point stay in the pool, so a
+ * new lap re-selects them, and three consecutive passes overlapped before the
+ * walk went back to 1.00 by itself.
+ *
+ * That is the fourth outing of one bug class (2026-09-12's 24 firings blaming
+ * Brave for a drained book; 2026-09-13's `collectBookDepth` holding a private
+ * copy of a predicate; 2026-09-22's yield alarm blaming Brave for a re-walk):
+ * an alarm that names a remedy without testing whether that remedy is the
+ * constraint. So test it against the lane's own state instead of asserting it.
+ *
+ * A rise in a rewind counter is preferred over a standing one, because the
+ * counters are lifetime totals and a single historical rewind would otherwise
+ * read as a live loop forever.
+ */
+export function collectRewalkCause(
+  state: LaneState,
+  prev: RewalkPrev | null,
+): {
+  cause: RewalkCause;
+  rewinds: number;
+  searchDeadRewinds: number;
+  laps: number;
+  cursor: string | null;
+  cursorMoved: boolean | null;
+} {
+  const rewinds = state.collectRewinds ?? 0;
+  const searchDeadRewinds = state.collectSearchDeadRewinds ?? 0;
+  const laps = state.collectLaps ?? 0;
+  const cursor = collectCursorKey(state);
+  const num = (v: unknown): number | null => (typeof v === 'number' ? v : null);
+  const prevRewinds = prev ? num(prev.collect_rewinds) : null;
+  const prevDead = prev ? num(prev.collect_search_dead_rewinds) : null;
+  const prevCursor = prev && typeof prev.collect_cursor === 'string' ? prev.collect_cursor : null;
+
+  // The alarm is keyed on the pass window, so a second firing means a new pass
+  // completed. A cursor that did not move across one is the direct evidence of
+  // the pinned walk this alarm was built for — no inference needed.
+  const cursorMoved = prevCursor === null || cursor === null ? null : cursor !== prevCursor;
+
+  const rewound = prevRewinds !== null || prevDead !== null
+    ? rewinds > (prevRewinds ?? 0) || searchDeadRewinds > (prevDead ?? 0)
+    : rewinds > 0 || searchDeadRewinds > 0;
+
+  const cause: RewalkCause = cursorMoved === false
+    ? 'cursor_pinned'
+    : rewound
+      ? 'rewind_loop'
+      : laps >= 1
+        ? 'lap_rewalk'
+        : 'unexplained';
+  return { cause, rewinds, searchDeadRewinds, laps, cursor, cursorMoved };
+}
+
 /** One completed collect pass, read off its summary line. */
 export type CollectPass = { points: number; hit: number; of: number; rate: number; summary: string };
 

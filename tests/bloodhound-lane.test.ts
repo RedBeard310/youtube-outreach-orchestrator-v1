@@ -12,7 +12,9 @@ import {
   lastCollectPassSearchDead,
   lastCollectPassYield,
   rewindWaiver,
+  collectCursorKey,
   collectRewalk,
+  collectRewalkCause,
   collectPasses,
   collectYield,
   collectPassAttribution,
@@ -707,4 +709,83 @@ test('collectPassAttribution: judges the same pass collectYield judges', () => {
 test('collectPassAttribution: too small a sample is null, not a clean reading', () => {
   assert.equal(collectPassAttribution(''), null);
   assert.equal(collectPassAttribution(attPass(attIds(0, 12), { hit: 1, none: 1 })), null);
+});
+
+// --- collectRewalkCause: WHY the walk is repeating ---------------------------
+// Added 2026-09-23. The walking-in-place alarm asserted "the cursor is failing
+// to advance" in its own text and said it twelve times on 2026-09-22 while the
+// lane state held collectRewinds: 0, collectSearchDeadRewinds: 0 and a cursor
+// that had moved. Fourth outing of the misattribution class, so the cause is
+// now read off the state rather than asserted.
+
+const cursorAt = (id: string) => ({ tier: 0, disc: '2026-07-15T17:00:14.391Z', id });
+
+test('collectRewalkCause: the real 2026-09-22 state reads as a lap re-walk, not a pinned cursor', () => {
+  const state = {
+    collectLaps: 6, collectRewinds: 0, collectSearchDeadRewinds: 0,
+    collectCursor: cursorAt('rec8z9sksO5QPOnCI'),
+  };
+  const prev = {
+    collect_rewinds: 0, collect_search_dead_rewinds: 0,
+    collect_cursor: '0:2026-07-15T17:00:14.391Z:recEARLIER',
+  };
+  const a = collectRewalkCause(state, prev);
+  assert.equal(a.cause, 'lap_rewalk');
+  assert.equal(a.cursorMoved, true);
+  assert.equal(a.laps, 6);
+});
+
+test('collectRewalkCause: a cursor that did not move across a pass is still a pinned walk', () => {
+  // The alarm this function serves is keyed on the pass window, so a second
+  // firing means a new pass completed. Same cursor across one = genuinely pinned.
+  const cursor = cursorAt('recSAME');
+  const a = collectRewalkCause(
+    { collectLaps: 6, collectRewinds: 0, collectSearchDeadRewinds: 0, collectCursor: cursor },
+    { collect_rewinds: 0, collect_search_dead_rewinds: 0, collect_cursor: '0:2026-07-15T17:00:14.391Z:recSAME' },
+  );
+  assert.equal(a.cause, 'cursor_pinned');
+  assert.equal(a.cursorMoved, false);
+});
+
+test('collectRewalkCause: a RISE in a rewind counter is a rewind loop', () => {
+  const a = collectRewalkCause(
+    { collectLaps: 6, collectRewinds: 3, collectSearchDeadRewinds: 0, collectCursor: cursorAt('recB') },
+    { collect_rewinds: 2, collect_search_dead_rewinds: 0, collect_cursor: '0:2026-07-15T17:00:14.391Z:recA' },
+  );
+  assert.equal(a.cause, 'rewind_loop');
+});
+
+test('collectRewalkCause: a STANDING rewind count from history is not a live loop', () => {
+  // The counters are lifetime totals. Without this, one historical rewind would
+  // read as a rewind loop forever — the same "always true, so not a test" shape
+  // the 2026-09-22 Brave attribution had.
+  const a = collectRewalkCause(
+    { collectLaps: 6, collectRewinds: 3, collectSearchDeadRewinds: 1, collectCursor: cursorAt('recB') },
+    { collect_rewinds: 3, collect_search_dead_rewinds: 1, collect_cursor: '0:2026-07-15T17:00:14.391Z:recA' },
+  );
+  assert.equal(a.cause, 'lap_rewalk');
+});
+
+test('collectRewalkCause: with no previous firing, any nonzero counter still alarms as a loop', () => {
+  // First firing has nothing to diff against, so fall back to the standing
+  // count. Better to name a fault that is not live than to miss a live one.
+  const a = collectRewalkCause(
+    { collectLaps: 6, collectRewinds: 2, collectSearchDeadRewinds: 0, collectCursor: cursorAt('recB') },
+    null,
+  );
+  assert.equal(a.cause, 'rewind_loop');
+  assert.equal(a.cursorMoved, null);
+});
+
+test('collectRewalkCause: repetition before the first lap closes is unexplained, not blamed', () => {
+  const a = collectRewalkCause(
+    { collectLaps: 0, collectRewinds: 0, collectSearchDeadRewinds: 0, collectCursor: cursorAt('recB') },
+    { collect_rewinds: 0, collect_search_dead_rewinds: 0, collect_cursor: '0:2026-07-15T17:00:14.391Z:recA' },
+  );
+  assert.equal(a.cause, 'unexplained');
+});
+
+test('collectCursorKey: a lane holding no cursor keys as null', () => {
+  assert.equal(collectCursorKey({}), null);
+  assert.equal(collectCursorKey({ collectCursor: cursorAt('recX') }), '0:2026-07-15T17:00:14.391Z:recX');
 });

@@ -27,8 +27,10 @@ import {
   collectPassAttribution,
   collectPasses,
   collectRewalk,
+  collectRewalkCause,
   collectYield,
   laneOptsFromEnv,
+  loadState,
   runBloodhoundLane,
   runRecoveryDuringOpenRouterHalt,
 } from '../../src/recovery/bloodhound-lane.ts';
@@ -120,8 +122,8 @@ const FATAL_PATTERNS = [
 // Keyed on the pass, not on a clock window, so the alarm still fires once per
 // pass (4x a day at the current cadence) for as long as the condition holds —
 // it loses the repetition, not the signal.
-function alreadyObserved(kind: string, passKey: string): boolean {
-  if (!existsSync(OBSERVATIONS)) return false;
+function lastObservation(kind: string): Record<string, unknown> | null {
+  if (!existsSync(OBSERVATIONS)) return null;
   try {
     const lines = readFileSync(OBSERVATIONS, 'utf8').split('\n');
     for (let i = lines.length - 1; i >= 0; i--) {
@@ -130,10 +132,14 @@ function alreadyObserved(kind: string, passKey: string): boolean {
       let o: Record<string, unknown>;
       try { o = JSON.parse(raw); } catch { continue; }
       if (o.kind !== kind) continue;
-      return o.pass_key === passKey; // the newest of this kind decides
+      return o; // the newest of this kind decides
     }
   } catch { /* an unreadable observations log must not suppress an alarm */ }
-  return false;
+  return null;
+}
+
+function alreadyObserved(kind: string, passKey: string): boolean {
+  return lastObservation(kind)?.pass_key === passKey;
 }
 
 function readEvents(file: string): Array<Record<string, unknown>> {
@@ -1216,18 +1222,39 @@ async function main(): Promise<void> {
       // The collect log carries no timestamps, so take the last day's worth of
       // COMPLETED passes by count. Derived from the cadence so a retune of the
       // interval keeps the window at one day.
-      const walk = collectRewalk(readFileSync(COLLECT_LOG, 'utf8'), passesPerDay);
+      const logText = readFileSync(COLLECT_LOG, 'utf8');
+      const walk = collectRewalk(logText, passesPerDay);
+      // Keyed on the window it judges, the way the two sibling lane alarms were
+      // keyed on 2026-09-21 (`da4b849`). This one was left out of that fix and
+      // re-reported the SAME window twelve times on 2026-09-22, byte for byte.
+      // The pass count makes the key move exactly when a new pass completes.
+      const walkKey = walk ? `${collectPasses(logText).length}:${walk.slots}/${walk.distinct}` : null;
       // A short sample makes the ratio noisy; one full batch is the floor.
-      if (walk && walk.slots >= laneOpts.collectBatch && walk.ratio < REWALK_ALARM_RATIO) {
+      if (walk && walkKey && walk.slots >= laneOpts.collectBatch && walk.ratio < REWALK_ALARM_RATIO &&
+          !alreadyObserved('bloodhound_collect_walking_in_place', walkKey)) {
         const rereads = (walk.slots / Math.max(1, walk.distinct)).toFixed(1);
+        // Read the cause off the lane's own state rather than asserting one.
+        const prev = lastObservation('bloodhound_collect_walking_in_place');
+        const att = collectRewalkCause(loadState(join(LOGS, 'bloodhound-lane-state.json')), prev);
+        const faulted = att.cause === 'cursor_pinned' || att.cause === 'rewind_loop';
+        const cause = att.cause === 'cursor_pinned'
+          ? `The cursor has not moved since the last firing (${att.cursor ?? 'none'}), so the walk is genuinely pinned — check logs/bloodhound-lane-state.json and campaign-<date>.jsonl for repeated "rewound" events on the same cursor.`
+          : att.cause === 'rewind_loop'
+            ? `A rewind counter rose since the last firing (collectRewinds ${att.rewinds}, collectSearchDeadRewinds ${att.searchDeadRewinds}), so a batch is being replayed — check logs/bloodhound-lane-state.json and campaign-<date>.jsonl for repeated "rewound" events on the same cursor.`
+            : att.cause === 'lap_rewalk'
+              ? `This is NOT a pinned cursor: collectRewinds is ${att.rewinds}, collectSearchDeadRewinds is ${att.searchDeadRewinds} and the cursor ${att.cursorMoved === true ? 'has moved since the last firing' : 'is advancing'}. The lane is on lap ${att.laps + 1} of its book, and a lead that yields no contact point stays in the pool, so a new lap re-selects the ones earlier laps already emptied. Overlap around a lap boundary is what this looks like and it clears itself as the walk moves on. Nothing to fix here: the constraint is leads to walk, and only new arrivals or lifting the discovery pause add any.`
+              : `The lane has closed no lap and no rewind counter has risen (collectRewinds ${att.rewinds}, collectSearchDeadRewinds ${att.searchDeadRewinds}), so the repetition is unexplained — read logs/bloodhound-lane-state.json before spending anything.`;
         appendFileSync(OBSERVATIONS, JSON.stringify({
           ts: new Date().toISOString(), kind: 'bloodhound_collect_walking_in_place',
           lead_slots: walk.slots, distinct_leads: walk.distinct, ratio: Number(walk.ratio.toFixed(3)),
           rereads_per_lead: Number(rereads), passes_sampled: passesPerDay,
-          alarm_ratio: REWALK_ALARM_RATIO,
-          detail: `The recovery lane's last ${passesPerDay} collect passes spent ${walk.slots} lead-slots on only ${walk.distinct} distinct leads (${rereads}x re-read, alarm below ${REWALK_ALARM_RATIO}). The collect book is NOT drained, so this is the cursor failing to advance rather than the lane running out of work — check logs/bloodhound-lane-state.json for a collectCursor that has not moved and for collectRewinds/collectSearchDeadRewinds climbing, and check campaign-<date>.jsonl for repeated "rewound" events on the same cursor. Spending money on search keys or Apify will not fix this: the lane is paying to re-read leads it has already read. Nothing is faulting, which is why no other check sees it.`,
+          alarm_ratio: REWALK_ALARM_RATIO, pass_key: walkKey,
+          attributed_to: att.cause, collect_rewinds: att.rewinds,
+          collect_search_dead_rewinds: att.searchDeadRewinds, collect_laps: att.laps,
+          collect_cursor: att.cursor, collect_cursor_moved: att.cursorMoved,
+          detail: `The recovery lane's last ${passesPerDay} collect passes spent ${walk.slots} lead-slots on only ${walk.distinct} distinct leads (${rereads}x re-read, alarm below ${REWALK_ALARM_RATIO}). The collect book is NOT drained. ${cause}${faulted ? ' Spending money on search keys or Apify will not fix this: the lane is paying to re-read leads it has already read.' : ''} Nothing is faulting, which is why no other check sees it.`,
         }) + '\n');
-        console.log(`[checkin ${day}] OBSERVATION bloodhound_collect_walking_in_place — ${walk.slots} lead-slots over ${walk.distinct} distinct leads (${rereads}x)`);
+        console.log(`[checkin ${day}] OBSERVATION bloodhound_collect_walking_in_place — ${walk.slots} lead-slots over ${walk.distinct} distinct leads (${rereads}x), cause=${att.cause}`);
       }
     } catch { /* an unreadable collect log is not an incident */ }
   }
