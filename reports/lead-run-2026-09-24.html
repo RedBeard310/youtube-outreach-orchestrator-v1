@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lead Run Debrief - 2026-09-24</title>
+<style>
+  :root {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --good-soft: #1f8a5b18; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+      --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+      --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --good-soft: #55c48c1c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --good-soft: #1f8a5b18; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+    --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+    --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --good-soft: #55c48c1c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 40px 22px 80px; }
+  .eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); font-weight: 600; }
+  h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.12; margin: 10px 0 6px; text-wrap: balance; letter-spacing: -.02em; }
+  h2 { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); margin: 44px 0 16px; font-weight: 700; }
+  h3 { font-size: 18px; margin: 0 0 6px; letter-spacing: -.01em; }
+  p { margin: 0 0 14px; }
+  .lede { font-size: 18px; color: var(--ink-soft); max-width: 68ch; }
+  .tag { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--amber-soft); color: var(--amber); letter-spacing: .02em; }
+  .tag.ok { background: var(--teal-soft); color: var(--teal); }
+  .tag.bad { background: var(--red-soft); color: var(--red); }
+  .tag.good { background: var(--good-soft); color: var(--good); }
+  .grid { display: grid; gap: 14px; }
+  .stats { grid-template-columns: repeat(4, 1fr); margin-top: 26px; }
+  @media (max-width: 720px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; box-shadow: var(--shadow); }
+  .stat .n { font-size: 30px; font-weight: 750; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .stat .l { font-size: 12.5px; color: var(--ink-soft); margin-top: 3px; }
+  .stat .s { font-size: 12px; margin-top: 8px; font-weight: 600; }
+  .up { color: var(--good); } .down { color: var(--red); } .warn { color: var(--amber); }
+  .accent-red { border-left: 3px solid var(--red); }
+  .accent-teal { border-left: 3px solid var(--teal); }
+  .accent-amber { border-left: 3px solid var(--amber); }
+  .accent-good { border-left: 3px solid var(--good); }
+
+  .strip { display: flex; align-items: flex-end; gap: 5px; height: 140px; padding: 14px 14px 10px; overflow-x: auto; }
+  .barwrap { flex: 1 0 22px; display: flex; flex-direction: column; align-items: center; gap: 5px; }
+  .bar { width: 100%; border-radius: 3px 3px 0 0; background: var(--teal); opacity: .9; }
+  .bar.low { background: var(--amber); }
+  .bar.today { background: var(--good); opacity: 1; }
+  .bar.zero { background: var(--red); opacity: 1; min-height: 2px; }
+  .barlab { font-size: 10.5px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-soft); padding: 0 14px 14px; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+
+  .q { border-radius: 14px; padding: 20px 22px; margin-bottom: 14px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); }
+  .q .ask { font-size: 17px; font-weight: 700; color: var(--ink); margin-bottom: 10px; display: flex; gap: 10px; align-items: baseline; }
+  .q .ask .qn { color: var(--red); font-weight: 800; flex: 0 0 auto; }
+  .q.accent-teal .ask .qn { color: var(--teal); }
+  .q.accent-good .ask .qn { color: var(--good); }
+  .q p { color: var(--ink-soft); }
+  .q b { color: var(--ink); }
+  .pill { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink); background: var(--panel-2); padding: 1px 7px; border-radius: 6px; border: 1px solid var(--line); white-space: nowrap; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+  th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); }
+  td .num { font-variant-numeric: tabular-nums; font-weight: 650; }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); box-shadow: var(--shadow); }
+  ol.recs { padding-left: 0; list-style: none; counter-reset: r; margin: 0; }
+  ol.recs li { counter-increment: r; position: relative; padding: 14px 16px 14px 52px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 10px; box-shadow: var(--shadow); }
+  ol.recs li::before { content: counter(r); position: absolute; left: 14px; top: 14px; width: 26px; height: 26px; border-radius: 8px; background: var(--teal-soft); color: var(--teal); font-weight: 800; font-size: 14px; display: grid; place-items: center; }
+  ol.recs b { color: var(--ink); }
+  .foot { margin-top: 46px; padding: 16px 18px; border-radius: 12px; background: var(--amber-soft); border: 1px solid var(--line); font-size: 14px; color: var(--ink-soft); }
+  .foot b { color: var(--ink); }
+  .muted { color: var(--ink-soft); font-size: 13.5px; }
+  code { background: var(--panel-2); border: 1px solid var(--line); border-radius: 5px; padding: 0 5px; font-size: .9em; }
+</style>
+
+<div class="wrap">
+
+  <div class="eyebrow">Lead Run Debrief · YouTube outreach</div>
+  <h1>2026-09-24: the door opened, 47 emails went out, and the next batch quietly lost ten of them</h1>
+  <p class="lede">Casey lifted the email pause on 09-23 and <b>47 emails were loaded into SmartLead</b> that afternoon, the first since 09-10. In the same cycle a hand-started enrichment run put <b>119 more finished leads on the shelf</b>, which now holds <b>6,675</b> researched, bundled, ready-to-write leads. Then the automatic 07:20 send this morning composed 18 emails, pushed 8, and wrote the other 10 down as <code>failed</code>. Nine of those ten died on a two-minute network wobble talking to SmartLead. All ten were finished emails with a verified address, and <b>no query in this pipeline would ever have looked at them again</b>. The send queue read zero, which is exactly what it reads when the work is genuinely done. That is fixed today, and the ten are back in the queue.</p>
+  <div style="margin-top:14px"><span class="tag good">47 EMAILS SENT, FIRST IN 13 DAYS</span> <span class="tag good">+119 ON THE SHELF</span> <span class="tag bad">10 FINISHED EMAILS STRANDED</span> <span class="tag ok">0 FAULTS, $0.00 ANTHROPIC</span> <span class="tag">RUNWAY 191 DAYS → 20</span></div>
+
+  <div class="grid stats">
+    <div class="card stat accent-good">
+      <div class="n">47</div>
+      <div class="l">emails loaded into SmartLead</div>
+      <div class="s up">First since 09-10. Twelve straight zero days before it</div>
+    </div>
+    <div class="card stat accent-good">
+      <div class="n">6,675</div>
+      <div class="l">leads researched and ready to write</div>
+      <div class="s up">6,586 → 6,675. 119 enriched, 31 shipped out</div>
+    </div>
+    <div class="card stat accent-red">
+      <div class="n">10</div>
+      <div class="l">finished emails stranded by a network blip</div>
+      <div class="s down">Invisible to every selector. Fixed in <code>ce5abf1</code></div>
+    </div>
+    <div class="card stat accent-amber">
+      <div class="n">+5</div>
+      <div class="l">leads parked into <code>approved_hold</code></div>
+      <div class="s warn">6,853 → 6,858. The recovery lane is still re-reading its book</div>
+    </div>
+  </div>
+
+  <h2>The shape of the day</h2>
+  <div class="card" style="padding:0">
+    <div class="strip">
+      <div class="barwrap"><div class="bar low" style="height:30%"></div><div class="barlab">14</div></div>
+      <div class="barwrap"><div class="bar" style="height:85%"></div><div class="barlab">40</div></div>
+      <div class="barwrap"><div class="bar zero" style="height:2%"></div><div class="barlab">0</div></div>
+      <div class="barwrap"><div class="bar zero" style="height:2%"></div><div class="barlab">0</div></div>
+      <div class="barwrap"><div class="bar zero" style="height:2%"></div><div class="barlab">0</div></div>
+      <div class="barwrap"><div class="bar zero" style="height:2%"></div><div class="barlab">0</div></div>
+      <div class="barwrap"><div class="bar zero" style="height:2%"></div><div class="barlab">0</div></div>
+      <div class="barwrap"><div class="bar zero" style="height:2%"></div><div class="barlab">0</div></div>
+      <div class="barwrap"><div class="bar zero" style="height:2%"></div><div class="barlab">0</div></div>
+      <div class="barwrap"><div class="bar zero" style="height:2%"></div><div class="barlab">0</div></div>
+      <div class="barwrap"><div class="bar zero" style="height:2%"></div><div class="barlab">0</div></div>
+      <div class="barwrap"><div class="bar zero" style="height:2%"></div><div class="barlab">0</div></div>
+      <div class="barwrap"><div class="bar zero" style="height:2%"></div><div class="barlab">0</div></div>
+      <div class="barwrap"><div class="bar zero" style="height:2%"></div><div class="barlab">0</div></div>
+      <div class="barwrap"><div class="bar today" style="height:100%"></div><div class="barlab">47</div></div>
+      <div class="barwrap"><div class="bar low" style="height:18%"></div><div class="barlab">8</div></div>
+    </div>
+    <div class="legend">
+      <span>Emails loaded into SmartLead per day, 09-09 to 09-24.</span>
+      <span><span class="dot" style="background:var(--red)"></span>The pause, 09-11 to 09-22</span>
+      <span><span class="dot" style="background:var(--good)"></span>09-23, the day it lifted</span>
+      <span><span class="dot" style="background:var(--amber)"></span>09-24, 8 of 18 attempted</span>
+    </div>
+  </div>
+  <p class="muted">The 47 did not come through <code>npm run send</code>. Nothing in the orchestrator's own log records them, so they were driven from the email repo by hand, in two goes at 16:00 and 17:00 UTC. They were picked across both lanes: 31 from <code>approved_hold</code> and 16 from <code>approved</code>. The 8 this morning were the automatic session-start send, which for the first time was not refused by the pause.</p>
+
+  <h2>The three questions</h2>
+
+  <div class="q accent-red">
+    <div class="ask"><span class="qn">1</span><span>How does a finished email disappear?</span></div>
+    <p>This morning's 07:20 send took 18 leads through writing and pushing. Four pushes went through in under two and a half seconds each. The rest hit <code>fetch failed</code>, which is what a connection timeout looks like from the inside. The email repo retries a transient failure once, after 60 seconds, and four more got through on that second attempt. Nine did not, because both of their attempts fell inside the same two-minute wobble. A tenth was correctly refused by the placeholder guard, which spotted <code>[Agent Name]</code> still sitting in the body.</p>
+    <p>Each of those ten was then written down as <code>failed</code>. That is the honest label, and it was also a trapdoor. <b>The send queue selects leads at <code>ready_data_scraped</code>, <code>enriched</code> or <code>email_drafted</code>, and <code>failed</code> is in none of them.</b> It is not in the tick's list of finished states either, so a manual <code>npm run tick</code> would have picked them up, and nobody has run a tick in months. Ten researched, written, verified-address leads went quiet, and <b>no alarm anywhere watches for that</b>.</p>
+    <p>The reading that makes this worse: after the failure the approved lane in Postgres read <b>0 ready, 0 drafted, 10 failed</b>. A send queue of zero is also exactly what it reads when the lane has genuinely finished its work. The two states are the same number.</p>
+  </div>
+
+  <div class="q accent-good">
+    <div class="ask"><span class="qn">2</span><span>What actually produced work this cycle?</span></div>
+    <p>Two things, and only one of them was a timer. <b>The 47 emails</b> are the whole output story. The pause that had held since 09-10 came off on 09-23, on a condition that is enforced in code rather than trusted: a mailbox may only send from warmup day 12 onward, measured per mailbox from the InboxKit snapshot. The 18 mailboxes bought on 09-19 reach day 12 on 30 September and cannot send before 1 October.</p>
+    <p><b>Enrichment did 124 leads, and 119 of them came from a run nobody scheduled.</b> The VPS backfill chain ran three batches totalling five leads and logged <code>no pending inflow, idling</code> after each, which is correct because its queue is about one lead. Meanwhile a separate process started at 21:28 UTC on 09-23 has been working a 132-lead list from an interactive session's scratchpad file in <code>/tmp</code>, at roughly eleven leads an hour. It is doing exactly the work the discovery pause exists to fund, and it accounts for the money: <b>OpenRouter moved $10.18 in the cycle</b>, which at 119 leads is about 9 cents each and matches the 10 cents a lead measured on 09-16.</p>
+    <p>Worth knowing rather than worth fixing: <b>no systemd unit owns that run.</b> Its list of ids lives in a temporary folder belonging to a chat session. If it dies, nothing restarts it, and the chain's own log will keep saying "idling" while it does.</p>
+  </div>
+
+  <div class="q accent-amber">
+    <div class="ask"><span class="qn">3</span><span>Is the recovery lane still the bottleneck?</span></div>
+    <p>Yes, and it is unchanged from yesterday's reading. The lane walked its usual <b>four collect passes and 600 lead slots</b>. It found <b>73 contact points</b>, up from 29 yesterday but against 1,063 on 09-20. Its hit rate per pass ran <b>7%, 9%, 5% and 3%</b> against a 32-pass median of 42%. The book went from <b>3,344 leads to 3,331</b>, so 600 readings bought 13 leads.</p>
+    <p>The cause is the one established on 09-22 and confirmed twice since: the lane is on <b>lap 6</b> and is re-reading leads it already emptied. Every one of the four alarms it raised said so, attributing to <code>book_rewalk</code> and not to search credit, and none of them recommended spending money. <b>Website resolution was fine all cycle</b>, at 97% to 99% on three of the four passes. The alarm fix shipped 09-22 is now three days into proving itself.</p>
+    <p>The verify half did what it could with what it was handed: six passes, <b>six addresses actually checked</b>, five more rejected on ownership before spending a credit, four flips into <code>approved_hold</code>, plus one more from the hourly re-score. That is the whole <b>+5</b>. Two of the six passes were handed nothing at all.</p>
+  </div>
+
+  <h2>What broke, what's fixed</h2>
+
+  <div class="card accent-red" style="margin-bottom:14px">
+    <h3>A network blip on the last step deleted ten finished emails from the pipeline</h3>
+    <p class="muted">Shipped: orchestrator <code>ce5abf1</code>. 87 tests pass, 11 of them new, typecheck clean, verified against the live database.</p>
+    <p>The send queue now also considers leads at <code>failed</code>, but only on the evidence in their own fields. A written subject and body means the work is paid for and the lead resumes at the push, which is exactly what <code>email_drafted</code> already meant. A bundle on disk with no draft means it resumes at compose, which is exactly what <code>ready_data_scraped</code> already meant. A <code>failed</code> lead with neither never got that far and stays out, because pulling it in would quietly turn a send into a find-and-enrich run, and that coupling was removed on purpose on 2026-07-17.</p>
+    <p>This is the same reading that <code>effectiveStatus()</code> in the email repo already makes when it decides where to restart a lead. The two repos disagreed: one knew how to resume a failed lead and the other would never hand it one. They agree now.</p>
+    <p><b>Verified live, not just in tests.</b> Before the change the send queue returned 0. After it, <code>npm run send:dry</code> returns exactly the ten stranded ids and nothing else. The fix is retroactive by nature: it rescues leads already sitting in the trapdoor, not just future ones.</p>
+  </div>
+
+  <div class="card accent-amber" style="margin-bottom:14px">
+    <h3>A send that loses more than half its batch looked identical to a clean one</h3>
+    <p class="muted">Same commit.</p>
+    <p>The email repo prints a tally at the end of a run and then exits 0, because one lead failing is deliberately not fatal to the batch. So the orchestrator's log line for this morning read <code>send_attempted=18 send_exit=0</code>, and that is all it read. A run that sent 18 and a run that sent 8 wrote the same line.</p>
+    <p>The send driver now reads that tally and records <code>send_sent</code> and <code>send_failed</code> in the JSONL, prints them on the closing line, and says so loudly when more leads failed than went out. Nobody has to read 500 lines of child output to find out a batch went badly.</p>
+  </div>
+
+  <div class="card accent-good">
+    <h3>Nothing else faulted</h3>
+    <p>Zero fatal error signatures. Zero halts. Zero quota stops. <b>$0.00 of Anthropic spend</b> against a $150 ceiling. The <code>stranded</code> counter, which is the number that would say a lead had fallen into the gap between the recovery lane's two halves, held at <b>3</b> for the eleventh day. The YouTube key pool read 15 working of 66 for the eleventh identical morning, which is the settled state and costs nothing while nothing is searching. Discovery produced zero new channels, which is the instruction.</p>
+    <p>Yesterday's fix is holding too. The <code>walking in place</code> alarm fired <b>13 times about one window</b> on 09-23 and <b>zero times</b> this cycle.</p>
+  </div>
+
+  <h2>The money, and a number that changed a lot</h2>
+  <p><b>OpenRouter runway went from 191 days to 20.</b> The balance fell from $210.16 to $199.98, which is $10.18 in a day against $1.10 the day before. Nothing is wrong: enrichment restarted, and enrichment is what OpenRouter is for. At the measured rate of about 10 cents a lead it is the cheapest part of this pipeline. It is worth saying plainly anyway, because the runway figure on the last three debriefs was a number nobody had to think about and now it is about three weeks.</p>
+  <p>For scale, writing the whole shelf would be a different bill. The <b>6,675</b> finished leads each still need an email composed, and composing is a separate model call from enriching. There is no measured per-email cost yet, because the cycle's spend is fully explained by the 119 enrichments. <b>Getting that number is worth doing before any large send, and it needs one send with a per-task cost log rather than a guess.</b></p>
+
+  <h2>The cycle in numbers</h2>
+  <div class="tablewrap">
+    <table>
+      <tr><th>Measure</th><th>This cycle</th><th>Previous</th><th>Reading</th></tr>
+      <tr><td>Emails loaded into SmartLead</td><td class="num">47</td><td class="num">0</td><td>First since 09-10. Pause lifted 09-23</td></tr>
+      <tr><td>Parked into <code>approved_hold</code></td><td class="num">+5</td><td class="num">+0</td><td>6,853 → 6,858. All 5 from the recovery lane</td></tr>
+      <tr><td>Shelf, researched and ready to write</td><td class="num">6,675</td><td class="num">6,586</td><td>+119 enriched, 31 shipped out</td></tr>
+      <tr><td><code>needs_contact</code> pool</td><td class="num">4,238</td><td class="num">4,243</td><td>Falling only by what the lane recovers</td></tr>
+      <tr><td>Enrichment leads / batches</td><td class="num">124 / 3+1</td><td class="num">0 / 0</td><td>119 from an unscheduled run, 5 from the chain</td></tr>
+      <tr><td>Contact points collected</td><td class="num">73</td><td class="num">29</td><td>1,063 on 09-20. Still a mined-out book</td></tr>
+      <tr><td>Collect passes / lead slots</td><td class="num">4 / 600</td><td class="num">4 / 600</td><td>All on schedule</td></tr>
+      <tr><td>Collect hit rate per pass</td><td class="num">7, 9, 5, 3%</td><td class="num">0, 3, 4, 4%</td><td>32-pass median is 42%</td></tr>
+      <tr><td>Collect book remaining</td><td class="num">3,331</td><td class="num">3,344</td><td>600 readings bought 13 leads</td></tr>
+      <tr><td>Website resolution per pass</td><td class="num">97-99%</td><td class="num">79-99%</td><td>Search is not the constraint</td></tr>
+      <tr><td>Stranded (gap indicator)</td><td class="num">3</td><td class="num">3</td><td>Unchanged since 09-13. No gap</td></tr>
+      <tr><td>Verify passes / addresses tested</td><td class="num">6 / 6</td><td class="num">8 / 6</td><td>5 rejected on ownership before spending</td></tr>
+      <tr><td>New channels discovered</td><td class="num">0</td><td class="num">0</td><td>Intended. Paused by Casey 09-08</td></tr>
+      <tr><td>Fatal signatures / halts</td><td class="num">0 / 0</td><td class="num">0 / 0</td><td>Nothing faulted</td></tr>
+      <tr><td>Anthropic spend</td><td class="num">$0.00</td><td class="num">$0.00</td><td>Ceiling is $150</td></tr>
+      <tr><td>OpenRouter</td><td class="num">$10.18/day</td><td class="num">$1.10/day</td><td>$199.98 left, about 20 days</td></tr>
+      <tr><td>YouTube keys working</td><td class="num">15 of 66</td><td class="num">15 of 66</td><td>Eleventh identical morning. Settled</td></tr>
+      <tr><td>Apify lane</td><td class="num">resting</td><td class="num">resting</td><td>$0.0053 spendable. Cycle rolls 30 Sep</td></tr>
+      <tr><td>Alarms: yield degraded</td><td class="num">4</td><td class="num">4</td><td>All 4 said <code>book_rewalk</code>. None blamed Brave</td></tr>
+      <tr><td>Alarms: walking in place</td><td class="num">0</td><td class="num">13</td><td>Yesterday's fix holding</td></tr>
+    </table>
+  </div>
+
+  <h2>Recommended next, ranked</h2>
+  <ol class="recs">
+    <li><b>Send again, and watch the failure count this time.</b> The door is open and the shelf is 6,675 leads deep. The ten stranded leads are back in the queue and will go out on the next send. The new log line reports sent against failed, so a repeat of this morning's nine-out-of-eighteen will be visible immediately rather than buried. <b>Sending stays manual and stays Casey's call.</b></li>
+    <li><b>Measure what an email costs before a big push.</b> Enrichment is a known 10 cents a lead. Composing is not measured at all, and the shelf is 6,675 emails. One send with the per-task cost log turned on answers it. Doing this before a large batch is cheaper than after.</li>
+    <li><b>Decide whether the unscheduled enrichment run should become a real unit.</b> It did 119 of the cycle's 124 leads, from a list in a temporary folder owned by a chat session, with nothing to restart it if it stops. The VPS chain sits idle beside it because its own queue is one lead. Either the chain should be fed that list or the run should get a unit. Right now the work depends on a <code>/tmp</code> path surviving.</li>
+    <li><b>Decide on the discovery pause.</b> Unchanged from yesterday and unchanged in urgency. The recovery lane is spending 600 readings a day to gain 13 leads, and that will not improve on its own. The three ways new leads arrive are lifting the pause, Apify on 30 September, and funding Brave. <b>Casey's word alone. No agent may touch this.</b></li>
+    <li><b>Watch Apify on 30 September.</b> Six days out. Last run recovered 62 leads in 52 minutes at $0.099 each. It is resting on its $10 reserve correctly and needs nothing done to it.</li>
+    <li><b>Keep an eye on the OpenRouter balance.</b> $199.98 left and about three weeks at the current rate. Not urgent, but it stopped being a background number this cycle.</li>
+    <li><b>The 09-17, 09-18 and 09-19 debriefs are still unwritten.</b> Three cycles of history are gone. Writing them needs a human re-login on the VPS, and no Anthropic API key may be used instead.</li>
+  </ol>
+
+  <div class="foot">
+    <p><b>The thing worth remembering from this cycle.</b> The pipeline spent thirteen days where zero output was the correct answer, and everyone learned to read zero as normal. On the first day that stopped being true, ten finished emails fell through a gap and the queue still read zero. The label <code>failed</code> was accurate and the trapdoor was that no query included it. A status that describes what happened is not the same as a status something acts on, and the gap between those two is where work goes to die quietly.</p>
+    <p><b>Deliberately not done:</b> no email sent by this agent, no discovery lane touched, no <code>.env</code> or secret read or written, no alarm threshold moved, no halt flag written, and the unscheduled enrichment run was left alone rather than killed or adopted. The loop is left running for the next cycle.</p>
+  </div>
+
+</div>

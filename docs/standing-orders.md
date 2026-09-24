@@ -197,7 +197,12 @@ everything up to "parked, ready to write" is automatic.
 
 ## Parked pools waiting on Casey (don't touch without his word)
 
-> **Numbers below are from 2026-09-02 and are stale. Live at 2026-09-22T07:00Z:
+> **Numbers below are from 2026-09-02 and are stale. Live at 2026-09-24T07:30Z:
+> `needs_contact` **4,238**, `approved_hold` **6,858** of which **6,675** are
+> `ready_data_scraped` (97%), and **the loading door is OPEN again** — 47 emails
+> went to SmartLead on 09-23 and 8 more on 09-24. See the 09-24 change-log entry.**
+>
+> **Older reading, 2026-09-22T07:00Z:
 > `needs_contact` 4,243 and now FLAT, `approved_hold` 6,853 of which 6,586 already
 > carry an enrichment bundle (96%) — the enrichment backlog is finished, not
 > "nearly clear". The 09-02 reasoning about collect throughput being the
@@ -282,6 +287,61 @@ this is the shape to check first.**
 5. Anything in this file contradicted by what Casey said today? → update it.
 
 ## Change log
+
+- 2026-09-24 (debrief): **THE EMAIL PAUSE IS LIFTED AND EMAILS ARE GOING OUT AGAIN. 47 LOADED INTO
+  SMARTLEAD ON 09-23, THE FIRST SINCE 09-10.** Casey lifted it on 09-23 (`automator/config/email-pause.json`
+  now reads `paused: false`). **The lift is CONDITIONAL and the condition is enforced in code:**
+  `warmup_wait.min_day` in `automator/config/siege.json` holds a floor at **warmup day 12**, read per
+  mailbox from `state/inbox-warmup.json`. A mailbox under day 12, one whose warmup subscription is not
+  active, and one missing from the snapshot are each refused. The fleet is **58 mailboxes on 20 fresh
+  domains**; the **18 bought 09-19 reach day 12 on 30 Sep and may first send 1 Oct**. The 47 were driven
+  **by hand from the email repo, not `npm run send`** (nothing in the orchestrator log records them),
+  31 from `approved_hold` and 16 from `approved`.
+  **THE 09-20 PREDICTION CAME TRUE: the session-start `npm run send` is no longer harmless.** It fired
+  at 07:20 today and actually sent, for the first time. Nobody has found what triggers it. **Anyone
+  opening an agent session in this repo now sends real email.**
+  **SHIPPED (`ce5abf1`): A NETWORK BLIP ON THE LAST STEP DELETED TEN FINISHED EMAILS FROM THE PIPELINE.**
+  That 07:20 send composed 18, pushed 8, and wrote 10 as `failed`: **nine lost both attempts to
+  `fetch failed`** inside one two-minute wobble (four pushes landed in <2.5s, four more on the 60s
+  retry), one correctly refused by the placeholder guard. All ten hold a written subject and body, a
+  bundle and a verified address, and **no query in this repo would ever have looked at them again** —
+  `failed` is in neither `APPROVED_FIRE_READY` nor the tick's `APPROVED_PREP_DONE`, ticks have been
+  manual-only since 06-01, and **nothing alarms on a send at all**. The approved lane read **0 ready,
+  0 drafted, 10 failed**, which is also exactly what a genuinely finished lane reads.
+  `fireResumeStage()` now backs both the bulk query and the per-id check: it widens to `failed` and
+  then qualifies each lead on its OWN fields — written subject+body resumes at push (same as
+  `email_drafted`), a bundle alone resumes at compose (same as `ready_data_scraped`), **neither is
+  refused** so a send can never silently become a prep run (the 2026-07-17 decoupling). It mirrors
+  `effectiveStatus()` in `youtube-email-outreach-v1/src/cli/outreach.ts`, which already knew how to
+  resume a failed lead while this repo would never hand it one; **if that function's reading changes,
+  change this one with it.** Same commit reads the child's `=== Final tally ===` into `send_sent` /
+  `send_failed` in the JSONL and warns when failures outnumber sends, because the child exits 0 either
+  way and `send_attempted=18 send_exit=0` was the entire record of a batch that lost ten emails.
+  *Verified:* tsc clean, **87/87** tests (11 new), and **live: `npm run send:dry` returned 0 before the
+  change and exactly the ten stranded ids after** — the fix is retroactive, not just preventive.
+  **DELIBERATELY NOT SHIPPED: more push retries.** A `fetch failed` can also be a response lost after
+  SmartLead accepted the lead, SmartLead's de-dup behaviour on a re-POST is not verified here, and with
+  the selector fixed a failure simply goes out on the next send. Confirm the de-dup before raising it.
+  **ENRICHMENT RESTARTED FROM A PROCESS NOBODY SCHEDULED.** The VPS chain did **5 leads in 3 batches**
+  and idled after each (its pool is 40, 39 permanently excluded). Beside it, a run started **21:28Z on
+  09-23** is working a **132-lead list from a chat session's `/tmp` scratchpad** at ~11 leads/hour
+  (`outreach.ts --lead-ids-file .../scratchpad/backfill-ids.txt --stop-after enrich`): **115 parked, 11
+  failed, 6 invalid.** It is the right work and it explains the money, but **no systemd unit owns it and
+  nothing restarts it if it dies** — and the chain's log will go on saying "idling" while it does.
+  Shelf **6,586 → 6,675 ready to write**; **+5 parked** (6,853 → **6,858**), all five from the recovery
+  lane's verify half plus one re-score.
+  **OPENROUTER RUNWAY WENT 191 DAYS → 20.** $210.16 → **$199.98**, $10.18 in a day against $1.10.
+  Nothing is wrong: 119 enrichments at ~9¢ each, matching the 10¢/lead measured 09-16. **But composing
+  an email is a separate model call and has never been measured, and the shelf is 6,675 emails. Get
+  that number from one send with the per-task cost log before any large batch.**
+  **RECOVERY LANE UNCHANGED:** 4 passes, 600 slots, book 3,344 → **3,331** (13 leads), **73 contact
+  points**, hit rates **7, 9, 5, 3%** against a 42% median, `stranded` held at 3. All four
+  `bloodhound_collect_yield_degraded` firings said `book_rewalk`; resolution ran 96-99% so none blamed
+  Brave. **Yesterday's `0874d8a` held: walking-in-place went 13 → 0.** 0 fatal signatures, 0 halts,
+  $0.00 Anthropic, 15/66 keys for the eleventh morning, Apify still resting until 30 Sep.
+  **The lesson: a status that describes what happened is not the same as a status something acts on,
+  and the gap between those two is where work goes to die quietly.** Full detail:
+  `brain/lead-gen/runs/lead-run-2026-09-24.html`.
 
 - 2026-09-23 (debrief): **THE FIRST DAY THE PIPELINE PRODUCED NOTHING, AND NOTHING WAS BROKEN.**
   **+0 parked** (6,853 → **6,853**), the first zero on record. Every pool ended exactly the size it
