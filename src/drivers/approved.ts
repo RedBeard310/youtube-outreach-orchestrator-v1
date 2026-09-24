@@ -1,10 +1,43 @@
 import type { Lead } from '../airtable.ts';
-import { runChild } from '../run.ts';
+import { runChild, runChildCapture } from '../run.ts';
 
 export interface ApprovedResult {
   attempted: number;
   exit_code: number | null;
   error?: string;
+  /** Per-status counts read off the child's `=== Final tally ===` block, or null
+   *  when the child printed none (a dry run, or a crash before the summary). */
+  outcomes?: Record<string, number> | null;
+}
+
+// youtube-email-outreach-v1 ends a run with:
+//
+//   === Final tally ===
+//     sent_to_smartlead: 8
+//     failed: 10
+//
+// and then exits 0 whether that read 18 sent or 18 failed, because a per-lead
+// failure is deliberately not fatal to the batch. So the exit code cannot tell a
+// clean send from a broken one, and until 2026-09-24 nothing else could either:
+// the orchestrator logged `send_attempted=18 send_exit=0` for a run that lost ten
+// finished emails to a network flap. Read the tally so the JSONL line says what
+// actually happened.
+export function parseFinalTally(output: string): Record<string, number> | null {
+  const start = output.lastIndexOf('=== Final tally ===');
+  if (start < 0) return null;
+  const counts: Record<string, number> = {};
+  for (const line of output.slice(start).split('\n').slice(1)) {
+    const m = /^\s+([a-z_]+):\s*(\d+)\s*$/.exec(line);
+    if (!m) {
+      // The tally is a contiguous indented block; the first line that isn't one
+      // ends it. Keep scanning past blank lines so a trailing newline doesn't
+      // truncate a real tally.
+      if (line.trim() === '') continue;
+      break;
+    }
+    counts[m[1]] = Number(m[2]);
+  }
+  return Object.keys(counts).length ? counts : null;
 }
 
 export interface DriverOpts {
@@ -22,8 +55,9 @@ async function runOutreach(
   label: string,
   humanAction: string,
   opts: DriverOpts,
+  captureTally = false,
 ): Promise<ApprovedResult> {
-  if (leads.length === 0) return { attempted: 0, exit_code: 0 };
+  if (leads.length === 0) return { attempted: 0, exit_code: 0, outcomes: null };
 
   const repoPath = process.env.EMAIL_OUTREACH_REPO_PATH;
   if (!repoPath) throw new Error('EMAIL_OUTREACH_REPO_PATH is not set');
@@ -34,12 +68,19 @@ async function runOutreach(
 
   if (opts.dryRun) {
     console.log(`[${label}] DRY RUN — would run in ${repoPath}: npm ${args.join(' ')}`);
-    return { attempted: leads.length, exit_code: 0 };
+    return { attempted: leads.length, exit_code: 0, outcomes: null };
   }
 
   console.log(`[${label}] ${humanAction} for ${leads.length} lead(s)`);
-  const result = await runChild('npm', args, repoPath);
-  return { attempted: leads.length, exit_code: result.exit_code, error: result.error };
+  if (!captureTally) {
+    const result = await runChild('npm', args, repoPath);
+    return { attempted: leads.length, exit_code: result.exit_code, error: result.error, outcomes: null };
+  }
+  // runChildCapture still tees the child to this terminal, so the visible output
+  // is unchanged; it just also keeps a copy to read the tally out of.
+  const result = await runChildCapture('npm', args, repoPath);
+  const outcomes = parseFinalTally(`${result.stdout}\n${result.stderr}`);
+  return { attempted: leads.length, exit_code: result.exit_code, error: result.error, outcomes };
 }
 
 // PREP (runs on the tick): find -> verify -> enrich, then park each lead at
@@ -71,5 +112,6 @@ export async function driveApprovedSend(leads: Lead[], opts: DriverOpts = {}): P
     'approved-send',
     'writing + sending (compose -> push)',
     opts,
+    true, // read the final tally: this is the money path, and its exit code is always 0
   );
 }

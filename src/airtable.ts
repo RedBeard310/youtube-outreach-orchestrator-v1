@@ -67,6 +67,15 @@ export interface Lead {
    *  in_conversation. in_conversation lasts while the thread is live (their message last,
    *  or anything under 14 days old), and dnc-sync releases it on its own. */
   dnc_reason: string | null;
+  /** The composed email, written by the email repo's compose stage. Present + non-empty
+   *  means the writing is already paid for and only the SmartLead push is left. Read
+   *  here (and nowhere else) so the send queue can tell a lead that died mid-push from
+   *  one that never got written. */
+  email_subject: string | null;
+  email_body: string | null;
+  /** Path to the on-disk enrichment bundle. Present means enrichment is already paid
+   *  for, so a send can resume at compose without re-running prep. */
+  enrichment_bundle_path: string | null;
 }
 
 // Every lead-selection query carries this. It is a plain boolean column so the
@@ -112,6 +121,43 @@ const APPROVED_PREP_DONE = new Set<OutreachStatus>([
 // `enriched` is a legacy alias for `ready_data_scraped`. `ready_no_data` is
 // intentionally excluded — its send path isn't built yet (see APPROVED_PREP_DONE).
 const APPROVED_FIRE_READY: readonly OutreachStatus[] = ['ready_data_scraped', 'enriched', 'email_drafted'];
+
+// `failed` is the fourth fire-ready state, and it is conditional — which is why it
+// is listed apart from the three above rather than inside them.
+//
+// The email repo writes `failed` for ANY unhandled error in a lead's run, including
+// a network blip on the SmartLead POST after the email was already written. On
+// 2026-09-24 that cost nine finished emails: the 07:20 send composed 18, lost 9 to
+// `fetch failed` on the push (one retry each, both inside the same two-minute flap),
+// and wrote them `failed`. `failed` was in neither the send queue below nor the
+// tick's APPROVED_PREP_DONE, so the send would never look at them again and the only
+// thing that could was a manual `npm run tick` that nobody runs. Ten researched,
+// written, verified-email leads went quiet with no alarm anywhere, and the approved
+// lane read 0 ready / 0 drafted — indistinguishable from a lane that had finished.
+//
+// A `failed` lead is re-fireable when its own fields show the work is already paid
+// for, which is the same reading youtube-email-outreach-v1's `effectiveStatus()`
+// makes when it decides where to resume: a written subject + body resumes at push
+// (exactly the `email_drafted` case), a bundle resumes at compose (exactly the
+// `ready_data_scraped` case). A `failed` lead with neither never got that far and
+// belongs to prep, not to send — including it would quietly turn a send into a
+// find/verify/enrich run, which is the coupling 2026-07-17 removed on purpose.
+const FIRE_RESUMABLE_STATUSES: readonly OutreachStatus[] = [...APPROVED_FIRE_READY, 'failed'];
+
+/** Where `npm run send` would resume this lead, or null if it must not be fired.
+ *  Mirrors `effectiveStatus()` in youtube-email-outreach-v1/src/cli/outreach.ts —
+ *  if that function's reading changes, change this one with it. */
+export function fireResumeStage(lead: Lead): 'push' | 'compose' | null {
+  const status = lead.outreach_status;
+  if (status == null) return null;
+  if (status === 'email_drafted') return 'push';
+  if (status === 'ready_data_scraped' || status === 'enriched') return 'compose';
+  if (status !== 'failed') return null;
+  // A `failed` lead only qualifies on the evidence in its own fields.
+  if (lead.email_subject?.trim() && lead.email_body?.trim()) return 'push';
+  if (lead.enrichment_bundle_path?.trim()) return 'compose';
+  return null;
+}
 
 const D100_TERMINAL = new Set<OutreachStatus>([
   'deep_research_complete',
@@ -179,6 +225,9 @@ function recordToLead(record: { id: string; get: (field: string) => unknown }): 
     discovered_via: (record.get('discovered_via') as string | undefined) ?? null,
     do_not_contact: record.get('do_not_contact') === true,
     dnc_reason: (record.get('dnc_reason') as string | undefined) ?? null,
+    email_subject: (record.get('email_subject') as string | undefined) ?? null,
+    email_body: (record.get('email_body') as string | undefined) ?? null,
+    enrichment_bundle_path: (record.get('enrichment_bundle_path') as string | undefined) ?? null,
   };
 }
 
@@ -207,13 +256,17 @@ export async function getLeadsForOrchestration(): Promise<Lead[]> {
 // anything else. Everything lies in wait; this is the only thing that sends.
 export async function getApprovedFireLeads(): Promise<Lead[]> {
   const base = getBase();
-  const readyClauses = APPROVED_FIRE_READY.map(s => `{outreach_status}='${s}'`).join(', ');
+  const readyClauses = FIRE_RESUMABLE_STATUSES.map(s => `{outreach_status}='${s}'`).join(', ');
   const formula = `AND({review_status}='approved', OR(${readyClauses}), ${NOT_SUPPRESSED})`;
   const records = await withRetry(
     () => base(tableName()).select({ filterByFormula: formula }).all(),
     'getApprovedFireLeads',
   );
-  return records.map(recordToLead);
+  // The query widens to `failed`; fireResumeStage() decides which of those are
+  // genuinely resumable. The narrowing happens here rather than in the formula
+  // because "has a written body" is a field test the filter translator would have
+  // to approximate, and pipeline-db refuses to approximate a lead-selection filter.
+  return records.map(recordToLead).filter(l => fireResumeStage(l) !== null);
 }
 
 // Whether a specific lead is parked and ready for `npm run send` to fire it.
@@ -223,8 +276,7 @@ export function isApprovedFireReady(lead: Lead): boolean {
   return (
     !lead.do_not_contact &&
     lead.review_status === 'approved' &&
-    lead.outreach_status != null &&
-    APPROVED_FIRE_READY.includes(lead.outreach_status)
+    fireResumeStage(lead) !== null
   );
 }
 

@@ -76,6 +76,8 @@ async function main() {
     console.log(`[send] ts=${startedAt} firing ${leads.length} ready lead(s) through compose+push dry_run=${dryRun}`);
     const result = await driveApprovedSend(leads, { dryRun });
 
+    const sent = result.outcomes?.sent_to_smartlead ?? null;
+    const failed = result.outcomes?.failed ?? null;
     writeTickLog({
       ts: startedAt,
       dry_run: dryRun,
@@ -83,8 +85,25 @@ async function main() {
       send_attempted: result.attempted,
       send_exit: result.exit_code,
       send_error: result.error ?? null,
+      send_sent: sent,
+      send_failed: failed,
+      send_outcomes: result.outcomes ?? null,
     });
-    console.log(`[send] done — attempted=${result.attempted} exit=${result.exit_code}`);
+    console.log(
+      `[send] done — attempted=${result.attempted} sent=${sent ?? '?'} failed=${failed ?? '?'} exit=${result.exit_code}`,
+    );
+    // The child exits 0 even when every lead failed, so a bad send is silent
+    // unless something says so here. A failed lead keeps its written email and is
+    // picked up by the next send (see fireResumeStage in ../airtable.ts) — the
+    // point of this line is that nobody has to read 500 lines of child output to
+    // find out a batch went badly.
+    if (failed && sent !== null && failed > sent) {
+      console.warn(
+        `[send] WARNING: more leads failed (${failed}) than sent (${sent}). ` +
+          'Most failures here are transient network errors on the SmartLead push; ' +
+          'the next send retries them. If it repeats, check SmartLead reachability.',
+      );
+    }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error('[send] failed:', message);
