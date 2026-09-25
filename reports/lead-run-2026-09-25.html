@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lead Run Debrief - 2026-09-25</title>
+<style>
+  :root {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --good-soft: #1f8a5b18; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+      --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+      --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --good-soft: #55c48c1c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --good-soft: #1f8a5b18; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+    --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+    --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --good-soft: #55c48c1c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 40px 22px 80px; }
+  .eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); font-weight: 600; }
+  h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.12; margin: 10px 0 6px; text-wrap: balance; letter-spacing: -.02em; }
+  h2 { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); margin: 44px 0 16px; font-weight: 700; }
+  h3 { font-size: 18px; margin: 0 0 6px; letter-spacing: -.01em; }
+  p { margin: 0 0 14px; }
+  .lede { font-size: 18px; color: var(--ink-soft); max-width: 68ch; }
+  .tag { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--amber-soft); color: var(--amber); letter-spacing: .02em; }
+  .tag.ok { background: var(--teal-soft); color: var(--teal); }
+  .tag.bad { background: var(--red-soft); color: var(--red); }
+  .tag.good { background: var(--good-soft); color: var(--good); }
+  .grid { display: grid; gap: 14px; }
+  .stats { grid-template-columns: repeat(4, 1fr); margin-top: 26px; }
+  @media (max-width: 720px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; box-shadow: var(--shadow); }
+  .stat .n { font-size: 30px; font-weight: 750; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .stat .l { font-size: 12.5px; color: var(--ink-soft); margin-top: 3px; }
+  .stat .s { font-size: 12px; margin-top: 8px; font-weight: 600; }
+  .up { color: var(--good); } .down { color: var(--red); } .warn { color: var(--amber); }
+  .accent-red { border-left: 3px solid var(--red); }
+  .accent-teal { border-left: 3px solid var(--teal); }
+  .accent-amber { border-left: 3px solid var(--amber); }
+  .accent-good { border-left: 3px solid var(--good); }
+
+  .strip { display: flex; align-items: flex-end; gap: 5px; height: 140px; padding: 14px 14px 10px; overflow-x: auto; }
+  .barwrap { flex: 1 0 22px; display: flex; flex-direction: column; align-items: center; gap: 5px; }
+  .bar { width: 100%; border-radius: 3px 3px 0 0; background: var(--teal); opacity: .9; }
+  .bar.low { background: var(--amber); }
+  .bar.today { background: var(--good); opacity: 1; }
+  .bar.zero { background: var(--red); opacity: 1; min-height: 2px; }
+  .barlab { font-size: 10.5px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-soft); padding: 0 14px 14px; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+
+  .q { border-radius: 14px; padding: 20px 22px; margin-bottom: 14px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); }
+  .q .ask { font-size: 17px; font-weight: 700; color: var(--ink); margin-bottom: 10px; display: flex; gap: 10px; align-items: baseline; }
+  .q .ask .qn { color: var(--red); font-weight: 800; flex: 0 0 auto; }
+  .q.accent-teal .ask .qn { color: var(--teal); }
+  .q.accent-good .ask .qn { color: var(--good); }
+  .q p { color: var(--ink-soft); }
+  .q b { color: var(--ink); }
+  .pill { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink); background: var(--panel-2); padding: 1px 7px; border-radius: 6px; border: 1px solid var(--line); white-space: nowrap; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+  th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); }
+  td .num { font-variant-numeric: tabular-nums; font-weight: 650; }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); box-shadow: var(--shadow); }
+  ol.recs { padding-left: 0; list-style: none; counter-reset: r; margin: 0; }
+  ol.recs li { counter-increment: r; position: relative; padding: 14px 16px 14px 52px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 10px; box-shadow: var(--shadow); }
+  ol.recs li::before { content: counter(r); position: absolute; left: 14px; top: 14px; width: 26px; height: 26px; border-radius: 8px; background: var(--teal-soft); color: var(--teal); font-weight: 800; font-size: 14px; display: grid; place-items: center; }
+  ol.recs b { color: var(--ink); }
+  .foot { margin-top: 46px; padding: 16px 18px; border-radius: 12px; background: var(--amber-soft); border: 1px solid var(--line); font-size: 14px; color: var(--ink-soft); }
+  .foot b { color: var(--ink); }
+  .muted { color: var(--ink-soft); font-size: 13.5px; }
+  code { background: var(--panel-2); border: 1px solid var(--line); border-radius: 5px; padding: 0 5px; font-size: .9em; }
+</style>
+
+
+<div class="wrap">
+
+  <div class="eyebrow">Lead Run Debrief · YouTube outreach</div>
+  <h1>2026-09-25: the biggest send day on record, and it emptied the only lane the send command can reach</h1>
+  <p class="lede"><b>55 emails were loaded into SmartLead this cycle</b>, more than any day in this pipeline's history and up from 47 the day before. The ten finished emails a network wobble stranded yesterday all went out this morning, so yesterday's fix paid for itself in twenty-two hours. Two things sit behind that headline. Only 8 of the 55 went through <code>npm run send</code>; the other 47 were driven by hand from the email repo, and this repo's own log knows nothing about them. And the lane that <code>npm run send</code> reads is now <b>completely empty</b>: 1,827 leads at <code>review_status = approved</code> and every single one already sent. The <b>6,649</b> finished emails are parked under <code>approved_hold</code>, which that selector does not look at. So the send command is a no-op from here, including the mystery one that fires whenever an agent opens this repo.</p>
+  <div style="margin-top:14px"><span class="tag good">55 EMAILS, A RECORD DAY</span> <span class="tag good">10 OF 10 STRANDED EMAILS RECOVERED</span> <span class="tag bad">SEND LANE DRAINED TO ZERO</span> <span class="tag ok">0 FAULTS, $0.00 ANTHROPIC</span> <span class="tag">RUNWAY 20 DAYS → 81</span></div>
+
+  <div class="grid stats">
+    <div class="card stat accent-good">
+      <div class="n">55</div>
+      <div class="l">emails loaded into SmartLead</div>
+      <div class="s up">Best day on record. 47 on 09-23, 40 on 09-10</div>
+    </div>
+    <div class="card stat accent-good">
+      <div class="n">10/10</div>
+      <div class="l">stranded emails recovered and sent</div>
+      <div class="s up">Yesterday's <code>ce5abf1</code>, proved in 22 hours</div>
+    </div>
+    <div class="card stat accent-red">
+      <div class="n">0</div>
+      <div class="l">leads <code>npm run send</code> can still fire</div>
+      <div class="s down">1,827 of 1,827 in that lane are sent. 6,649 wait elsewhere</div>
+    </div>
+    <div class="card stat accent-amber">
+      <div class="n">+2</div>
+      <div class="l">leads parked into <code>approved_hold</code></div>
+      <div class="s warn">6,858 → 6,860. The recovery lane is still re-reading its book</div>
+    </div>
+  </div>
+
+  <h2>The shape of the day</h2>
+  <div class="card" style="padding:0">
+    <div class="strip">
+      <div class="barwrap"><div class="bar low" style="height:25%"></div><div class="barlab">14</div></div>
+      <div class="barwrap"><div class="bar" style="height:73%"></div><div class="barlab">40</div></div>
+      <div class="barwrap"><div class="bar zero" style="height:2%"></div><div class="barlab">0</div></div>
+      <div class="barwrap"><div class="bar zero" style="height:2%"></div><div class="barlab">0</div></div>
+      <div class="barwrap"><div class="bar zero" style="height:2%"></div><div class="barlab">0</div></div>
+      <div class="barwrap"><div class="bar zero" style="height:2%"></div><div class="barlab">0</div></div>
+      <div class="barwrap"><div class="bar zero" style="height:2%"></div><div class="barlab">0</div></div>
+      <div class="barwrap"><div class="bar zero" style="height:2%"></div><div class="barlab">0</div></div>
+      <div class="barwrap"><div class="bar zero" style="height:2%"></div><div class="barlab">0</div></div>
+      <div class="barwrap"><div class="bar zero" style="height:2%"></div><div class="barlab">0</div></div>
+      <div class="barwrap"><div class="bar zero" style="height:2%"></div><div class="barlab">0</div></div>
+      <div class="barwrap"><div class="bar zero" style="height:2%"></div><div class="barlab">0</div></div>
+      <div class="barwrap"><div class="bar zero" style="height:2%"></div><div class="barlab">0</div></div>
+      <div class="barwrap"><div class="bar zero" style="height:2%"></div><div class="barlab">0</div></div>
+      <div class="barwrap"><div class="bar" style="height:85%"></div><div class="barlab">47</div></div>
+      <div class="barwrap"><div class="bar today" style="height:100%"></div><div class="barlab">55</div></div>
+      <div class="barwrap"><div class="bar low" style="height:18%"></div><div class="barlab">10</div></div>
+    </div>
+    <div class="legend">
+      <span>Emails loaded into SmartLead per day, 09-09 to 09-25.</span>
+      <span><span class="dot" style="background:var(--red)"></span>The pause, 09-11 to 09-22</span>
+      <span><span class="dot" style="background:var(--good)"></span>09-24, this cycle</span>
+      <span><span class="dot" style="background:var(--amber)"></span>09-25 so far: the ten recovered ones</span>
+    </div>
+  </div>
+  <p class="muted">Three days of sending, three different hands on the lever. The 47 on 09-23 and the 47 inside this cycle were both driven from the email repo by lead id. The 8 at the start of this cycle and the 10 this morning were the automatic session-start send. Counted from <code>outreach_processed_at</code> in Postgres, which the email repo stamps on the push. Note that loading a lead into a SmartLead campaign is not the same as SmartLead delivering the email: its scheduler sends Monday to Thursday, 09:00 to 15:00 Eastern.</p>
+
+  <h2>The three questions</h2>
+
+  <div class="q accent-red">
+    <div class="ask"><span class="qn">1</span><span>Why did nobody know 55 emails went out?</span></div>
+    <p>Because nothing counted them. The grounded metrics file this report is written from carries <code>parked</code>, <code>discovered_today</code>, five sweep health blocks, campaign counters, two spend blocks and a YouTube key probe. Until today it had <b>no field for emails sent at all</b>. For thirteen days that was harmless, because the answer was zero. It stopped being harmless on 09-23.</p>
+    <p>This repo's own log is not a substitute. It records sends it launched itself, which this cycle was one run of 18 attempts. The other 47 were driven by hand from the email repo with a list of ids, and no line anywhere in this repo mentions them. So yesterday's report said "47 emails" for a day whose own log read <code>send_attempted=18</code>, and today's number, 55, had to be pulled out of Postgres by hand by whoever thought to ask.</p>
+    <p>Both numbers now sit in the snapshot, side by side rather than reconciled. <b>The gap between them is the signal</b>: it says how much of the money path ran outside the coordination loop that is supposed to own it. This cycle it says 47 of 55.</p>
+  </div>
+
+  <div class="q accent-red">
+    <div class="ask"><span class="qn">2</span><span>Why can't <code>npm run send</code> do this again?</span></div>
+    <p>Its queue is structurally empty, and it will stay empty. The selector reads <code>review_status = approved</code> and nothing else. That lane now holds <b>1,827 leads, all of them at <code>sent_to_smartlead</code></b>. Zero ready, zero drafted, zero failed. This morning's send took the last ten, which were the ten yesterday's fix rescued.</p>
+    <p>The <b>6,649</b> researched, bundled, ready-to-write leads are at <code>approved_hold</code>. That is not an accident and not a bug: <code>approved_hold</code> is the parking status that exists precisely so approved, validated leads are <em>not</em> auto-composed and sent. The 47 hand-driven emails got out of it by being named individually by id, which bypasses the selector entirely.</p>
+    <p>So the practical position: <b>every future send has to be hand-driven from the email repo, or the selector has to be opened to <code>approved_hold</code></b>. The second is a small code change and a large decision, because it converts a deliberate hold gate into an automatic one. <b>That is Casey's call and no agent should make it.</b> One side effect worth knowing: the unexplained send that fires whenever an agent opens this repo will now find nothing, so it stops being a hazard by itself. Nobody has found what triggers it and that is still worth finding.</p>
+  </div>
+
+  <div class="q accent-amber">
+    <div class="ask"><span class="qn">3</span><span>Is the recovery lane still the bottleneck?</span></div>
+    <p>Yes, and it got thinner again. Four collect passes since yesterday's report, <b>600 lead slots</b>, and they found <b>43 contact points from 21 leads</b>. Hit rates ran <b>4.7%, 3.3%, 1.3% and 4.7%</b> against a lane median near 42%. The book went from <b>3,331 to 3,326</b>, so 600 readings bought <b>5 leads</b>, about 120 readings each against 150 yesterday and 46 on 09-20.</p>
+    <p><b>Search is not the cause and the alarms correctly said so.</b> Not one pass opened on a Brave refusal this cycle, the first clean run of four in a week, and only 2 to 6 of each 150 leads failed to resolve a website. The cause is the one established on 09-22: the lane is on <b>lap 6</b>, re-reading leads it already emptied. All three <code>bloodhound_collect_yield_degraded</code> firings landed on three distinct passes with no hourly repeats, so both the 09-21 per-pass keying and the 09-22 attribution are holding.</p>
+    <p>The verify half tested <b>5 addresses across 3 passes</b> and was handed nothing at all in the other three. That is downstream of collect, not a fault of its own. Those 5 are the whole <b>+2</b>.</p>
+    <p><b>One thing to watch rather than fix.</b> The yield alarm's long baseline is eroding: it read 33%, then 30%, then 28% across the cycle's three firings, against 42% a day earlier. The 09-21 fix gave it an eight-day memory of normal so a slow slide could not erase it, and eight days of degraded passes are now inside that window. The alarm will go quiet within a few days. For a regime we understand and have attributed, that is the designed behaviour, not a regression. But it means the lane's decline will stop announcing itself.</p>
+  </div>
+
+  <h2>What broke, what's fixed</h2>
+
+  <div class="card accent-good" style="margin-bottom:14px">
+    <h3>Yesterday's fix proved itself in twenty-two hours</h3>
+    <p class="muted">No change needed. <code>ce5abf1</code>, shipped 09-24.</p>
+    <p>The ten finished emails that a two-minute network wobble wrote down as <code>failed</code> were, before the fix, invisible to every query in this repo. This morning's 07:20 send selected <b>exactly those ten</b>, resumed all ten at the push step because each carried a written subject and body, and pushed <b>10 of 10 in 12.5 seconds</b>. Nothing was recomposed and nothing was re-enriched, which is what the per-lead resume rule was for.</p>
+    <p>That is a retroactive rescue, not a preventive one. Without it those ten researched, written, verified-address leads would still be sitting in the trapdoor, and the queue would still read zero.</p>
+  </div>
+
+  <div class="card accent-teal" style="margin-bottom:14px">
+    <h3>The report's own numbers had no field for the thing the pipeline exists to do</h3>
+    <p class="muted">Shipped: orchestrator <code>1340a4b</code>. Typecheck clean, 91 tests pass (4 new), 10 new selftest cases, both new queries run live against Postgres and match hand-written SQL exactly.</p>
+    <p><code>sent_today</code> counts emails loaded into a SmartLead campaign inside the cycle, tallied by the lane they came from, beside what this repo's own log recorded. It reads <code>outreach_processed_at</code>, which the email repo stamps on the push, and deliberately not <code>last_contacted_at</code>, which a historical backfill polluted years of rows ago. It carries its own caveat in the file: loaded is not delivered.</p>
+    <p><code>shelf</code> counts the parked pool three ways: ready to write, carrying a bundle, and total. The shelf has been the largest thing in this pipeline since 09-16 and every figure quoted for it since has been counted by hand. This cycle it reads <b>6,649 ready, 6,852 bundled of 6,860</b>, so enrichment has <b>eight</b> leads of work left in that pool.</p>
+    <p>Both fail soft. A debrief missing its send numbers is bad; one that crashes and writes nothing is worse, which is what happened on 09-17, 09-18 and 09-19.</p>
+  </div>
+
+  <div class="card accent-teal" style="margin-bottom:14px">
+    <h3>A clean send could not say it had zero failures, and a total loss printed no warning</h3>
+    <p class="muted">Same commit.</p>
+    <p>This morning's send was perfect, 10 out of 10, and its closing line read <code>sent=10 failed=?</code>, with <code>send_failed: null</code> in the log. The tally the email repo prints only lists statuses it actually saw, and yesterday's reader treated a missing status the same as a missing tally. So "nothing failed" and "nobody measured" wrote the identical record, one day after that exact confusion cost ten emails.</p>
+    <p>A parsed tally is now read as a complete statement: a status it omits happened zero times, and only an absent tally stays unknown. The consequence that matters more than the cosmetics: the warning that fires when failures outnumber sends tested <code>sent !== null</code>, so <b>a batch where every single lead failed was the one case that printed no warning at all</b>. There is a test for that now.</p>
+  </div>
+
+  <div class="card accent-good" style="margin-bottom:14px">
+    <h3>The unscheduled enrichment run finished its list and stopped on its own</h3>
+    <p class="muted">No action taken, none needed.</p>
+    <p>Yesterday flagged a real risk: 119 of the cycle's 124 enrichments came from a process nobody scheduled, working a 132-lead list out of a chat session's <code>/tmp</code> scratchpad, with no unit to restart it. It did not die. It finished: <b>122 of the 132 are parked with a bundle on disk</b>, 6 had no valid email and 1 failed, and the retries cleared 10 of yesterday's 11 failures. The process is gone from the box because its work is done.</p>
+    <p>The risk was real and it simply did not land this time. The VPS chain ran <b>2 batches of 1 lead</b> beside it and idled after each, correctly, because its own queue is one lead. The lasting version of this lesson is the one in recommendation 3.</p>
+  </div>
+
+  <div class="card accent-good">
+    <h3>Nothing faulted</h3>
+    <p>Zero fatal error signatures. Zero halts. Zero quota stops. <b>$0.00 of Anthropic spend</b> against a $150 ceiling. The <code>stranded</code> counter, which is what would say a lead had fallen between the recovery lane's two halves, held at <b>3</b> for the twelfth day. The YouTube key pool read <b>15 working of 66</b> for the twelfth identical morning, which is the settled state and costs nothing while nothing is searching. Every timer fired on schedule. Discovery produced zero new channels, which is the instruction.</p>
+  </div>
+
+  <h2>The money</h2>
+  <p><b>OpenRouter runway went the other way: 20 days back to 81.</b> Spend fell from $10.18 a day to <b>$2.44</b>, and the balance is <b>$197.54</b>. Nothing was fixed and nothing broke. The unscheduled enrichment run finished its 132 leads, so the thing that was spending stopped having work. Yesterday's three-week runway was a true reading of a temporary rate. Treat both figures as "runway at the current rate", and the current rate depends entirely on whether anything is enriching.</p>
+  <p><b>What an email costs to write is still unmeasured, and this cycle could not answer it.</b> Most of the 55 pushes resumed from drafts that were already written and paid for, so the cycle's spend does not isolate a compose cost. The shelf is 6,649 emails that each need one. <b>One send with the per-task cost log turned on still answers it, and doing that before a large batch is cheaper than after.</b></p>
+
+  <h2>The cycle in numbers</h2>
+  <div class="tablewrap">
+    <table>
+      <tr><th>Measure</th><th>This cycle</th><th>Previous</th><th>Reading</th></tr>
+      <tr><td>Emails loaded into SmartLead</td><td class="num">55</td><td class="num">47</td><td>Record day. 15 from <code>approved</code>, 40 from <code>approved_hold</code></td></tr>
+      <tr><td>&nbsp;&nbsp;of which via <code>npm run send</code></td><td class="num">8</td><td class="num">0</td><td>The other 47 hand-driven from the email repo</td></tr>
+      <tr><td>Leads <code>npm run send</code> can still fire</td><td class="num">0</td><td class="num">10</td><td>That lane is drained: 1,827 of 1,827 sent</td></tr>
+      <tr><td>Parked into <code>approved_hold</code></td><td class="num">+2</td><td class="num">+5</td><td>6,858 → 6,860. Both from the recovery lane</td></tr>
+      <tr><td>Shelf, researched and ready to write</td><td class="num">6,649</td><td class="num">6,675</td><td>Fell because 40 shipped out of it</td></tr>
+      <tr><td>Shelf carrying a bundle</td><td class="num">6,852 / 6,860</td><td class="num">n/a</td><td>99.9%. Eight leads of enrichment left</td></tr>
+      <tr><td><code>needs_contact</code> pool</td><td class="num">4,236</td><td class="num">4,238</td><td>Falling only by what the lane recovers</td></tr>
+      <tr><td>Enrichment leads / batches</td><td class="num">2 / 2</td><td class="num">124 / 4</td><td>The 132-lead unscheduled run finished. Queue is 1</td></tr>
+      <tr><td>Contact points collected</td><td class="num">43</td><td class="num">73</td><td>1,063 on 09-20. A mined-out book</td></tr>
+      <tr><td>Collect passes / lead slots</td><td class="num">4 / 600</td><td class="num">4 / 600</td><td>All on schedule</td></tr>
+      <tr><td>Collect hit rate per pass</td><td class="num">4.7, 3.3, 1.3, 4.7%</td><td class="num">7, 9, 5, 3%</td><td>Lane median near 42%</td></tr>
+      <tr><td>Collect book remaining</td><td class="num">3,326</td><td class="num">3,331</td><td>600 readings bought 5 leads</td></tr>
+      <tr><td>Brave refusals at pass open</td><td class="num">0</td><td class="num">0</td><td>2-6 of 150 failed to resolve a site. Not the cause</td></tr>
+      <tr><td>Stranded (gap indicator)</td><td class="num">3</td><td class="num">3</td><td>Unchanged since 09-13. No gap</td></tr>
+      <tr><td>Verify passes / addresses tested</td><td class="num">6 / 5</td><td class="num">6 / 6</td><td>Three passes handed nothing at all</td></tr>
+      <tr><td>New channels discovered</td><td class="num">0</td><td class="num">0</td><td>Intended. Paused by Casey 09-08</td></tr>
+      <tr><td>Fatal signatures / halts</td><td class="num">0 / 0</td><td class="num">0 / 0</td><td>Nothing faulted</td></tr>
+      <tr><td>Anthropic spend</td><td class="num">$0.00</td><td class="num">$0.00</td><td>Ceiling is $150</td></tr>
+      <tr><td>OpenRouter</td><td class="num">$2.44/day</td><td class="num">$10.18/day</td><td>$197.54 left, about 81 days</td></tr>
+      <tr><td>YouTube keys working</td><td class="num">15 of 66</td><td class="num">15 of 66</td><td>Twelfth identical morning. Settled</td></tr>
+      <tr><td>Apify lane</td><td class="num">resting</td><td class="num">resting</td><td>$0.0053 spendable. Cycle rolls 30 Sep</td></tr>
+      <tr><td>Alarms: yield degraded</td><td class="num">3</td><td class="num">4</td><td>3 distinct passes, no repeats. Baseline eroding 33→28%</td></tr>
+      <tr><td>Alarms: walking in place</td><td class="num">0</td><td class="num">0</td><td>Second clean cycle since <code>0874d8a</code></td></tr>
+    </table>
+  </div>
+
+  <h2>Recommended next, ranked</h2>
+  <ol class="recs">
+    <li><b>Decide what fires the next send.</b> <code>npm run send</code> has nothing left to fire and will not get anything back by itself. The 6,649 finished emails are behind the <code>approved_hold</code> gate, which exists to stop exactly this from being automatic. The two options are to keep driving batches by hand from the email repo with a list of ids, which is what produced 94 of the last 112 emails, or to open the selector to <code>approved_hold</code> and accept that the hold gate becomes an automatic one. <b>Casey's call. No agent should make it.</b></li>
+    <li><b>Measure what composing an email costs before a large batch.</b> Still unmeasured, and this cycle could not answer it because the pushes resumed from drafts already written. Enrichment is a known 10 cents a lead. The shelf is 6,649 emails. One send with the per-task cost log on settles it.</li>
+    <li><b>Give enrichment a queue it owns, or accept that it has no work.</b> The chain's real queue is one lead and its pool is 3. The 132-lead run that did almost all of this week's enrichment took its list from a chat session's temporary folder and has now finished and exited. Nothing is broken, and nothing is scheduled to enrich the next batch either. If the recovery lane, Apify or a lifted pause produces arrivals, the chain picks them up; if the work arrives as a hand-made list again, it needs a hand again.</li>
+    <li><b>Decide on the discovery pause.</b> Unchanged, and the case for deciding gets a little stronger each day. The recovery lane is spending 600 readings a day to gain 5 leads, down from 13 yesterday and 62 five days ago. The only three ways new leads arrive are lifting the pause, Apify on 30 September, and funding Brave. <b>Casey's word alone.</b></li>
+    <li><b>Watch Apify on 30 September.</b> Five days out. It has logged the same <code>resting</code> line twelve times a day, correctly, and needs nothing done to it. Last run recovered 62 leads in 52 minutes at $0.099 each.</li>
+    <li><b>Expect the yield alarm on the recovery lane to go quiet, and do not read that as recovery.</b> Its eight-day memory of normal has fallen 42% to 28% as the degraded passes age into it. That is the designed behaviour for a settled regime, but the book problem it is attributing will still be there when the alarm stops mentioning it.</li>
+    <li><b>The 09-17, 09-18 and 09-19 debriefs are still unwritten.</b> Three cycles of history gone. Writing them needs a human re-login on the VPS, and no Anthropic API key may be used instead.</li>
+  </ol>
+
+  <div class="foot">
+    <p><b>The thing worth remembering from this cycle.</b> The pipeline had its best sending day ever and the number was not written down anywhere. Thirteen days of zeroes had taught every part of this system to stop asking, and the file the daily report is built from carried no send count at all, so the headline figure came out of a hand-typed database query. The fix was four lines of counting. The lesson is that a measurement nobody needs while the answer is zero is exactly the measurement that goes missing on the day the answer changes.</p>
+    <p><b>Deliberately not done:</b> no email sent by this agent, no discovery lane touched, no <code>.env</code> or secret read or written, no alarm threshold moved, no halt flag written, and the send selector was left reading <code>approved</code> only rather than quietly widened to the hold pool. The loop is left running for the next cycle.</p>
+  </div>
+
+</div>

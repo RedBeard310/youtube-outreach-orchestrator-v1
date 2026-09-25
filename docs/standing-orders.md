@@ -197,10 +197,15 @@ everything up to "parked, ready to write" is automatic.
 
 ## Parked pools waiting on Casey (don't touch without his word)
 
-> **Numbers below are from 2026-09-02 and are stale. Live at 2026-09-24T07:30Z:
-> `needs_contact` **4,238**, `approved_hold` **6,858** of which **6,675** are
-> `ready_data_scraped` (97%), and **the loading door is OPEN again** — 47 emails
-> went to SmartLead on 09-23 and 8 more on 09-24. See the 09-24 change-log entry.**
+> **Numbers below are from 2026-09-02 and are stale. Live at 2026-09-25T07:30Z:
+> `needs_contact` **4,236**, `approved_hold` **6,860** of which **6,649** are
+> `ready_data_scraped` and **6,852 carry a bundle (99.9%)**, and **the loading door is
+> OPEN**: 47 emails went to SmartLead on 09-23, **55 on 09-24 (a record)** and 10 on
+> 09-25. **But `npm run send` can no longer fire any of them** — its selector reads
+> `review_status='approved'` only and that lane is drained (1,827 leads, all sent). The
+> shelf sits at `approved_hold`, which the selector deliberately does not read, so every
+> send now has to be hand-driven from the email repo by lead id. Widening the selector is
+> Casey's call alone. See the 09-25 change-log entry.**
 >
 > **Older reading, 2026-09-22T07:00Z:
 > `needs_contact` 4,243 and now FLAT, `approved_hold` 6,853 of which 6,586 already
@@ -287,6 +292,55 @@ this is the shape to check first.**
 5. Anything in this file contradicted by what Casey said today? → update it.
 
 ## Change log
+
+- 2026-09-25 (debrief): **THE BIGGEST SEND DAY ON RECORD, 55 EMAILS, AND IT EMPTIED THE ONLY LANE
+  `npm run send` CAN REACH.** 55 loaded into SmartLead (47 on 09-23, 40 on 09-10), and **yesterday's
+  `ce5abf1` proved itself in 22 hours**: the 07:20 send picked exactly the ten stranded `failed` leads,
+  resumed all ten at push off their own written subject+body, and pushed **10 of 10 in 12.5s**.
+  **`npm run send` IS NOW STRUCTURALLY A NO-OP. Its selector reads `review_status='approved'` only and
+  that lane holds 1,827 leads ALL at `sent_to_smartlead`** (0 ready, 0 drafted, 0 failed) because this
+  morning took the last ten. The **6,649** finished emails are at `approved_hold`, which the selector
+  deliberately does not read. **94 of the last 112 emails were hand-driven from the email repo by lead
+  id**, bypassing the selector: 47 at 19:00-20:00Z this cycle (37 `approved_hold` + 10 `approved`) plus
+  47 on 09-23. **Opening the selector to `approved_hold` converts a deliberate hold gate into an
+  automatic one and is CASEY'S CALL ALONE — no agent may widen it.** Side effect: the unexplained
+  session-start send now finds nothing, so it stops being a hazard by itself; the trigger is still
+  unfound.
+  **SHIPPED (`1340a4b`): THE GROUNDED-METRICS FILE HAD NO FIELD FOR EMAILS SENT.** Parked counts, five
+  sweep health blocks, campaign counters, two spend blocks, a key probe, and nothing for the one thing
+  the pipeline exists to do. Harmless through thirteen days of zeroes; from 09-23 it meant the 09-24
+  report quoted "47 emails" for a day whose own log read `send_attempted=18`, and today's 55 came out of
+  a hand-typed SQL query. `sent_today` counts pushes from `outreach_processed_at` (**not** the
+  backfill-polluted `last_contacted_at`), tallied by lane, **beside** what this repo's log recorded
+  rather than reconciled with it — the gap is the signal and it says 47 of 55 ran outside the loop that
+  owns the money path. `shelf` counts ready/bundled/total (hand-quoted in every report since 09-16):
+  **6,649 ready, 6,852 bundled of 6,860 (99.9%)**, so enrichment has eight leads of work left in that
+  pool. Both fail soft. Same commit: **`tallyCount()`** reads a parsed tally as a complete statement (an
+  omitted status happened zero times; only a MISSING tally is unknown), because this morning's flawless
+  send printed `failed=?` and logged `send_failed: null`, identical to an unmeasured send, one day after
+  that exact confusion cost ten emails. Bigger consequence: run-send's more-failed-than-sent warning
+  tested `sent !== null`, so **a batch where EVERY lead failed was the one case that printed no
+  warning.** *Verified:* tsc clean, **91/91** tests (4 new) + 10 new selftest cases, both queries run
+  live against Postgres matching hand SQL exactly, `debrief-data.ts` re-run end to end exit 0.
+  **THE UNSCHEDULED /tmp ENRICHMENT RUN FINISHED AND EXITED** — yesterday's risk did not land. **122 of
+  its 132 parked with bundles**, 6 invalid, 1 failed, its own retries clearing 10 of 11. The chain did
+  **2 batches of 1 lead** beside it and idled, correctly, because the pool is 99.9% bundled.
+  **RECOVERY LANE THINNER AGAIN:** 4 passes, 600 slots, book 3,331 → **3,326** (**5 leads**, ~120
+  readings each, against 13 on 09-24 and 62 on 09-20), **43 contact points**, hit rates **4.7, 3.3, 1.3,
+  4.7%** against a 42% median. **Brave was NOT the cause and for the first time in a week no pass said it
+  was** (0 `402` refusals at pass open, 2-6 of 150 leads unresolved). All 3
+  `bloodhound_collect_yield_degraded` firings hit 3 distinct passes, so the 09-21 per-pass keying and the
+  09-22 attribution both hold. **WATCH, DO NOT FIX: that alarm's 8-day memory of normal has eroded 42% →
+  33 → 30 → 28%** as degraded passes age into it, so within days it will go quiet on a book problem that
+  is still there. Verify tested 5 addresses in 3 passes and was handed nothing in the other 3; those 5
+  are the whole **+2** (6,858 → **6,860**). `needs_contact` **4,236**. 0 fatal signatures, 0 halts,
+  $0.00 Anthropic, 15/66 keys for the twelfth morning, Apify resting until 30 Sep.
+  **OPENROUTER RUNWAY WENT 20 DAYS BACK TO 81** ($2.44/day, $197.54 left) because the run that was
+  spending finished. Both readings were true; runway tracks whether anything is enriching. **Composing
+  an email is still unmeasured and this cycle could not answer it** (most pushes resumed from drafts
+  already written). **The lesson: a measurement nobody needs while the answer is zero is exactly the one
+  that goes missing on the day the answer changes.** Full detail:
+  `brain/lead-gen/runs/lead-run-2026-09-25.html`.
 
 - 2026-09-24 (debrief): **THE EMAIL PAUSE IS LIFTED AND EMAILS ARE GOING OUT AGAIN. 47 LOADED INTO
   SMARTLEAD ON 09-23, THE FIRST SINCE 09-10.** Casey lifted it on 09-23 (`automator/config/email-pause.json`
