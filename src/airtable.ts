@@ -337,3 +337,64 @@ export async function countByReviewStatus(status: ReviewStatus): Promise<number>
   );
   return records.length;
 }
+
+// Emails loaded into SmartLead inside a window, tallied by the review_status lane
+// they came from.
+//
+// Why this exists (2026-09-25): the loading door reopened on 09-23 and 47, then 55,
+// then 10 emails went out — and NOTHING in this repo counted them. The orchestrator's
+// own JSONL only records sends it launched itself (8 of the 55 on 09-24; the other 47
+// were driven by hand from the email repo), and the debrief's grounded-metrics feed had
+// no send field at all. So the one number that is the whole point of the pipeline had to
+// be reconstructed from Postgres by hand, every day, by whoever happened to think of it.
+// Reads `outreach_processed_at`, which the email repo stamps on the push — NOT
+// `last_contacted_at`, which is polluted by a historical backfill (see CLAUDE.md).
+//
+// Note this counts leads LOADED into a SmartLead campaign, which is not the same as
+// emails SmartLead actually delivered: its scheduler sends Mon-Thu 09:00-15:00 ET. For
+// real delivered volume use youtube-email-outreach-v1/scripts/sl-sent-per-day.ts.
+export async function countSentBetween(
+  sinceISO: string,
+  untilISO: string,
+): Promise<{ total: number; by_review_status: Record<string, number> }> {
+  const base = getBase();
+  const formula = `AND(
+    {outreach_status}='sent_to_smartlead',
+    IS_AFTER({outreach_processed_at}, "${sinceISO}"),
+    IS_BEFORE({outreach_processed_at}, "${untilISO}")
+  )`;
+  const records = await withRetry(
+    () => base(tableName()).select({ filterByFormula: formula, fields: ['review_status'] }).all(),
+    'countSentBetween',
+  );
+  const by: Record<string, number> = {};
+  for (const r of records) {
+    const lane = (r.get('review_status') as string | undefined) ?? '(none)';
+    by[lane] = (by[lane] ?? 0) + 1;
+  }
+  return { total: records.length, by_review_status: by };
+}
+
+// The shelf: parked leads that are researched, bundled and one command from a written
+// email. This has been the largest thing in the pipeline since 2026-09-16 and it was
+// only ever counted by hand. `bundled` is the honest measure of whether enrichment has
+// work left; `ready_to_write` is what `npm run send` could fire today if the lane it
+// draws from were opened to approved_hold.
+export async function countShelf(): Promise<{ ready_to_write: number; bundled: number; total: number }> {
+  const base = getBase();
+  const rows = await withRetry(
+    () => base(tableName()).select({
+      filterByFormula: `{review_status}='approved_hold'`,
+      fields: ['outreach_status', 'enrichment_bundle_path'],
+    }).all(),
+    'countShelf',
+  );
+  let ready = 0;
+  let bundled = 0;
+  for (const r of rows) {
+    const status = r.get('outreach_status') as string | undefined;
+    if (status === 'ready_data_scraped' || status === 'enriched') ready += 1;
+    if ((r.get('enrichment_bundle_path') as string | undefined)?.trim()) bundled += 1;
+  }
+  return { ready_to_write: ready, bundled, total: rows.length };
+}

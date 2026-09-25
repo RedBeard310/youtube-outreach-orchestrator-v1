@@ -40,6 +40,22 @@ export function parseFinalTally(output: string): Record<string, number> | null {
   return Object.keys(counts).length ? counts : null;
 }
 
+// Read one status out of a parsed tally.
+//
+// A parsed tally is a COMPLETE statement: the email repo prints a line per status it saw,
+// so a status that is absent happened zero times. Only a missing tally (a dry run, or a
+// crash before the summary) is genuinely unknown, and that is the only case that returns
+// null. Before 2026-09-25 both collapsed to null, so a clean send logged
+// `send_failed: null` and printed `failed=?` — indistinguishable from a send nobody
+// measured, which is the exact shape that let ten finished emails sit unnoticed for a day.
+export function tallyCount(
+  outcomes: Record<string, number> | null | undefined,
+  status: string,
+): number | null {
+  if (!outcomes) return null;
+  return outcomes[status] ?? 0;
+}
+
 export interface DriverOpts {
   dryRun?: boolean;
 }

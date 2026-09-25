@@ -9,7 +9,13 @@ import 'dotenv/config';
 import { execSync } from 'node:child_process';
 import { appendFileSync, existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { countByReviewStatus, getLeadsDiscoveredSince, type Lead } from '../../src/airtable.ts';
+import {
+  countByReviewStatus,
+  countSentBetween,
+  countShelf,
+  getLeadsDiscoveredSince,
+  type Lead,
+} from '../../src/airtable.ts';
 import { discoveryReportKey } from '../../src/discovery-method.ts';
 import { summarizeToday, pacificDate } from './burn-ledger.js';
 
@@ -656,6 +662,63 @@ function cycleCampaignEvents(sinceISO: string, untilISO: string): Array<Record<s
   return ev;
 }
 
+// What this repo's own JSONL recorded about sending inside the cycle (2026-09-25).
+//
+// WHY, and why it is reported NEXT TO the database count rather than instead of it:
+// `npm run send` is not the only thing that pushes to SmartLead. On 2026-09-23 and again
+// on 09-24, 47 emails a day were driven by hand from the email repo, and this log knows
+// nothing about them — 09-24 read `send_attempted=18` for a day that loaded 55. So the
+// gap between the two numbers IS the signal: it says how much of the money path ran
+// outside the coordination loop that is supposed to own it. Do not "reconcile" them by
+// dropping one.
+export function summarizeSendLines(
+  lines: Array<Record<string, unknown>>,
+  sinceISO: string,
+  untilISO: string,
+): {
+  runs: number;
+  attempted_sum: number;
+  sent_sum: number | null;
+  failed_sum: number | null;
+  dry_runs_excluded: number;
+} {
+  let runs = 0;
+  let attempted = 0;
+  let sent: number | null = null;
+  let failed: number | null = null;
+  let dry = 0;
+  for (const e of lines) {
+    const ts = typeof e.ts === 'string' ? e.ts : '';
+    if (ts < sinceISO || ts >= untilISO) continue;
+    if (e.manual_send_run !== true) continue;
+    if (e.dry_run === true) { dry += 1; continue; }
+    runs += 1;
+    attempted += typeof e.send_attempted === 'number' ? e.send_attempted : 0;
+    // send_sent/send_failed only exist from 2026-09-24 (`ce5abf1`), and are null when the
+    // child printed no tally at all. Leave the sum null rather than reading a missing
+    // field as a zero — "we didn't measure" is not "nothing happened", which is the exact
+    // confusion that let a batch lose ten finished emails unnoticed.
+    if (typeof e.send_sent === 'number') sent = (sent ?? 0) + e.send_sent;
+    if (typeof e.send_failed === 'number') failed = (failed ?? 0) + e.send_failed;
+  }
+  return { runs, attempted_sum: attempted, sent_sum: sent, failed_sum: failed, dry_runs_excluded: dry };
+}
+
+function orchestratorSendLog(sinceISO: string, untilISO: string): {
+  runs: number;
+  attempted_sum: number;
+  sent_sum: number | null;
+  failed_sum: number | null;
+  dry_runs_excluded: number;
+} {
+  const lines: Array<Record<string, unknown>> = [];
+  for (const f of readdirSync(LOGS)) {
+    if (!/^orchestrator-\d{4}-\d{2}-\d{2}\.jsonl$/.test(f)) continue;
+    lines.push(...readJsonl(join(LOGS, f)));
+  }
+  return summarizeSendLines(lines, sinceISO, untilISO);
+}
+
 function parkedAtCycleStart(sinceISO: string): number | null {
   const f = join(LOGS, 'autopilot-parked-history.jsonl');
   if (!existsSync(f)) return null;
@@ -1145,6 +1208,12 @@ async function main(): Promise<void> {
     countByReviewStatus('needs_contact'),
   ]);
 
+  // Sending is the point of the pipeline and until now no field here counted it.
+  // Both fail soft: a debrief missing its send numbers is bad, one that crashes and
+  // writes nothing is worse (that is how 09-17/18/19 went unwritten).
+  const sent = await countSentBetween(sinceISO, untilISO).catch(() => null);
+  const shelf = await countShelf().catch(() => null);
+
   // Close the window at the cycle end too. The query is open-ended, so every row the
   // sweeps write between midnight PT and whenever this actually runs used to land in
   // "today" — and the debrief is written FROM these numbers, so a rerun silently
@@ -1252,6 +1321,27 @@ async function main(): Promise<void> {
       parked_today: parkedStart === null ? null : parkedNow - parkedStart,
       done_parked_gain_sum: sum('done', 'parked_gain'),
       needs_contact_now: needsContact,
+    },
+    // Emails LOADED into a SmartLead campaign this cycle (see countSentBetween). Null
+    // means the query failed, not that nothing was sent.
+    sent_today: {
+      total: sent?.total ?? null,
+      by_review_status: sent?.by_review_status ?? null,
+      orchestrator_log: orchestratorSendLog(sinceISO, untilISO),
+      note:
+        'Loaded into a SmartLead campaign, counted from leads.outreach_processed_at. ' +
+        'SmartLead sends on its own schedule (Mon-Thu 09:00-15:00 ET), so this is not ' +
+        'delivered volume — for that run youtube-email-outreach-v1/scripts/sl-sent-per-day.ts. ' +
+        'orchestrator_log covers only sends this repo launched; a batch driven by hand from ' +
+        'the email repo shows up in total and not there, and the difference is the point.',
+    },
+    // The shelf: parked, researched, one command from a written email. The largest
+    // thing in the pipeline since 2026-09-16 and, until now, counted only by hand.
+    shelf: {
+      ready_to_write: shelf?.ready_to_write ?? null,
+      bundled: shelf?.bundled ?? null,
+      approved_hold_total: shelf?.total ?? null,
+      bundled_pct: shelf && shelf.total > 0 ? Math.round((1000 * shelf.bundled) / shelf.total) / 10 : null,
     },
     discovered_today: {
       total: discovered.length,

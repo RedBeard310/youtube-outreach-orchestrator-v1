@@ -19,7 +19,7 @@ import {
   isApprovedFireReady,
   type Lead,
 } from '../airtable.ts';
-import { driveApprovedSend } from '../drivers/approved.ts';
+import { driveApprovedSend, tallyCount } from '../drivers/approved.ts';
 import { acquireLock, releaseLock } from '../lock.ts';
 import { writeTickLog } from '../logger.ts';
 
@@ -76,8 +76,10 @@ async function main() {
     console.log(`[send] ts=${startedAt} firing ${leads.length} ready lead(s) through compose+push dry_run=${dryRun}`);
     const result = await driveApprovedSend(leads, { dryRun });
 
-    const sent = result.outcomes?.sent_to_smartlead ?? null;
-    const failed = result.outcomes?.failed ?? null;
+    // Absent status in a parsed tally means zero; only a missing tally is unknown.
+    // See tallyCount in ../drivers/approved.ts for why that distinction is load-bearing.
+    const sent = tallyCount(result.outcomes, 'sent_to_smartlead');
+    const failed = tallyCount(result.outcomes, 'failed');
     writeTickLog({
       ts: startedAt,
       dry_run: dryRun,

@@ -1,4 +1,4 @@
-import { classifyKeyProbe, missingDebriefs, isVerifiedOrBeyond, laneYield, priorAdvanceSource, priorSeedsAdvanced, priorSeedsWalked, reconcileAdvanced, sessionSeedsAdvanced, sessionStartMs, walkRateTrend } from './debrief-data.ts';
+import { classifyKeyProbe, missingDebriefs, summarizeSendLines, isVerifiedOrBeyond, laneYield, priorAdvanceSource, priorSeedsAdvanced, priorSeedsWalked, reconcileAdvanced, sessionSeedsAdvanced, sessionStartMs, walkRateTrend } from './debrief-data.ts';
 let fail = 0;
 const ok = (name: string, got: unknown, want: unknown) => {
   const pass = JSON.stringify(got) === JSON.stringify(want);
@@ -164,6 +164,43 @@ ok('seven completed cycles, newest first',
 ok('no metrics and no flag for a cycle that never ran',
   future[0], { date: '2099-01-07', has_metrics: false, reason: null });
 console.log(`     (live: ${JSON.stringify(missingDebriefs(new Date().toISOString().slice(0, 10)).map((m) => m.date))})`);
+
+// summarizeSendLines (2026-09-25) — what this repo's OWN log knows about sending.
+const SINCE = '2026-09-24T07:00:00.000Z';
+const UNTIL = '2026-09-25T07:00:00.000Z';
+// The real 09-24 line: a send that predates the send_sent field entirely.
+ok('pre-ce5abf1 line counts the run but leaves the tally unknown',
+  summarizeSendLines(
+    [{ ts: '2026-09-24T07:20:32.262Z', dry_run: false, manual_send_run: true, send_attempted: 18, send_exit: 0 }],
+    SINCE, UNTIL),
+  { runs: 1, attempted_sum: 18, sent_sum: null, failed_sum: null, dry_runs_excluded: 0 });
+// A clean send reports zero failures as zero, not as "no idea".
+ok('a measured clean send sums failed to 0, not null',
+  summarizeSendLines(
+    [{ ts: '2026-09-25T06:00:00.000Z', dry_run: false, manual_send_run: true, send_attempted: 10, send_sent: 10, send_failed: 0 }],
+    SINCE, UNTIL),
+  { runs: 1, attempted_sum: 10, sent_sum: 10, failed_sum: 0, dry_runs_excluded: 0 });
+ok('dry runs are excluded and counted separately',
+  summarizeSendLines(
+    [{ ts: '2026-09-24T07:36:10.839Z', dry_run: true, manual_send_run: true, send_attempted: 10 }],
+    SINCE, UNTIL),
+  { runs: 0, attempted_sum: 0, sent_sum: null, failed_sum: null, dry_runs_excluded: 1 });
+ok('lines outside the cycle window are ignored',
+  summarizeSendLines(
+    [{ ts: '2026-09-25T07:20:33.098Z', dry_run: false, manual_send_run: true, send_attempted: 10, send_sent: 10 }],
+    SINCE, UNTIL),
+  { runs: 0, attempted_sum: 0, sent_sum: null, failed_sum: null, dry_runs_excluded: 0 });
+ok('a tick line is not a send',
+  summarizeSendLines([{ ts: '2026-09-24T09:00:00.000Z', dry_run: false, approved_prepped: 4 }], SINCE, UNTIL),
+  { runs: 0, attempted_sum: 0, sent_sum: null, failed_sum: null, dry_runs_excluded: 0 });
+// The whole point: two real sends, only one of which this repo launched. The gap between
+// attempted_sum and the database count is what says work ran outside the loop.
+ok('two runs sum, and a partly-measured cycle keeps the measured part',
+  summarizeSendLines([
+    { ts: '2026-09-24T07:20:32.262Z', dry_run: false, manual_send_run: true, send_attempted: 18, send_exit: 0 },
+    { ts: '2026-09-24T19:00:00.000Z', dry_run: false, manual_send_run: true, send_attempted: 8, send_sent: 8, send_failed: 0 },
+  ], SINCE, UNTIL),
+  { runs: 2, attempted_sum: 26, sent_sum: 8, failed_sum: 0, dry_runs_excluded: 0 });
 
 console.log(fail === 0 ? '\nALL PASS' : `\n${fail} FAILED`);
 process.exit(fail === 0 ? 0 : 1);

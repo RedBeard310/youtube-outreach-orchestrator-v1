@@ -4,7 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { fireResumeStage, isApprovedFireReady, type Lead } from '../src/airtable.ts';
-import { parseFinalTally } from '../src/drivers/approved.ts';
+import { parseFinalTally, tallyCount } from '../src/drivers/approved.ts';
 
 function lead(over: Partial<Lead> = {}): Lead {
   return {
@@ -117,4 +117,36 @@ test('parseFinalTally: a run with no tally reports nothing rather than zero', ()
   // are different facts and the JSONL line has to be able to tell them apart.
   assert.equal(parseFinalTally('crashed before the summary'), null);
   assert.equal(parseFinalTally('=== Final tally ===\n'), null);
+});
+
+// tallyCount (2026-09-25): a parsed tally is a complete statement, so a status it
+// does not mention happened zero times. Only a MISSING tally is unknown. Today's
+// clean 10-of-10 send printed `failed=?` and logged `send_failed: null`, which is
+// what an unmeasured send also looks like.
+test('tallyCount: a status absent from a parsed tally is zero, not unknown', () => {
+  assert.equal(tallyCount({ sent_to_smartlead: 10 }, 'failed'), 0);
+  assert.equal(tallyCount({ sent_to_smartlead: 10 }, 'sent_to_smartlead'), 10);
+});
+
+test('tallyCount: no tally at all stays unknown', () => {
+  assert.equal(tallyCount(null, 'failed'), null);
+  assert.equal(tallyCount(undefined, 'sent_to_smartlead'), null);
+});
+
+test('tallyCount: the 09-24 stranding reads as 8 sent and 10 failed', () => {
+  const tally = parseFinalTally('=== Final tally ===\n  sent_to_smartlead: 8\n  failed: 10\n');
+  assert.equal(tallyCount(tally, 'sent_to_smartlead'), 8);
+  assert.equal(tallyCount(tally, 'failed'), 10);
+});
+
+test('tallyCount: a tally of only failures reports 0 sent, which must trip the warning', () => {
+  const tally = parseFinalTally('=== Final tally ===\n  failed: 18\n');
+  const sent = tallyCount(tally, 'sent_to_smartlead');
+  const failed = tallyCount(tally, 'failed');
+  assert.equal(sent, 0);
+  assert.equal(failed, 18);
+  // run-send.ts warns on `failed && sent !== null && failed > sent`. Under the old
+  // null-for-absent reading sent was null here, so the worst possible send — every
+  // lead lost — was the one case that printed no warning.
+  assert.ok(failed && sent !== null && failed > sent);
 });
