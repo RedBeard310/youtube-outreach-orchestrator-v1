@@ -73,7 +73,13 @@ async function runOutreach(
   opts: DriverOpts,
   captureTally = false,
 ): Promise<ApprovedResult> {
-  if (leads.length === 0) return { attempted: 0, exit_code: 0, outcomes: null };
+  // An EMPTY BATCH IS A COMPLETE STATEMENT, NOT AN UNKNOWN (2026-09-26). Nothing
+  // was attempted, so nothing was sent and nothing failed. Returning `null` here
+  // made the drained-lane case print `attempted=0 sent=? failed=?` and log
+  // `send_sent: null`, which is the same shape a crashed-before-the-tally send
+  // writes — the exact ambiguity tallyCount() was added to kill one day earlier.
+  // `{}` is a tally with no statuses in it, which tallyCount reads as 0 each.
+  if (leads.length === 0) return { attempted: 0, exit_code: 0, outcomes: {} };
 
   const repoPath = process.env.EMAIL_OUTREACH_REPO_PATH;
   if (!repoPath) throw new Error('EMAIL_OUTREACH_REPO_PATH is not set');

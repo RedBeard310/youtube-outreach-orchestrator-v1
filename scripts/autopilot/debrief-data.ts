@@ -17,6 +17,7 @@ import {
   type Lead,
 } from '../../src/airtable.ts';
 import { discoveryReportKey } from '../../src/discovery-method.ts';
+import { collectBookDepth, collectYieldBetween, loadState } from '../../src/recovery/bloodhound-lane.ts';
 import { summarizeToday, pacificDate } from './burn-ledger.js';
 
 const REPO = '/home/casey/repos/youtube-outreach-orchestrator-v1';
@@ -1214,6 +1215,13 @@ async function main(): Promise<void> {
   const sent = await countSentBetween(sinceISO, untilISO).catch(() => null);
   const shelf = await countShelf().catch(() => null);
 
+  // The recovery lane is the only thing still producing new sendable leads while
+  // discovery is paused, and no field here counted its output. Same fail-soft rule
+  // as the two above. See collectYieldBetween() for what each number means.
+  const laneYieldNow = await collectYieldBetween(sinceISO, untilISO).catch(() => null);
+  const laneBook = await collectBookDepth().catch(() => null);
+  const laneState = loadState(join(LOGS, 'bloodhound-lane-state.json'));
+
   // Close the window at the cycle end too. The query is open-ended, so every row the
   // sweeps write between midnight PT and whenever this actually runs used to land in
   // "today" — and the debrief is written FROM these numbers, so a rerun silently
@@ -1334,6 +1342,30 @@ async function main(): Promise<void> {
         'delivered volume — for that run youtube-email-outreach-v1/scripts/sl-sent-per-day.ts. ' +
         'orchestrator_log covers only sends this repo launched; a batch driven by hand from ' +
         'the email repo shows up in total and not there, and the difference is the point.',
+    },
+    // What the Bloodhound recovery lane produced this cycle. Its collect pass is the
+    // pipeline's only lead-producing process while discovery is paused, so a debrief
+    // that can't see its yield can't tell a picked-over book from a broken lane.
+    // `email_points` is the number that matters: only an email flips a lead to
+    // approved_hold. A null block means the queries failed, not that yield was zero.
+    recovery_lane: {
+      contact_points_added: laneYieldNow?.points ?? null,
+      email_points_added: laneYieldNow?.email_points ?? null,
+      leads_with_new_points: laneYieldNow?.leads_with_points ?? null,
+      contact_points_prev_7d: laneYieldNow?.points_prev_7d ?? null,
+      email_points_prev_7d: laneYieldNow?.email_points_prev_7d ?? null,
+      collect_book_pool: laneBook?.pool ?? null,
+      collect_book_stranded: laneBook?.stranded ?? null,
+      collect_laps: laneState.collectLaps ?? null,
+      last_collect_at: laneState.lastCollectAt ?? null,
+      last_verify_at: laneState.lastVerifyAt ?? null,
+      note:
+        'Contact points the collect pass wrote in the cycle, from leads.contact_points.created_at. ' +
+        'A lap is one full walk of collect_book_pool; past lap 1 most leads are re-walks, so a ' +
+        'low yield at a high lap count is a picked-over book rather than a fault — read it ' +
+        'against contact_points_prev_7d. A climbing collect_book_stranded is the real fault ' +
+        'signal (a selector gap has reopened). Emails here are unverified: the verify pass ' +
+        'decides which ones flip to approved_hold.',
     },
     // The shelf: parked, researched, one command from a written email. The largest
     // thing in the pipeline since 2026-09-16 and, until now, counted only by hand.

@@ -4,7 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { fireResumeStage, isApprovedFireReady, type Lead } from '../src/airtable.ts';
-import { parseFinalTally, tallyCount } from '../src/drivers/approved.ts';
+import { driveApprovedSend, parseFinalTally, tallyCount } from '../src/drivers/approved.ts';
 
 function lead(over: Partial<Lead> = {}): Lead {
   return {
@@ -137,6 +137,18 @@ test('tallyCount: the 09-24 stranding reads as 8 sent and 10 failed', () => {
   const tally = parseFinalTally('=== Final tally ===\n  sent_to_smartlead: 8\n  failed: 10\n');
   assert.equal(tallyCount(tally, 'sent_to_smartlead'), 8);
   assert.equal(tallyCount(tally, 'failed'), 10);
+});
+
+// The drained lane (2026-09-26). Both session-start sends since the approved lane
+// emptied logged `send_attempted: 0` with `send_sent: null` and printed
+// `sent=? failed=?`, which is the shape of a send nobody measured. Nothing was
+// attempted, so 0 and 0 are the facts.
+test('driveApprovedSend: an empty batch reports 0 sent and 0 failed, not unknown', async () => {
+  const r = await driveApprovedSend([]);
+  assert.equal(r.attempted, 0);
+  assert.equal(r.exit_code, 0);
+  assert.equal(tallyCount(r.outcomes, 'sent_to_smartlead'), 0);
+  assert.equal(tallyCount(r.outcomes, 'failed'), 0);
 });
 
 test('tallyCount: a tally of only failures reports 0 sent, which must trip the warning', () => {

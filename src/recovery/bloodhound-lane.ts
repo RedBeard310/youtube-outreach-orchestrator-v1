@@ -540,6 +540,61 @@ export async function collectBookDepth(): Promise<{ pool: number; stranded: numb
   return { pool: Number(r?.pool ?? 0), stranded: Number(r?.stranded ?? 0) };
 }
 
+/** What the collect pass actually PRODUCED in a window, plus the same measure over
+ *  the seven days before it, so one number can be read against its own trend.
+ *
+ *  WHY (2026-09-26). While discovery is paused this lane is the pipeline's only
+ *  source of new sendable leads, and the daily grounded metrics counted its output
+ *  nowhere: `parked_today` is the approved_hold delta, which the Siege send path
+ *  moves too, and nothing else in the file mentions the lane at all. So the 09-26
+ *  cycle reported `parked_today: 0` for a lane whose collect yield had fallen from
+ *  250-550 contact points a pass to about 6 — five days earlier, when its first lap
+ *  closed. That is not a fault (the book is picked over: 3,339 of 4,236 pool leads
+ *  already carry a resolved website and their methods have run against it up to six
+ *  times), but a debrief cannot say so without the number.
+ *
+ *  Emails are counted separately because they are the only kind that flips a lead
+ *  to approved_hold; every other kind is a step towards one. A `points` figure that
+ *  looks alive on phones and socials while `email_points` is zero is exactly the
+ *  shape worth seeing.
+ *
+ *  Counted from `leads.contact_points.created_at`, which is the collector's own
+ *  write, so this needs no log parsing and cannot be thrown off by a pass whose
+ *  child was killed before it printed a summary line. */
+export async function collectYieldBetween(
+  sinceISO: string,
+  untilISO: string,
+): Promise<{
+  points: number;
+  email_points: number;
+  leads_with_points: number;
+  points_prev_7d: number;
+  email_points_prev_7d: number;
+}> {
+  const emailKinds = `('business_email', 'personal_email', 'youtube_email')`;
+  const inWindow = `cp.created_at >= $1::timestamptz AND cp.created_at < $2::timestamptz`;
+  const inPrev7d = `cp.created_at >= $1::timestamptz - interval '7 days' AND cp.created_at < $1::timestamptz`;
+  const rows = await query<Record<string, string | number>>(
+    `SELECT
+       count(*) FILTER (WHERE ${inWindow}) AS points,
+       count(*) FILTER (WHERE ${inWindow} AND cp.kind IN ${emailKinds}) AS email_points,
+       count(DISTINCT cp.lead_id) FILTER (WHERE ${inWindow}) AS leads_with_points,
+       count(*) FILTER (WHERE ${inPrev7d}) AS points_prev_7d,
+       count(*) FILTER (WHERE ${inPrev7d} AND cp.kind IN ${emailKinds}) AS email_points_prev_7d
+       FROM leads.contact_points cp`,
+    [sinceISO, untilISO],
+  );
+  const r = rows[0] ?? {};
+  const n = (k: string) => Number(r[k] ?? 0);
+  return {
+    points: n('points'),
+    email_points: n('email_points'),
+    leads_with_points: n('leads_with_points'),
+    points_prev_7d: n('points_prev_7d'),
+    email_points_prev_7d: n('email_points_prev_7d'),
+  };
+}
+
 export async function selectUntouchedBatch(
   limit: number,
   cursor?: CollectCursor,
