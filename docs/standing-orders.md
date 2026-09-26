@@ -293,6 +293,51 @@ this is the shape to check first.**
 
 ## Change log
 
+- 2026-09-26 (debrief): **107 EMAILS, NEARLY DOUBLE THE RECORD, AND 97 OF THEM CAME FROM SIEGE, NOT
+  FROM THIS REPO.** Ten at 00:20 PT from the session-start send, then **97 between 09:25 and 10:22 PT
+  from one LIVE Siege run**: board of **4,737 people in 3 tiers**, **513 DNC blocks honoured**, **22
+  live mailboxes of 37** at 15/day for **185 offered slots**, and it took **100** because the ramp cap
+  on sending day 3 is 100. Wrote 100, **sent 97, skipped 1, failed 0**, and paid **$0** — all six live
+  offers are template writers ("No model calls, $0") drawing on bundles paid for weeks ago.
+  **THE VOLUME CEILING IS NOW OFFER VARIETY, NOT LEADS: 10 of 16 Siege offers cannot run**, each for a
+  small named reason it prints at the top of every run (no Notion subject line, no batch-writer script,
+  0 of the 2 required follow-up bodies, `email_type` missing from `leads.vocab_outreach_email_type`, a
+  Notion Working Status left on Paused, one writer importing a dead `/Users/caseybrown/...` Mac path).
+  One is blocked on purpose: the 80% time offer's gate says the breakdown video does not exist yet.
+  Unblocking offers is what lets one board absorb more volume without emailing anybody twice.
+  **ENRICHMENT IS FINISHED.** The chain launched **0 batches** this cycle, its pool is **3 leads (2
+  permanently excluded)**, and it logged one line all day: a transcript-provider limit at 12:40:34Z that
+  cleared **19 seconds later** on its own. Casey's 09-08 order to put every resource into the leads we
+  already have is complete at **99.9% bundled**, leaving a **6,570-lead shelf**, about 60 days of
+  sending at this rate. **Do not read the idle chain as a fault.**
+  **NEW FINDING, WHERE OPENROUTER IS ACTUALLY GOING:** spend held flat at **$2.52/day** on a cycle when
+  enrichment did nothing and the finder logged zero calls, so the old rule ("the burn is enrichment") no
+  longer explains it. `automator/scripts/smartlead-auto-reply.py` ran **683 times in 24h, always in dry
+  run, and 401 of those runs paid `openrouter:deepseek/deepseek-v3.2` to classify the SAME address**
+  (`tara@rehab-hq.com`): dry run never sends, so the reply never leaves the queue, so the next run
+  re-buys the same verdict. Fix is a result held against the reply id, or a slower timer while in dry
+  run. **It lives outside the five repos the autopilot may edit**, so it is recorded here, not shipped.
+  Runway is **77 days on $194.99**, so this is waste, not a threat.
+  **THE RECOVERY LANE PARKED NOBODY FOR A SECOND DAY:** 4 passes, **600 readings → 26 contact points, 6
+  of them emails, 20 leads, 5 leads off the book** (3,326 → 3,321), hit rates **4.7/2.7/2.0/4.0%**,
+  **100% re-walks on every pass**, website resolution **98-99%**, **Brave refused nothing**. Its verify
+  half is genuinely drained rather than gapped: of 913 `needs_contact` leads holding 1,215 email points,
+  **only 4 have never been checked** (542 carry a ZeroBounce verdict, the rest are held by the ownership
+  gate), and `stranded` held at **3** for the 13th day. **The alarm saying all this is one day from
+  going quiet** — its long baseline fell **27.7 → 17.3 → 8.3 → 7.3%** across four firings and today's
+  drop read 45.5% against a 40% threshold. Whether the hourly collect pass keeps its slot is a judgement
+  call for Casey: it costs no money and is not broken, but 1,200 readings over two days moved 5 leads,
+  and the 4,236-lead pool needs a method it does not have rather than another lap of the ones it does.
+  **SHIPPED (`5eb5581`): THE METRICS FILE COULD NOT SEE THE ONLY LANE STILL PRODUCING LEADS.**
+  `parked_today` is the parked-pool delta, which the Siege send path also moves, so its **0** was
+  ambiguous on a day the lane's yield was down 98%. New `recovery_lane` block: contact points and email
+  addresses this cycle **against the prior 7 days** (26 and 6, versus **3,672 and 405**), book depth,
+  `stranded`, lap number. The query (`collectYieldBetween`) sits next to the two selectors it derives
+  from, so widening one cannot leave the number describing a pool that no longer exists. Same commit:
+  **an empty send batch now reports 0 sent / 0 failed** instead of `null`, because both session-start
+  sends since the `approved` lane drained printed `sent=? failed=?`, which is the shape of a send that
+  crashed before its tally. *Verified:* tsc clean, **86 tests pass** (1 new), both new queries run live
+  against Postgres. Full detail: `brain/lead-gen/runs/lead-run-2026-09-26.html`.
 - 2026-09-25 (debrief): **THE BIGGEST SEND DAY ON RECORD, 55 EMAILS, AND IT EMPTIED THE ONLY LANE
   `npm run send` CAN REACH.** 55 loaded into SmartLead (47 on 09-23, 40 on 09-10), and **yesterday's
   `ce5abf1` proved itself in 22 hours**: the 07:20 send picked exactly the ten stranded `failed` leads,
