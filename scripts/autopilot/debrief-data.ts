@@ -1362,7 +1362,7 @@ async function main(): Promise<void> {
       note:
         'Contact points the collect pass wrote in the cycle, from leads.contact_points.created_at. ' +
         'A lap is one full walk of collect_book_pool; past lap 1 most leads are re-walks, so a ' +
-        'low yield at a high lap count is a picked-over book rather than a fault — read it ' +
+        'low yield at a high lap count is a picked-over book rather than a fault, so read it ' +
         'against contact_points_prev_7d. A climbing collect_book_stranded is the real fault ' +
         'signal (a selector gap has reopened). Emails here are unverified: the verify pass ' +
         'decides which ones flip to approved_hold.',
