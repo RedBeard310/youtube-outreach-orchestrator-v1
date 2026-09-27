@@ -1,4 +1,4 @@
-import { classifyKeyProbe, missingDebriefs, summarizeSendLines, isVerifiedOrBeyond, laneYield, priorAdvanceSource, priorSeedsAdvanced, priorSeedsWalked, reconcileAdvanced, sessionSeedsAdvanced, sessionStartMs, walkRateTrend } from './debrief-data.ts';
+import { classifyKeyProbe, MAX_MISSING_DEBRIEFS, missingDebriefs, summarizeSendLines, isVerifiedOrBeyond, laneYield, priorAdvanceSource, priorSeedsAdvanced, priorSeedsWalked, reconcileAdvanced, sessionSeedsAdvanced, sessionStartMs, walkRateTrend } from './debrief-data.ts';
 let fail = 0;
 const ok = (name: string, got: unknown, want: unknown) => {
   const pass = JSON.stringify(got) === JSON.stringify(want);
@@ -159,11 +159,23 @@ ok('anything unrecognised stays unrecognised', classifyKeyProbe(500, 'backend er
 const future = missingDebriefs('2099-01-08');
 ok('a cycle is never listed as missing its own report', future.some((m) => m.date === '2099-01-08'), false);
 ok('seven completed cycles, newest first',
-  future.map((m) => m.date),
+  future.map((m) => m.date).slice(0, 7),
   ['2099-01-07', '2099-01-06', '2099-01-05', '2099-01-04', '2099-01-03', '2099-01-02', '2099-01-01']);
 ok('no metrics and no flag for a cycle that never ran',
   future[0], { date: '2099-01-07', has_metrics: false, reason: null });
-console.log(`     (live: ${JSON.stringify(missingDebriefs(new Date().toISOString().slice(0, 10)).map((m) => m.date))})`);
+// THE REGRESSION (2026-09-27). The 7-day window forgot the gap it was written for:
+// 2026-09-17/18/19 aged out of it by 09-25 and the field read `[]` for two cycles
+// while six reports were owed. A date with grounded metrics on disk is still
+// writable however old it is, so it must still be listed.
+const liveMissing = missingDebriefs(new Date().toISOString().slice(0, 10));
+ok('an old gap that still has its metrics file is not forgotten',
+  liveMissing.some((m) => m.has_metrics && m.date < new Date(Date.now() - 7 * 86_400_000).toISOString().slice(0, 10)),
+  true);
+ok('newest first', liveMissing.map((m) => m.date).join() ===
+  [...liveMissing.map((m) => m.date)].sort().reverse().join(), true);
+ok('the list is capped so a backlog cannot crowd out the cycle',
+  liveMissing.length <= MAX_MISSING_DEBRIEFS, true);
+console.log(`     (live: ${JSON.stringify(liveMissing.map((m) => m.date))})`);
 
 // summarizeSendLines (2026-09-25) — what this repo's OWN log knows about sending.
 const SINCE = '2026-09-24T07:00:00.000Z';

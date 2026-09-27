@@ -741,15 +741,47 @@ function parkedAtCycleStart(sinceISO: string): number | null {
 // metrics file on disk, so a later run can write the report from real numbers
 // rather than guesses. Deliberately reads only the filesystem: no database call,
 // no cost, and it cannot itself be the thing that is broken.
+//
+// A GAP MUST NOT AGE OUT OF ITS OWN REMINDER (2026-09-27). The list above was a
+// flat 7-day lookback, which is exactly long enough to forget the thing it was
+// written for. 2026-09-17, -18 and -19 were the gap it was built on 09-20 to
+// report, and by 09-25 all three had slid past the seventh day: this field read
+// `[]` on 09-26 and 09-27 while six cycles were owed, three of them the original
+// three. A reminder with a shorter memory than the backlog it tracks reports an
+// empty backlog and reads as "nothing owed".
+//
+// So it is now the union of two readings, which answer different questions:
+//
+//  - the last 7 dates, which catch a cycle that failed so early it wrote no
+//    metrics file at all (`has_metrics: false`), the shape of the OAuth failure
+//    in the note above;
+//  - every date that HAS a metrics file and no report, however old, because that
+//    is precisely the set a later run can still write from real numbers. It is
+//    bounded by the metrics files on disk, and no date before the first one can
+//    ever be written anyway.
+//
+// Newest first, capped, so a long backlog cannot crowd out the current cycle.
+export const MAX_MISSING_DEBRIEFS = 14;
+
 export function missingDebriefs(today: string): Array<{ date: string; has_metrics: boolean; reason: string | null }> {
   const RUNS = '/home/casey/repos/casey-assistant/brain/lead-gen/runs';
-  const out: Array<{ date: string; has_metrics: boolean; reason: string | null }> = [];
   const todayMs = Date.parse(`${today}T12:00:00Z`);
-  if (Number.isNaN(todayMs)) return out;
+  if (Number.isNaN(todayMs)) return [];
+  const dates = new Set<string>();
   // The last 7 completed cycles. Today's own report does not exist yet — the agent
   // that reads this is the one about to write it — so start one day back.
   for (let back = 1; back <= 7; back++) {
-    const d = new Date(todayMs - back * 86_400_000).toISOString().slice(0, 10);
+    dates.add(new Date(todayMs - back * 86_400_000).toISOString().slice(0, 10));
+  }
+  // Every cycle whose numbers survive on disk, at any age.
+  try {
+    for (const f of readdirSync(LOGS)) {
+      const m = /^autopilot-debrief-(\d{4}-\d{2}-\d{2})\.json$/.exec(f);
+      if (m && m[1]! < today) dates.add(m[1]!);
+    }
+  } catch { /* an unreadable log dir leaves the 7-day window, which is the old behaviour */ }
+  const out: Array<{ date: string; has_metrics: boolean; reason: string | null }> = [];
+  for (const d of [...dates].sort().reverse()) {
     if (existsSync(join(RUNS, `lead-run-${d}.html`))) continue;
     const flag = join(LOGS, `autopilot-debrief-missing-${d}.flag`);
     let reason: string | null = null;
@@ -760,6 +792,7 @@ export function missingDebriefs(today: string): Array<{ date: string; has_metric
       } catch { /* a flag we cannot read is still a flag */ }
     }
     out.push({ date: d, has_metrics: existsSync(join(LOGS, `autopilot-debrief-${d}.json`)), reason });
+    if (out.length >= MAX_MISSING_DEBRIEFS) break;
   }
   return out;
 }
