@@ -711,6 +711,62 @@ test('collectPassAttribution: too small a sample is null, not a clean reading', 
   assert.equal(collectPassAttribution(attPass(attIds(0, 12), { hit: 1, none: 1 })), null);
 });
 
+// --- braveRefusals: could this pass search at all?  Added 2026-09-27 ---------
+// THE REGRESSION THIS EXISTS FOR (the mirror image of the one above). The 09-22
+// fix assumed the all-keys-refused line prints on every pass, so it hard-coded
+// "raising the cap would not have changed it" into the alarm text. It prints
+// only when EVERY key refuses. On 2026-09-26 both keys hit their monthly cap,
+// the lane rewound the cursor twice for `previous_pass_search_dead`, and the
+// check-in an hour later was still telling Casey the line was not evidence.
+const REFUSAL = '[bloodhound] All 2 Brave Search API key(s) refused: 402 Usage limit exceeded';
+
+test('collectPassAttribution: a pass with no refusal line counts zero', () => {
+  const log = [
+    attPass(attIds(0, 40), { hit: 25, none: 2 }),
+    attPass(attIds(500, 40), { hit: 20, none: 2 }),
+  ].join('\n');
+  assert.equal(collectPassAttribution(log)!.braveRefusals, 0);
+});
+
+test('collectPassAttribution: refusals are counted from the judged pass only', () => {
+  // Two refusals in the pass BEFORE the judged one, one inside it. A tail read
+  // cannot tell these apart; that is the whole bug.
+  const log = [
+    attPass(attIds(0, 40), { hit: 25, none: 2 }),
+    REFUSAL, REFUSAL,
+    attPass(attIds(500, 40), { hit: 1, none: 2 }),
+    REFUSAL,
+    attPass(attIds(900, 40), { hit: 1, none: 2 }),
+  ].join('\n');
+  const a = collectPassAttribution(log)!;
+  assert.equal(a.braveRefusals, 1, 'only the refusal inside the judged pass');
+  assert.ok(a.noSitePct < 70, 'a capped plan and healthy resolution can coexist');
+  assert.equal(a.rewalkPct, 0);
+});
+
+test('collectPassAttribution: refusals do not disturb the lead readings', () => {
+  const ids = attIds(0, 40);
+  const log = [
+    attPass(ids, { hit: 25, none: 2 }),
+    [REFUSAL, attPass(ids, { hit: 1, none: 2 })].join('\n'),
+  ].join('\n');
+  const a = collectPassAttribution(log)!;
+  assert.equal(a.braveRefusals, 1);
+  assert.equal(a.sampled, 40);
+  assert.equal(a.rewalkPct, 100, 'still reads as the re-walk it also is');
+  assert.equal(a.resolvedHit, 1);
+});
+
+test('collectPassAttribution: the refusal line matches the rewind detector', () => {
+  // Same regex, so the alarm and lastCollectPassSearchDead() cannot disagree.
+  for (const status of ['402 Usage limit exceeded', 'no key answered (network or timeout)']) {
+    const line = `[bloodhound] All 2 Brave Search API key(s) refused: ${status}`;
+    const log = [attPass(attIds(0, 40), { hit: 25, none: 2 }), line,
+      attPass(attIds(500, 40), { hit: 1, none: 2 })].join('\n');
+    assert.equal(collectPassAttribution(log)!.braveRefusals, 1, status);
+  }
+});
+
 // --- collectRewalkCause: WHY the walk is repeating ---------------------------
 // Added 2026-09-23. The walking-in-place alarm asserted "the cursor is failing
 // to advance" in its own text and said it twelve times on 2026-09-22 while the

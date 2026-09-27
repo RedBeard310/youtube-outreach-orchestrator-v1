@@ -1351,17 +1351,29 @@ async function main(): Promise<void> {
         // to raise the cap about three passes that resolved sites for 93%, 79%
         // and 79% of their leads. See collectPassAttribution() for the reading
         // and for why `bookDrained` could not suppress this one.
-        const braveRefused = logText.split('\n').slice(-400).some((l) => l.includes('Brave Search API key'));
+        // COUNT THE REFUSALS THIS PASS LOGGED, DO NOT GUESS FROM THE TAIL
+        // (2026-09-27). The 09-22 note below over-corrected: it assumed the
+        // all-keys-refused line prints on every pass, so it dismissed the line
+        // as never being evidence. `searchBrave()` prints it only when EVERY key
+        // refuses, so a pass with one healthy key prints nothing, and the last
+        // eight passes logged 0,0,0,0,0,1,1,0. Both keys hit their monthly cap
+        // during 2026-09-26 and this alarm told Casey "raising the cap would not
+        // have changed it" one hour after the lane itself rewound the cursor for
+        // `previous_pass_search_dead` off the same line. The tail read stays only
+        // as the fallback for when the pass is too small to attribute at all.
         const att = collectPassAttribution(logText);
+        const braveRefused = att !== null
+          ? att.braveRefusals > 0
+          : logText.split('\n').slice(-400).some((l) => l.includes('Brave Search API key'));
         const resolutionDown = att !== null && att.noSitePct >= NO_SITE_ALARM_PCT;
-        const spendWouldHelp = att === null || resolutionDown;
+        const spendWouldHelp = att === null || resolutionDown || braveRefused;
         let cause: string;
         if (att && !resolutionDown) {
           const rewalking = att.rewalkPct >= REWALK_CAUSE_PCT;
           cause = `Website resolution is NOT what broke here: this pass resolved a site for ${att.resolvedSampled} of ${att.sampled} leads (${(100 - att.noSitePct).toFixed(0)}%).` +
             (braveRefused
-              ? ' A Brave refusal line is printed on every pass because one key sits permanently at its monthly cap, so it is not evidence about this pass and raising the cap would not have changed it.'
-              : '') +
+              ? ` It did lose ${att.braveRefusals} lookup${att.braveRefusals === 1 ? '' : 's'} to every Brave key refusing at once, so search credit is genuinely out and the leads needing a FRESH lookup got nothing — topping up the plan or adding BRAVE_SEARCH_API_KEY[_N] keys would recover that share, which is the smaller half of this pass.`
+              : ' No Brave key refused during this pass, so search credit is not the constraint and topping up the plan would not have changed it.') +
             (rewalking
               ? ` ${att.seenBefore} of the ${att.sampled} leads (${att.rewalkPct.toFixed(0)}%) have been collected from before in this log, and only ${att.resolvedHit} of the ${att.resolvedSampled} with a working site produced anything — the lane is re-walking a book it has already mined. The constraint is leads to walk, not search credit.`
               : ' Check the collect log for a new failure mode in the collection methods themselves before assuming the backlog thinned.');
@@ -1392,7 +1404,13 @@ async function main(): Promise<void> {
           pass_resolved_hit: att?.resolvedHit ?? null,
           pass_resolved_sampled: att?.resolvedSampled ?? null,
           brave_refusal_logged: braveRefused,
-          attributed_to: att === null ? 'unknown' : resolutionDown ? 'site_resolution' : att.rewalkPct >= REWALK_CAUSE_PCT ? 'book_rewalk' : 'unexplained',
+          pass_brave_refusals: att === null ? null : att.braveRefusals,
+          // Two causes can be true at once and the record now says so, because a
+          // re-walked book and a dead search plan need opposite answers (wait
+          // vs. spend) and 2026-09-27 was both.
+          attributed_to: att === null ? 'unknown' : resolutionDown ? 'site_resolution'
+            : att.rewalkPct >= REWALK_CAUSE_PCT ? (braveRefused ? 'book_rewalk+search_dead' : 'book_rewalk')
+            : braveRefused ? 'search_dead' : 'unexplained',
           detail: `The recovery lane's last collect pass produced contact points for ${y.current.hit} of ${y.current.of} leads (${(y.current.rate * 100).toFixed(0)}%), against a ${y.baselineSource === 'long' ? y.longPasses : y.shortPasses}-pass median of ${(y.baseline * 100).toFixed(0)}% — a ${y.dropPct.toFixed(0)}% relative fall, alarm at ${YIELD_DROP_ALARM_PCT}%.${memory} This is the recovery lane's throughput, and while discovery is paused it is the only source of new parked leads. ${cause} ${escalation}`,
         }) + '\n');
         console.log(`[checkin ${day}] OBSERVATION bloodhound_collect_yield_degraded — ${y.current.hit}/${y.current.of} (${(y.current.rate * 100).toFixed(0)}%) vs ${(y.baseline * 100).toFixed(0)}% ${y.baselineSource} baseline, down ${y.dropPct.toFixed(0)}%`);

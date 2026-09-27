@@ -1333,6 +1333,26 @@ export function collectYield(
  * correctly silent at 1.36x while this sat at 100%). A rotated or truncated log
  * shortens the history, so the reading can only ever under-claim a re-walk.
  *
+ * `braveRefusals` (2026-09-27) is the third reading, and it is here to keep the
+ * 09-22 fix above from over-correcting. That fix was written on the premise that
+ * the all-keys-refused line "prints at the top of EVERY pass" because one key
+ * sits at its $5 cap, so it told Casey the line is never evidence. The premise
+ * is wrong: `searchBrave()` prints that line only when EVERY key refuses a
+ * lookup, so a pass with one healthy key prints nothing. Counted per pass over
+ * the eight passes to 2026-09-27T07:00Z the line appeared 0, 0, 0, 0, 0, 1, 1
+ * and 0 times. Both keys reached their monthly cap during 09-26, and the lane's
+ * own `lastCollectPassSearchDead()` read the same line off the same pass and
+ * rewound the cursor twice for `previous_pass_search_dead` — while the check-in
+ * one hour later was still printing "raising the cap would not have changed it".
+ *
+ * So the count is scoped to the judged pass, exactly like the other two
+ * readings, and a caller can say "this pass asked and got refused N times"
+ * instead of inferring anything from the file. A pass can be BOTH a re-walk of a
+ * mined-out book AND unable to search: `resolvedSampled` says whether the sites
+ * it did hold were enough to work with, and this says whether new lookups were
+ * possible at all. The two together are the honest answer; either alone has now
+ * misreported this lane once in each direction.
+ *
  * Returns null when the newest judged pass is too small a sample to attribute.
  */
 export function collectPassAttribution(
@@ -1347,6 +1367,9 @@ export function collectPassAttribution(
   resolvedHit: number;
   seenBefore: number;
   rewalkPct: number;
+  /** All-keys-refused lines logged INSIDE this pass. 0 means the pass could
+   *  search; >0 means some lookups in it got nothing back from any key. */
+  braveRefusals: number;
   historyPasses: number;
 } | null {
   const minSample = opts.minSample ?? 30;
@@ -1366,9 +1389,13 @@ export function collectPassAttribution(
   if (pick < 0) return null;
   const start = pick === 0 ? 0 : ends[pick - 1]!.at + 1;
   const LEAD = /^\[(rec\w+)\].* site=(\S+)/;
+  // The same line lastCollectPassSearchDead() matches, so the alarm and the
+  // rewind can never disagree about whether a pass could search.
+  const REFUSED = /Brave Search API key\(s\) refused/;
   const ids: string[] = [];
-  let noSite = 0, resolvedSampled = 0, resolvedHit = 0;
+  let noSite = 0, resolvedSampled = 0, resolvedHit = 0, braveRefusals = 0;
   for (const raw of lines.slice(start, ends[pick]!.at)) {
+    if (REFUSED.test(raw)) braveRefusals++;
     const m = LEAD.exec(raw.trim());
     if (!m) continue;
     ids.push(m[1]!);
@@ -1391,6 +1418,7 @@ export function collectPassAttribution(
     resolvedHit,
     seenBefore,
     rewalkPct: (seenBefore / ids.length) * 100,
+    braveRefusals,
     historyPasses: pick,
   };
 }
