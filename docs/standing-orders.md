@@ -330,7 +330,7 @@ this is the shape to check first.**
   disk and no report at any age, newest first, capped at 14: **09-19, 09-18, 09-17, 08-18, 08-17,
   07-11**. **ENRICHMENT IS A DRIP:** 3 batches of 1 lead, 3 distinct ids, all exit 0, then idle; pool of
   3 with 2 permanently excluded; shelf **6,573 ready to write**, **6,855 of 6,863 bundled (99.9%)**.
-  **+3 parked** (6,860 to 6,863), the lane's first parks in three days, off **27 contact points and 4
+  **+3 parked** (6,860 to 6,863), the lane's first parks in two days, off **27 contact points and 4
   emails** against 2,774 and 360 in the prior seven days. **The paid reply loop self-cleared** after
   **539 more** re-classifications of `tara@rehab-hq.com` (940 lifetime for one reply), stopping at
   01:31Z when the reply left the queue; the shape that caused it is untouched, so the next stuck reply
