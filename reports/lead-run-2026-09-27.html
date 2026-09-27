@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lead Run Debrief - 2026-09-27</title>
+<style>
+  :root {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --good-soft: #1f8a5b18; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+      --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+      --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --good-soft: #55c48c1c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --good-soft: #1f8a5b18; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+    --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+    --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --good-soft: #55c48c1c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 40px 22px 80px; }
+  .eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); font-weight: 600; }
+  h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.12; margin: 10px 0 6px; text-wrap: balance; letter-spacing: -.02em; }
+  h2 { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); margin: 44px 0 16px; font-weight: 700; }
+  h3 { font-size: 18px; margin: 0 0 6px; letter-spacing: -.01em; }
+  p { margin: 0 0 14px; }
+  .lede { font-size: 18px; color: var(--ink-soft); max-width: 68ch; }
+  .tag { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--amber-soft); color: var(--amber); letter-spacing: .02em; }
+  .tag.ok { background: var(--teal-soft); color: var(--teal); }
+  .tag.bad { background: var(--red-soft); color: var(--red); }
+  .tag.good { background: var(--good-soft); color: var(--good); }
+  .grid { display: grid; gap: 14px; }
+  .stats { grid-template-columns: repeat(4, 1fr); margin-top: 26px; }
+  @media (max-width: 720px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; box-shadow: var(--shadow); }
+  .stat .n { font-size: 30px; font-weight: 750; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .stat .l { font-size: 12.5px; color: var(--ink-soft); margin-top: 3px; }
+  .stat .s { font-size: 12px; margin-top: 8px; font-weight: 600; }
+  .up { color: var(--good); } .down { color: var(--red); } .warn { color: var(--amber); }
+  .accent-red { border-left: 3px solid var(--red); }
+  .accent-teal { border-left: 3px solid var(--teal); }
+  .accent-amber { border-left: 3px solid var(--amber); }
+  .accent-good { border-left: 3px solid var(--good); }
+
+  .strip { display: flex; align-items: flex-end; gap: 5px; height: 140px; padding: 14px 14px 10px; overflow-x: auto; }
+  .barwrap { flex: 1 0 22px; display: flex; flex-direction: column; align-items: center; gap: 5px; }
+  .bar { width: 100%; border-radius: 3px 3px 0 0; background: var(--teal); opacity: .9; }
+  .bar.low { background: var(--amber); }
+  .bar.today { background: var(--good); opacity: 1; }
+  .bar.zero { background: var(--red); opacity: 1; min-height: 2px; }
+  .barlab { font-size: 10.5px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-soft); padding: 0 14px 14px; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+
+  .q { border-radius: 14px; padding: 20px 22px; margin-bottom: 14px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); }
+  .q .ask { font-size: 17px; font-weight: 700; color: var(--ink); margin-bottom: 10px; display: flex; gap: 10px; align-items: baseline; }
+  .q .ask .qn { color: var(--red); font-weight: 800; flex: 0 0 auto; }
+  .q.accent-teal .ask .qn { color: var(--teal); }
+  .q.accent-good .ask .qn { color: var(--good); }
+  .q p { color: var(--ink-soft); }
+  .q b { color: var(--ink); }
+  .pill { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink); background: var(--panel-2); padding: 1px 7px; border-radius: 6px; border: 1px solid var(--line); white-space: nowrap; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+  th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); }
+  td .num { font-variant-numeric: tabular-nums; font-weight: 650; }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); box-shadow: var(--shadow); }
+  ol.recs { padding-left: 0; list-style: none; counter-reset: r; margin: 0; }
+  ol.recs li { counter-increment: r; position: relative; padding: 14px 16px 14px 52px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 10px; box-shadow: var(--shadow); }
+  ol.recs li::before { content: counter(r); position: absolute; left: 14px; top: 14px; width: 26px; height: 26px; border-radius: 8px; background: var(--teal-soft); color: var(--teal); font-weight: 800; font-size: 14px; display: grid; place-items: center; }
+  ol.recs b { color: var(--ink); }
+  .foot { margin-top: 46px; padding: 16px 18px; border-radius: 12px; background: var(--amber-soft); border: 1px solid var(--line); font-size: 14px; color: var(--ink-soft); }
+  .foot b { color: var(--ink); }
+  .muted { color: var(--ink-soft); font-size: 13.5px; }
+  code { background: var(--panel-2); border: 1px solid var(--line); border-radius: 5px; padding: 0 5px; font-size: .9em; }
+</style>
+
+
+
+
+<div class="wrap">
+
+  <div class="eyebrow">Lead Run Debrief · YouTube outreach</div>
+  <h1>2026-09-26: zero emails went out, and the schedule is the reason</h1>
+  <p class="lede"><b>No emails were loaded into SmartLead this cycle</b>, against 107 the day before. Nothing failed and nothing was lost. Siege's timer runs Monday to Friday because SmartLead only delivers Monday to Thursday, and Siege counts its volume ramp in sending days rather than calendar dates, so Monday picks up at 100 new emails and not at a higher rung. Saturday was always going to read zero. The real news is in the recovery lane: <b>both Brave Search keys hit their monthly spending cap</b> during the cycle. The lane caught it and held its cursor rather than marking 300 leads as walked, which is the behaviour it was built for. The hourly alarm that reports on it was still telling Casey that topping up the plan would not have helped, which was true a week ago and is not true now. That is fixed. Enrichment is down to a drip of three leads, Anthropic spend was zero for the fourteenth day, and nothing faulted.</p>
+  <div style="margin-top:14px"><span class="tag ok">0 EMAILS, BY DESIGN</span> <span class="tag bad">BOTH BRAVE KEYS CAPPED</span> <span class="tag good">CURSOR HELD, 300 LEADS SAVED</span> <span class="tag good">+3 PARKED</span> <span class="tag">539 MORE PAID RE-READS, NOW STOPPED</span></div>
+
+  <div class="grid stats">
+    <div class="card stat accent-teal">
+      <div class="n">0</div>
+      <div class="l">emails loaded into SmartLead</div>
+      <div class="s">Saturday. Siege runs Mon to Fri, SmartLead delivers Mon to Thu</div>
+    </div>
+    <div class="card stat accent-red">
+      <div class="n">2</div>
+      <div class="l">collect passes that could not search at all</div>
+      <div class="s down">Every Brave key answered 402 Usage limit exceeded</div>
+    </div>
+    <div class="card stat accent-good">
+      <div class="n">2</div>
+      <div class="l">cursor rewinds, so nobody was walked blind</div>
+      <div class="s up">300 leads kept their turn instead of being skipped for a lap</div>
+    </div>
+    <div class="card stat accent-amber">
+      <div class="n">27</div>
+      <div class="l">contact points, 4 of them email addresses</div>
+      <div class="s warn">450 readings, 10 leads. 2,774 in the prior seven days</div>
+    </div>
+  </div>
+
+  <h2>The shape of the day</h2>
+  <div class="card" style="padding:0">
+    <div class="strip">
+      <div class="barwrap"><div class="bar low" style="height:7%"></div><div class="barlab">8</div></div>
+      <div class="barwrap"><div class="bar low" style="height:13%"></div><div class="barlab">14</div></div>
+      <div class="barwrap"><div class="bar" style="height:37%"></div><div class="barlab">40</div></div>
+      <div class="barwrap"><div class="bar zero" style="height:2%"></div><div class="barlab">0</div></div>
+      <div class="barwrap"><div class="bar zero" style="height:2%"></div><div class="barlab">0</div></div>
+      <div class="barwrap"><div class="bar zero" style="height:2%"></div><div class="barlab">0</div></div>
+      <div class="barwrap"><div class="bar zero" style="height:2%"></div><div class="barlab">0</div></div>
+      <div class="barwrap"><div class="bar zero" style="height:2%"></div><div class="barlab">0</div></div>
+      <div class="barwrap"><div class="bar zero" style="height:2%"></div><div class="barlab">0</div></div>
+      <div class="barwrap"><div class="bar zero" style="height:2%"></div><div class="barlab">0</div></div>
+      <div class="barwrap"><div class="bar zero" style="height:2%"></div><div class="barlab">0</div></div>
+      <div class="barwrap"><div class="bar zero" style="height:2%"></div><div class="barlab">0</div></div>
+      <div class="barwrap"><div class="bar zero" style="height:2%"></div><div class="barlab">0</div></div>
+      <div class="barwrap"><div class="bar zero" style="height:2%"></div><div class="barlab">0</div></div>
+      <div class="barwrap"><div class="bar zero" style="height:2%"></div><div class="barlab">0</div></div>
+      <div class="barwrap"><div class="bar" style="height:44%"></div><div class="barlab">47</div></div>
+      <div class="barwrap"><div class="bar" style="height:51%"></div><div class="barlab">55</div></div>
+      <div class="barwrap"><div class="bar" style="height:100%"></div><div class="barlab">107</div></div>
+      <div class="barwrap"><div class="bar" style="height:2%;background:var(--amber);opacity:1"></div><div class="barlab">0</div></div>
+    </div>
+    <div class="legend">
+      <span>Emails loaded into SmartLead per Pacific day, 09-08 to 09-26.</span>
+      <span><span class="dot" style="background:var(--red)"></span>The email pause, 09-11 to 09-22</span>
+      <span><span class="dot" style="background:var(--amber)"></span>09-26, this cycle: a scheduled zero, not a fault</span>
+    </div>
+  </div>
+  <p class="muted">There was nothing to plot inside the day. The send command ran at 00:20 Pacific, found an empty lane, and reported zero attempted, zero sent, zero failed, which is the shape yesterday's fix taught it to print instead of a row of question marks. Siege never started. Counted from <code>outreach_processed_at</code> in Postgres, the stamp the email repo writes on a push. The 107 from Friday are still being delivered: SmartLead sends Monday to Thursday, 09:00 to 15:00 Eastern, so Friday's batch lands across this coming week.</p>
+
+  <h2>The three questions</h2>
+
+  <div class="q accent-teal">
+    <div class="ask"><span class="qn">1</span><span>A zero after the best day on record. Did something break?</span></div>
+    <p>No. <b><code>siege-plan.timer</code> is set to Monday through Friday at 08:15 Eastern</b>, 45 minutes before SmartLead's sending window opens, and its last run was Friday at 12:15 UTC. It did not fire on Saturday and it will not fire today. That is deliberate: SmartLead delivers Monday to Thursday only, so writing emails on a Saturday would just queue them behind Monday's.</p>
+    <p><b>The ramp costs nothing either.</b> Siege's volume ceiling climbs 50, 50, 100, 100, 150, 150, 200, 250, and the note in its own config says the count is kept in <b>sending days rather than dates, so a skipped day resumes where it left off instead of jumping</b>. Friday was day 3 and took 100. Monday is day 4 and takes 100. The plateau of 250 a day is still about four sending days out, which lines up with Casey's instruction that full volume was not wanted until the end of September.</p>
+    <p>The only thing this repo's own send command did was confirm it has nothing to do. It fired at 00:20, selected zero leads, and logged <code>attempted=0 sent=0 failed=0</code>. Its lane has been fully sent since Friday morning and the 6,573-lead shelf sits under <code>approved_hold</code>, which its selector does not read on purpose.</p>
+  </div>
+
+  <div class="q accent-red">
+    <div class="ask"><span class="qn">2</span><span>Brave ran out of money. How much did that cost, and what did the lane do about it?</span></div>
+    <p>Both keys reached their monthly spending caps during the cycle. Two of the three collect passes logged <b>All 2 Brave Search API key(s) refused: 402 Usage limit exceeded</b>, the line the search helper prints when no key will answer at all. Nine of the collector's ten methods need the creator's own website, and the website comes from that search.</p>
+    <p><b>What it did not cost is the interesting part.</b> The lane read its own refusal line and rewound its cursor twice, for <code>previous_pass_search_dead</code>, so the 300 leads in those two passes keep their turn instead of being stamped walked and waiting a full lap of 3,300 for another look. That machinery was built after 2026-09-04, when exactly this failure turned a widened batch into 71 parked leads instead of 627. It worked without anybody looking at it.</p>
+    <p>What it did cost is the small share of leads that needed a fresh lookup. Site resolution still read <b>97%</b> across both passes, because most of those leads are re-walks whose site was already stored, and the free channel-page route resolves plenty more with no search at all. So the honest reading is two causes at once: a picked-over book, which no money fixes, and a dead search plan, which money does fix for the minority of leads needing a new lookup. <b>Brave is also the pipeline's only web search since Tavily was dropped on 09-13</b>, so the same cap throttles email finding, not just this lane.</p>
+  </div>
+
+  <div class="q accent-amber">
+    <div class="ask"><span class="qn">3</span><span>With sending off and Brave capped, what actually produced anything?</span></div>
+    <p>Three things, all small. <b>The recovery lane parked 3 leads</b>, its first parks in three days, from 27 contact points across 10 leads. <b>The enrichment chain ran 3 batches of one lead each</b>, three different leads, all exit 0, and then went back to idling. That is the shape of a finished job: the chain is no longer draining a queue, it is catching each lead the recovery lane flips, one at a time, within hours.</p>
+    <p><b>The shelf grew by exactly those three</b>, from 6,570 to 6,573 researched leads ready to write, with 6,855 of 6,863 parked leads carrying a bundle. At Friday's 107 that is about sixty sending days of material, and at the 250-a-day plateau it is about twenty-six.</p>
+    <p>The <b>Apify email-recovery lane produced nothing and correctly said so twelve times</b>. It holds $10.0053 with $10 reserved, so it has $0.0053 to spend, which buys zero channels against a 25-channel floor. It has been resting on that reserve since 09-06. It is not broken and it is not going to restart on its own.</p>
+  </div>
+
+  <h2>What broke, what's fixed</h2>
+
+  <div class="card accent-good" style="margin-bottom:14px">
+    <h3>Nothing faulted</h3>
+    <p>Zero fatal error signatures. Zero halts. Zero quota stops. <b>$0.00 of Anthropic spend</b> against a $150 ceiling, the fourteenth consecutive zero. The <code>stranded</code> counter, which is what would say a lead had fallen between the recovery lane's two halves, held at <b>3</b> for the fourteenth day. The YouTube key pool read <b>15 working of 66</b> for the fourteenth identical morning, which is settled and costs nothing while nothing is searching. Discovery produced zero new channels, which is the instruction from 09-08. Every timer fired on its schedule, including the ones whose schedule is "not on Saturday".</p>
+  </div>
+
+  <div class="card accent-teal" style="margin-bottom:14px">
+    <h3>The alarm told Casey a real Brave outage was not evidence of a Brave outage</h3>
+    <p class="muted">Shipped: orchestrator <code>41a23f5</code>. Typecheck clean, 96 tests pass, 4 of them new, verified against the live collect log.</p>
+    <p>On 09-22 this alarm was fixed for blaming the search plan whenever the string "Brave Search API key" appeared anywhere in the log tail. That fix was right about the symptom and wrong about the mechanism: it assumed the line <b>prints on every pass</b> because one key sits permanently at its $5 cap, so it hard-coded the sentence "raising the cap would not have changed it" into the alarm text.</p>
+    <p>The line prints only when <b>every</b> key refuses a single lookup. Counted per pass, the last eight passes logged it 0, 0, 0, 0, 0, 1, 1 and 0 times. So when both keys capped out yesterday, the alarm fired at 01:11, recorded <code>brave_refusal_logged: true</code>, blamed the re-walk alone and told Casey his money would buy nothing. <b>One hour earlier the lane itself had rewound the cursor off that same line.</b> The two halves of one measurement disagreed, and the half that talks to Casey was the wrong one.</p>
+    <p><code>collectPassAttribution()</code> now counts refusals inside the pass being judged, using the same pattern the rewind detector uses, so they cannot disagree again. The record gains <code>pass_brave_refusals</code>, and <code>attributed_to</code> can say <code>book_rewalk+search_dead</code>, because both were true. When a pass logs no refusal the alarm still says plainly that search credit is not the constraint. <b>The rule this keeps re-learning: an alarm that names a remedy costing money has to read the pass in front of it, not the file it sits in, and that cuts both ways.</b></p>
+  </div>
+
+  <div class="card accent-teal" style="margin-bottom:14px">
+    <h3>The list of unwritten debriefs had a shorter memory than the backlog</h3>
+    <p class="muted">Shipped: orchestrator <code>93c428b</code>. Typecheck clean, selftest passes with 3 new cases.</p>
+    <p>The grounded metrics file carries a <code>missing_debriefs</code> field, added on 09-20 after an expired login silently skipped the reports for 09-17, 09-18 and 09-19. It looked back seven days. By 09-25 all three of those dates had slid past the seventh day, so the field read <code>[]</code> on both of the last two cycles while <b>six reports were owed</b>, including the three it was written to remember.</p>
+    <p>It now also lists every date that still has a grounded metrics file on disk and no report, at any age, because that is exactly the set a later run can write from real numbers instead of guesses. Newest first, capped at 14 so a long backlog cannot crowd out the current cycle. It reads <b>09-19, 09-18, 09-17, 08-18, 08-17 and 07-11</b> today. Yesterday's report named only one of those six, which is the cost of the bug it had.</p>
+  </div>
+
+  <div class="card accent-good" style="margin-bottom:14px">
+    <h3>The paid reply loop stopped by itself, after 539 more re-reads</h3>
+    <p class="muted">Observed, not changed. The script is outside the five repos this agent may edit.</p>
+    <p>Yesterday's report found the auto-reply timer paying a model to re-classify one address, <code>tara@rehab-hq.com</code>, 401 times in a day, because dry run never clears the queue that feeds it. This cycle it did it <b>539 more times across 698 runs</b>, and then at 01:31 the reply left the queue and every run since has read "0 replies to classify". Lifetime cost of that one reply: <b>940 paid classifications</b>.</p>
+    <p>It fixed itself, and the shape that caused it is untouched. The next reply that sits in a dry-run queue will do the same thing. The fix is still one of two small things in <code>automator/scripts/smartlead-auto-reply.py</code>: cache the verdict against the reply id, or slow the timer while it is in dry run.</p>
+  </div>
+
+  <div class="card accent-amber">
+    <h3>Ten of Siege's sixteen offers still cannot run, and the ramp is about to make that expensive</h3>
+    <p class="muted">Unchanged from yesterday. Not this repo's to fix. Repeated because the deadline moved.</p>
+    <p>Six offers can run. The other ten are out for small nameable reasons Siege prints at the top of every run: no subject line in Notion, no batch-writer script, zero of the two required follow-up bodies, an email type missing from the database vocabulary, a Notion status left on Paused, and one writer importing a path from Casey's old Mac. One is blocked on purpose, the 80% time offer, whose gate says its breakdown video does not exist.</p>
+    <p>What changed is the timing. The ramp goes 100, 150, 150, 200, 250 over the next five sending days. Its own config note says <b>3,115 reachable people at one offer a week absorb about 450 a day, and only seven offers are finished</b>, so the board is the limit long before the mailboxes are. Every offer unblocked this week is capacity the ramp can actually use.</p>
+  </div>
+
+  <h2>The money</h2>
+  <p><b>OpenRouter: $2.03 spent, $192.88 left, about 93 days at that rate.</b> Down from $2.52, and the drop is the stuck reply leaving the queue partway through the night rather than any lane getting cheaper. Runway improved from 77 days to 93 for the same reason.</p>
+  <p><b>Anthropic: $0.00 against a $150 ceiling</b>, fourteen days running. <b>Apify: resting</b> on $0.0053 of spendable budget behind a $10 reserve, as it has since 09-06. <b>Brave: out of money on both keys</b>, which is the one spend problem that is actively costing something. Nothing was written this cycle, so no model wrote a word.</p>
+  <p><b>What a researched, model-written email costs is still unmeasured</b>, for the third cycle. Nothing model-written has gone out: all six runnable offers are templates, and the offers that would use the 6,573 leads' research are among the ten that cannot run.</p>
+
+  <h2>The cycle in numbers</h2>
+  <div class="tablewrap">
+    <table>
+      <tr><th>Measure</th><th>This cycle</th><th>Previous</th><th>Reading</th></tr>
+      <tr><td>Emails loaded into SmartLead</td><td class="num">0</td><td class="num">107</td><td>Saturday. Not a sending day for Siege or SmartLead</td></tr>
+      <tr><td>&nbsp;&nbsp;of which from Siege</td><td class="num">0</td><td class="num">97</td><td><code>siege-plan.timer</code> is Mon to Fri. Last ran Friday 12:15 UTC</td></tr>
+      <tr><td>&nbsp;&nbsp;of which via <code>npm run send</code></td><td class="num">0</td><td class="num">10</td><td>Attempted 0. Logged clean zeroes, not question marks</td></tr>
+      <tr><td>Siege ramp position</td><td class="num">day 3 held</td><td class="num">day 3</td><td>Counted in sending days. Monday is day 4, cap 100</td></tr>
+      <tr><td>Parked into <code>approved_hold</code></td><td class="num">+3</td><td class="num">0</td><td>6,860 to 6,863. First parks in three days</td></tr>
+      <tr><td>Shelf, researched and ready to write</td><td class="num">6,573</td><td class="num">6,570</td><td>About 60 sending days at 107, 26 at the 250 plateau</td></tr>
+      <tr><td>Shelf carrying a bundle</td><td class="num">6,855 / 6,863</td><td class="num">6,852 / 6,860</td><td>99.9%. Enrichment is finished</td></tr>
+      <tr><td>Enrichment leads / batches</td><td class="num">3 / 3</td><td class="num">0 / 0</td><td>Three distinct leads, all exit 0. A drip, not a queue</td></tr>
+      <tr><td><code>needs_contact</code> pool</td><td class="num">4,233</td><td class="num">4,236</td><td>Down by the 3 that flipped</td></tr>
+      <tr><td>Contact points collected</td><td class="num">27</td><td class="num">26</td><td>4 email addresses, 10 leads. 2,774 in the prior 7 days</td></tr>
+      <tr><td>Collect passes / lead readings</td><td class="num">3 / 450</td><td class="num">4 / 600</td><td>Cadence is about 7h, so three passes fit this window</td></tr>
+      <tr><td>Collect hit rate per pass</td><td class="num">2.0, 4.0, 0.7%</td><td class="num">4.7, 2.7, 2.0, 4.0%</td><td>Lane's own long median has fallen to 5%</td></tr>
+      <tr><td>Collect book remaining</td><td class="num">3,316</td><td class="num">3,321</td><td>450 readings bought 5 leads. Lap 6, 100% re-walks</td></tr>
+      <tr><td>Brave all-keys refusals</td><td class="num">2 of 3 passes</td><td class="num">0</td><td><b>New.</b> Both keys at their monthly spending cap</td></tr>
+      <tr><td>Search-dead cursor rewinds</td><td class="num">2</td><td class="num">0</td><td>300 leads kept their turn instead of being walked blind</td></tr>
+      <tr><td>Website resolution</td><td class="num">97%</td><td class="num">98-99%</td><td>From stored sites. Fresh lookups got nothing</td></tr>
+      <tr><td>Stranded (gap indicator)</td><td class="num">3</td><td class="num">3</td><td>Unchanged since 09-13. No selector gap</td></tr>
+      <tr><td>Verify passes / addresses tested</td><td class="num">7 / 5</td><td class="num">6 / 5</td><td>Three dispatches were handed nothing to test</td></tr>
+      <tr><td>New channels discovered</td><td class="num">0</td><td class="num">0</td><td>Intended. Paused by Casey 09-08</td></tr>
+      <tr><td>Fatal signatures / halts</td><td class="num">0 / 0</td><td class="num">0 / 0</td><td>Nothing faulted</td></tr>
+      <tr><td>Anthropic spend</td><td class="num">$0.00</td><td class="num">$0.00</td><td>Fourteenth zero. Ceiling is $150</td></tr>
+      <tr><td>OpenRouter</td><td class="num">$2.03/day</td><td class="num">$2.52/day</td><td>$192.88 left, about 93 days</td></tr>
+      <tr><td>Auto-reply dry runs / paid re-reads</td><td class="num">698 / 539</td><td class="num">683 / 401</td><td>Same one address. Stopped by itself at 01:31Z</td></tr>
+      <tr><td>YouTube keys working</td><td class="num">15 of 66</td><td class="num">15 of 66</td><td>Fourteenth identical morning. Settled</td></tr>
+      <tr><td>Apify lane</td><td class="num">resting</td><td class="num">resting</td><td>$0.0053 spendable behind a $10 reserve, since 09-06</td></tr>
+      <tr><td>Alarms: yield degraded</td><td class="num">2</td><td class="num">4</td><td>Distinct passes. Baseline fell 7.3% to 5%</td></tr>
+      <tr><td>Alarms: walking in place</td><td class="num">0</td><td class="num">0</td><td>Fourth clean cycle since <code>0874d8a</code></td></tr>
+      <tr><td>Debriefs owed</td><td class="num">6</td><td class="num">reported 0</td><td>09-19, 09-18, 09-17, 08-18, 08-17, 07-11. All have metrics</td></tr>
+    </table>
+  </div>
+
+  <h2>Recommended next, ranked</h2>
+  <ol class="recs">
+    <li><b>Top up Brave, or add keys.</b> Both <code>BRAVE_SEARCH_API_KEY</code> plans are at their monthly spending cap and every lookup is refused. This is the one active money problem: Brave is the pipeline's only web search since Tavily was dropped on 09-13, so it throttles email finding as well as the recovery lane. The caps are monthly, so the alternative is waiting for the plan month to roll over and accepting cache-only resolution until then. <b>Casey's spend call.</b></li>
+    <li><b>Unblock more Siege offers.</b> Still the volume lever, and now on a clock: the ramp goes 100, 150, 150, 200, 250 over the next five sending days, and Siege's own config says the 3,115-person board absorbs about 450 a day only if there are enough offers to rotate. Ten of sixteen are out for a missing subject line, a missing writer script, two missing follow-up bodies, a vocabulary row, or a Notion status left on Paused. Siege prints the exact reason for each at the top of every run.</li>
+    <li><b>Give Apify $10 to $20, or retire it.</b> It has held the same resting line twelve times a day for three weeks: $10.0053 in the account, $10 reserved, $0.0053 spendable, which buys nothing against a 25-channel floor. Its last real run recovered 62 leads at about ten cents each. Either state is fine, but the current one is a lane that looks alive and does nothing.</li>
+    <li><b>Cache the auto-reply classification against the reply id.</b> The loop stopped on its own last night after 940 paid re-reads of a single address across two days, and nothing about it has changed, so the next stuck reply repeats it. One line of cache, or a slower timer while in dry run. <code>automator/scripts/smartlead-auto-reply.py</code> is outside the five repos this agent may edit.</li>
+    <li><b>Expect a zero today as well, and do not read weekend zeroes as faults.</b> Sunday has no Siege run and no SmartLead delivery. The weekly shape from here is four or five sending days and two or three scheduled zeroes, so a day's send count only means something next to the day of the week.</li>
+    <li><b>Write the six owed debriefs, or decide they are not owed.</b> 09-19, 09-18, 09-17, 08-18, 08-17 and 07-11 all have grounded metrics on disk, so each can be written from real numbers. Until this cycle the reminder had stopped mentioning most of them.</li>
+    <li><b>Decide whether the collect pass keeps its slot.</b> Three days, 1,650 readings, 8 leads off the book and 3 parked. It costs no money and it is not broken. But its own long median is down to 5%, and the fair reading is that the 4,233-lead <code>needs_contact</code> pool needs a method it does not have rather than a seventh lap of the ones it does.</li>
+  </ol>
+
+  <div class="foot">
+    <p><b>The thing worth remembering from this cycle.</b> Two systems hit a wall on the same day and only one of them was a problem. Sending stopped because Saturday is not a sending day, the ramp counts sending days so nothing slipped, and Monday resumes exactly where Friday left off. Search stopped because the money ran out, and the recovery lane handled that correctly on its own, holding its cursor so 300 leads keep their turn. What needed fixing was neither of those. It was the sentence the alarm prints to Casey, which had been hard-coded a week ago to say a Brave refusal is never evidence, and was still saying it an hour after the lane had acted on one.</p>
+    <p><b>Deliberately not done:</b> no email sent by this agent, no discovery lane touched, no <code>.env</code> or secret read or written, no alarm threshold moved, no halt flag written, the send selector left reading <code>approved</code> only, Brave and Apify left unfunded because both are spend calls, and the automator's reply loop left as it is rather than changed from here. The loop is left running for the next cycle.</p>
+  </div>
+
+</div>

@@ -293,6 +293,54 @@ this is the shape to check first.**
 
 ## Change log
 
+- 2026-09-27 (debrief): **A ZERO-SEND SATURDAY THAT COST NOTHING, AND A SEARCH PLAN THAT RAN OUT OF
+  MONEY.** **0 emails loaded into SmartLead** against 107 on Friday, and the zero is the schedule:
+  `siege-plan.timer` is `OnCalendar=Mon..Fri 08:15 America/New_York`, so it last ran Friday 12:15 UTC
+  and will not fire again until Monday. **Nothing slipped, because Siege's ramp counts SENDING DAYS
+  rather than dates** (`config/siege.json` `per_day_ramp` `[50,50,100,100,150,150,200,250]`, and its own
+  note says a skipped day resumes where it left off): Friday was day 3 at a cap of 100, **Monday is day
+  4 at a cap of 100**. **Read a send count next to its day of the week from now on** or every weekend
+  will look like a fault. Sends per PT day: **47 (Wed), 55 (Thu), 107 (Fri), 0 (Sat)**, lifetime 2,132.
+  `npm run send` fired at 00:20 PT into its permanently empty lane and logged clean
+  `attempted=0 sent=0 failed=0`, which is 09-26's fix working.
+  **BOTH BRAVE SEARCH KEYS HIT THEIR MONTHLY SPENDING CAP, AND IT IS THE ONE ACTIVE MONEY PROBLEM.**
+  Two of the cycle's three collect passes logged `All 2 Brave Search API key(s) refused: 402 Usage limit
+  exceeded`. **The lane handled it correctly with nobody watching:** `lastCollectPassSearchDead()` read
+  the line and rewound the cursor **twice** (`previous_pass_search_dead`, rewinds 1 then 2 of a 48 cap),
+  so the **300 leads in those passes keep their turn** instead of being stamped walked and waiting a lap
+  of 3,300. That is the machinery built after 09-04, when this exact failure turned a widened batch into
+  71 parks instead of 627. Site resolution still read **97%** off stored sites and the free channel-page
+  route, so the pass was **BOTH** a mined-out re-walk (lap 6, 100% re-walks, long median down to **5%**)
+  **AND** unable to search, and those need opposite answers: wait, and spend. **Brave is the only web
+  search in the pipeline since Tavily was dropped 09-13, so the same cap throttles email finding.**
+  **SHIPPED (`41a23f5`): the alarm told Casey a real Brave outage was not evidence of one.** The 09-22
+  fix stopped it blaming the search plan for a drained book, but it assumed the all-keys-refused line
+  "prints on every pass" because one key sits at its $5 cap, so it hard-coded *"raising the cap would
+  not have changed it"* into the alarm text. **That line prints ONLY when EVERY key refuses one
+  lookup** (per-pass counts over the last eight passes: 0,0,0,0,0,1,1,0). So the 01:11 firing recorded
+  `brave_refusal_logged: true`, blamed `book_rewalk` alone and dismissed spend, **one hour after the
+  lane itself rewound off that same line**. `collectPassAttribution()` now returns `braveRefusals`,
+  counted inside the judged pass with **the same regex the rewind detector uses**, so the two halves of
+  one measurement cannot disagree again; the observation gains `pass_brave_refusals` and `attributed_to`
+  can read `book_rewalk+search_dead` or `search_dead`. *Verified:* tsc clean, **96 tests (4 new)**, run
+  live against the collect log. **ALSO SHIPPED (`93c428b`): the unwritten-debrief reminder had a shorter
+  memory than its own backlog.** `missing_debriefs` was added 09-20 after an expired login silently
+  skipped 09-17/18/19; its flat 7-day window meant all three aged out by 09-25, so the field read `[]`
+  for two cycles while **six** reports were owed. It now also lists every date with grounded metrics on
+  disk and no report at any age, newest first, capped at 14: **09-19, 09-18, 09-17, 08-18, 08-17,
+  07-11**. **ENRICHMENT IS A DRIP:** 3 batches of 1 lead, 3 distinct ids, all exit 0, then idle; pool of
+  3 with 2 permanently excluded; shelf **6,573 ready to write**, **6,855 of 6,863 bundled (99.9%)**.
+  **+3 parked** (6,860 to 6,863), the lane's first parks in three days, off **27 contact points and 4
+  emails** against 2,774 and 360 in the prior seven days. **The paid reply loop self-cleared** after
+  **539 more** re-classifications of `tara@rehab-hq.com` (940 lifetime for one reply), stopping at
+  01:31Z when the reply left the queue; the shape that caused it is untouched, so the next stuck reply
+  repeats it. **Apify has rested on its $10 reserve floor for three weeks** ($0.0053 spendable, buys 0
+  against a 25-channel floor). **0 faults, 0 halts, $0.00 Anthropic (14th zero), OpenRouter $2.03/day
+  with $192.88 left (~93 days).** **#1 lever = top up Brave or add keys (Casey's spend call); #2 =
+  unblock more Siege offers before the ramp reaches 250/day in five sending days; #3 = fund or retire
+  Apify.** *Two systems hit a wall the same day and only one was a problem; what needed fixing was
+  neither, it was the sentence the alarm prints.*
+
 - 2026-09-26 (debrief): **107 EMAILS, NEARLY DOUBLE THE RECORD, AND 97 OF THEM CAME FROM SIEGE, NOT
   FROM THIS REPO.** Ten at 00:20 PT from the session-start send, then **97 between 09:25 and 10:22 PT
   from one LIVE Siege run**: board of **4,737 people in 3 tiers**, **513 DNC blocks honoured**, **22
