@@ -293,6 +293,52 @@ this is the shape to check first.**
 
 ## Change log
 
+- 2026-09-28 (debrief): **THE RECOVERY LANE REACHED THE PART OF ITS BOOK IT CANNOT READ FOR FREE, AND
+  THAT PART NOW HAS A PRICE.** The collect book is sorted cheapest-first: a lead whose YouTube page
+  links a website, or whose site was already found and stored, is **tier 0** and free to read; a lead
+  with neither is **tier 1** and needs a paid Brave search. Counted live with the selector's own
+  predicate, the 3,317 book is **139 + 40 priority, 2,562 tier 0, 576 tier 1**. The cursor entered
+  tier 1 at 21:01Z. **So the day carried TWO unrelated failures eight hours apart and the daily total
+  is their sum.** The 07:00 and 14:01 passes resolved sites for **97%** of their leads and collected
+  **one contact point across 300 lead-slots**, which is the mined-out lap-6 book and no money fixes
+  it. The 21:01 and 04:00 passes read **48%** then **94% no website**: those leads have never had a
+  site found for them, so nothing is stored to fall back on and Brave is refusing. **At $5 per 1,000
+  searches, one attempt at all 576 costs under $3**, the first time the remaining work has been
+  priced rather than described. **+2 parked** (6,863 to **6,865**), both from verify, which ran 8
+  slots and was handed nothing in 6 of them. **40 contact points and 5 emails** against 1,300 and 205
+  in the prior seven days. **SHIPPED (`7a06ce5`): yesterday's refusal count is latched at one per
+  pass and the alarm read it as a volume.** `searchBrave()` sets `braveExhaustedWarned` the first
+  time every key refuses and never prints again, and a pass is one process, so the count is **0 or 1
+  however many lookups die**. On today's worst pass the text would have said *"it did lose 1 lookup
+  ... the smaller half of this pass"* about a pass where **141 of 150 leads got no website at all**.
+  Fourth outing of one class (09-22, 09-23, 09-27): a sentence naming or dismissing a remedy with no
+  measurement behind it. `collectPassAttribution()` now returns `braveRefusedAfterLeads` /
+  `leadsAfterRefusal` / `noSiteAfterRefusal`, because once the line has printed every later lookup in
+  that pass got nothing: the leads behind it are the cost, the ones that resolved anyway prove the
+  free routes still carried part of the pass, and the no-site count among them is an honest upper
+  bound. Same commit retires `bloodhound_site_resolution_collapsed`'s **private copy of the parse**,
+  whose `lines.slice(start)` read **past its own pass boundary**, so a refusal logged by the NEXT
+  pass counted as evidence about this one. All three lane alarms now read one pass through one
+  function with the same regex `lastCollectPassSearchDead()` rewinds on. *Verified:* tsc clean,
+  **100/100 tests** (4 new), check-in run end to end on live logs, exited `healthy`.
+  **THE `approved` LANE IS NOT PERMANENTLY EMPTY, CORRECT THE 09-25 ENTRY.** Forty minutes after the
+  cycle closed the session-start send fired at 07:20:32Z, found **2 leads** and pushed both in 17.5s
+  (`attempted=2 sent=2 failed=0`), the first emails since Friday and not from Siege. It refills at a
+  trickle and **what refills it is not established** (the only lane-touching event logged was
+  dnc-sync releasing one lead at 23:23Z). One of the two, *Marie Stopes International Cambodia*, is
+  an international NGO reached via "fertility clinic patient referrals", a fit question for Casey and
+  not a bug. **0 emails loaded on Sunday is the schedule** (Siege runs Mon-Fri; Monday is ramp day 4,
+  cap 100). The 07:00 collect pass opened with a `previous_pass_search_dead` rewind (2 of a 48 cap),
+  so Friday's dead-search leads kept their turn a second cycle running. Enrichment **2 batches of 1
+  lead**, shelf **6,575 ready to write**, **6,857 of 6,865 bundled (99.9%)**. Stranded held at **3**
+  for the 15th day. **0 faults, 0 halts, $0.00 Anthropic (15th zero), OpenRouter $1.50/day with
+  $191.38 left (~128 days).** Six debriefs still owed (09-19, 09-18, 09-17, 08-18, 08-17, 07-11).
+  **#1 lever = raise the Brave cap or add a key, under $3 and the cheapest item on the list; #2 =
+  decide the discovery pause, because the free end of the book is mined out; #3 = Apify rolls 30 Sep;
+  #4 = find the session-start send trigger, which now loads real email.** *One half of the fall was
+  re-reading leads already emptied, which no money fixes; the other half was reading leads it has
+  never been able to see, which about three dollars fixes. A single daily number averages them and
+  recommends nothing.*
 - 2026-09-27 (debrief): **A ZERO-SEND SATURDAY THAT COST NOTHING, AND A SEARCH PLAN THAT RAN OUT OF
   MONEY.** **0 emails loaded into SmartLead** against 107 on Friday, and the zero is the schedule:
   `siege-plan.timer` is `OnCalendar=Mon..Fri 08:15 America/New_York`, so it last ran Friday 12:15 UTC
