@@ -1353,6 +1353,25 @@ export function collectYield(
  * possible at all. The two together are the honest answer; either alone has now
  * misreported this lane once in each direction.
  *
+ * `braveRefusals` IS A YES/NO, NEVER A VOLUME (2026-09-28). `searchBrave()` in
+ * youtube-email-outreach-v1/src/bloodhound/db.ts latches a module-level
+ * `braveExhaustedWarned` the first time every key refuses, so the line prints at
+ * most ONCE per process and a pass is one process. The count can therefore never
+ * exceed 1, however many lookups died after it. The day this shipped the alarm
+ * read it as a volume and told Casey a pass that resolved no website for 141 of
+ * its 150 leads "did lose 1 lookup ... the smaller half of this pass". Same bug
+ * class as the two fixes above, one sentence over: a claim with no measurement
+ * behind it.
+ *
+ * `leadsAfterRefusal` / `noSiteAfterRefusal` are the measurement. Once the line
+ * has printed, every later lookup in that pass got nothing, so the leads behind
+ * it that resolved no website are what the spent plan plausibly cost, and the
+ * ones that resolved anyway prove the free routes (a stored site, the channel
+ * page) were still carrying part of the pass. It is an upper bound: some of
+ * those creators have no website to find. Lead lines are written as leads
+ * finish and the collector runs 8 at a time, so the split point is accurate to
+ * about a lead-slot, which is far inside what any of these sentences claim.
+ *
  * Returns null when the newest judged pass is too small a sample to attribute.
  */
 export function collectPassAttribution(
@@ -1368,8 +1387,17 @@ export function collectPassAttribution(
   seenBefore: number;
   rewalkPct: number;
   /** All-keys-refused lines logged INSIDE this pass. 0 means the pass could
-   *  search; >0 means some lookups in it got nothing back from any key. */
+   *  search; >0 means search was dead for part of it. NOT a volume — see
+   *  `leadsAfterRefusal` and the note above. */
   braveRefusals: number;
+  /** Lead lines that came before the first refusal, or null if none refused. */
+  braveRefusedAfterLeads: number | null;
+  /** Lead lines at or after the first refusal: the leads that ran with search
+   *  dead. */
+  leadsAfterRefusal: number;
+  /** Of those, how many resolved no website at all. The upper bound on what the
+   *  spent plan cost this pass. */
+  noSiteAfterRefusal: number;
   historyPasses: number;
 } | null {
   const minSample = opts.minSample ?? 30;
@@ -1394,14 +1422,24 @@ export function collectPassAttribution(
   const REFUSED = /Brave Search API key\(s\) refused/;
   const ids: string[] = [];
   let noSite = 0, resolvedSampled = 0, resolvedHit = 0, braveRefusals = 0;
+  let braveRefusedAfterLeads: number | null = null;
+  let leadsAfterRefusal = 0, noSiteAfterRefusal = 0;
   for (const raw of lines.slice(start, ends[pick]!.at)) {
-    if (REFUSED.test(raw)) braveRefusals++;
+    if (REFUSED.test(raw)) {
+      braveRefusals++;
+      if (braveRefusedAfterLeads === null) braveRefusedAfterLeads = ids.length;
+    }
     const m = LEAD.exec(raw.trim());
     if (!m) continue;
     ids.push(m[1]!);
     const scored = /\+([1-9]\d*) pts/.test(raw);
-    if (m[2] === '(none)') noSite++;
+    const none = m[2] === '(none)';
+    if (none) noSite++;
     else { resolvedSampled++; if (scored) resolvedHit++; }
+    if (braveRefusedAfterLeads !== null) {
+      leadsAfterRefusal++;
+      if (none) noSiteAfterRefusal++;
+    }
   }
   if (ids.length < minSample) return null;
   const before = new Set<string>();
@@ -1419,6 +1457,9 @@ export function collectPassAttribution(
     seenBefore,
     rewalkPct: (seenBefore / ids.length) * 100,
     braveRefusals,
+    braveRefusedAfterLeads,
+    leadsAfterRefusal,
+    noSiteAfterRefusal,
     historyPasses: pick,
   };
 }

@@ -142,6 +142,30 @@ function alreadyObserved(kind: string, passKey: string): boolean {
   return lastObservation(kind)?.pass_key === passKey;
 }
 
+type PassAttribution = NonNullable<ReturnType<typeof collectPassAttribution>>;
+
+/**
+ * What a spent Brave plan actually cost the pass being judged, in leads.
+ *
+ * WHY THIS IS NOT JUST `braveRefusals` (2026-09-28). The all-keys-refused line
+ * is printed behind a latch that is set once per process, and a collect pass is
+ * one process, so the count is 0 or 1 and can never be a volume. Read as one the
+ * day it shipped, it produced "it did lose 1 lookup ... the smaller half of this
+ * pass" about a pass that resolved no website for 141 of its 150 leads. Every
+ * lookup after that line got nothing, so the leads BEHIND it are the measurement,
+ * and the ones that resolved anyway are the free routes still carrying the pass.
+ */
+function braveCost(att: PassAttribution): string {
+  if (att.leadsAfterRefusal === 0) {
+    return 'every key refused, but the line landed after the pass had read its last lead, so it cost this pass nothing.';
+  }
+  const resolvedAfter = att.leadsAfterRefusal - att.noSiteAfterRefusal;
+  const where = att.braveRefusedAfterLeads === 0
+    ? 'from its first lead onward'
+    : `after its first ${att.braveRefusedAfterLeads} leads`;
+  return `every key refused ${where}, so the ${att.leadsAfterRefusal} leads behind that point ran with no web search at all — ${att.noSiteAfterRefusal} of them resolved no website (an upper bound on the cost: some creators have none), and ${resolvedAfter} resolved anyway off a stored site or the channel page.`;
+}
+
 function readEvents(file: string): Array<Record<string, unknown>> {
   const out: Array<Record<string, unknown>> = [];
   for (const raw of readFileSync(file, 'utf8').split('\n')) {
@@ -1259,47 +1283,45 @@ async function main(): Promise<void> {
     } catch { /* an unreadable collect log is not an incident */ }
   }
 
+  // 7c. Website resolution has collapsed outright.
+  //
+  // READ THE PASS THROUGH THE SAME FUNCTION THE OTHER TWO LANE ALARMS USE
+  // (2026-09-28). This block kept its own copy of the parse: its own tail window,
+  // its own substring test for the refusal line, and — the part that bit — a
+  // `lines.slice(start)` that ran PAST the judged pass's end into the next pass's
+  // opening lines, so a refusal logged by the following pass was read as evidence
+  // about this one. That is the third copy of "a private copy of a predicate it
+  // was meant to track" (2026-09-13's collectBookDepth, 2026-09-22's tail read).
+  // collectPassAttribution() bounds the pass, matches the refusal line with the
+  // same regex lastCollectPassSearchDead() rewinds on, and reports what the
+  // refusal cost in leads rather than in latched log lines.
   if (existsSync(COLLECT_LOG) && !bookDrained) {
     try {
-      // Per-lead lines look like: [recXXXX] "Name" site=(none) +0 pts, 9 skipped, 2 err
-      // and each pass ends with:  Collected N contact points from M/K leads.
-      // Read the tail only: passes are ~150 leads, so 400 lines covers the last one
-      // with room to spare, and the file grows for the life of the lane.
-      const lines = readFileSync(COLLECT_LOG, 'utf8').split('\n').slice(-400);
-      let end = -1;
-      for (let i = lines.length - 1; i >= 0; i--) {
-        if (/^Collected \d+ contact points from \d+\/\d+ leads\./.test(lines[i]!.trim())) { end = i; break; }
-      }
-      // Only judge a COMPLETED pass. A pass still running has a partial sample, and
-      // the front of a batch is not representative of the batch.
-      if (end >= 0) {
-        let start = 0;
-        for (let i = end - 1; i >= 0; i--) {
-          if (/^Collected \d+ contact points from \d+\/\d+ leads\./.test(lines[i]!.trim())) { start = i + 1; break; }
-        }
-        const pass = lines.slice(start, end);
-        const withSite = pass.filter((l) => l.includes(' site='));
-        const noSite = withSite.filter((l) => l.includes('site=(none)'));
-        const summary = lines[end]!.trim();
-        const MIN_SAMPLE = 30;
-        if (withSite.length >= MIN_SAMPLE) {
-          const pct = (noSite.length / withSite.length) * 100;
-          // Identifies the pass, not just its shape: two passes can produce a
-          // byte-identical summary line, and the count is monotone.
-          const passKey = `${collectPasses(readFileSync(COLLECT_LOG, 'utf8')).length}:${summary}`;
-          if (pct >= NO_SITE_ALARM_PCT && !alreadyObserved('bloodhound_site_resolution_collapsed', passKey)) {
-            const braveRefused = pass.some((l) => l.includes('Brave Search API key')) ||
-              lines.slice(start).some((l) => l.includes('Brave Search API key'));
-            const cause = braveRefused
-              ? 'The lane logged a Brave Search refusal, so the search plan is the cause: raise its cap or add BRAVE_SEARCH_API_KEY[_N] keys.'
-              : 'No Brave refusal line was logged, so this is either a new failure mode in website resolution or a genuinely site-less slice of the backlog. Check the collect log before assuming the backlog.';
-            appendFileSync(OBSERVATIONS, JSON.stringify({
-              ts: new Date().toISOString(), kind: 'bloodhound_site_resolution_collapsed',
-              no_site: noSite.length, sampled: withSite.length, pct: Number(pct.toFixed(1)), summary, pass_key: passKey,
-              detail: `The recovery lane's last completed collect pass resolved NO website for ${noSite.length} of ${withSite.length} leads (${pct.toFixed(0)}%, alarm at ${NO_SITE_ALARM_PCT}%). 9 of its 10 collection methods need a website, so its yield collapses and the verify half starves on an empty queue — this is what took 2026-09-04 from 627 parked to 71. Pass summary: "${summary}". ${cause} Not escalating — the remedy is a spend call a fix-agent cannot make.`,
-            }) + '\n');
-            console.log(`[checkin ${day}] OBSERVATION bloodhound_site_resolution_collapsed — ${noSite.length}/${withSite.length} (${pct.toFixed(0)}%) leads resolved no website`);
-          }
+      const logText = readFileSync(COLLECT_LOG, 'utf8');
+      const passes = collectPasses(logText);
+      const att = collectPassAttribution(logText);
+      const current = passes[passes.length - 1];
+      if (att && current) {
+        const summary = current.summary;
+        // Identifies the pass, not just its shape: two passes can produce a
+        // byte-identical summary line, and the count is monotone.
+        const passKey = `${passes.length}:${summary}`;
+        if (att.noSitePct >= NO_SITE_ALARM_PCT && !alreadyObserved('bloodhound_site_resolution_collapsed', passKey)) {
+          const cause = att.braveRefusals > 0
+            ? `The search plan is the cause: ${braveCost(att)} Raise its cap or add BRAVE_SEARCH_API_KEY[_N] keys.`
+            : 'No Brave key refused inside this pass, so search credit is not what broke: this is either a new failure mode in website resolution or a genuinely site-less slice of the book. Check the collect log before spending anything.';
+          appendFileSync(OBSERVATIONS, JSON.stringify({
+            ts: new Date().toISOString(), kind: 'bloodhound_site_resolution_collapsed',
+            no_site: att.noSite, sampled: att.sampled, pct: Number(att.noSitePct.toFixed(1)), summary, pass_key: passKey,
+            pass_brave_refusals: att.braveRefusals,
+            pass_leads_after_refusal: att.leadsAfterRefusal,
+            pass_no_site_after_refusal: att.noSiteAfterRefusal,
+            pass_brave_refused_after_leads: att.braveRefusedAfterLeads,
+            pass_rewalk_pct: Number(att.rewalkPct.toFixed(1)),
+            attributed_to: att.braveRefusals > 0 ? 'search_dead' : 'unexplained',
+            detail: `The recovery lane's last completed collect pass resolved NO website for ${att.noSite} of ${att.sampled} leads (${att.noSitePct.toFixed(0)}%, alarm at ${NO_SITE_ALARM_PCT}%). 9 of its 10 collection methods need a website, so its yield collapses and the verify half starves on an empty queue — this is what took 2026-09-04 from 627 parked to 71. Pass summary: "${summary}". ${cause} Not escalating — the remedy is a spend call a fix-agent cannot make.`,
+          }) + '\n');
+          console.log(`[checkin ${day}] OBSERVATION bloodhound_site_resolution_collapsed — ${att.noSite}/${att.sampled} (${att.noSitePct.toFixed(0)}%) leads resolved no website`);
         }
       }
     } catch { /* an unreadable collect log is not an incident */ }
@@ -1372,13 +1394,14 @@ async function main(): Promise<void> {
           const rewalking = att.rewalkPct >= REWALK_CAUSE_PCT;
           cause = `Website resolution is NOT what broke here: this pass resolved a site for ${att.resolvedSampled} of ${att.sampled} leads (${(100 - att.noSitePct).toFixed(0)}%).` +
             (braveRefused
-              ? ` It did lose ${att.braveRefusals} lookup${att.braveRefusals === 1 ? '' : 's'} to every Brave key refusing at once, so search credit is genuinely out and the leads needing a FRESH lookup got nothing — topping up the plan or adding BRAVE_SEARCH_API_KEY[_N] keys would recover that share, which is the smaller half of this pass.`
+              ? ` Search credit did run out inside this pass: ${braveCost(att)} Topping up the plan or adding BRAVE_SEARCH_API_KEY[_N] keys buys back that share and nothing else here.`
               : ' No Brave key refused during this pass, so search credit is not the constraint and topping up the plan would not have changed it.') +
             (rewalking
               ? ` ${att.seenBefore} of the ${att.sampled} leads (${att.rewalkPct.toFixed(0)}%) have been collected from before in this log, and only ${att.resolvedHit} of the ${att.resolvedSampled} with a working site produced anything — the lane is re-walking a book it has already mined. The constraint is leads to walk, not search credit.`
               : ' Check the collect log for a new failure mode in the collection methods themselves before assuming the backlog thinned.');
         } else if (braveRefused) {
-          cause = `This pass resolved no website for ${att ? `${att.noSite} of ${att.sampled} leads (${att.noSitePct.toFixed(0)}%)` : 'most of its leads'} and the lane logged a Brave Search refusal, so the search plan is the cause: raise the plan cap or add BRAVE_SEARCH_API_KEY[_N] keys.`;
+          cause = `This pass resolved no website for ${att ? `${att.noSite} of ${att.sampled} leads (${att.noSitePct.toFixed(0)}%)` : 'most of its leads'} and the lane logged a Brave Search refusal, so the search plan is the cause: raise the plan cap or add BRAVE_SEARCH_API_KEY[_N] keys.` +
+            (att ? ` In this pass, ${braveCost(att)}` : '');
         } else {
           cause = 'No Brave refusal line was logged, so check the collect log for a new failure mode before assuming the backlog thinned.';
         }
@@ -1405,6 +1428,11 @@ async function main(): Promise<void> {
           pass_resolved_sampled: att?.resolvedSampled ?? null,
           brave_refusal_logged: braveRefused,
           pass_brave_refusals: att === null ? null : att.braveRefusals,
+          // The refusal line is latched once per process, so the count above is
+          // a yes/no. These three are the volume it cannot carry.
+          pass_leads_after_refusal: att === null ? null : att.leadsAfterRefusal,
+          pass_no_site_after_refusal: att === null ? null : att.noSiteAfterRefusal,
+          pass_brave_refused_after_leads: att === null ? null : att.braveRefusedAfterLeads,
           // Two causes can be true at once and the record now says so, because a
           // re-walked book and a dead search plan need opposite answers (wait
           // vs. spend) and 2026-09-27 was both.

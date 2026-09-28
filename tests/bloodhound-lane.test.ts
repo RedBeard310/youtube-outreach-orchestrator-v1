@@ -767,6 +767,70 @@ test('collectPassAttribution: the refusal line matches the rewind detector', () 
   }
 });
 
+// --- what a refused plan COST the pass.  Added 2026-09-28 -------------------
+// THE REGRESSION THIS EXISTS FOR. `searchBrave()` latches its all-keys-refused
+// warning once per process, and a pass is one process, so braveRefusals can
+// never exceed 1 no matter how many lookups died. The day the count shipped the
+// alarm read it as a volume: a pass that resolved no website for 141 of its 150
+// leads was reported as having "lost 1 lookup ... the smaller half of this
+// pass". The leads behind the line are the measurement, not the line count.
+
+test('collectPassAttribution: a latched refusal still measures the whole pass it cost', () => {
+  // 40 leads, 36 of them resolving nothing, one refusal line before any of them.
+  const log = [
+    attPass(attIds(0, 40), { hit: 25, none: 2 }),
+    [REFUSAL, attPass(attIds(500, 40), { hit: 2, none: 36 })].join('\n'),
+  ].join('\n');
+  const a = collectPassAttribution(log)!;
+  assert.equal(a.braveRefusals, 1, 'the latch caps the line count at one');
+  assert.equal(a.braveRefusedAfterLeads, 0, 'refused before the first lead');
+  assert.equal(a.leadsAfterRefusal, 40, 'every lead in the pass ran with search dead');
+  assert.equal(a.noSiteAfterRefusal, 36);
+});
+
+test('collectPassAttribution: a refusal part-way through costs only the leads behind it', () => {
+  const ids = attIds(500, 40);
+  // attPass puts the site-less leads first, so splicing the refusal in after
+  // lead 10 leaves 26 of the 30 remaining leads without a site.
+  const pass = attPass(ids, { hit: 2, none: 36 }).split('\n');
+  const log = [
+    attPass(attIds(0, 40), { hit: 25, none: 2 }),
+    [...pass.slice(0, 10), REFUSAL, ...pass.slice(10)].join('\n'),
+  ].join('\n');
+  const a = collectPassAttribution(log)!;
+  assert.equal(a.braveRefusedAfterLeads, 10);
+  assert.equal(a.leadsAfterRefusal, 30);
+  assert.equal(a.noSiteAfterRefusal, 26);
+  assert.equal(a.noSite, 36, 'the whole-pass readings are unchanged');
+});
+
+test('collectPassAttribution: a pass that could search reports no cost at all', () => {
+  const log = [
+    attPass(attIds(0, 40), { hit: 25, none: 2 }),
+    attPass(attIds(500, 40), { hit: 20, none: 2 }),
+  ].join('\n');
+  const a = collectPassAttribution(log)!;
+  assert.equal(a.braveRefusals, 0);
+  assert.equal(a.braveRefusedAfterLeads, null);
+  assert.equal(a.leadsAfterRefusal, 0);
+  assert.equal(a.noSiteAfterRefusal, 0);
+});
+
+test('collectPassAttribution: a refusal in the PREVIOUS pass costs this one nothing', () => {
+  // The site-collapse alarm used to read past its own pass boundary, so a
+  // refusal logged by the next pass was evidence about the one before it.
+  const log = [
+    attPass(attIds(0, 40), { hit: 25, none: 2 }),
+    REFUSAL,
+    attPass(attIds(500, 40), { hit: 2, none: 36 }),
+    attPass(attIds(900, 40), { hit: 2, none: 36 }),
+  ].join('\n');
+  const a = collectPassAttribution(log)!;
+  assert.equal(a.braveRefusals, 0, 'the refusal belongs to an earlier pass');
+  assert.equal(a.leadsAfterRefusal, 0);
+  assert.ok(a.noSitePct >= 70, 'and the collapse is still reported');
+});
+
 // --- collectRewalkCause: WHY the walk is repeating ---------------------------
 // Added 2026-09-23. The walking-in-place alarm asserted "the cursor is failing
 // to advance" in its own text and said it twelve times on 2026-09-22 while the
