@@ -1,7 +1,7 @@
 // Confirm the database will accept every review_status / outreach_status the
 // orchestrator writes.
 //
-// This replaces verify-singleselect.mjs, which asked Airtable's Meta API for the
+// This replaces verify-singleselect.mjs, which asked the old database's Meta API for the
 // choices on a singleSelect field. The equivalent in Postgres is a vocabulary table
 // that the status column references, so the check is the same question against a
 // different source: is every value the code writes actually allowed?

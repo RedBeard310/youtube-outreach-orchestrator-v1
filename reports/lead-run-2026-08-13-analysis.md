@@ -87,7 +87,7 @@ once, at 2,113.
 
 **The check that would settle it cannot run from this box.** The migration plan
 says to keep Airtable in place read-only for a week as the rollback path, and
-`pipeline-db/scripts/verify-against-airtable.ts` exists to do exactly this
+`pipeline-db/scripts/verify-against-db.ts` exists to do exactly this
 comparison. The Airtable token in the shared env now returns
 `401 AUTHENTICATION_REQUIRED` on that base, so neither the parity script nor the
 rollback path is reachable. Worth knowing before the week is up.

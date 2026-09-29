@@ -109,7 +109,7 @@ Written by the migration work, not by an autopilot breach.
 Remove this file to resume: rm logs/autopilot-halt.flag
 ```
 
-The migration plan (`youtube-outreach-orchestrator-v1/airtable-to-postgres-migration.md`,
+The migration plan (`youtube-outreach-orchestrator-v1/postgres-migration-2026-08-12.md`,
 risk table) calls for doing the cutover during a halt-flag pause, so this is the
 plan working as written. The commits in that window back it up: the email repo
 pointed its lead store at Postgres (`7b923ce48`) and the deep-research repo

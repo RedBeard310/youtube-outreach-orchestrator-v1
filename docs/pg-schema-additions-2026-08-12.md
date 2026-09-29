@@ -2,7 +2,7 @@
 
 After the Postgres cutover, both machines' enrichment batches were failing on
 pipeline-db's writable-field guard: the DDL generation dropped every table's
-Airtable primary "label" field plus the bank chunking fields, all of which the
+The old database primary "label" field plus the bank chunking fields, all of which the
 quick repo writes at insert time. Applied directly to the live DB (additive,
 nullable, `IF NOT EXISTS`):
 
@@ -15,7 +15,7 @@ nullable, `IF NOT EXISTS`):
 - `enrichment.banks.chunk_index` integer
 - `enrichment.banks.chunk_count` integer
 
-Not added: `videos.is_trending_outlier` / `is_all_time_outlier` (Airtable
+Not added: `videos.is_trending_outlier` / `is_all_time_outlier` (the old database
 formula fields — computed, never written) and `outbound_links.link_label`
 (nothing writes it). pipeline-db's catalog reads live from information_schema,
 so no code or rebuild was needed — fresh processes pick the columns up

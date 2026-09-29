@@ -48,13 +48,13 @@ docs (`system-overview.md`, `CLAUDE.md`) to match, and act on the open items.
   campaign, mailbox `message_per_day=15`, 12 mailboxes/campaign. A weekend import
   dump (e.g. 176 leads on a Saturday) queues for days. **Import != send.**
 - **`last_contacted_at` is polluted.** It was historically backfilled from
-  `outreach_processed_at` (which updates on *every* Airtable write), so ~156
+  `outreach_processed_at` (which updates on *every* the old database write), so ~156
   non-sent leads carry a bogus `last_contacted_at`. CRITICAL: the outreach pipeline
   selects leads by `review_status` + `outreach_status` only and **never reads
   `last_contacted_at`** — so it has zero effect on sending, and it is not a reliable
   "we contacted them" signal right now. Going-forward stamping on push-success is
   correct (per the earlier handoff); the historical backfill is the pollution.
-- **Airtable data state** (`lead_candidates`, base `appenY7r5jlZMRpJ0`), 2026-06-01:
+- **the old database data state** (`lead_candidates`, base `appenY7r5jlZMRpJ0`), 2026-06-01:
   3,139 total. `review_status`: approved 777, no_host_identified 1149,
   below_threshold 455, demo_niche_excluded 340, unreviewed 268, rejected 144, D100 6.
   Of the 777 approved: ~503 `sent_to_smartlead` (all now have a `smartlead_lead_id`),
@@ -106,7 +106,7 @@ docs (`system-overview.md`, `CLAUDE.md`) to match, and act on the open items.
   the repo closed at scheduled tick times. Run ticks manually. **Do not re-enable
   the 4-hour cron unless Casey says so.**
 
-## 4. Airtable mutations performed (production writes)
+## 4. The old database mutations performed (production writes)
 
 - Backfilled `smartlead_lead_id` on **13** leads (looked up by email in SmartLead).
   All ~503 `sent_to_smartlead` leads now have an id. Wrote only that field via the

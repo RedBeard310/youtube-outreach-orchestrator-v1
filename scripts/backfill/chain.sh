@@ -306,7 +306,7 @@ for(let i=1;i<=500;i++){const v=process.env[`YOUTUBE_API_KEY_${i}`]; if(v){gap=0
   fi
 
   # The enrichment-base capacity gate was removed on 2026-08-12. It waited while
-  # the Airtable enrichment base sat above 70% of its 125,000-record cap, reading
+  # the old database enrichment base sat above 70% of its 125,000-record cap, reading
   # the fill percentage out of enrichment-db-cleanup.service's journal. The store
   # is Postgres now: there is no cap, the cleanup timer is stopped and disabled,
   # and the journal it read has no new entries — so the gate could only ever find

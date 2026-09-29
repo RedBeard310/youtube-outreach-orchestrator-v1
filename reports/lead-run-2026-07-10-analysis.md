@@ -133,7 +133,7 @@ existed but was administratively locked out of the active pool.
 ## Fixes shipped today (staged in the orchestrator repo, not yet committed)
 
 1. **Anti-crash: `ENOTFOUND`/`EAI_AGAIN`/`getaddrinfo`/`fetch failed` added to the retry
-   regex** in `src/airtable.ts` — DNS/network blips now retry with backoff instead of
+   regex** in `src/db.ts` — DNS/network blips now retry with backoff instead of
    throwing straight through `withRetry`.
 2. **Floating-promise guard:** `pendingVerify = verifyPending(...).catch(...)` in
    `campaign.ts` — a failed verify can no longer become an unhandled rejection.

@@ -4,7 +4,7 @@
 
 The orchestrator advances any reviewed leads through either the full email pipeline into SmartLead (`approved`) or find/verify + deep research into the shared `research` schema in Postgres, one `client_id` per prospect (`D100`). The lead-finder is part of the system but paused by default — you trigger discovery runs manually with `npm run finder` when you want new leads to review.
 
-> **⚠️ Ticks are MANUAL-ONLY (since 2026-06-01).** The 4-hour `launchd` cron is **unloaded and disabled** (plist renamed `.disabled`) because the Mac is usually asleep or the repo closed at scheduled tick times, so scheduled ticks silently no-fired. Run ticks by hand with `npm run tick`. **Do not re-enable the cron unless Casey explicitly says so.** The enrichment cleanup (`com.caseybrown.airtable-cleanup`) was retired on 2026-08-12 and must not be run. It existed only to stay under Airtable's record cap, and Postgres has no cap (see [Cleanup behavior](#cleanup-behavior--what-gets-deleted-and-what-doesnt)).
+> **⚠️ Ticks are MANUAL-ONLY (since 2026-06-01).** The 4-hour `launchd` cron is **unloaded and disabled** (plist renamed `.disabled`) because the Mac is usually asleep or the repo closed at scheduled tick times, so scheduled ticks silently no-fired. Run ticks by hand with `npm run tick`. **Do not re-enable the cron unless Casey explicitly says so.** The enrichment cleanup (`com.caseybrown.db-cleanup`) was retired on 2026-08-12 and must not be run. It existed only to stay under the old database's record cap, and Postgres has no cap (see [Cleanup behavior](#cleanup-behavior--what-gets-deleted-and-what-doesnt)).
 
 ## What the orchestrator (this repo) does
 
@@ -105,7 +105,7 @@ you → npm run finder (in the orchestrator repo)
 
 | API | What it's for | Cost shape | Bottleneck? |
 |---|---|---|---|
-| **Postgres** (`pipeline` database on a private Hetzner box, browsed in NocoDB) | All lead state (`leads`), quick enrichment (`enrichment`), deep research (`research`) | A private server with no per-record pricing. The Airtable plan was canceled 2026-09-13. | No: no record cap and no base count |
+| **Postgres** (`pipeline` database on a private Hetzner box, browsed in NocoDB) | All lead state (`leads`), quick enrichment (`enrichment`), deep research (`research`) | A private server with no per-record pricing. The old database plan was canceled 2026-09-13. | No: no record cap and no base count |
 | **YouTube Data API v3** | Channel/video/search lookups in finder + both enrichment pipelines | **`YOUTUBE_API_BACKEND=auto` (default since 2026-06-01): direct Google `YOUTUBE_API_KEY[_N]` keys first, RapidAPI mirror only as fallback when every direct key is dead.** Modes: `auto`/`direct`/`rapidapi`. | Direct keys: ~10k units/day each. The shared env bank holds **7 key slots as of 2026-07-31** (`YOUTUBE_API_KEY_1..7`; the old ~20- and ~225-key pools are history — see the [backend history](#why-rapidapi-not-direct-keys) note). Suspensions come and go — re-check every ~2 days with `youtube-email-outreach-v1/scripts/youtube-key-health.ts`. RapidAPI's 2000/window search bucket is the fallback ceiling. |
 | **Anthropic API** | Haiku for finder + classifiers; **Opus 4.7** for compose | Per-token. Opus ~60× Haiku | No, but compose is the priciest single call per lead |
 | **ZeroBounce** | Email verification | ~$0.001–0.003 per verification depending on tier | No |
@@ -144,12 +144,12 @@ Lead-finder is currently paused (`LEAD_FINDER_AUTO=false`) and runs only when yo
 | Data | Cleaned? | When | By |
 |---|---|---|---|
 | `lead_candidates` rows | **No** — kept forever | Never | (nothing) |
-| Quick enrichment rows in the `enrichment` schema (videos, transcripts, comments, etc.) | **No** (the cleanup was retired 2026-08-12) | Never | (nothing; `airtable-cleanup.ts` has been deleted) |
+| Quick enrichment rows in the `enrichment` schema (videos, transcripts, comments, etc.) | **No** (the cleanup was retired 2026-08-12) | Never | (nothing; `db-cleanup.ts` has been deleted) |
 | `enrichment.channels` table | **No** (preserved for dedup) | Never | (nothing) |
 | Local enrichment markdown bundles | **No** (kept on disk) | Never | (nothing) |
 | Deep research rows (`research` schema) | **No** | Never | (nothing) |
 
-So your `lead_candidates` table grows monotonically — but only when the lead-finder runs. **~3,139 rows as of 2026-06-01** (777 approved, ~503 of those loaded to SmartLead and essentially drained). **Zero growth** until you trigger `npm run finder` (auto-mode off). NOTE: the 268 "unreviewed" leads are NOT untapped volume — all 268 score 4–5 (below the ≥6 approval bar); everything ≥6 is already triaged. Real new volume comes from a fresh `npm run finder` run, not from the unreviewed queue (which is just below-threshold leftovers to reject or ignore). Postgres has no record cap, so neither the lead table nor the `enrichment` schema needs cleaning. The Airtable caps went away with the 2026-08-12 move.
+So your `lead_candidates` table grows monotonically — but only when the lead-finder runs. **~3,139 rows as of 2026-06-01** (777 approved, ~503 of those loaded to SmartLead and essentially drained). **Zero growth** until you trigger `npm run finder` (auto-mode off). NOTE: the 268 "unreviewed" leads are NOT untapped volume — all 268 score 4–5 (below the ≥6 approval bar); everything ≥6 is already triaged. Real new volume comes from a fresh `npm run finder` run, not from the unreviewed queue (which is just below-threshold leftovers to reject or ignore). Postgres has no record cap, so neither the lead table nor the `enrichment` schema needs cleaning. The old database caps went away with the 2026-08-12 move.
 
 ## Other costs / constraints worth knowing
 
@@ -166,7 +166,7 @@ So your `lead_candidates` table grows monotonically — but only when the lead-f
 
 ## `last_contacted_at` is polluted — do not trust it as a "we contacted them" signal
 
-Historically `last_contacted_at` was backfilled from `outreach_processed_at` (which, back in Airtable, updated on *every* write), which could leave never-sent leads carrying a bogus value. **The outreach pipeline selects leads by `review_status` + `outreach_status` only and never reads `last_contacted_at`** — so even when polluted it had zero effect on sending.
+Historically `last_contacted_at` was backfilled from `outreach_processed_at` (which, back in the old database, updated on *every* write), which could leave never-sent leads carrying a bogus value. **The outreach pipeline selects leads by `review_status` + `outreach_status` only and never reads `last_contacted_at`** — so even when polluted it had zero effect on sending.
 
 **Verified clean 2026-06-01:** all 531 rows with `last_contacted_at` are `sent_to_smartlead`; **zero** never-sent leads carry the field. The redrive the earlier handoff flagged is effectively already done — no action needed. Going-forward stamping on push-success (one `sentAt` for both `outreach_processed_at` and `last_contacted_at`) is correct.
 - **No base-count ceiling.** Each D100 prospect is one `client_id` in the shared `research` schema, not a separate base, so hundreds of prospects need no plan change.

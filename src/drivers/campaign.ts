@@ -22,7 +22,7 @@ import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statS
 import { join, resolve } from 'node:path';
 import { driveLeadFinder } from './lead-finder.ts';
 import { runChild, runChildCapture } from '../run.ts';
-import { countByReviewStatus, getVerifiablePitchableLeads } from '../airtable.ts';
+import { countByReviewStatus, getVerifiablePitchableLeads } from '../db.ts';
 import { laneOptsFromEnv, runBloodhoundLane } from '../recovery/bloodhound-lane.ts';
 import { writeTickLog } from '../logger.ts';
 
@@ -779,7 +779,7 @@ export async function driveCampaign(opts: CampaignOpts): Promise<void> {
       // hourly check-in can tell a dry term pool (harvest/discovery couldn't refill —
       // self-heals on the next harvest/back-off) apart from a genuine quota/keys/database
       // failure (needs a human). Prior to this, all 23 of the 2026-08-01 supply-exhaustion
-      // stops logged as an indistinguishable "hard wall (quota/keys/Airtable)".
+      // stops logged as an indistinguishable "hard wall (quota/keys/the old database)".
       const supplyExhausted = finder.exit_code === 3;
       console.error(`[campaign] finder exit ${finder.exit_code} — consecutive failures: ${consecutiveFinderFailures}`);
       if (consecutiveFinderFailures >= 2) {

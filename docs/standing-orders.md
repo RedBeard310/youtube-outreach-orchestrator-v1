@@ -192,7 +192,7 @@ everything up to "parked, ready to write" is automatic.
   approved_hold pool; VPS handles unclaimed + inflow, the Mac owns its frozen
   claim file. Leads run ~3-6 min each now.
 - The store is **Postgres** (`pipeline` db, via `/home/casey/.pipeline-db.env`).
-  Anything that reads Airtable is dead code. Whole-table reads are forbidden —
+  Anything that reads the old database is dead code. Whole-table reads are forbidden —
   enrichment.videos is 2.5M rows and killed every export once (2026-08-13).
 
 ## Parked pools waiting on Casey (don't touch without his word)
@@ -1463,8 +1463,8 @@ this is the shape to check first.**
   throws once per lead, the chain counts that as a failed lead, and the batch
   still exits 0. Last good batch was 2026-09-01T23:13Z; by 04:00Z on 09-02 every
   batch read `done=0 failed=24`. Fixed by giving the variable a committed default
-  in `src/env.ts`, which is what the file already does for `AIRTABLE_BASE_ID` and
-  `AIRTABLE_ENRICHMENT_BASE_ID` after the same deletion broke those. **A path is
+  in `src/env.ts`, which is what the file already does for `PIPELINE_BASE_ID` and
+  `PIPELINE_ENRICHMENT_BASE_ID` after the same deletion broke those. **A path is
   configuration, not a secret, so it belongs in code**, and a repo `.env` is not
   a durable home for anything. Verified by enriching one real lead end to end.
   This is the fourth time in a fortnight a liveness signal was mistaken for a

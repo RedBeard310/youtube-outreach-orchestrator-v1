@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { getLeadsForOrchestration } from '../airtable.ts';
+import { getLeadsForOrchestration } from '../db.ts';
 import { driveApprovedPrep } from '../drivers/approved.ts';
 import { driveD100 } from '../drivers/d100.ts';
 import { driveLeadFinder } from '../drivers/lead-finder.ts';

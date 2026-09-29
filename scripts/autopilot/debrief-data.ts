@@ -2,7 +2,7 @@
 //
 // Emits a compact JSON snapshot of the cycle (midnight-PT → now) so the daily debrief
 // agent writes a report grounded in real numbers, not guesses. Reuses the campaign's own
-// database helpers (src/airtable.ts, Postgres via pipeline-db) + the campaign JSONL. Prints JSON to stdout; also writes it to
+// database helpers (src/db.ts, Postgres via pipeline-db) + the campaign JSONL. Prints JSON to stdout; also writes it to
 // logs/autopilot-debrief-<pacific-date>.json.
 
 import 'dotenv/config';
@@ -15,7 +15,7 @@ import {
   countShelf,
   getLeadsDiscoveredSince,
   type Lead,
-} from '../../src/airtable.ts';
+} from '../../src/db.ts';
 import { discoveryReportKey } from '../../src/discovery-method.ts';
 import { collectBookDepth, collectYieldBetween, loadState } from '../../src/recovery/bloodhound-lane.ts';
 import { summarizeToday, pacificDate } from './burn-ledger.js';
@@ -833,7 +833,7 @@ function fatalSignaturesToday(sinceMs: number): string[] {
           //    definitionally not stuck. A genuine hang/crash (module error, OOM, unhandled
           //    campaign exception) never reaches DONE, so it is still surfaced. Without this the
           //    2026-07-30 cycle lit `finder_hard_wall` on a productive session (+18 parked, 118
-          //    channels) whose only failure was two consecutive Airtable 503s that rode out within
+          //    channels) whose only failure was two consecutive the old database 503s that rode out within
           //    the same day — crying wolf against the check-in that had logged it benign. Genuine
           //    supply/quota problems are surfaced by supply_health + the hard_stops/quota_stops
           //    counts, not by this signature.
@@ -1285,7 +1285,7 @@ async function main(): Promise<void> {
 
   // Discovery-method attribution (2026-08-09, Casey-requested). discovered_via is a
   // JSON-array string; the FIRST entry's prefix identifies the method (see the Lead
-  // type doc in src/airtable.ts). A bare term with no colon-prefix is the keyword
+  // type doc in src/db.ts). A bare term with no colon-prefix is the keyword
   // engine — the original method, so it has no tag of its own. This is what makes
   // comment-sweep/graph-sweep/peer-sweep's contribution visible in the daily report
   // instead of invisibly folded into "discovered_today" — see

@@ -18,7 +18,7 @@ import {
   getLeadsByIds,
   isApprovedFireReady,
   type Lead,
-} from '../airtable.ts';
+} from '../db.ts';
 import { driveApprovedSend, tallyCount } from '../drivers/approved.ts';
 import { acquireLock, releaseLock } from '../lock.ts';
 import { writeTickLog } from '../logger.ts';
@@ -96,7 +96,7 @@ async function main() {
     );
     // The child exits 0 even when every lead failed, so a bad send is silent
     // unless something says so here. A failed lead keeps its written email and is
-    // picked up by the next send (see fireResumeStage in ../airtable.ts) — the
+    // picked up by the next send (see fireResumeStage in ../db.ts) — the
     // point of this line is that nobody has to read 500 lines of child output to
     // find out a batch went badly.
     if (failed && sent !== null && failed > sent) {

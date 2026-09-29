@@ -1,4 +1,4 @@
-import type { Lead } from '../airtable.ts';
+import type { Lead } from '../db.ts';
 import { runChild, runChildCapture } from '../run.ts';
 
 export interface ApprovedResult {

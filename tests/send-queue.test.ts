@@ -3,7 +3,7 @@
 // and no selector in this repo would ever look at them again.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { fireResumeStage, isApprovedFireReady, type Lead } from '../src/airtable.ts';
+import { fireResumeStage, isApprovedFireReady, type Lead } from '../src/db.ts';
 import { driveApprovedSend, parseFinalTally, tallyCount } from '../src/drivers/approved.ts';
 
 function lead(over: Partial<Lead> = {}): Lead {

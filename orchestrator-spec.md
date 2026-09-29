@@ -1,10 +1,10 @@
 # Orchestrator spec — `youtube-outreach-orchestrator-v1`
 
-> **Storage moved to Postgres on 2026-08-12.** This is the original build spec, written while the lead data lived in Airtable. Each Airtable base below is now a schema in the Postgres `pipeline` database: the lead base is `leads`, the quick enrichment base is `enrichment`, and the per-client deep-research bases are one `research` schema with a `client_id` column. Nothing in those schemas is cleaned up or purged, so ignore the 24-hour cleanup below. For how storage works today, read [CLAUDE.md](CLAUDE.md) → "Database architecture (Postgres, since 2026-08-12)".
+> **Storage moved to Postgres on 2026-08-12.** This is the original build spec, written while the lead data lived in the old database. Each old base below is now a schema in the Postgres `pipeline` database: the lead base is `leads`, the quick enrichment base is `enrichment`, and the per-client deep-research bases are one `research` schema with a `client_id` column. Nothing in those schemas is cleaned up or purged, so ignore the 24-hour cleanup below. For how storage works today, read [CLAUDE.md](CLAUDE.md) → "Database architecture (Postgres, since 2026-08-12)".
 
 Working name. Coordinates the existing repos and skills into one continuous workflow: discover → review → find email → enrich → draft → push.
 
-The orchestrator owns almost no business logic. Each repo/skill already runs end-to-end on its own. The orchestrator's job is to call them in the right order, in response to state changes in Airtable, and make sure nothing falls through the cracks.
+The orchestrator owns almost no business logic. Each repo/skill already runs end-to-end on its own. The orchestrator's job is to call them in the right order, in response to state changes in the old database, and make sure nothing falls through the cracks.
 
 ---
 
@@ -12,7 +12,7 @@ The orchestrator owns almost no business logic. Each repo/skill already runs end
 
 **Is:**
 - A standalone repo (`youtube-outreach-orchestrator-v1`) with a thin coordination loop.
-- Cron-triggered (every N hours) to poll Airtable and advance leads through whatever stage they're ready for.
+- Cron-triggered (every N hours) to poll the old database and advance leads through whatever stage they're ready for.
 - Two routing paths: `approved` (standard outreach) and `d100` (deep research, no automated email yet).
 - A logger of what ran when, so debugging across repos is one place.
 
@@ -30,7 +30,7 @@ The orchestrator owns almost no business logic. Each repo/skill already runs end
                   ┌─────────────────────────────────────┐
                   │   youtube-lead-finder-v1            │
                   │   discovers channels                 │
-                  │   writes to Airtable                 │
+                  │   writes to the old database                 │
                   │   review_status = "unreviewed"       │
                   └─────────────────┬───────────────────┘
                                     │
@@ -55,7 +55,7 @@ The orchestrator owns almost no business logic. Each repo/skill already runs end
   ┌──────────────────────────────┐       ┌──────────────────────────────┐
   │ Quick YouTube Channel        │       │ <Deep-Research repo, TBN>    │
   │ Research v1                  │       │ writes to a separate, perm-  │
-  │ writes to scratch base       │       │ anent Airtable base          │
+  │ writes to scratch base       │       │ anent old base          │
   │ (cleaned 24h after sent)     │       │ (never auto-cleaned)         │
   └──────────────────────────────┘       └──────────────────────────────┘
                 │                                       │
@@ -90,7 +90,7 @@ The orchestrator owns almost no business logic. Each repo/skill already runs end
 |---|---|---|---|
 | `youtube-lead-finder-v1` | Agent (repo) | Discovers YouTube channels matching ICP, writes to the lead table (`leads.lead_candidates`) with `review_status="unreviewed"`. **No orchestrator involvement** — runs on its own schedule, possibly Casey-triggered. | Lead candidates table |
 | `youtube-email-outreach-v1` | Agent (repo) | The current repo. Find email → verify → enrich (calls Quick research) → compose → push — **but the tick stops after enrich (parks at `ready_data_scraped`); compose + push are the decoupled on-demand `npm run send`.** Handles its own state machine via `outreach_status`. Already supports `--lead-id`, `--variant`, `--concurrency` flags. | Outreach status fields + email vars |
-| `quick-youtube-channel-research-v1` | Agent (repo, locked) | Quick enrichment. Called by email-outreach-v1 today; will continue to be called the same way. Writes to the `enrichment` schema, exports local markdown bundle. | `enrichment` schema (never cleaned; the old `airtable-cleanup.ts` was retired 2026-08-12) |
+| `quick-youtube-channel-research-v1` | Agent (repo, locked) | Quick enrichment. Called by email-outreach-v1 today; will continue to be called the same way. Writes to the `enrichment` schema, exports local markdown bundle. | `enrichment` schema (never cleaned; the old `db-cleanup.ts` was retired 2026-08-12) |
 | **Deep-research agent (TBN)** | Agent (future repo) | For `d100` leads only. Likely a rename/fork of `quick-youtube-channel-research-v1` with deeper extraction passes. Writes to the `research` schema, one `client_id` per prospect. Casey will name this. | `research` schema |
 | `5-ideas-email` | Skill (`~/.claude/skills/5-ideas-email/`) | Email writer variant A. Read by `youtube-email-outreach-v1` at compose time. | — |
 | `nick-saraev-cold-email` | Skill (`~/.claude/skills/nick-saraev-cold-email/`) | Email writer variant B. A/B split with variant A via SHA-256 hash of lead ID. | — |
@@ -121,8 +121,8 @@ The lead's `review_status` field on `leads.lead_candidates` is what the orchestr
 
 | Lives at | What | Touched by |
 |---|---|---|
-| `leads` schema (was Airtable base `appenY7r5jlZMRpJ0`) | One row per lead (`lead_candidates` table). `review_status`, `outreach_status`, `email_address`, `email_variant`, `smartlead_*`, `enrichment_run_id`. | Lead-finder writes rows. Casey edits `review_status`. Email-outreach updates outreach fields. Orchestrator reads everything, writes nothing directly (delegates to email-outreach). |
-| `enrichment` schema (was Airtable base `appTvzwOiTLmqC5Mw`) | Videos, transcripts, comments, etc. Channels table kept as dedup index. Nothing is purged. | `quick-youtube-channel-research-v1` writes. No automated cleanup (retired 2026-08-12). |
+| `leads` schema (was old base `appenY7r5jlZMRpJ0`) | One row per lead (`lead_candidates` table). `review_status`, `outreach_status`, `email_address`, `email_variant`, `smartlead_*`, `enrichment_run_id`. | Lead-finder writes rows. Casey edits `review_status`. Email-outreach updates outreach fields. Orchestrator reads everything, writes nothing directly (delegates to email-outreach). |
+| `enrichment` schema (was old base `appTvzwOiTLmqC5Mw`) | Videos, transcripts, comments, etc. Channels table kept as dedup index. Nothing is purged. | `quick-youtube-channel-research-v1` writes. No automated cleanup (retired 2026-08-12). |
 | **`research` schema** (one `client_id` per prospect) | Permanent. Same shape as `enrichment`, plus a `clients` table. Used for Casey's manual review + future d100 outreach agent. | Deep-research agent writes. No automated cleanup. |
 | Local file system, this repo's `enrichment-bundles/<recId>/` | Markdown bundle for quick enrichments. Source of truth for the compose stage. | `quick-youtube-channel-research-v1` exports. Email-outreach reads at compose. |
 | Local file system, deep-research repo's bundles dir | Markdown bundle for d100 deep enrichments. | Deep-research agent. |
@@ -155,11 +155,11 @@ New field (proposed):
 
 ## Trigger / scheduling
 
-**Cron-driven, polling Airtable.**
+**Cron-driven, polling the old database.**
 
 - Default cadence: every 4 hours (`17 */4 * * *` — off-zero minute per the [[skill-cron-best-practices]] rule).
 - On each tick, the orchestrator:
-  1. Queries the lead Airtable base for leads with `review_status` in (`approved`, `d100`) AND `outreach_status` NOT in terminal-success state for that branch.
+  1. Queries the lead old base for leads with `review_status` in (`approved`, `d100`) AND `outreach_status` NOT in terminal-success state for that branch.
   2. Buckets them by branch.
   3. For each branch, calls the appropriate next-stage repo to advance the batch.
 
@@ -258,7 +258,7 @@ That's it. The underlying repos already write their own detailed per-lead logs. 
 ## Build order
 
 1. **Scaffold the repo.** `youtube-outreach-orchestrator-v1`. Just `package.json`, `tsconfig.json`, `.env.example`, `README.md`, `src/cli/orchestrate.ts`.
-2. **Lead query helper.** Reads the lead Airtable base, returns leads in scope for each branch.
+2. **Lead query helper.** Reads the lead old base, returns leads in scope for each branch.
 3. **Approved-path driver.** Shells out to `youtube-email-outreach-v1`'s outreach CLI with the right `--lead-ids` list. Pipes stdout, captures exit code.
 4. **D100-path driver.** Same shape, but needs the find-and-verify-only flag added to email-outreach-v1, then the deep-research repo's CLI.
 5. **Logger.** Writes one JSONL line per tick.
@@ -286,10 +286,10 @@ Nothing required in `youtube-lead-finder-v1` (orchestrator just reads its output
 ## Open questions for Casey
 
 1. **Deep-research repo name.** You mentioned renaming `quick-youtube-channel-research-v1` or forking it. Lean toward a fresh repo (`youtube-deep-research-v1`?) so the quick research one stays stable for the orchestrator's hot path.
-2. **D100 Airtable base.** Will you provision it manually (matching the schema of `appTvzwOiTLmqC5Mw`), or should the deep-research repo seed it programmatically on first run?
+2. **D100 old base.** Will you provision it manually (matching the schema of `appTvzwOiTLmqC5Mw`), or should the deep-research repo seed it programmatically on first run?
 3. **`deep_research_status` field vs extending `outreach_status`.** Slight preference toward extending `outreach_status` with `deep_research_*` values to keep one state column, but it does mix two slightly different state spaces. Your call.
 4. **Cron interval.** Default 4h. If your typical batch cadence is daily, every 24h might be enough. If you'd want faster response to new approvals, every 1h.
-5. **Where does the orchestrator log live?** Inside its own repo (`logs/`) or written into the lead Airtable base as orchestrator-tick rows in a new table? Files are simpler.
+5. **Where does the orchestrator log live?** Inside its own repo (`logs/`) or written into the lead old base as orchestrator-tick rows in a new table? Files are simpler.
 6. **Do we need d100 leads to also get the email-find step at all?** You said yes earlier ("find an email first"), but for some elite d100 leads you might have the email already (your network, referrals). Worth allowing manual email override on the lead row that skips find/verify.
 
 ---

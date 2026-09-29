@@ -21,7 +21,7 @@ import { join } from 'node:path';
 import { homedir } from 'node:os';
 import { spawn, execSync } from 'node:child_process';
 import { summarizeToday, pacificDate } from './burn-ledger.js';
-import { countByReviewStatus } from '../../src/airtable.ts';
+import { countByReviewStatus } from '../../src/db.ts';
 import {
   collectBookDepth,
   collectPassAttribution,

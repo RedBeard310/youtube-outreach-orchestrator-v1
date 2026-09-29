@@ -23,7 +23,7 @@ That instruction got captured in the handoff but didn't ship in the code — eve
 
 ## What to fix
 
-**Find the code path that flips `outreach_status` to `sent_to_smartlead` after a successful SmartLead push.** Likely in `src/lib/smartlead.ts` or `src/lib/airtable.ts` or wherever the database update for that transition happens. There should be a single `update(...)` call (or small handful) that sets `outreach_status` and `outreach_processed_at` on send success.
+**Find the code path that flips `outreach_status` to `sent_to_smartlead` after a successful SmartLead push.** Likely in `src/lib/smartlead.ts` or `src/lib/db.ts` or wherever the database update for that transition happens. There should be a single `update(...)` call (or small handful) that sets `outreach_status` and `outreach_processed_at` on send success.
 
 **Add `last_contacted_at: new Date().toISOString()` to the same fields object.** Same call, same transaction, same timestamp source — so the two fields can't drift relative to each other.
 
@@ -31,13 +31,13 @@ Rough pattern:
 
 ```typescript
 // Before
-await airtable.update(leadId, {
+await db.update(leadId, {
   outreach_status: 'sent_to_smartlead',
   outreach_processed_at: now,
 });
 
 // After
-await airtable.update(leadId, {
+await db.update(leadId, {
   outreach_status: 'sent_to_smartlead',
   outreach_processed_at: now,
   last_contacted_at: now,  // <-- north star for retargeting eligibility

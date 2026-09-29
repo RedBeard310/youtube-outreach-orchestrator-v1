@@ -9,7 +9,7 @@
 
 ## 1. Headline number (measured, not estimated)
 
-The pipeline **records `total_cost_usd` to Airtable on every run** (`runs` table in the shared Quick-mode base `appTvzwOiTLmqC5Mw`). Pulled from **70 completed runs**:
+The pipeline **records `total_cost_usd` to the old database on every run** (`runs` table in the shared Quick-mode base `appTvzwOiTLmqC5Mw`). Pulled from **70 completed runs**:
 
 | Metric | Per lead | Per 100 leads |
 |---|---|---|
@@ -202,4 +202,4 @@ The pipeline uses **list pricing** to compute `total_cost_usd`, so the measured 
 | Transcripts (top 15) | `.../src/lib/pipeline/stage-02-transcripts.ts` |
 | Top comments | `.../src/lib/pipeline/stage-04-top-comments.ts` |
 | Enrichment invocation | `youtube-email-outreach-v1/src/enrichment/runner.ts` |
-| Recorded costs | Airtable base `appTvzwOiTLmqC5Mw`, `runs.total_cost_usd` |
+| Recorded costs | old base `appTvzwOiTLmqC5Mw`, `runs.total_cost_usd` |

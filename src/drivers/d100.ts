@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { getLeadsByIds, updateLead, type Lead } from '../airtable.ts';
+import { getLeadsByIds, updateLead, type Lead } from '../db.ts';
 import { runChild } from '../run.ts';
 
 export interface D100Result {

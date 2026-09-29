@@ -1,6 +1,6 @@
 // Which discovery method wrote a lead row.
 //
-// `discovered_via` is a JSON-array string (see the Lead type in airtable.ts); the FIRST
+// `discovered_via` is a JSON-array string (see the Lead type in db.ts); the FIRST
 // entry's colon-prefix names the method. A bare term with no prefix is the keyword
 // engine — the original method, so it never got a tag of its own.
 //

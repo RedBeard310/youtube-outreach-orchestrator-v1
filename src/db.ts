@@ -167,7 +167,7 @@ const D100_TERMINAL = new Set<OutreachStatus>([
 ]);
 
 // pipeline-db finds the Postgres connection string on its own, so no API token is
-// needed. LEAD_BASE_ID is the old Airtable base id; pipeline-db accepts it and ignores it.
+// needed. LEAD_BASE_ID is the old base id; pipeline-db accepts it and ignores it.
 function getBase() {
   const baseId = process.env.LEAD_BASE_ID;
   if (!baseId) throw new Error('LEAD_BASE_ID is not set');
@@ -175,7 +175,7 @@ function getBase() {
 }
 
 // A database call can fail on a passing blip (a dropped connection or a timeout).
-// Before the 2026-08-12 move to Postgres, Airtable threw transient 5xx "Try again"
+// Before the 2026-08-12 move to Postgres, the old database threw transient 5xx "Try again"
 // errors under load. Either kind aborts a call mid-pass even though a retry would
 // succeed, and when that call is the post-run yield query, the run's JSONL line ends
 // up with a null breakdown (the "logging gap" seen on 2026-07-08). Wrap the hot reads so

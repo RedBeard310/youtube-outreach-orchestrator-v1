@@ -84,7 +84,7 @@ two-minute window. A tenth was correctly refused by the placeholder guard, which
 
 All ten were then written as `failed`. That label is accurate and it was also a trapdoor:
 
-- `APPROVED_FIRE_READY` in `src/airtable.ts` selects `ready_data_scraped`, `enriched` and
+- `APPROVED_FIRE_READY` in `src/db.ts` selects `ready_data_scraped`, `enriched` and
   `email_drafted`. `failed` is in none of them, so `npm run send` would never see them again.
 - `APPROVED_PREP_DONE` does not contain `failed` either, so the tick *would* re-drive them. Ticks
   have been manual-only since 2026-06-01 and nobody runs one.

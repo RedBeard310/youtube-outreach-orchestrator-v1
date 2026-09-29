@@ -8,9 +8,9 @@
 // already appears in MAX_ATTEMPTS or more prior *-ids.txt files in the backfill dir is
 // excluded and reported.
 //
-// Reads Postgres directly (2026-08-12). This used to call the Airtable REST API by
+// Reads Postgres directly (2026-08-12). This used to call the old database REST API by
 // hand, which is why the migration's first sweep missed it -- it is a .cjs file and
-// builds its request with `https.get` rather than the Airtable SDK, so neither the
+// builds its request with `https.get` rather than the old SDK, so neither the
 // dependency check nor a search for SDK call sites found it.
 //
 // Prints shell-parseable lines: COUNT=, FILE=, POOL=, EXCLUDED=.
@@ -68,7 +68,7 @@ function belowFloorCount() {
 }
 
 (() => {
-  // Ordered best-first now that the source is a database rather than Airtable's
+  // Ordered best-first now that the source is a database rather than the old database's
   // insertion order. If a run is cut short by quota, the leads that did get enriched
   // are the ones most worth having enriched.
   const ids = pendingIds();

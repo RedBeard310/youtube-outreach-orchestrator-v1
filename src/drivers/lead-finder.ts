@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { getLeadsDiscoveredSince, type Lead } from '../airtable.ts';
+import { getLeadsDiscoveredSince, type Lead } from '../db.ts';
 import { isKeywordEngineLead } from '../discovery-method.ts';
 import { runChild } from '../run.ts';
 

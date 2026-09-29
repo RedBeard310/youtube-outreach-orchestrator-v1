@@ -1,8 +1,8 @@
 # Mac backfill handoff — approved_hold enrichment (written 2026-08-09, VPS side)
 
 > **History. Nobody should act on this brief (note added 2026-09-13).** It was written on
-> 2026-08-09, when the pipeline kept its data in Airtable. Storage moved to Postgres on
-> 2026-08-12, the 15-minute cleanup timer it describes is retired, and Airtable was
+> 2026-08-09, when the pipeline kept its data in the old database. Storage moved to Postgres on
+> 2026-08-12, the 15-minute cleanup timer it describes is retired, and the old database was
 > canceled on 2026-09-13.
 
 You are the Claude session in the **Mac clone** of `youtube-outreach-orchestrator-v1`.
@@ -19,7 +19,7 @@ reconfigured and expects you to take the claimed list.
   `approved_hold` after the snapshot. Its id-fetcher already excludes your claimed
   ids (default role `vps` in `scripts/backfill/next-batch-ids.cjs`).
 - No coordination needed mid-run: the id sets are disjoint by construction. Statuses
-  live in Airtable (base `appenY7r5jlZMRpJ0`) and each lead is only ever touched by
+  live in the old database (base `appenY7r5jlZMRpJ0`) and each lead is only ever touched by
   one machine.
 
 ## ⚠️ STEP 0 — env keys, BEFORE anything else
@@ -37,7 +37,7 @@ them to the Mac master, the sync will strip them from the VPS and break BOTH sid
      the live credits)
    - `OPENROUTER_API_KEY` (all LLM calls — the pipeline is zero-Anthropic since
      2026-08-01; ANTHROPIC_API_KEY is deliberately absent, do NOT re-add it)
-   - `AIRTABLE_PAT`, `RAPIDAPI_KEY`, `RAPIDAPI_YOUTUBE_HOST`
+   - `RAPIDAPI_KEY`, `RAPIDAPI_YOUTUBE_HOST`
 3. Only then proceed.
 
 ## Step 1 — freshen the repos (pull, never clone)
@@ -123,7 +123,7 @@ the non-reproducible artifact — treat this like the 2026-07 near-loss taught u
 - Shared external quotas: Supadata credits and RapidAPI are one pool across both
   machines. If your batches suddenly mass-fail, the chain's guards cool you down —
   don't override them; check which quota died before resuming.
-- The Airtable enrichment scratch base (`appTvzwOiTLmqC5Mw`, 125k-record cap) is
+- The old database enrichment scratch base (`appTvzwOiTLmqC5Mw`, 125k-record cap) is
   shared. The VPS cleanup timer drains it every 15 min. If you see
   `LIMIT_CHECK_TOO_MANY_RECORDS_IN_TABLE` failures, stop and wait ~1h for the
   valve — that's what the mass-fail guard does automatically.

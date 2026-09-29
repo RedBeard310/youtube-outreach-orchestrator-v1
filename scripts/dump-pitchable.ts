@@ -3,7 +3,7 @@
 //   npx tsx scripts/dump-pitchable.ts <out.txt> [--limit N]
 import 'dotenv/config';
 import { writeFileSync } from 'node:fs';
-import { getVerifiablePitchableLeads } from '../src/airtable.ts';
+import { getVerifiablePitchableLeads } from '../src/db.ts';
 
 const out = process.argv.find(a => a.endsWith('.txt')) ?? 'logs/pitchable.txt';
 const li = process.argv.indexOf('--limit');

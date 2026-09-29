@@ -73,9 +73,9 @@ Write the next 100 record ids (newline-separated) to a scratch file. Node snippe
 ```js
 // _make_ids.mjs  — run: node _make_ids.mjs > batch.ids ; then delete the script
 import 'dotenv/config';
-import Airtable from 'pipeline-db/sdk'; // Postgres, behind the old Airtable SDK interface
+import PipelineDb from 'pipeline-db/sdk'; // Postgres, behind the old SDK interface
 import { writeFileSync } from 'node:fs';
-const base = new Airtable({ apiKey: process.env.AIRTABLE_PAT }).base(process.env.LEAD_BASE_ID);
+const base = new PipelineDb().base(process.env.LEAD_BASE_ID);
 const LIMIT = 100;
 const recs = await base(process.env.LEAD_TABLE_NAME ?? 'lead_candidates')
   .select({ filterByFormula: `AND({review_status}='approved_hold', {outreach_status}='email_verified')`, fields: ['channel_name'] })

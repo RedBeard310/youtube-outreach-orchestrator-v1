@@ -10,7 +10,7 @@ See [CLAUDE.md](CLAUDE.md) for the operational contract and [orchestrator-spec.m
 npm install
 cp .env.example .env
 # Fill in EMAIL_OUTREACH_REPO_PATH, DEEP_RESEARCH_REPO_PATH, LEAD_FINDER_REPO_PATH.
-# LEAD_BASE_ID must still be non-empty (src/airtable.ts checks it),
+# LEAD_BASE_ID must still be non-empty (src/db.ts checks it),
 # but the Postgres layer ignores its value.
 ```
 

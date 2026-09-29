@@ -177,7 +177,7 @@ Time: a tick blocks until downstream finishes; D100 adds 60s/lead of deliberate 
 | [src/cli/orchestrate.ts](src/cli/orchestrate.ts) | tick entry point (`npm run tick`) |
 | [src/cli/run-finder.ts](src/cli/run-finder.ts) | manual finder entry point (`npm run finder`) |
 | [src/drivers/](src/drivers/) | the three branch drivers |
-| [src/airtable.ts](src/airtable.ts) | lead query + status writes (talks to Postgres through `pipeline-db`, despite the file name); the `ReviewStatus`/`OutreachStatus` enums |
+| [src/db.ts](src/db.ts) | lead query + status writes (talks to Postgres through `pipeline-db`, despite the file name); the `ReviewStatus`/`OutreachStatus` enums |
 | [src/lock.ts](src/lock.ts), [src/logger.ts](src/logger.ts), [src/run.ts](src/run.ts) | lockfile, JSONL logger, child-process spawner |
 | [.env](.env) / [.env.example](.env.example) | config & secrets (gitignored) |
 | `logs/orchestrator-*.jsonl` | per-tick structured logs |
@@ -186,7 +186,7 @@ Time: a tick blocks until downstream finishes; D100 adds 60s/lead of deliberate 
 | [scripts/](scripts/) | operational/diagnostic toolkit (see Running it) |
 | [orchestrator-spec.md](orchestrator-spec.md), [system-overview.md](system-overview.md), [CLAUDE.md](CLAUDE.md) | full spec / system context / operating contract |
 
-**Credentials required:** the database connection string, read from `/home/casey/.pipeline-db.env` on the VPS (or from `PIPELINE_DATABASE_URL` / `DATABASE_URL`). `LEAD_BASE_ID` must also be non-empty, because `src/airtable.ts` checks it, but `pipeline-db` ignores its value. No Airtable token is needed. To actually run a tick end-to-end, the three downstream repos each need their own keys configured (Anthropic, YouTube/RapidAPI, ZeroBounce, Firecrawl, Supadata, SmartLead). Secrets load via `dotenv` from `.env`; on Casey's setup the real source of truth is `~/Claude/env-storage/.env`, exported through `~/.zshenv`.
+**Credentials required:** the database connection string, read from `/home/casey/.pipeline-db.env` on the VPS (or from `PIPELINE_DATABASE_URL` / `DATABASE_URL`). `LEAD_BASE_ID` must also be non-empty, because `src/db.ts` checks it, but `pipeline-db` ignores its value. No the old database token is needed. To actually run a tick end-to-end, the three downstream repos each need their own keys configured (Anthropic, YouTube/RapidAPI, ZeroBounce, Firecrawl, Supadata, SmartLead). Secrets load via `dotenv` from `.env`; on Casey's setup the real source of truth is `~/Claude/env-storage/.env`, exported through `~/.zshenv`.
 
 ## What's off vs. not built
 
