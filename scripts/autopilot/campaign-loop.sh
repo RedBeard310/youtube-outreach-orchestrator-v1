@@ -204,10 +204,18 @@ while true; do
   # on disk (and still parses) so autopilot-improve commits self-deploy within one iteration
   # instead of waiting for a manual `systemctl restart`. exec keeps the same PID, so systemd
   # sees no restart. (autopilot-improve 2026-07-14)
+  #
+  # Through `bash`, not through $0 (2026-09-30). This file is tracked 100755 so
+  # `exec "$0"` works today, but chain.sh copied this block into a file tracked
+  # 100644 and the re-exec died on "Permission denied", killing the loop it was
+  # meant to update in place. Going through the interpreter does not care about
+  # the mode bit, so the pattern is safe to copy again.
   now_mtime="$(stat -c %Y "$0" 2>/dev/null || echo 0)"
   if [ "$now_mtime" != "$SELF_MTIME" ] && bash -n "$0" 2>/dev/null; then
     log "campaign-loop.sh updated on disk (mtime $SELF_MTIME → $now_mtime) — re-exec'ing to load it"
-    exec "$0" "$@"
+    exec bash "$0" "$@"
+    log "re-exec FAILED (exit $?) — continuing on the already-loaded copy"
+    SELF_MTIME="$now_mtime"
   fi
 
   # Anthropic hard ceiling — belt-and-suspenders (the check-in is the primary guard).

@@ -195,10 +195,39 @@ while true; do
   # `systemctl restart` that would kill whatever batch is in flight. `exec` keeps
   # the same PID so systemd sees no restart, and re-running the `exec 9>` line
   # above re-takes the single-instance lock on the same process.
+  #
+  # RE-EXEC THROUGH THE INTERPRETER, NOT THROUGH $0 (2026-09-30). This was copied
+  # from campaign-loop.sh, which git tracks as 100755, so `exec "$0"` works there.
+  # chain.sh is tracked 100644 and its unit runs it as `/usr/bin/env bash chain.sh`,
+  # so `exec "$0"` asks the kernel to run a file with no execute bit:
+  #
+  #   chain.sh: line 201: .../chain.sh: Permission denied
+  #
+  # A failed `exec` takes the shell down with it, so the one mechanism built to
+  # deploy a fix WITHOUT killing an in-flight batch was instead killing the
+  # process — the exact failure it exists to avoid. It fired on 2026-09-29 at
+  # 17:41:47Z when a checkout changed the mtime; the chain happened to be idle,
+  # systemd's Restart=always brought it back 60s later, and the only trace was one
+  # bare "Permission denied" naming no cause. Going through `bash` works whatever
+  # the mode bit is, so losing the execute bit can never break the self-deploy again.
   now_mtime="$(stat -c %Y "$0" 2>/dev/null || echo 0)"
   if [ "$now_mtime" != "$SELF_MTIME" ] && bash -n "$0" 2>/dev/null; then
     log "chain.sh updated on disk (mtime $SELF_MTIME → $now_mtime) — re-exec'ing to load it"
-    exec "$0" "$@"
+    exec bash "$0" "$@"
+    # Only reached if exec itself failed. Say so, then carry on with the old code:
+    # a stale chain that keeps enriching beats a dead one, and systemd would
+    # otherwise restart us into the same failure every 60s.
+    log "re-exec FAILED (exit $?) — continuing on the already-loaded copy; the fix deploys on the next restart"
+    SELF_MTIME="$now_mtime"
+  fi
+
+  # The halt flag lives in $DIR (logs/backfill-2026-07/), not next to this script.
+  # A halt.flag sitting beside chain.sh is ignored, and someone stopping the chain
+  # would reach for exactly that path. Warn rather than honour it: a tracked
+  # scripts/backfill/halt.flag from the 2026-08-12 migration freeze is still on
+  # disk, and treating that as live would halt enrichment the moment this deploys.
+  if [ -f "$(dirname "$0")/halt.flag" ]; then
+    log "note: $(dirname "$0")/halt.flag exists and is NOT the halt flag — the chain reads $HALT. Nothing is halted."
   fi
 
   # Orphan sweep (2026-08-08): a killed batch strands npm-exec'd enrichment
