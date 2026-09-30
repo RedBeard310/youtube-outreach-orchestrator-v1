@@ -23,6 +23,162 @@ import { summarizeToday, pacificDate } from './burn-ledger.js';
 const REPO = '/home/casey/repos/youtube-outreach-orchestrator-v1';
 const LOGS = join(REPO, 'logs');
 const FINDER_REPO = '/home/casey/repos/youtube-lead-finder-v1';
+const AUTOMATOR_REPO = '/home/casey/repos/automator';
+
+// THE SEND PLAN, AND WHY A ZERO-SEND DAY WAS UNREADABLE (2026-09-30).
+//
+// Siege in `automator` sends almost everything. Its daily timer PLANS a batch and
+// writes a 20-email sample, then stops on `SAMPLE RUN: nothing pushed, nothing sent.
+// Waiting on Casey's approval.` The push is a separate step somebody has to run.
+//
+// On Tuesday 2026-09-29 the plan held 150 assignments against 296 free mailbox slots
+// and nobody approved it, so the whole pipeline sent 4 emails — all four from this
+// repo's own session-start send. The debrief had `sent_today.total: 4` and no way to
+// tell that apart from "nothing was ready", "SmartLead doesn't send at weekends", or
+// "the send crashed". Three very different days, one number.
+//
+// So read Siege's own plan for the cycle. Deliberately filesystem-only: no database
+// call, no automator import, no cost, and a missing or malformed plan degrades to
+// `plan_found: false` rather than taking the debrief down with it. This repo must not
+// grow send logic (see CLAUDE.md "No business logic here") — it only counts.
+export type SiegePlanFacts = {
+  plan_found: boolean;
+  plan_day: string | null;
+  email_paused: boolean | null;
+  day_cap: number | null;
+  planned: number | null;
+  mailbox_slots: number | null;
+  live_inboxes: number | null;
+  offers_blocked: number | null;
+};
+
+const NO_PLAN: SiegePlanFacts = {
+  plan_found: false,
+  plan_day: null,
+  email_paused: null,
+  day_cap: null,
+  planned: null,
+  mailbox_slots: null,
+  live_inboxes: null,
+  offers_blocked: null,
+};
+
+const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+
+// Pure so the selftest can feed it a hand-built plan. Every field is optional on the
+// way in: automator owns this file's shape and may change it without telling us, and a
+// renamed key must cost one null, not the block.
+export function siegePlanFacts(raw: unknown): SiegePlanFacts {
+  if (!raw || typeof raw !== 'object') return NO_PLAN;
+  const plan = raw as { summary?: Record<string, unknown>; assignments?: unknown };
+  const s = plan.summary && typeof plan.summary === 'object' ? plan.summary : {};
+  const inboxes = Array.isArray(s.inboxes) ? (s.inboxes as Array<Record<string, unknown>>) : null;
+  const live = inboxes?.filter((i) => i.live === true) ?? null;
+  return {
+    plan_found: true,
+    plan_day: typeof s.day === 'string' ? s.day : null,
+    email_paused: typeof s.email_paused === 'boolean' ? s.email_paused : null,
+    day_cap: num(s.day_cap),
+    planned: Array.isArray(plan.assignments) ? plan.assignments.length : null,
+    // What the warm mailboxes would actually accept, which is the number that stopped
+    // being the constraint on 09-29 (33 slots on 09-28 -> 296 on 09-29, on +1 inbox:
+    // Monday's follow-ups were eating the ladder and Tuesday's were zero).
+    mailbox_slots: live === null
+      ? null
+      : live.reduce((t, i) => t + (num(i.free_before_fill) ?? 0), 0),
+    live_inboxes: live?.length ?? null,
+    // An object keyed by offer name, each holding that offer's list of reasons. Counted
+    // because it is the ceiling on who can be emailed without repeating anyone: 9 of
+    // Siege's 16 offers could not run on 2026-09-29. Accepts an array too, so a later
+    // shape change degrades to a count rather than a null.
+    offers_blocked: Array.isArray(s.offer_problems)
+      ? s.offer_problems.length
+      : s.offer_problems && typeof s.offer_problems === 'object'
+        ? Object.keys(s.offer_problems).length
+        : null,
+  };
+}
+
+export type SendPlanHealth = SiegePlanFacts & {
+  sent_in_cycle: number | null;
+  sent_by_this_repo: number | null;
+  sent_elsewhere: number | null;
+  unpushed_planned: number | null;
+  approval_pending: boolean | null;
+  binding_constraint: string | null;
+  note: string;
+};
+
+// `sent_elsewhere` is everything that reached SmartLead this cycle that this repo did
+// not push — Siege plus any batch driven by hand from the email repo. It cannot be
+// attributed further from here, and it does not need to be: the question is whether
+// the planned batch moved at all.
+export function sendPlanHealth(
+  facts: SiegePlanFacts,
+  sentInCycle: number | null,
+  sentByThisRepo: number | null,
+): SendPlanHealth {
+  const elsewhere = sentInCycle === null || sentByThisRepo === null
+    ? null
+    : Math.max(0, sentInCycle - sentByThisRepo);
+  const planned = facts.planned;
+  const unpushed = planned === null || elsewhere === null ? null : Math.max(0, planned - elsewhere);
+  // A plan with work in it that moved nothing. Not flagged when email is paused on
+  // purpose, and not inferred when either count is missing — "we didn't measure" is
+  // not "nothing happened".
+  const approvalPending = planned === null || elsewhere === null
+    ? null
+    : facts.email_paused === true
+      ? false
+      : planned > 0 && elsewhere === 0;
+
+  let binding: string | null = null;
+  if (facts.email_paused === true) binding = 'email_paused';
+  else if (approvalPending === true) binding = 'awaiting_approval';
+  else if (elsewhere !== null && elsewhere > 0) {
+    // Only claim a ceiling when the day actually pressed against it.
+    if (facts.day_cap !== null && facts.mailbox_slots !== null && facts.mailbox_slots < facts.day_cap
+      && elsewhere >= facts.mailbox_slots) binding = 'mailbox_slots';
+    else if (facts.day_cap !== null && elsewhere >= facts.day_cap) binding = 'day_cap';
+    else binding = 'partial_push';
+  }
+
+  return {
+    ...facts,
+    sent_in_cycle: sentInCycle,
+    sent_by_this_repo: sentByThisRepo,
+    sent_elsewhere: elsewhere,
+    unpushed_planned: unpushed,
+    approval_pending: approvalPending,
+    binding_constraint: binding,
+    note:
+      "Siege's own plan for this cycle, read from automator/state/siege/<day>/plan.json. " +
+      'Its daily timer plans and samples, then waits for Casey to approve the push, so ' +
+      'approval_pending:true means a written batch sat still — the 2026-09-29 shape, where ' +
+      '150 planned against 296 free slots produced 4 sends. day_cap is the warmup ramp and ' +
+      'mailbox_slots is what the live inboxes would accept; the smaller one is the real ' +
+      'ceiling. plan_found:false means no plan on disk (Siege did not run), which is not ' +
+      'the same as a plan that ran and pushed nothing.',
+  };
+}
+
+// The PT day the cycle covers. The debrief fires ~00:20 PT and reports the 24h that
+// just ended, so that is yesterday's date, and Siege names its plan directory for the
+// day it ran. Derived from the cycle window rather than `date - 1` so the two can
+// never drift apart.
+export function cyclePacificDay(sinceISO: string): string {
+  return pacificDate(new Date(Date.parse(sinceISO) + 12 * 60 * 60 * 1000));
+}
+
+function readSiegePlan(day: string): SiegePlanFacts {
+  const f = join(AUTOMATOR_REPO, 'state', 'siege', day, 'plan.json');
+  if (!existsSync(f)) return NO_PLAN;
+  try {
+    return siegePlanFacts(JSON.parse(readFileSync(f, 'utf8')));
+  } catch {
+    return NO_PLAN;
+  }
+}
 
 // Health snapshot for the three sweep-based discovery methods (2026-08-09). None of
 // these show up in campaign.jsonl (that's the keyword engine only), so without this
@@ -1323,6 +1479,13 @@ async function main(): Promise<void> {
   const parkedStart = parkedAtCycleStart(sinceISO);
   const burn = summarizeToday(date);
 
+  const sendLog = orchestratorSendLog(sinceISO, untilISO);
+  const sendPlan = sendPlanHealth(
+    readSiegePlan(cyclePacificDay(sinceISO)),
+    sent?.total ?? null,
+    sendLog.sent_sum,
+  );
+
   // Supply-health — surface the persistent term-supply outage the finder can't self-heal.
   const obs = readObservations();
   const blockStart = ongoingEpisodeStart(obs, 'autocomplete_blocked', sinceMs);
@@ -1368,7 +1531,7 @@ async function main(): Promise<void> {
     sent_today: {
       total: sent?.total ?? null,
       by_review_status: sent?.by_review_status ?? null,
-      orchestrator_log: orchestratorSendLog(sinceISO, untilISO),
+      orchestrator_log: sendLog,
       note:
         'Loaded into a SmartLead campaign, counted from leads.outreach_processed_at. ' +
         'SmartLead sends on its own schedule (Mon-Thu 09:00-15:00 ET), so this is not ' +
@@ -1376,6 +1539,9 @@ async function main(): Promise<void> {
         'orchestrator_log covers only sends this repo launched; a batch driven by hand from ' +
         'the email repo shows up in total and not there, and the difference is the point.',
     },
+    // Why the cycle sent what it sent. sent_today counts emails; this says whether a
+    // batch was written and left standing. See the block comment on siegePlanFacts().
+    send_plan: sendPlan,
     // What the Bloodhound recovery lane produced this cycle. Its collect pass is the
     // pipeline's only lead-producing process while discovery is paused, so a debrief
     // that can't see its yield can't tell a picked-over book from a broken lane.

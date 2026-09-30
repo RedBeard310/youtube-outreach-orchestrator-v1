@@ -1,4 +1,4 @@
-import { classifyKeyProbe, MAX_MISSING_DEBRIEFS, missingDebriefs, summarizeSendLines, isVerifiedOrBeyond, laneYield, priorAdvanceSource, priorSeedsAdvanced, priorSeedsWalked, reconcileAdvanced, sessionSeedsAdvanced, sessionStartMs, walkRateTrend } from './debrief-data.ts';
+import { classifyKeyProbe, cyclePacificDay, MAX_MISSING_DEBRIEFS, missingDebriefs, sendPlanHealth, siegePlanFacts, summarizeSendLines, isVerifiedOrBeyond, laneYield, priorAdvanceSource, priorSeedsAdvanced, priorSeedsWalked, reconcileAdvanced, sessionSeedsAdvanced, sessionStartMs, walkRateTrend } from './debrief-data.ts';
 let fail = 0;
 const ok = (name: string, got: unknown, want: unknown) => {
   const pass = JSON.stringify(got) === JSON.stringify(want);
@@ -213,6 +213,76 @@ ok('two runs sum, and a partly-measured cycle keeps the measured part',
     { ts: '2026-09-24T19:00:00.000Z', dry_run: false, manual_send_run: true, send_attempted: 8, send_sent: 8, send_failed: 0 },
   ], SINCE, UNTIL),
   { runs: 2, attempted_sum: 26, sent_sum: 8, failed_sum: 0, dry_runs_excluded: 0 });
+
+// sendPlanHealth / siegePlanFacts / cyclePacificDay — telling "nobody approved the
+// batch" apart from "nothing to send". The 2026-09-29 shape is the first case.
+const PLAN_29 = {
+  summary: {
+    day: '2026-09-29', email_paused: false, day_cap: 150,
+    offer_problems: { 'super-fan': ['paused'], 'time-offer': ['no video'] },
+    inboxes: [
+      { live: true, free_before_fill: 8 },
+      { live: true, free_before_fill: 8 },
+      { live: false, free_before_fill: 0 },
+    ],
+  },
+  assignments: new Array(150).fill({ lead_id: 'x' }),
+};
+ok('plan facts read off the real shape',
+  siegePlanFacts(PLAN_29),
+  { plan_found: true, plan_day: '2026-09-29', email_paused: false, day_cap: 150,
+    planned: 150, mailbox_slots: 16, live_inboxes: 2, offers_blocked: 2 });
+ok('blocked offers count as an array too',
+  siegePlanFacts({ summary: { offer_problems: [{ offer: 'a' }] } }).offers_blocked, 1);
+ok('a dead inbox contributes no slots',
+  siegePlanFacts({ summary: { inboxes: [{ live: false, free_before_fill: 12 }] } }).mailbox_slots, 0);
+ok('a renamed key costs one null, not the block',
+  siegePlanFacts({ summary: { day_cap: 'oops' }, assignments: [1] }),
+  { plan_found: true, plan_day: null, email_paused: null, day_cap: null,
+    planned: 1, mailbox_slots: null, live_inboxes: null, offers_blocked: null });
+ok('garbage is no plan', siegePlanFacts('nope').plan_found, false);
+ok('null is no plan', siegePlanFacts(null).plan_found, false);
+
+const h29 = sendPlanHealth(siegePlanFacts(PLAN_29), 4, 4);
+ok('09-29: 150 planned, all 4 sends were ours -> awaiting approval',
+  [h29.sent_elsewhere, h29.unpushed_planned, h29.approval_pending, h29.binding_constraint],
+  [0, 150, true, 'awaiting_approval']);
+// The real Monday 2026-09-28: 100-email ramp, 33 free slots, 34 loaded of which this
+// repo pushed 2. It stopped one short of the mailbox ceiling, so no ceiling is claimed.
+const PLAN_28 = {
+  summary: {
+    day: '2026-09-28', email_paused: false, day_cap: 100,
+    inboxes: [{ live: true, free_before_fill: 33 }],
+  },
+  assignments: new Array(100).fill({ lead_id: 'x' }),
+};
+ok('09-28: 34 loaded, 2 of them ours -> the batch moved, no ceiling reached',
+  (() => { const h = sendPlanHealth(siegePlanFacts(PLAN_28), 34, 2);
+    return [h.sent_elsewhere, h.approval_pending, h.binding_constraint]; })(),
+  [32, false, 'partial_push']);
+ok('one more email and the mailbox ceiling is the honest answer',
+  sendPlanHealth(siegePlanFacts(PLAN_28), 35, 2).binding_constraint, 'mailbox_slots');
+ok('a day that filled the ramp names the ramp',
+  sendPlanHealth(
+    siegePlanFacts({ ...PLAN_29, summary: { ...PLAN_29.summary, day_cap: 10 } }), 12, 2,
+  ).binding_constraint, 'day_cap');
+ok('a deliberate email pause is not a missing approval',
+  (() => { const h = sendPlanHealth(
+    siegePlanFacts({ ...PLAN_29, summary: { ...PLAN_29.summary, email_paused: true } }), 0, 0);
+    return [h.approval_pending, h.binding_constraint]; })(),
+  [false, 'email_paused']);
+// An unmeasured cycle must not read as a quiet one — the same rule summarizeSendLines keeps.
+ok('no send count -> no verdict',
+  (() => { const h = sendPlanHealth(siegePlanFacts(PLAN_29), null, 4);
+    return [h.sent_elsewhere, h.approval_pending, h.binding_constraint]; })(),
+  [null, null, null]);
+ok('Siege never ran -> no plan, and no approval claim',
+  (() => { const h = sendPlanHealth(siegePlanFacts(null), 4, 4);
+    return [h.plan_found, h.approval_pending, h.binding_constraint]; })(),
+  [false, null, null]);
+// The plan directory is named for the day the cycle covers, not the day the debrief runs.
+ok('cycle day is the PT day that just ended', cyclePacificDay('2026-09-29T07:00:00.000Z'), '2026-09-29');
+ok('cycle day across a PT month boundary', cyclePacificDay('2026-09-30T07:00:00.000Z'), '2026-09-30');
 
 console.log(fail === 0 ? '\nALL PASS' : `\n${fail} FAILED`);
 process.exit(fail === 0 ? 0 : 1);
