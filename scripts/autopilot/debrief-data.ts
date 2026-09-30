@@ -1335,21 +1335,40 @@ async function openRouterHealth(sinceISO: string, untilISO: string): Promise<Rec
   let accountSpend: number | null = null;
   let sampleHours: number | null = null;
   const SAMPLE = join(LOGS, 'openrouter-usage-samples.jsonl');
+  // Well under the 24h debrief cadence, so the normal daily run always measures,
+  // and comfortably above the minutes between an accidental double-run.
+  const MIN_USAGE_SAMPLE_GAP_H = 6;
   if (totalUsage !== null) {
     try {
-      const prior = existsSync(SAMPLE)
+      // A SECOND RUN IN THE SAME CYCLE MUST NOT DESTROY THE MEASUREMENT (2026-09-30).
+      // This appended a sample on every run and diffed against the newest one, so
+      // re-running the gatherer — which this script is safe to do, and which the
+      // debrief agent does when it wants fresh numbers — diffed against a sample
+      // minutes old. Today that turned a real $4.61/day over 24h into $15.00/day
+      // over 0.02h, and cut reported runway from 40 days to 12. The numbers had to
+      // be repaired by hand, which is the tell that the measurement was fragile.
+      // Two halves of one rule: diff against the newest sample that is actually old
+      // enough to measure against, and don't write a new one until that much time
+      // has passed. Re-running now returns the same answer instead of a sliver.
+      const samples = existsSync(SAMPLE)
         ? (readJsonl(SAMPLE) as Array<{ ts?: unknown; total_usage?: unknown }>)
             .filter((r) => typeof r.ts === 'string' && typeof r.total_usage === 'number')
-            .pop()
-        : undefined;
+        : [];
+      const nowMs = Date.now();
+      const oldEnough = (r: { ts?: unknown }) =>
+        nowMs - Date.parse(r.ts as string) >= MIN_USAGE_SAMPLE_GAP_H * 3_600_000;
+      const prior = samples.filter(oldEnough).pop();
       if (prior) {
-        const dt = Date.now() - Date.parse(prior.ts as string);
+        const dt = nowMs - Date.parse(prior.ts as string);
         if (dt > 0) {
           accountSpend = Number((totalUsage - (prior.total_usage as number)).toFixed(4));
           sampleHours = Number((dt / 3_600_000).toFixed(2));
         }
       }
-      appendFileSync(SAMPLE, JSON.stringify({ ts: new Date().toISOString(), total_usage: totalUsage }) + '\n');
+      const newest = samples.at(-1);
+      if (!newest || oldEnough(newest)) {
+        appendFileSync(SAMPLE, JSON.stringify({ ts: new Date().toISOString(), total_usage: totalUsage }) + '\n');
+      }
     } catch { /* sampling is best-effort; never fail a debrief over it */ }
   }
   // Per-day rate, so an off-cadence debrief run can't read as a cheap day.
