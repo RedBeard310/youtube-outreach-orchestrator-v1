@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lead Run Debrief - 2026-10-01</title>
+<style>
+  :root {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --good-soft: #1f8a5b18; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+      --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+      --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --good-soft: #55c48c1c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --good-soft: #1f8a5b18; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+    --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+    --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --good-soft: #55c48c1c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 40px 22px 80px; }
+  .eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); font-weight: 600; }
+  h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.12; margin: 10px 0 6px; text-wrap: balance; letter-spacing: -.02em; }
+  h2 { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); margin: 44px 0 16px; font-weight: 700; }
+  h3 { font-size: 18px; margin: 0 0 6px; letter-spacing: -.01em; }
+  p { margin: 0 0 14px; }
+  .lede { font-size: 18px; color: var(--ink-soft); max-width: 68ch; }
+  .tag { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--amber-soft); color: var(--amber); letter-spacing: .02em; }
+  .tag.ok { background: var(--teal-soft); color: var(--teal); }
+  .tag.bad { background: var(--red-soft); color: var(--red); }
+  .tag.good { background: var(--good-soft); color: var(--good); }
+  .grid { display: grid; gap: 14px; }
+  .stats { grid-template-columns: repeat(4, 1fr); margin-top: 26px; }
+  @media (max-width: 720px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; box-shadow: var(--shadow); }
+  .stat .n { font-size: 30px; font-weight: 750; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .stat .l { font-size: 12.5px; color: var(--ink-soft); margin-top: 3px; }
+  .stat .s { font-size: 12px; margin-top: 8px; font-weight: 600; }
+  .up { color: var(--good); } .down { color: var(--red); } .warn { color: var(--amber); }
+  .accent-red { border-left: 3px solid var(--red); }
+  .accent-teal { border-left: 3px solid var(--teal); }
+  .accent-amber { border-left: 3px solid var(--amber); }
+  .accent-good { border-left: 3px solid var(--good); }
+
+  .q { border-radius: 14px; padding: 20px 22px; margin-bottom: 14px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); }
+  .q .ask { font-size: 17px; font-weight: 700; color: var(--ink); margin-bottom: 10px; display: flex; gap: 10px; align-items: baseline; }
+  .q .ask .qn { color: var(--red); font-weight: 800; flex: 0 0 auto; }
+  .q.accent-teal .ask .qn { color: var(--teal); }
+  .q.accent-good .ask .qn { color: var(--good); }
+  .q p { color: var(--ink-soft); }
+  .q b { color: var(--ink); }
+  .pill { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink); background: var(--panel-2); padding: 1px 7px; border-radius: 6px; border: 1px solid var(--line); white-space: nowrap; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+  th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); }
+  td .num { font-variant-numeric: tabular-nums; font-weight: 650; }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); box-shadow: var(--shadow); }
+  ol.recs { padding-left: 0; list-style: none; counter-reset: r; margin: 0; }
+  ol.recs li { counter-increment: r; position: relative; padding: 14px 16px 14px 52px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 10px; box-shadow: var(--shadow); }
+  ol.recs li::before { content: counter(r); position: absolute; left: 14px; top: 14px; width: 26px; height: 26px; border-radius: 8px; background: var(--teal-soft); color: var(--teal); font-weight: 800; font-size: 14px; display: grid; place-items: center; }
+  ol.recs b { color: var(--ink); }
+  .foot { margin-top: 46px; padding: 16px 18px; border-radius: 12px; background: var(--amber-soft); border: 1px solid var(--line); font-size: 14px; color: var(--ink-soft); }
+  .foot b { color: var(--ink); }
+  .muted { color: var(--ink-soft); font-size: 13.5px; }
+  code { background: var(--panel-2); border: 1px solid var(--line); border-radius: 5px; padding: 0 5px; font-size: .9em; }
+</style>
+
+<div class="wrap">
+
+  <div class="eyebrow">Lead Run Debrief · YouTube outreach</div>
+  <h1>2026-09-30: the paid lane's month reset, and the pipeline moved for the first time in weeks</h1>
+  <p class="lede">Apify bills monthly. Its allowance ran out on 20 September, so the one paid way we have of reading a creator's hidden email address sat idle for ten days. The new month started at midnight and the lane ran four times before the cycle closed, scraping <b>400 channels</b>, finding <b>311 addresses</b>, and parking <b>244 leads</b> for about <b>$28</b>. That is roughly eleven cents a lead. For scale, the last three days of free searching parked two, nothing, and two. Separately, somebody approved Siege's batch, so <b>151 emails</b> went into SmartLead against a ramp that allowed 150. And every one of those new leads then has to be researched, so the enrichment chain went from batches of one lead to batches of <b>66 and 67</b>, which is why the OpenRouter bill tripled and the money left on that account is now <b>8.5 days</b>, not 40.</p>
+  <div style="margin-top:14px"><span class="tag good">+203 PARKED</span> <span class="tag good">151 EMAILS LOADED</span> <span class="tag ok">$0.115 PER RECOVERED LEAD</span> <span class="tag bad">OPENROUTER 8.5 DAYS LEFT</span> <span class="tag good">0 FAULTS</span></div>
+
+  <div class="grid stats">
+    <div class="card stat accent-good">
+      <div class="n">+203</div>
+      <div class="l">leads parked, 6,867 to 7,070</div>
+      <div class="s up">+2, 0 and +2 on the three days before</div>
+    </div>
+    <div class="card stat accent-good">
+      <div class="n">151</div>
+      <div class="l">emails loaded into SmartLead</div>
+      <div class="s up">150 planned, 150 allowed. The batch went</div>
+    </div>
+    <div class="card stat accent-teal">
+      <div class="n">136</div>
+      <div class="l">leads enriched, in 4 batches</div>
+      <div class="s">One or two a day for the previous fortnight</div>
+    </div>
+    <div class="card stat accent-red">
+      <div class="n">8.5</div>
+      <div class="l">days of OpenRouter money left</div>
+      <div class="s down">$19.52 a day, up from $4.61. $165 left</div>
+    </div>
+  </div>
+
+  <h2>The shape of the day</h2>
+
+  <div class="card">
+    <p>Three things happened in the same twenty-four hours, and they are all the same event seen at three points in the pipeline.</p>
+    <p>A creator's email address is usually behind a button on their YouTube About tab that only a human can click. One paid service clicks it for us, at about seven cents a channel. That service bills by the month, we spend it until it runs out, and we then wait. It ran out on 20 September. The new month began at midnight and the lane ran immediately, four times, before the cycle ended at 07:00Z.</p>
+    <p>Those 244 new leads landed in the parked pool. Every parked lead needs its channel researched before an email can be written, so the research chain woke up too. And research is what spends money on OpenRouter, which is why the daily bill tripled on a cycle where nobody changed anything.</p>
+  </div>
+
+  <div class="tablewrap" style="margin-top:14px">
+    <table>
+      <tr><th>The paid lane, batch by batch</th><th>00:21</th><th>02:22</th><th>04:20</th><th>06:20</th></tr>
+      <tr><td>Channels scraped</td><td class="num">100</td><td class="num">100</td><td class="num">100</td><td class="num">100</td></tr>
+      <tr><td>Addresses published</td><td class="num">70</td><td class="num">87</td><td class="num">74</td><td class="num">80</td></tr>
+      <tr><td>Leads actually parked</td><td class="num">66</td><td class="num">67</td><td class="num">59</td><td class="num">52</td></tr>
+      <tr><td>What the lane reported parking</td><td class="num">66</td><td class="num">67</td><td class="num"><b>19</b></td><td class="num">52</td></tr>
+      <tr><td>Cost per parked lead</td><td class="num">$0.106</td><td class="num">$0.105</td><td class="num">$0.119</td><td class="num">$0.135</td></tr>
+    </table>
+  </div>
+  <p class="muted" style="margin-top:10px">The 04:20 row is today's main finding. The lane told itself it had recovered 19 leads for 37 cents each, which is nearly double Casey's price limit. It had actually recovered 59, for twelve cents. See below.</p>
+
+  <div class="card accent-good" style="margin-top:14px">
+    <h3>Free searching is finished on this pool. Paid searching is not.</h3>
+    <p>The free recovery lane ran four passes over <b>491 leads</b> and found <b>10</b> contact points. That is not a fault and no money fixes it: the lane is on its seventh full walk of the same book, so it is mostly re-reading leads it has already emptied. Both Brave search keys are still refusing at their monthly cap, but that barely mattered this cycle, because the passes landed on leads whose websites were already stored, so only one lead in five came back with no website at all.</p>
+    <p>Set the two side by side. Free: 491 leads read, 10 contact points, 0 parked. Paid: 400 channels read, 311 addresses, 244 parked. The free lane has been the only thing filling the pool since discovery stopped, and it is empty.</p>
+  </div>
+
+  <h2>The three questions</h2>
+
+  <div class="q accent-teal">
+    <div class="ask"><span class="qn">1</span><span>Did we find new leads?</span></div>
+    <p>No, and that's the standing order. Discovery has been off since 2026-09-08 on Casey's instruction, so <span class="pill">0</span> new channels is the intended state. Every sweep, the keyword harvest and the campaign loop stayed stopped, and the flag holding them off is untouched. Eighth debrief in a row saying this.</p>
+  </div>
+
+  <div class="q accent-good">
+    <div class="ask"><span class="qn">2</span><span>Did we recover leads we already had?</span></div>
+    <p>Yes, by far the most of any day in this series. <span class="pill">292</span> contact points, <span class="pill">286</span> of them email addresses, across <span class="pill">291</span> leads. The seven days before this cycle produced <span class="pill">223</span> contact points and <span class="pill">35</span> addresses in total, so one cycle beat the previous week eightfold on addresses. The pool went <b>6,867 to 7,070</b> and the waiting pool fell to <b>4,034</b>.</p>
+    <p><b>282 of the 292 points came from the paid lane.</b> The free lane contributed 10. Worth keeping straight, because the free lane's numbers are the ones that have been reported every day and they are now the small half by a factor of thirty.</p>
+  </div>
+
+  <div class="q accent-good">
+    <div class="ask"><span class="qn">3</span><span>Did we email anybody?</span></div>
+    <p>151 people, which fills the day's allowance. Siege's plan held 150 assignments, the warmup ramp allowed 150, the live mailboxes would have taken 185, and <b>the push ran</b>: 95 small batches between 22:58Z and 00:01Z, zero failed, zero blocked. The 151st is this repo's own send. For contrast, the day before had 150 written and pushed none.</p>
+    <p>So the binding limit today was the <b>ramp</b>, not mailbox capacity and not permission. That is the first time in this series the pipeline hit the ceiling it is supposed to hit.</p>
+  </div>
+
+  <div class="tablewrap" style="margin-top:14px">
+    <table>
+      <tr><th>Emails loaded into SmartLead, by Pacific day</th><th>Fri 09-25</th><th>Sat 09-26</th><th>Sun 09-27</th><th>Mon 09-28</th><th>Tue 09-29</th><th>Wed 09-30</th></tr>
+      <tr><td>Loaded</td><td class="num">107</td><td class="num">0</td><td class="num">0</td><td class="num">34</td><td class="num">4</td><td class="num"><b>151</b></td></tr>
+      <tr><td>Allowed by the ramp</td><td class="num">n/a</td><td class="num">n/a</td><td class="num">100</td><td class="num">100</td><td class="num">150</td><td class="num">150</td></tr>
+      <tr><td>Mailbox slots that day</td><td class="num">185</td><td class="num">n/a</td><td class="num">n/a</td><td class="num">33</td><td class="num">296</td><td class="num">185</td></tr>
+    </table>
+  </div>
+  <p class="muted" style="margin-top:10px">Loaded means put into a SmartLead campaign. SmartLead sends on its own schedule, Monday to Thursday, 09:00 to 15:00 Eastern, so this is not delivered volume. The two zeros are the weekend, by design.</p>
+
+  <h2>What broke, what's fixed</h2>
+
+  <div class="card accent-red">
+    <h3>1. The paid lane was charged for leads the free lane had parked, and nearly stopped itself over it</h3>
+    <p>The lane protects Casey's wallet by scoring every batch on what it cost per recovered lead. Two batches in a row above twenty cents and it writes a halt file and stops for the rest of the month. That brake is right, and it was about to fire for the wrong reason.</p>
+    <p>A batch has two halves. The paid half scrapes 100 channels, one at a time with a gap, which takes about an hour. The free half then asks ZeroBounce which of those addresses are real and parks the good ones. Meanwhile the free recovery lane runs its own verify on a three-hourly timer, and it does not know or care that a scrape is in progress. On the 04:20 batch that timer landed at 05:03, took the 48 addresses written in the batch's first forty minutes, checked them and parked them. By the time the batch got to its own verify, those leads were already done, so it skipped them and counted 19.</p>
+    <p>So the batch reported <b>19 recoveries at $0.369 each</b> and took strike one of two. It had really recovered <b>59, at $0.119</b>. The next batch came in cheap and cleared the strike, which is luck, not design: two unlucky overlaps in a row would have stopped the highest-yield recovery method in the pipeline on day one of a fresh $100 allowance.</p>
+    <p><b>Fixed in <code>ed5aedd</code> (youtube-email-outreach-v1).</b> The batch now counts how many of its leads are sitting in the parked pool whoever put them there, prints that as a <code>Recovered:</code> line, and the price check reads it. Logs written before today still fall back to the old number, and the fallback says so in the log. <i>Verified:</i> typecheck clean, 270 of 270 tests pass, and the new count replayed against the real 04:20 ledger returns 59 and $0.119 where the old one returned 19 and $0.369.</p>
+  </div>
+
+  <div class="card accent-amber" style="margin-top:14px">
+    <h3>2. Apify's remaining money and OpenRouter's remaining money are one budget, and nothing read them together</h3>
+    <p>Today's three headline numbers are one causal chain, and no report connected them. Apify's allowance appeared in no snapshot. The enrichment chain appeared in no snapshot. So what reached a person was a runway falling from 40 days to 8.5 with no cause attached, which is the exact shape this series has fixed four times already.</p>
+    <p>They need deciding together. There is <b>$68.94</b> of Apify allowance spendable after its reserve, which buys about <b>980 channels</b>, which at this cycle's measured rate is roughly <b>500 more parked leads</b>. Each parked lead costs about <b>$0.147</b> of OpenRouter to research. So finishing the Apify month commits about <b>$74</b> of OpenRouter against a <b>$165</b> balance. It fits, but only just, and nobody would have known until enrichment stopped halfway through the pool.</p>
+    <p><b>Fixed in <code>9325b36</code> (orchestrator).</b> A new <code>recovery_budget</code> block in the daily snapshot reads Apify's allowance, the cycle's batches and real recoveries, the enrichment chain's batches and leads, then converts the unspent allowance into leads and those leads into OpenRouter dollars, and says whether the balance covers it. Deliberately filesystem-only: Apify prints its own ledger at the top of every run log, so this needs no key and no network call and can never be the reason a debrief fails to get written. <i>Verified:</i> typecheck clean, selftest all pass with 11 new cases, and the gatherer run end to end on live data returns the figures quoted above.</p>
+  </div>
+
+  <div class="card accent-amber" style="margin-top:14px">
+    <h3>3. Re-running the gatherer quietly inflated the day's headline number</h3>
+    <p>Found by doing it. <code>parked_today</code> is the pool now minus the pool at cycle start, and "now" means whenever the snapshot was taken. The scheduled run at 07:20Z read <b>203</b>. A re-run thirty-two minutes later read <b>247</b>, because the 06:20 Apify batch was still parking leads. Same shape as the double-run bug repaired on 09-30: a figure whose measurement window depends on when you happened to ask.</p>
+    <p><b>Fixed in the same commit.</b> The snapshot now records how many minutes after the cycle boundary it was taken and flags itself once that passes thirty, which is just above the timer's normal twenty. The number is unchanged for a scheduled run and self-labelling for any other. The authoritative snapshot for this cycle was restored to the 07:20Z reading, so every figure in this debrief is the real cycle.</p>
+  </div>
+
+  <h2>The money</h2>
+
+  <div class="card">
+    <p><b>Anthropic: $0.00, the eighteenth zero in a row.</b> Nothing in the pipeline bills that key.</p>
+    <p><b>OpenRouter: $19.52 a day, $165.28 left, about 8.5 days.</b> Up from $4.61 a day and 40 days. The cause is now known and is enrichment: 136 leads researched this cycle against one or two a day before it. Charging the whole account to enrichment gives about 15 cents a lead, which is an upper bound and the safe direction for a runway.</p>
+    <p><b>Apify: $28.08 spent, $78.94 left of $100, month ends 31 October.</b> Four batches at $7.02. Real cost across the cycle was <b>$0.115 per parked lead</b>, inside the ten-to-twenty-cent target.</p>
+    <p><b>Brave Search: still refusing.</b> Both keys answer <code>402 Usage limit exceeded</code>. It cost almost nothing this cycle because the passes landed on leads with stored websites, and it will cost again the moment the cursor walks back into the leads that have none.</p>
+  </div>
+
+  <h2>The cycle in numbers</h2>
+
+  <div class="tablewrap">
+    <table>
+      <tr><th>What</th><th>Count</th><th>Note</th></tr>
+      <tr><td>Leads parked</td><td class="num">+203</td><td>6,867 to 7,070. Best day in this series</td></tr>
+      <tr><td>Contact points found</td><td class="num">292</td><td>282 paid lane, 10 free lane</td></tr>
+      <tr><td>Email addresses found</td><td class="num">286</td><td>Against 35 across the prior 7 days</td></tr>
+      <tr><td>Paid lane batches</td><td class="num">4</td><td>400 channels, 311 addresses, 244 parked</td></tr>
+      <tr><td>Free lane passes</td><td class="num">4</td><td>491 lead slots, 10 points, lap 7, 3 stranded</td></tr>
+      <tr><td>Emails loaded</td><td class="num">151</td><td>150 Siege, 1 this repo. Ramp allowed 150</td></tr>
+      <tr><td>Shelf ready to write</td><td class="num">6,611</td><td>7,015 of 7,070 researched, 99.2%</td></tr>
+      <tr><td>Waiting pool</td><td class="num">4,034</td><td>Down from 4,237</td></tr>
+      <tr><td>New channels discovered</td><td class="num">0</td><td>Discovery paused since 09-08, intended</td></tr>
+      <tr><td>Enrichment batches</td><td class="num">4</td><td>136 leads, 0 failed, 1 still running at close</td></tr>
+      <tr><td>Fatal signatures / halts</td><td class="num">0 / 0</td><td>No lane halted, no flag written</td></tr>
+      <tr><td>Anthropic spend</td><td class="num">$0.00</td><td>18th consecutive zero</td></tr>
+      <tr><td>OpenRouter</td><td class="num">$19.52/day</td><td>$165.28 left, ~8.5 days. Was $4.61/day</td></tr>
+      <tr><td>Apify</td><td class="num">$28.08</td><td>$78.94 left, month ends 31 Oct</td></tr>
+      <tr><td>YouTube keys working</td><td class="num">15 of 66</td><td>Settled, quota cut on 50 projects</td></tr>
+    </table>
+  </div>
+
+  <h2>Recommended next, ranked</h2>
+
+  <ol class="recs">
+    <li><b>Top up OpenRouter, or accept that enrichment stops in about a week.</b> New at number one. $165 left at $19.52 a day, and that rate holds only while there are leads to research. Finishing the Apify month adds roughly 500 more leads and about $74 of research on top. This is not an emergency today, it is a calendar item that becomes an outage if it is missed, and the account went to zero without warning once already on 08-25.</li>
+    <li><b>Spend the rest of the Apify allowance deliberately.</b> $68.94 spendable, about 980 channels, about 500 parked leads at eleven cents each. It is the best price per lead anything in this pipeline has ever achieved and the allowance expires on 31 October whether it is used or not. The lane front-loads on purpose and will spend it in a day or two if left alone, which is the right behaviour. The only thing to decide is whether to let it, given the OpenRouter bill above.</li>
+    <li><b>Make the Siege push not depend on somebody being awake.</b> Yesterday it sent 4 because nobody approved. Today it sent 150 because somebody did. Same plan, same pipeline, two very different days, and the only variable is a human. Either put the approval on a schedule or let the offers already trusted push on their own.</li>
+    <li><b>Raise the Brave Search cap or add a key.</b> Under $3, and unchanged for five debriefs. Less urgent than it looked, because the paid lane has overtaken the free one and this cycle's passes mostly did not need Brave. It becomes the binding limit again as soon as the cursor re-enters the leads with no stored website.</li>
+    <li><b>Decide the discovery pause.</b> Eighth debrief carrying it. The picture has changed in its favour: the free recovery lane is empty (10 points from 491 leads), and the paid one has a hard monthly ceiling. Once Apify's $100 is spent, nothing is adding leads at all.</li>
+    <li><b>Unblock a few Siege offers.</b> Nine of sixteen still cannot run, for small named reasons: a missing subject line in Notion, two follow-up bodies, a batch writer, an email type absent from the database vocabulary. One is gated on a breakdown video nobody has recorded. One imports a path from Casey's old Mac. This matters more now that real volume is flowing, because variety is what lets a 6,600-lead shelf be worked without emailing anyone twice.</li>
+  </ol>
+
+  <div class="foot">
+    <b>The lesson.</b> Every number that moved today moved because a billing month reset, and the pipeline had no idea that was the lever. The free recovery lane has been reported on in detail every day for three weeks while producing almost nothing, and the paid lane, which produced thirty times as much in one cycle, appeared in no snapshot at all: not its allowance, not its reset date, not the research bill its output creates. Both fixes shipped today are measurements rather than throughput. One stops a scheduling overlap from halting the best lane we have over an accounting artefact. The other puts the paid lane's money, the leads it buys, and the research those leads cost into the same place, so the next time the runway falls by a factor of five it arrives with the reason attached.
+  </div>
+
+  <p class="muted" style="margin-top:26px">Cycle window 2026-09-30T07:00Z to 2026-10-01T07:00Z (Wednesday 2026-09-30 Pacific). Grounded metrics: <code>youtube-outreach-orchestrator-v1/logs/autopilot-debrief-2026-10-01.json</code>. Companion: <a href="lead-run-2026-10-01-analysis.md">lead-run-2026-10-01-analysis.md</a>. Six debriefs are still owed and have grounded metrics on disk: 09-19, 09-18, 09-17, 08-18, 08-17, 07-11.</p>
+
+</div>
+</html>
