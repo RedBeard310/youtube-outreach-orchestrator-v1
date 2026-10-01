@@ -1259,6 +1259,208 @@ async function youtubeKeyPoolHealth(): Promise<Record<string, unknown>> {
   };
 }
 
+// THE PAID RECOVERY LANE AND THE ENRICHMENT BILL ARE ONE BUDGET (2026-10-01).
+//
+// Apify's billing month rolled at 00:00 on 1 Oct and the endspec lane, idle since
+// 20 Sep on a drained allowance, ran four batches and parked 203 leads. Every one
+// of those leads then has to be enriched, so the backfill chain went from batches
+// of 1-3 leads to 66 and 67, and the OpenRouter account rate went $4.61/day to
+// $19.52/day — runway 40 days to 8.5. Nothing in this snapshot connected those
+// facts: Apify's remaining allowance appeared nowhere, the enrichment chain
+// appeared nowhere, and the OpenRouter runway was a figure with no cause attached.
+//
+// They are the same decision. Apify money converts into parked leads at a measured
+// rate, and each parked lead draws a measured amount of OpenRouter to enrich. So
+// spending the rest of the Apify allowance commits a predictable amount of
+// OpenRouter, and whether the balance covers it is answerable a week ahead instead
+// of discovered when enrichment stops mid-pool.
+//
+// DELIBERATELY FILESYSTEM-ONLY, like sendPlanHealth. Every endspec run log opens
+// with Apify's own ledger line, so the allowance needs no token and no network
+// call, and this can never be the reason a debrief fails to be written. The figure
+// is as of the last batch, which is the right resolution for a daily snapshot;
+// `budget_read_at` says how stale it is.
+
+/** Apify's own ledger line, printed at the top of every endspec run log. */
+export function apifyLedgerLine(log: string): { used: number; cap: number; left: number; cycleEnds: string } | null {
+  const m = /^Apify: plan \S+, month \$([\d.]+) of \$([\d.]+) used, \$([\d.]+) left \(cycle ends (\d{4}-\d{2}-\d{2})\)/m.exec(log);
+  if (!m) return null;
+  return { used: Number(m[1]), cap: Number(m[2]), left: Number(m[3]), cycleEnds: m[4] };
+}
+
+/**
+ * What one endspec batch scraped and what it actually recovered.
+ *
+ * `recovered` prefers the `Recovered:` line, which counts lead state and so
+ * includes the leads the recovery lane's verify timer parked mid-scrape. The
+ * `leads flipped` fallback is for logs written before 2026-10-01, when that was
+ * the only number and it undercounted by whatever the other lane had taken (19 of
+ * a real 59 on the 04:20 batch).
+ */
+export function apifyBatchFacts(log: string): { scraped: number; found: number; recovered: number | null } | null {
+  const s = /^Scrape done: (\d+) found, (\d+) no email, (\d+) failed/m.exec(log);
+  if (!s) return null;
+  const found = Number(s[1]);
+  const scraped = found + Number(s[2]);
+  const rec = /^Recovered: (\d+) of \d+/m.exec(log);
+  if (rec) return { scraped, found, recovered: Number(rec[1]) };
+  const flip = /(\d+) leads flipped to approved_hold/.exec(log);
+  return { scraped, found, recovered: flip ? Number(flip[1]) : null };
+}
+
+/** Backfill chain batches that finished inside the window, and the leads they enriched. */
+export function enrichmentChainFacts(
+  chainLog: string,
+  sinceISO: string,
+  untilISO: string,
+): { batches: number; leads_done: number; leads_failed: number; in_flight: number } {
+  let batches = 0;
+  let done = 0;
+  let failed = 0;
+  let launched = 0;
+  for (const line of chainLog.split('\n')) {
+    const t = /^\[(\d{4}-\d{2}-\d{2}T[\d:]+Z)\]/.exec(line);
+    if (!t || t[1] < sinceISO || t[1] >= untilISO) continue;
+    const fin = /batch finished: exit=\d+ done=(\d+) failed=(\d+)/.exec(line);
+    if (fin) { batches++; done += Number(fin[1]); failed += Number(fin[2]); continue; }
+    if (/launching batch: count=\d+/.test(line)) launched++;
+  }
+  // A launch with no matching finish is a batch still running at cycle close, not
+  // a lost one. Reporting it as zero work is how a busy night reads as a quiet one.
+  return { batches, leads_done: done, leads_failed: failed, in_flight: Math.max(0, launched - batches) };
+}
+
+/**
+ * Convert the remaining Apify allowance into leads, and those leads into the
+ * OpenRouter dollars enriching them will cost. Pure arithmetic on measured rates,
+ * so a rate that could not be measured yields null rather than a guess.
+ */
+export function projectRecoveryBudget(input: {
+  spendableUsd: number | null;
+  pricePerRun: number;
+  recoveredInCycle: number | null;
+  channelsInCycle: number;
+  enrichedInCycle: number;
+  accountSpendUsd: number | null;
+  balanceUsd: number | null;
+}): Record<string, unknown> {
+  const { spendableUsd, pricePerRun, recoveredInCycle, channelsInCycle, enrichedInCycle } = input;
+  const channels = spendableUsd !== null && spendableUsd > 0
+    ? Math.floor(spendableUsd / pricePerRun)
+    : 0;
+  const perChannel = recoveredInCycle !== null && channelsInCycle > 0
+    ? Number((recoveredInCycle / channelsInCycle).toFixed(4))
+    : null;
+  const projectedLeads = perChannel !== null ? Math.round(channels * perChannel) : null;
+  // Cost per enriched lead, from the provider's own meter over the same cycle that
+  // did the enriching. Attributing ALL account spend to enrichment is an upper
+  // bound and deliberately so: on a cycle where the backfill is the only heavy
+  // caller it is near-exact, and erring high is the safe direction for a runway.
+  const perLead = input.accountSpendUsd !== null && enrichedInCycle > 0
+    ? Number((input.accountSpendUsd / enrichedInCycle).toFixed(4))
+    : null;
+  const enrichCost = projectedLeads !== null && perLead !== null
+    ? Number((projectedLeads * perLead).toFixed(2))
+    : null;
+  return {
+    channels_affordable: channels,
+    recovered_per_channel: perChannel,
+    projected_leads: projectedLeads,
+    openrouter_usd_per_enriched_lead: perLead,
+    openrouter_cost_of_projected_leads_usd: enrichCost,
+    openrouter_balance_usd: input.balanceUsd,
+    balance_covers_projected: enrichCost !== null && input.balanceUsd !== null
+      ? input.balanceUsd >= enrichCost
+      : null,
+  };
+}
+
+/** The paid-recovery / enrichment budget pair, read off disk. */
+function recoveryBudgetHealth(
+  sinceISO: string,
+  untilISO: string,
+  openrouter: { account_spend_usd?: unknown; balance_usd?: unknown },
+): Record<string, unknown> {
+  const EMAIL_REPO = '/home/casey/repos/youtube-email-outreach-v1';
+  const PRICE_PER_RUN = 0.0702; // apify-endspec-loop.sh APIFY_PRICE_PER_RUN
+  const RESERVE = 10;           // apify-endspec-loop.sh BUDGET_RESERVE_USD
+
+  let batches = 0;
+  let channels = 0;
+  let found = 0;
+  let recovered: number | null = null;
+  let ledger: ReturnType<typeof apifyLedgerLine> = null;
+  let ledgerAt: string | null = null;
+  const emailLogs = join(EMAIL_REPO, 'logs');
+  if (existsSync(emailLogs)) {
+    const names = readdirSync(emailLogs)
+      .filter((n) => /^apify-endspec-\d{8}T\d{6}Z\.log$/.test(n))
+      .sort();
+    for (const n of names) {
+      const stamp = /(\d{8})T(\d{6})Z/.exec(n)!;
+      const iso = `${stamp[1].slice(0, 4)}-${stamp[1].slice(4, 6)}-${stamp[1].slice(6, 8)}T`
+        + `${stamp[2].slice(0, 2)}:${stamp[2].slice(2, 4)}:${stamp[2].slice(4, 6)}Z`;
+      let text = '';
+      try { text = readFileSync(join(emailLogs, n), 'utf8'); } catch { continue; }
+      // The allowance is read from the NEWEST log whatever cycle it belongs to: a
+      // lane resting all month still has a real remaining balance worth reporting.
+      const led = apifyLedgerLine(text);
+      if (led) { ledger = led; ledgerAt = iso; }
+      if (iso < sinceISO || iso >= untilISO) continue;
+      const f = apifyBatchFacts(text);
+      if (!f) continue;
+      batches++; channels += f.scraped; found += f.found;
+      if (f.recovered !== null) recovered = (recovered ?? 0) + f.recovered;
+    }
+  }
+
+  let chain = { batches: 0, leads_done: 0, leads_failed: 0, in_flight: 0 };
+  const chainLog = join(LOGS, 'backfill-2026-07', 'chain.log');
+  if (existsSync(chainLog)) {
+    try { chain = enrichmentChainFacts(readFileSync(chainLog, 'utf8'), sinceISO, untilISO); } catch { /* keep zeros */ }
+  }
+
+  const left = ledger ? ledger.left : null;
+  const spendable = left !== null ? Number((left - RESERVE).toFixed(4)) : null;
+  const halted = existsSync(join(emailLogs, 'apify-endspec-halt.flag'));
+  let strikes = 0;
+  const strikeFile = join(emailLogs, '.apify-endspec-overpriced');
+  if (existsSync(strikeFile)) {
+    try { strikes = Number(readFileSync(strikeFile, 'utf8').trim()) || 0; } catch { /* 0 */ }
+  }
+
+  return {
+    apify: {
+      batches_in_cycle: batches,
+      channels_scraped: channels,
+      addresses_found: found,
+      recovered_in_cycle: recovered,
+      cost_per_recovered_usd: recovered !== null && recovered > 0
+        ? Number(((channels * PRICE_PER_RUN) / recovered).toFixed(3))
+        : null,
+      budget_left_usd: left,
+      budget_cap_usd: ledger ? ledger.cap : null,
+      budget_cycle_ends: ledger ? ledger.cycleEnds : null,
+      budget_read_at: ledgerAt,
+      reserve_usd: RESERVE,
+      spendable_usd: spendable,
+      halted,
+      price_strikes: strikes,
+    },
+    enrichment: chain,
+    projection: projectRecoveryBudget({
+      spendableUsd: spendable,
+      pricePerRun: PRICE_PER_RUN,
+      recoveredInCycle: recovered,
+      channelsInCycle: channels,
+      enrichedInCycle: chain.leads_done,
+      accountSpendUsd: typeof openrouter.account_spend_usd === 'number' ? openrouter.account_spend_usd : null,
+      balanceUsd: typeof openrouter.balance_usd === 'number' ? openrouter.balance_usd : null,
+    }),
+    note: 'Apify allowance read off the newest endspec run log (no token, no network) — `budget_read_at` is its age. `projection` turns the unspent allowance into leads at the cycle\'s measured recovery rate, then into the OpenRouter dollars those leads will cost to enrich, so the two budgets are decided together. `openrouter_usd_per_enriched_lead` charges ALL account spend to enrichment, which is an upper bound. `halted`/`price_strikes` are the lane\'s own brake: 2 strikes stops it for the month.',
+  };
+}
+
 /**
  * The account that actually pays for this pipeline, and how long it has left.
  *
@@ -1533,6 +1735,10 @@ async function main(): Promise<void> {
     term_starvation_obs_this_cycle: obs.filter((o) => o.kind === 'term_starvation' && o.ts >= sinceISO).length,
   };
 
+  // Fetched before the snapshot literal because recovery_budget prices its
+  // projection off the same account figures, and both must report one reading.
+  const openrouter = await openRouterHealth(sinceISO, untilISO);
+
   const snapshot = {
     date,
     cycle_start_iso: sinceISO,
@@ -1544,6 +1750,18 @@ async function main(): Promise<void> {
       parked_today: parkedStart === null ? null : parkedNow - parkedStart,
       done_parked_gain_sum: sum('done', 'parked_gain'),
       needs_contact_now: needsContact,
+      // `approved_hold_now` is a LIVE count, so parked_today is really "the gain from
+      // cycle start until this gatherer ran". The timer fires 20 min after the
+      // boundary and that bleed is immaterial, but a re-run hours later is not: on
+      // 2026-10-01 a re-run at 07:46Z read 247 against the 203 the 07:20Z run saw,
+      // because an Apify batch was still flipping leads. Same shape as the
+      // OpenRouter double-run repaired on 09-30 — a figure whose measurement window
+      // silently depends on when you asked. So say when it was asked.
+      // 30 min, not an hour: the timer fires at 20 and today's re-run at 32 had
+      // already drifted 203 -> 247. The line has to sit just above the scheduled
+      // run or it flags nothing that matters.
+      measured_minutes_after_cycle_end: Math.round((nowMs - Date.parse(untilISO)) / 60_000),
+      counts_post_cycle_arrivals: nowMs - Date.parse(untilISO) > 30 * 60_000,
     },
     // Emails LOADED into a SmartLead campaign this cycle (see countSentBetween). Null
     // means the query failed, not that nothing was sent.
@@ -1631,7 +1849,8 @@ async function main(): Promise<void> {
       soft: burn.soft_usd,
       hard: burn.hard_usd,
     },
-    openrouter_today: await openRouterHealth(sinceISO, untilISO),
+    openrouter_today: openrouter,
+    recovery_budget: recoveryBudgetHealth(sinceISO, untilISO, openrouter),
     youtube_key_pool: await youtubeKeyPoolHealth(),
     supply_health: supplyHealth,
     halt: haltHealth(sinceMs, Date.parse(untilISO)),

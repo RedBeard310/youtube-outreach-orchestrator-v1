@@ -1,4 +1,4 @@
-import { classifyKeyProbe, cyclePacificDay, MAX_MISSING_DEBRIEFS, missingDebriefs, sendPlanHealth, siegePlanFacts, summarizeSendLines, isVerifiedOrBeyond, laneYield, priorAdvanceSource, priorSeedsAdvanced, priorSeedsWalked, reconcileAdvanced, sessionSeedsAdvanced, sessionStartMs, walkRateTrend } from './debrief-data.ts';
+import { apifyBatchFacts, apifyLedgerLine, classifyKeyProbe, cyclePacificDay, enrichmentChainFacts, projectRecoveryBudget, MAX_MISSING_DEBRIEFS, missingDebriefs, sendPlanHealth, siegePlanFacts, summarizeSendLines, isVerifiedOrBeyond, laneYield, priorAdvanceSource, priorSeedsAdvanced, priorSeedsWalked, reconcileAdvanced, sessionSeedsAdvanced, sessionStartMs, walkRateTrend } from './debrief-data.ts';
 let fail = 0;
 const ok = (name: string, got: unknown, want: unknown) => {
   const pass = JSON.stringify(got) === JSON.stringify(want);
@@ -283,6 +283,73 @@ ok('Siege never ran -> no plan, and no approval claim',
 // The plan directory is named for the day the cycle covers, not the day the debrief runs.
 ok('cycle day is the PT day that just ended', cyclePacificDay('2026-09-29T07:00:00.000Z'), '2026-09-29');
 ok('cycle day across a PT month boundary', cyclePacificDay('2026-09-30T07:00:00.000Z'), '2026-09-30');
+
+// --- recovery_budget: the paid lane and the enrichment bill as one budget ---
+
+// Apify's own ledger line, off the top of a real 2026-10-01 run log.
+ok('apify ledger line',
+  apifyLedgerLine('Apify: plan STARTER, month $21.06 of $100.00 used, $78.94 left (cycle ends 2026-10-31)\n'),
+  { used: 21.06, cap: 100, left: 78.94, cycleEnds: '2026-10-31' });
+ok('no ledger line (lane rested, log is one line)', apifyLedgerLine('[apify-loop] resting: $16.11 left\n'), null);
+
+// THE CASE THIS BLOCK EXISTS FOR. The 04:20 batch on 2026-10-01 flipped 19 itself
+// and really recovered 59, because recovery-lane.timer parked 40 mid-scrape.
+const BATCH_0420 = 'Scrape done: 74 found, 26 no email, 0 failed. Estimated Apify charge $7.02.\n'
+  + 'Verify done: 26 ZeroBounce checks, 19 leads flipped to approved_hold.\n'
+  + 'Recovered: 59 of 74 scraped addresses now in approved_hold (19 flipped here, 40 already parked by the recovery lane).\n';
+ok('batch facts prefer Recovered: over flipped',
+  apifyBatchFacts(BATCH_0420), { scraped: 100, found: 74, recovered: 59 });
+ok('pre-2026-10-01 log falls back to flipped (and so undercounts, by design)',
+  apifyBatchFacts('Scrape done: 74 found, 26 no email, 0 failed.\nVerify done: 26 ZeroBounce checks, 19 leads flipped to approved_hold.\n'),
+  { scraped: 100, found: 74, recovered: 19 });
+ok('a crashed verify leaves recovery unknown, not zero',
+  apifyBatchFacts('Scrape done: 74 found, 26 no email, 0 failed.\nfetch failed\n'),
+  { scraped: 100, found: 74, recovered: null });
+ok('no scrape line at all', apifyBatchFacts('Apify: plan STARTER, month $0.00 of $100.00 used\n'), null);
+
+// Enrichment chain: the 2026-10-01 shape, two finished batches and one still running.
+const CHAIN = '[2026-09-30T06:59:00Z] batch finished: exit=0 done=9 failed=0 log=x\n'
+  + '[2026-09-30T18:13:29Z] launching batch: count=2 pool=4 excluded=2 file=x\n'
+  + '[2026-09-30T18:41:34Z] batch finished: exit=0 done=2 failed=0 log=x\n'
+  + '[2026-10-01T01:24:32Z] launching batch: count=66 pool=67 excluded=1 file=x\n'
+  + '[2026-10-01T04:09:04Z] batch finished: exit=0 done=66 failed=1 log=x\n'
+  + '[2026-10-01T06:36:46Z] launching batch: count=59 pool=60 excluded=1 file=x\n'
+  + '[2026-10-01T09:00:00Z] batch finished: exit=0 done=59 failed=0 log=x\n';
+ok('chain facts inside the window only, with the in-flight batch counted',
+  enrichmentChainFacts(CHAIN, '2026-09-30T07:00:00Z', '2026-10-01T07:00:00Z'),
+  { batches: 2, leads_done: 68, leads_failed: 1, in_flight: 1 });
+ok('a quiet cycle is zeros, not a crash',
+  enrichmentChainFacts(CHAIN, '2026-09-28T07:00:00Z', '2026-09-29T07:00:00Z'),
+  { batches: 0, leads_done: 0, leads_failed: 0, in_flight: 0 });
+
+// The projection. $71.92 left, $10 reserved -> 882 channels at $0.0702.
+ok('remaining allowance priced in leads and then in OpenRouter dollars',
+  projectRecoveryBudget({
+    spendableUsd: 61.92, pricePerRun: 0.0702,
+    recoveredInCycle: 244, channelsInCycle: 400,
+    enrichedInCycle: 133, accountSpendUsd: 19.5239, balanceUsd: 165.28,
+  }),
+  { channels_affordable: 882, recovered_per_channel: 0.61, projected_leads: 538,
+    openrouter_usd_per_enriched_lead: 0.1468, openrouter_cost_of_projected_leads_usd: 78.98,
+    openrouter_balance_usd: 165.28, balance_covers_projected: true });
+ok('a balance that does not cover the projection says so',
+  (() => { const p = projectRecoveryBudget({
+    spendableUsd: 61.92, pricePerRun: 0.0702, recoveredInCycle: 244, channelsInCycle: 400,
+    enrichedInCycle: 133, accountSpendUsd: 19.5239, balanceUsd: 40,
+  }); return p.balance_covers_projected; })(),
+  false);
+ok('an unmeasured recovery rate projects null, never 0 leads',
+  (() => { const p = projectRecoveryBudget({
+    spendableUsd: 61.92, pricePerRun: 0.0702, recoveredInCycle: null, channelsInCycle: 0,
+    enrichedInCycle: 0, accountSpendUsd: null, balanceUsd: 165.28,
+  }); return [p.projected_leads, p.openrouter_usd_per_enriched_lead, p.balance_covers_projected]; })(),
+  [null, null, null]);
+ok('a drained allowance affords nothing and prices nothing',
+  (() => { const p = projectRecoveryBudget({
+    spendableUsd: -3.89, pricePerRun: 0.0702, recoveredInCycle: 244, channelsInCycle: 400,
+    enrichedInCycle: 133, accountSpendUsd: 19.5239, balanceUsd: 165.28,
+  }); return [p.channels_affordable, p.projected_leads, p.openrouter_cost_of_projected_leads_usd]; })(),
+  [0, 0, 0]);
 
 console.log(fail === 0 ? '\nALL PASS' : `\n${fail} FAILED`);
 process.exit(fail === 0 ? 0 : 1);
