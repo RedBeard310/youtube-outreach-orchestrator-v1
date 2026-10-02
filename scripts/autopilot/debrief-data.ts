@@ -1487,7 +1487,24 @@ function recoveryBudgetHealth(
     try { chain = enrichmentChainFacts(readFileSync(chainLog, 'utf8'), sinceISO, untilISO); } catch { /* keep zeros */ }
   }
 
-  const left = ledger ? ledger.left : null;
+  // The lane writes its live ledger reading every tick, resting or not
+  // (apify-endspec-loop.sh, 2026-10-02). Prefer it when it is newer than the newest
+  // run log's own line, because a run log's figure is taken BEFORE that batch spends:
+  // on 2026-10-01 the last batch started at "$15.69 left" and spent $5.69, so the
+  // logs' freshest answer said $5.69 was spendable while the lane had been resting on
+  // $0.00 for seven hours. Falls back to the run-log line when the file is absent.
+  let left = ledger ? ledger.left : null;
+  let ledgerSource = ledger ? 'run_log' : null;
+  try {
+    const t = JSON.parse(readFileSync(join(emailLogs, 'apify-endspec-budget.json'), 'utf8'));
+    const tickAt = typeof t.read_at === 'string' ? t.read_at : null;
+    const tickLeft = typeof t.left_usd === 'number' ? t.left_usd : null;
+    if (tickAt && tickLeft !== null && (ledgerAt === null || tickAt > ledgerAt)) {
+      left = tickLeft;
+      ledgerAt = tickAt;
+      ledgerSource = 'loop_tick';
+    }
+  } catch { /* no tick file yet, or unreadable: the run-log line stands */ }
   const spendable = left !== null ? Number((left - RESERVE).toFixed(4)) : null;
   const halted = existsSync(join(emailLogs, 'apify-endspec-halt.flag'));
   let strikes = 0;
@@ -1509,6 +1526,7 @@ function recoveryBudgetHealth(
       budget_cap_usd: ledger ? ledger.cap : null,
       budget_cycle_ends: ledger ? ledger.cycleEnds : null,
       budget_read_at: ledgerAt,
+      budget_read_from: ledgerSource,
       reserve_usd: RESERVE,
       spendable_usd: spendable,
       halted,
