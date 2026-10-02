@@ -1,4 +1,4 @@
-import { apifyBatchFacts, apifyLedgerLine, classifyKeyProbe, cyclePacificDay, enrichmentChainFacts, projectRecoveryBudget, MAX_MISSING_DEBRIEFS, missingDebriefs, sendPlanHealth, siegePlanFacts, summarizeSendLines, isVerifiedOrBeyond, laneYield, priorAdvanceSource, priorSeedsAdvanced, priorSeedsWalked, reconcileAdvanced, sessionSeedsAdvanced, sessionStartMs, walkRateTrend } from './debrief-data.ts';
+import { apifyBatchFacts, apifyLedgerLine, classifyKeyProbe, cyclePacificDay, enrichmentChainFacts, projectRecoveryBudget, MAX_MISSING_DEBRIEFS, missingDebriefs, pushRunVerdict, sendPlanHealth, siegePlanFacts, summarizeSendLines, isVerifiedOrBeyond, laneYield, priorAdvanceSource, priorSeedsAdvanced, priorSeedsWalked, reconcileAdvanced, sessionSeedsAdvanced, sessionStartMs, walkRateTrend } from './debrief-data.ts';
 let fail = 0;
 const ok = (name: string, got: unknown, want: unknown) => {
   const pass = JSON.stringify(got) === JSON.stringify(want);
@@ -280,6 +280,40 @@ ok('Siege never ran -> no plan, and no approval claim',
   (() => { const h = sendPlanHealth(siegePlanFacts(null), 4, 4);
     return [h.plan_found, h.approval_pending, h.binding_constraint]; })(),
   [false, null, null]);
+// --- the push that was killed rather than finished (2026-10-01) ---
+// Real numbers: a 150-email plan, 135 reached SmartLead, none of them ours, and
+// siege-plan.service ended `timeout` after systemd SIGTERMed the push mid-batch.
+const PLAN_1001 = {
+  summary: {
+    day: '2026-10-01', email_paused: false, day_cap: 150,
+    inboxes: new Array(36).fill({ live: true, free_before_fill: 5 }),
+  },
+  assignments: new Array(150).fill({ lead_id: 'x' }),
+};
+ok('10-01: a 150-email plan cut off 15 short names the kill, not a soft shortfall',
+  (() => { const h = sendPlanHealth(siegePlanFacts(PLAN_1001), 135, 0, 'timeout');
+    return [h.sent_elsewhere, h.unpushed_planned, h.push_unit_result, h.binding_constraint]; })(),
+  [135, 15, 'timeout', 'push_killed']);
+ok('the same shortfall with the unit reporting success stays partial_push',
+  sendPlanHealth(siegePlanFacts(PLAN_1001), 135, 0, 'success').binding_constraint, 'partial_push');
+ok('no unit verdict measured -> the old answer, never an invented one',
+  (() => { const h = sendPlanHealth(siegePlanFacts(PLAN_1001), 135, 0);
+    return [h.push_unit_result, h.binding_constraint]; })(),
+  [null, 'partial_push']);
+// A kill that lands after the ramp was already full cost nothing, so the ramp is still
+// the honest answer.
+ok('a real ceiling outranks a late kill',
+  sendPlanHealth(siegePlanFacts(PLAN_1001), 150, 0, 'timeout').binding_constraint, 'day_cap');
+// pushRunVerdict — only this cycle's run may speak for this cycle.
+ok('a run inside the window speaks for it',
+  pushRunVerdict('timeout', '2026-10-01T10:17:22.000Z', '2026-10-01T07:00:00.000Z', '2026-10-02T07:00:00.000Z'),
+  'timeout');
+ok('Friday\'s verdict does not describe Sunday',
+  pushRunVerdict('timeout', '2026-10-01T10:17:22.000Z', '2026-10-04T07:00:00.000Z', '2026-10-05T07:00:00.000Z'),
+  null);
+ok('no result -> no verdict', pushRunVerdict(null, '2026-10-01T10:17:22.000Z', '2026-10-01T07:00:00.000Z', '2026-10-02T07:00:00.000Z'), null);
+ok('unreadable timestamp -> no verdict', pushRunVerdict('timeout', null, '2026-10-01T07:00:00.000Z', '2026-10-02T07:00:00.000Z'), null);
+
 // The plan directory is named for the day the cycle covers, not the day the debrief runs.
 ok('cycle day is the PT day that just ended', cyclePacificDay('2026-09-29T07:00:00.000Z'), '2026-09-29');
 ok('cycle day across a PT month boundary', cyclePacificDay('2026-09-30T07:00:00.000Z'), '2026-09-30');

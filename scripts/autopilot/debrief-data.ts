@@ -105,9 +105,42 @@ export type SendPlanHealth = SiegePlanFacts & {
   sent_elsewhere: number | null;
   unpushed_planned: number | null;
   approval_pending: boolean | null;
+  push_unit_result: string | null;
   binding_constraint: string | null;
   note: string;
 };
+
+/** Did the push run finish, or was it stopped? `null` means not measured.
+ *
+ *  WHY (2026-10-02). `partial_push` says a plan moved some of its emails and not
+ *  the rest, and reads as a soft shortfall — a few leads a builder couldn't
+ *  finish. On 2026-10-01 it was not soft: `siege-plan.service` is a oneshot with
+ *  five sequential steps and ONE `TimeoutStartSec=3600` across all of them, the
+ *  push needs about 35 seconds of `npx tsx` startup per batch of one to three
+ *  emails, and at 11:17:22Z systemd killed it with SIGTERM mid-batch — 132 of 150
+ *  sent, the rest dropped, and the `siege-report.py` step never ran either. The
+ *  1-hour budget was noted the day before as "not a fault, just slow". It became
+ *  the fault the first day the plan was big enough.
+ *
+ *  Nothing in the pipeline said so: no error line, no retry, and the day read as
+ *  135 emails against a 150 plan. So read the unit's own verdict. `success` means
+ *  the shortfall really is per-lead; `timeout` or a signal means the run was cut
+ *  off and the missing emails are simply unsent. */
+export function pushRunVerdict(
+  result: string | null,
+  startedISO: string | null,
+  sinceISO: string,
+  untilISO: string,
+): string | null {
+  if (!result) return null;
+  // The unit result is whatever its LAST run left behind, and the timer runs
+  // Mon-Fri. On a debrief for a day the unit never ran, that verdict belongs to a
+  // different cycle, so say nothing rather than report the wrong day's outcome.
+  if (!startedISO) return null;
+  const t = Date.parse(startedISO);
+  if (!Number.isFinite(t) || t < Date.parse(sinceISO) || t >= Date.parse(untilISO)) return null;
+  return result;
+}
 
 // `sent_elsewhere` is everything that reached SmartLead this cycle that this repo did
 // not push — Siege plus any batch driven by hand from the email repo. It cannot be
@@ -117,6 +150,7 @@ export function sendPlanHealth(
   facts: SiegePlanFacts,
   sentInCycle: number | null,
   sentByThisRepo: number | null,
+  pushUnitResult: string | null = null,
 ): SendPlanHealth {
   const elsewhere = sentInCycle === null || sentByThisRepo === null
     ? null
@@ -140,6 +174,10 @@ export function sendPlanHealth(
     if (facts.day_cap !== null && facts.mailbox_slots !== null && facts.mailbox_slots < facts.day_cap
       && elsewhere >= facts.mailbox_slots) binding = 'mailbox_slots';
     else if (facts.day_cap !== null && elsewhere >= facts.day_cap) binding = 'day_cap';
+    // The run was stopped rather than finished, so the shortfall is the kill, not
+    // the leads. Ranked below the two real ceilings: a push killed after it had
+    // already sent everything the ramp allowed cost nothing.
+    else if (pushUnitResult !== null && pushUnitResult !== 'success') binding = 'push_killed';
     else binding = 'partial_push';
   }
 
@@ -150,15 +188,20 @@ export function sendPlanHealth(
     sent_elsewhere: elsewhere,
     unpushed_planned: unpushed,
     approval_pending: approvalPending,
+    push_unit_result: pushUnitResult,
     binding_constraint: binding,
     note:
       "Siege's own plan for this cycle, read from automator/state/siege/<day>/plan.json. " +
-      'Its daily timer plans and samples, then waits for Casey to approve the push, so ' +
-      'approval_pending:true means a written batch sat still — the 2026-09-29 shape, where ' +
-      '150 planned against 296 free slots produced 4 sends. day_cap is the warmup ramp and ' +
+      'Casey gave Siege standing approval on 2026-09-30, so approval_pending:true now means ' +
+      'the run did not reach the push at all, not that a person left a batch standing. ' +
+      'day_cap is the warmup ramp and ' +
       'mailbox_slots is what the live inboxes would accept; the smaller one is the real ' +
-      'ceiling. plan_found:false means no plan on disk (Siege did not run), which is not ' +
-      'the same as a plan that ran and pushed nothing.',
+      'ceiling. push_unit_result is siege-plan.service\'s own verdict on the run that sent ' +
+      'this cycle (null = that unit did not run in this window, so no verdict applies); ' +
+      'binding_constraint:push_killed means systemd stopped the push part-way, which is ' +
+      'the 2026-10-01 shape — TimeoutStartSec=3600 covers all five of that oneshot\'s ' +
+      'steps and the push alone needs about an hour. plan_found:false means no plan on ' +
+      'disk (Siege did not run), which is not the same as a plan that ran and pushed nothing.',
   };
 }
 
@@ -191,6 +234,30 @@ function serviceActive(name: string): boolean | null {
     return execSync(`systemctl is-active ${name}`, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }).trim() === 'active';
   } catch {
     return null; // systemctl unavailable or unit unknown — don't claim unhealthy on a check that couldn't run
+  }
+}
+
+/** siege-plan.service's own verdict on the run that did this cycle's sending, or null
+ *  if that unit did not run inside the window. Local systemd only, no network and no
+ *  token, same rule as every other probe in this file. See pushRunVerdict(). */
+function siegeUnitVerdict(sinceISO: string, untilISO: string): string | null {
+  try {
+    const out = execSync(
+      'systemctl show siege-plan.service -p Result -p ExecMainStartTimestamp --value',
+      { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] },
+    ).trim().split('\n').map((l) => l.trim());
+    const [result, stamp] = out;
+    // systemd prints its timestamps like "Thu 2026-10-01 10:15:25 UTC"; Date can read
+    // that once the weekday is dropped. An unparseable stamp yields null, not a guess.
+    const started = stamp ? new Date(stamp.replace(/^[A-Za-z]{3}\s+/, '')) : null;
+    return pushRunVerdict(
+      result || null,
+      started && Number.isFinite(started.getTime()) ? started.toISOString() : null,
+      sinceISO,
+      untilISO,
+    );
+  } catch {
+    return null;
   }
 }
 function sweepStateUpdatedAt(stateFile: string): string | null {
@@ -1705,6 +1772,7 @@ async function main(): Promise<void> {
     readSiegePlan(cyclePacificDay(sinceISO)),
     sent?.total ?? null,
     sendLog.sent_sum,
+    siegeUnitVerdict(sinceISO, untilISO),
   );
 
   // Supply-health — surface the persistent term-supply outage the finder can't self-heal.
