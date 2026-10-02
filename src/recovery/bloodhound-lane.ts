@@ -560,7 +560,27 @@ export async function collectBookDepth(): Promise<{ pool: number; stranded: numb
  *
  *  Counted from `leads.contact_points.created_at`, which is the collector's own
  *  write, so this needs no log parsing and cannot be thrown off by a pass whose
- *  child was killed before it printed a summary line. */
+ *  child was killed before it printed a summary line.
+ *
+ *  SPLIT BY WHO PAID (2026-10-02). `leads.contact_points` is a shared table: the
+ *  free collect pass writes to it under its method name (`01-mailto`,
+ *  `34-channel-page`, ...) and the paid Apify lane writes to it under
+ *  `apify:endspec/...`. A single total therefore reads as free-lane yield and is
+ *  not. On the 2026-10-01 cycle the total was 742 points / 707 emails, which
+ *  looked like the best recovery day in the series; 701 of those points were
+ *  Apify's and the free pass found SIX addresses. That mattered the same day,
+ *  because Apify's month was spent by 02:22Z and the next 29 days belong to the
+ *  free pass alone — a reader believing the lane had just produced 707 emails
+ *  would have drawn the opposite conclusion about what happens next.
+ *
+ *  `free_*` is the lane this function was written to measure. The totals are kept
+ *  unchanged so nothing that already reads them shifts meaning, and `paid_*` is
+ *  reported beside them so the two can never be confused again. The discriminator
+ *  is the `source` prefix, which the paid writer sets itself; anything that is not
+ *  prefixed `apify` is counted as free, so a new free method needs no change here
+ *  and a new PAID writer must add its prefix to PAID_POINT_SOURCE_PREFIXES. */
+const PAID_POINT_SOURCE_PREFIXES = ['apify'];
+
 export async function collectYieldBetween(
   sinceISO: string,
   untilISO: string,
@@ -570,17 +590,39 @@ export async function collectYieldBetween(
   leads_with_points: number;
   points_prev_7d: number;
   email_points_prev_7d: number;
+  free_points: number;
+  free_email_points: number;
+  free_leads_with_points: number;
+  free_points_prev_7d: number;
+  free_email_points_prev_7d: number;
+  paid_points: number;
+  paid_email_points: number;
+  paid_points_prev_7d: number;
 }> {
   const emailKinds = `('business_email', 'personal_email', 'youtube_email')`;
   const inWindow = `cp.created_at >= $1::timestamptz AND cp.created_at < $2::timestamptz`;
   const inPrev7d = `cp.created_at >= $1::timestamptz - interval '7 days' AND cp.created_at < $1::timestamptz`;
+  // A NULL source predates the source column and belongs to the free pass, which is
+  // why this tests for the paid prefix rather than against it.
+  const isPaid = PAID_POINT_SOURCE_PREFIXES
+    .map((p) => `cp.source LIKE '${p}%'`)
+    .join(' OR ');
+  const isFree = `NOT (${isPaid}) OR cp.source IS NULL`;
   const rows = await query<Record<string, string | number>>(
     `SELECT
        count(*) FILTER (WHERE ${inWindow}) AS points,
        count(*) FILTER (WHERE ${inWindow} AND cp.kind IN ${emailKinds}) AS email_points,
        count(DISTINCT cp.lead_id) FILTER (WHERE ${inWindow}) AS leads_with_points,
        count(*) FILTER (WHERE ${inPrev7d}) AS points_prev_7d,
-       count(*) FILTER (WHERE ${inPrev7d} AND cp.kind IN ${emailKinds}) AS email_points_prev_7d
+       count(*) FILTER (WHERE ${inPrev7d} AND cp.kind IN ${emailKinds}) AS email_points_prev_7d,
+       count(*) FILTER (WHERE ${inWindow} AND (${isFree})) AS free_points,
+       count(*) FILTER (WHERE ${inWindow} AND (${isFree}) AND cp.kind IN ${emailKinds}) AS free_email_points,
+       count(DISTINCT cp.lead_id) FILTER (WHERE ${inWindow} AND (${isFree})) AS free_leads_with_points,
+       count(*) FILTER (WHERE ${inPrev7d} AND (${isFree})) AS free_points_prev_7d,
+       count(*) FILTER (WHERE ${inPrev7d} AND (${isFree}) AND cp.kind IN ${emailKinds}) AS free_email_points_prev_7d,
+       count(*) FILTER (WHERE ${inWindow} AND (${isPaid})) AS paid_points,
+       count(*) FILTER (WHERE ${inWindow} AND (${isPaid}) AND cp.kind IN ${emailKinds}) AS paid_email_points,
+       count(*) FILTER (WHERE ${inPrev7d} AND (${isPaid})) AS paid_points_prev_7d
        FROM leads.contact_points cp`,
     [sinceISO, untilISO],
   );
@@ -592,6 +634,14 @@ export async function collectYieldBetween(
     leads_with_points: n('leads_with_points'),
     points_prev_7d: n('points_prev_7d'),
     email_points_prev_7d: n('email_points_prev_7d'),
+    free_points: n('free_points'),
+    free_email_points: n('free_email_points'),
+    free_leads_with_points: n('free_leads_with_points'),
+    free_points_prev_7d: n('free_points_prev_7d'),
+    free_email_points_prev_7d: n('free_email_points_prev_7d'),
+    paid_points: n('paid_points'),
+    paid_email_points: n('paid_email_points'),
+    paid_points_prev_7d: n('paid_points_prev_7d'),
   };
 }
 

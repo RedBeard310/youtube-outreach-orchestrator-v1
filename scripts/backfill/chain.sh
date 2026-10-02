@@ -445,6 +445,27 @@ for(let i=1;i<=500;i++){const v=process.env[`YOUTUBE_API_KEY_${i}`]; if(v){gap=0
   fi
   zero_streak=0
 
+  # Per-lead transient refund (2026-10-02). The two guards above are whole-batch:
+  # they fire when a batch obviously died of infrastructure, and a batch that
+  # enriched 92 leads and failed 12 is not that batch. But on 2026-10-01 TEN of
+  # those 12 failed on `503 backendError` from YouTube's videos endpoint — Google
+  # briefly unavailable, nothing about the channel — and each silently paid one of
+  # its three attempts. Three such minutes across a lead's life and a good lead is
+  # excluded from enrichment forever, with nothing in the log saying why.
+  #
+  # So refund per lead rather than per batch: drop the transiently-failed ids from
+  # this batch's ids file, which is what next-batch-ids.cjs counts attempts from.
+  # Narrow by design — an unrecognised failure still pays, so a lead that is
+  # genuinely broken still ages out — and capped per lead, so nothing can refund
+  # itself into an immortal loop. See refund-transient-attempts.cjs.
+  if [ "$failed_n" -gt 0 ] && [ -f "$file" ]; then
+    refund_out=$(node "$ORCH/scripts/backfill/refund-transient-attempts.cjs" "$runlog" "$file" 2>&1)
+    case "$refund_out" in
+      REFUND=0*) : ;;   # nothing transient: silent, this is the common case
+      *) log "transient attempt refund: $refund_out" ;;
+    esac
+  fi
+
   if [ "$rc" -ne 0 ]; then
     consec_fail=$((consec_fail + 1))
     if [ "$consec_fail" -ge 2 ]; then

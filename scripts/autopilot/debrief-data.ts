@@ -1784,22 +1784,37 @@ async function main(): Promise<void> {
     // that can't see its yield can't tell a picked-over book from a broken lane.
     // `email_points` is the number that matters: only an email flips a lead to
     // approved_hold. A null block means the queries failed, not that yield was zero.
+    //
+    // The `free_*` fields are this lane's own work and the `*_added` totals are not:
+    // the paid Apify lane writes into the same table. See collectYieldBetween() for
+    // the 2026-10-01 cycle that made the difference load-bearing.
     recovery_lane: {
       contact_points_added: laneYieldNow?.points ?? null,
       email_points_added: laneYieldNow?.email_points ?? null,
       leads_with_new_points: laneYieldNow?.leads_with_points ?? null,
       contact_points_prev_7d: laneYieldNow?.points_prev_7d ?? null,
       email_points_prev_7d: laneYieldNow?.email_points_prev_7d ?? null,
+      free_contact_points_added: laneYieldNow?.free_points ?? null,
+      free_email_points_added: laneYieldNow?.free_email_points ?? null,
+      free_leads_with_new_points: laneYieldNow?.free_leads_with_points ?? null,
+      free_contact_points_prev_7d: laneYieldNow?.free_points_prev_7d ?? null,
+      free_email_points_prev_7d: laneYieldNow?.free_email_points_prev_7d ?? null,
+      paid_contact_points_added: laneYieldNow?.paid_points ?? null,
+      paid_email_points_added: laneYieldNow?.paid_email_points ?? null,
+      paid_contact_points_prev_7d: laneYieldNow?.paid_points_prev_7d ?? null,
       collect_book_pool: laneBook?.pool ?? null,
       collect_book_stranded: laneBook?.stranded ?? null,
       collect_laps: laneState.collectLaps ?? null,
       last_collect_at: laneState.lastCollectAt ?? null,
       last_verify_at: laneState.lastVerifyAt ?? null,
       note:
-        'Contact points the collect pass wrote in the cycle, from leads.contact_points.created_at. ' +
+        'Contact points written in the cycle, from leads.contact_points.created_at. ' +
+        'READ THE free_* FIELDS AS THIS LANE: the totals also contain the paid Apify ' +
+        'lane, which writes into the same table, and on 2026-10-01 that was 701 of 742 ' +
+        'points while the free pass found 6 addresses. ' +
         'A lap is one full walk of collect_book_pool; past lap 1 most leads are re-walks, so a ' +
         'low yield at a high lap count is a picked-over book rather than a fault, so read it ' +
-        'against contact_points_prev_7d. A climbing collect_book_stranded is the real fault ' +
+        'against free_contact_points_prev_7d. A climbing collect_book_stranded is the real fault ' +
         'signal (a selector gap has reopened). Emails here are unverified: the verify pass ' +
         'decides which ones flip to approved_hold.',
     },
