@@ -198,9 +198,16 @@ export function sendPlanHealth(
       'mailbox_slots is what the live inboxes would accept; the smaller one is the real ' +
       'ceiling. push_unit_result is siege-plan.service\'s own verdict on the run that sent ' +
       'this cycle (null = that unit did not run in this window, so no verdict applies); ' +
-      'binding_constraint:push_killed means systemd stopped the push part-way, which is ' +
-      'the 2026-10-01 shape — TimeoutStartSec=3600 covers all five of that oneshot\'s ' +
-      'steps and the push alone needs about an hour. plan_found:false means no plan on ' +
+      'binding_constraint:push_killed means systemd stopped the push part-way, the shape ' +
+      'seen on 2026-10-01 and 2026-10-02: TimeoutStartSec=3600 covers all five of that ' +
+      "oneshot's steps and the push ran past it. The 10-02 debrief blamed `npx tsx` " +
+      'startup for that hour and was wrong. Measured 2026-10-03: each push-batch process ' +
+      'did its real work in ~1.1s and then sat ~29s on an unclosed pg pool ' +
+      '(idleTimeoutMillis 30s), so 90 batches spent ~43 minutes of the hour waiting on ' +
+      'nothing. Fixed in youtube-email-outreach-v1 7fd02b6fd (src/db/cli-exit.ts), which ' +
+      'took a batch 31s to 1.9s. If push_killed appears for a cycle after 2026-10-03, do ' +
+      'not re-diagnose it as slowness: check that the fix is deployed, then the unit. ' +
+      'plan_found:false means no plan on ' +
       'disk (Siege did not run), which is not the same as a plan that ran and pushed nothing.',
   };
 }
