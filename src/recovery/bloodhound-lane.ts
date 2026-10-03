@@ -588,15 +588,18 @@ export async function collectYieldBetween(
   points: number;
   email_points: number;
   leads_with_points: number;
+  leads_with_email_points: number;
   points_prev_7d: number;
   email_points_prev_7d: number;
   free_points: number;
   free_email_points: number;
   free_leads_with_points: number;
+  free_leads_with_email_points: number;
   free_points_prev_7d: number;
   free_email_points_prev_7d: number;
   paid_points: number;
   paid_email_points: number;
+  paid_leads_with_email_points: number;
   paid_points_prev_7d: number;
 }> {
   const emailKinds = `('business_email', 'personal_email', 'youtube_email')`;
@@ -613,15 +616,27 @@ export async function collectYieldBetween(
        count(*) FILTER (WHERE ${inWindow}) AS points,
        count(*) FILTER (WHERE ${inWindow} AND cp.kind IN ${emailKinds}) AS email_points,
        count(DISTINCT cp.lead_id) FILTER (WHERE ${inWindow}) AS leads_with_points,
+       -- PEOPLE, not addresses. One creator whose site exposes a mailto on every page
+       -- can contribute dozens of email points on their own, so the address count says
+       -- nothing about how many leads could actually be recovered. On 2026-10-02 the free
+       -- pass wrote 32 email points and they belonged to TWO leads, 31 of them to one.
+       -- Beside leads_with_points (12, counting every kind of contact point) that read as
+       -- "32 addresses across 12 leads"; both leads flipped, and parked_today was 2.
+       count(DISTINCT cp.lead_id) FILTER (WHERE ${inWindow} AND cp.kind IN ${emailKinds})
+         AS leads_with_email_points,
        count(*) FILTER (WHERE ${inPrev7d}) AS points_prev_7d,
        count(*) FILTER (WHERE ${inPrev7d} AND cp.kind IN ${emailKinds}) AS email_points_prev_7d,
        count(*) FILTER (WHERE ${inWindow} AND (${isFree})) AS free_points,
        count(*) FILTER (WHERE ${inWindow} AND (${isFree}) AND cp.kind IN ${emailKinds}) AS free_email_points,
        count(DISTINCT cp.lead_id) FILTER (WHERE ${inWindow} AND (${isFree})) AS free_leads_with_points,
+       count(DISTINCT cp.lead_id) FILTER (WHERE ${inWindow} AND (${isFree}) AND cp.kind IN ${emailKinds})
+         AS free_leads_with_email_points,
        count(*) FILTER (WHERE ${inPrev7d} AND (${isFree})) AS free_points_prev_7d,
        count(*) FILTER (WHERE ${inPrev7d} AND (${isFree}) AND cp.kind IN ${emailKinds}) AS free_email_points_prev_7d,
        count(*) FILTER (WHERE ${inWindow} AND (${isPaid})) AS paid_points,
        count(*) FILTER (WHERE ${inWindow} AND (${isPaid}) AND cp.kind IN ${emailKinds}) AS paid_email_points,
+       count(DISTINCT cp.lead_id) FILTER (WHERE ${inWindow} AND (${isPaid}) AND cp.kind IN ${emailKinds})
+         AS paid_leads_with_email_points,
        count(*) FILTER (WHERE ${inPrev7d} AND (${isPaid})) AS paid_points_prev_7d
        FROM leads.contact_points cp`,
     [sinceISO, untilISO],
@@ -632,15 +647,18 @@ export async function collectYieldBetween(
     points: n('points'),
     email_points: n('email_points'),
     leads_with_points: n('leads_with_points'),
+    leads_with_email_points: n('leads_with_email_points'),
     points_prev_7d: n('points_prev_7d'),
     email_points_prev_7d: n('email_points_prev_7d'),
     free_points: n('free_points'),
     free_email_points: n('free_email_points'),
     free_leads_with_points: n('free_leads_with_points'),
+    free_leads_with_email_points: n('free_leads_with_email_points'),
     free_points_prev_7d: n('free_points_prev_7d'),
     free_email_points_prev_7d: n('free_email_points_prev_7d'),
     paid_points: n('paid_points'),
     paid_email_points: n('paid_email_points'),
+    paid_leads_with_email_points: n('paid_leads_with_email_points'),
     paid_points_prev_7d: n('paid_points_prev_7d'),
   };
 }

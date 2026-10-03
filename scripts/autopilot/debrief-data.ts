@@ -1885,15 +1885,18 @@ async function main(): Promise<void> {
       contact_points_added: laneYieldNow?.points ?? null,
       email_points_added: laneYieldNow?.email_points ?? null,
       leads_with_new_points: laneYieldNow?.leads_with_points ?? null,
+      leads_with_new_email: laneYieldNow?.leads_with_email_points ?? null,
       contact_points_prev_7d: laneYieldNow?.points_prev_7d ?? null,
       email_points_prev_7d: laneYieldNow?.email_points_prev_7d ?? null,
       free_contact_points_added: laneYieldNow?.free_points ?? null,
       free_email_points_added: laneYieldNow?.free_email_points ?? null,
       free_leads_with_new_points: laneYieldNow?.free_leads_with_points ?? null,
+      free_leads_with_new_email: laneYieldNow?.free_leads_with_email_points ?? null,
       free_contact_points_prev_7d: laneYieldNow?.free_points_prev_7d ?? null,
       free_email_points_prev_7d: laneYieldNow?.free_email_points_prev_7d ?? null,
       paid_contact_points_added: laneYieldNow?.paid_points ?? null,
       paid_email_points_added: laneYieldNow?.paid_email_points ?? null,
+      paid_leads_with_new_email: laneYieldNow?.paid_leads_with_email_points ?? null,
       paid_contact_points_prev_7d: laneYieldNow?.paid_points_prev_7d ?? null,
       collect_book_pool: laneBook?.pool ?? null,
       collect_book_stranded: laneBook?.stranded ?? null,
@@ -1905,6 +1908,12 @@ async function main(): Promise<void> {
         'READ THE free_* FIELDS AS THIS LANE: the totals also contain the paid Apify ' +
         'lane, which writes into the same table, and on 2026-10-01 that was 701 of 742 ' +
         'points while the free pass found 6 addresses. ' +
+        'COUNT PEOPLE, NOT ADDRESSES: free_leads_with_new_email is the number that ' +
+        'predicts parking, because one creator with a mailto on every page writes dozens of ' +
+        'email points alone. On 2026-10-02 free_email_points_added was 32 and ' +
+        'free_leads_with_new_email was 2, with 31 of the 32 from one lead; both flipped and ' +
+        'parked_today was 2. free_leads_with_new_points counts every kind of point, so it is ' +
+        'the wrong denominator for addresses (it read 12 that day). ' +
         'A lap is one full walk of collect_book_pool; past lap 1 most leads are re-walks, so a ' +
         'low yield at a high lap count is a picked-over book rather than a fault, so read it ' +
         'against free_contact_points_prev_7d. A climbing collect_book_stranded is the real fault ' +
