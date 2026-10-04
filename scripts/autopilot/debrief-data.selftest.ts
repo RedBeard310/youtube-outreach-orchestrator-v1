@@ -1,4 +1,4 @@
-import { apifyBatchFacts, apifyLedgerLine, classifyKeyProbe, cyclePacificDay, enrichmentChainFacts, projectRecoveryBudget, MAX_MISSING_DEBRIEFS, missingDebriefs, pushRunVerdict, sendPlanHealth, siegePlanFacts, summarizeSendLines, isVerifiedOrBeyond, laneYield, priorAdvanceSource, priorSeedsAdvanced, priorSeedsWalked, reconcileAdvanced, sessionSeedsAdvanced, sessionStartMs, walkRateTrend } from './debrief-data.ts';
+import { apifyBatchFacts, apifyLedgerLine, classifyKeyProbe, cyclePacificDay, enrichmentChainFacts, isSendingDay, projectRecoveryBudget, MAX_MISSING_DEBRIEFS, missingDebriefs, pushRunVerdict, sendPlanHealth, siegePlanFacts, summarizeSendLines, isVerifiedOrBeyond, laneYield, priorAdvanceSource, priorSeedsAdvanced, priorSeedsWalked, reconcileAdvanced, sessionSeedsAdvanced, sessionStartMs, walkRateTrend } from './debrief-data.ts';
 let fail = 0;
 const ok = (name: string, got: unknown, want: unknown) => {
   const pass = JSON.stringify(got) === JSON.stringify(want);
@@ -313,6 +313,45 @@ ok('Friday\'s verdict does not describe Sunday',
   null);
 ok('no result -> no verdict', pushRunVerdict(null, '2026-10-01T10:17:22.000Z', '2026-10-01T07:00:00.000Z', '2026-10-02T07:00:00.000Z'), null);
 ok('unreadable timestamp -> no verdict', pushRunVerdict('timeout', null, '2026-10-01T07:00:00.000Z', '2026-10-02T07:00:00.000Z'), null);
+
+// --- a weekend with no plan is not a Monday with no plan (2026-10-04) ---
+// The live line, verbatim from `systemctl show siege-plan.timer -p TimersCalendar`.
+const CAL = '{ OnCalendar=Mon..Fri *-*-* 06:15:00 America/New_York ; next_elapse=Mon 2026-10-05 10:15:00 UTC }';
+ok('Mon..Fri includes Friday 10-02', isSendingDay(CAL, '2026-10-02'), true);
+ok('Mon..Fri excludes Saturday 10-03', isSendingDay(CAL, '2026-10-03'), false);
+ok('Mon..Fri excludes Sunday 10-04', isSendingDay(CAL, '2026-10-04'), false);
+ok('Mon..Fri includes Monday 10-05', isSendingDay(CAL, '2026-10-05'), true);
+ok('a comma list is read', isSendingDay('{ OnCalendar=Mon,Wed,Sat *-*-* 06:15:00 ; next_elapse=x }', '2026-10-03'), true);
+ok('a comma list excludes what it omits', isSendingDay('{ OnCalendar=Mon,Wed,Sat *-*-* 06:15:00 ; next_elapse=x }', '2026-10-02'), false);
+// A range that wraps past Sunday: Sat..Tue covers Sat, Sun, Mon, Tue.
+ok('a wrapping range covers Sunday', isSendingDay('OnCalendar=Sat..Tue 06:15:00', '2026-10-04'), true);
+ok('a wrapping range still excludes Thursday', isSendingDay('OnCalendar=Sat..Tue 06:15:00', '2026-10-01'), false);
+ok('no weekday field means every day', isSendingDay('{ OnCalendar=*-*-* 06:15:00 ; next_elapse=x }', '2026-10-03'), true);
+ok('daily means every day', isSendingDay('{ OnCalendar=daily ; next_elapse=x }', '2026-10-03'), true);
+ok('an unreadable schedule claims nothing', isSendingDay(null, '2026-10-03'), null);
+ok('an abbreviation we do not know claims nothing',
+  isSendingDay('OnCalendar=Mon..Zzz 06:15:00', '2026-10-03'), null);
+
+const SAT = { sending_day: false, unit_state: 'failed', unit_last_result: 'timeout', unit_last_started: '2026-10-02T10:17:09.000Z' };
+ok('a weekend with no plan names the weekend, and carries the unit it last ran',
+  (() => { const h = sendPlanHealth(siegePlanFacts(null), 0, 0, null, SAT);
+    return [h.plan_found, h.sending_day, h.binding_constraint, h.push_unit_result, h.unit_last_result]; })(),
+  [false, false, 'not_a_sending_day', null, 'timeout']);
+ok('a sending day with no plan is the loud one',
+  sendPlanHealth(siegePlanFacts(null), 0, 0, null, { ...SAT, sending_day: true }).binding_constraint,
+  'plan_missing_on_sending_day');
+// A hand-driven batch does not excuse a missing plan: before this the day read
+// `partial_push`, which says a plan moved part of itself.
+ok('a hand-driven batch does not excuse a missing plan',
+  sendPlanHealth(siegePlanFacts(null), 12, 0, null, { ...SAT, sending_day: true }).binding_constraint,
+  'plan_missing_on_sending_day');
+ok('an unknown schedule leaves the old answer alone',
+  sendPlanHealth(siegePlanFacts(null), 4, 4, null,
+    { sending_day: null, unit_state: null, unit_last_result: null, unit_last_started: null },
+  ).binding_constraint, null);
+ok('a plan that exists is judged on the plan, not the calendar',
+  sendPlanHealth(siegePlanFacts(PLAN_1001), 135, 0, 'timeout', { ...SAT, sending_day: true })
+    .binding_constraint, 'push_killed');
 
 // The plan directory is named for the day the cycle covers, not the day the debrief runs.
 ok('cycle day is the PT day that just ended', cyclePacificDay('2026-09-29T07:00:00.000Z'), '2026-09-29');

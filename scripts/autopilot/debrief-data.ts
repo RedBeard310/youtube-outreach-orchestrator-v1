@@ -99,7 +99,78 @@ export function siegePlanFacts(raw: unknown): SiegePlanFacts {
   };
 }
 
-export type SendPlanHealth = SiegePlanFacts & {
+// WAS A SATURDAY INDISTINGUISHABLE FROM A BROKEN MONDAY (2026-10-04).
+//
+// `plan_found: false` is the right answer for both of these days and they are not
+// remotely the same day:
+//
+//   • Saturday — `siege-plan.timer` is `OnCalendar=Mon..Fri`, so no plan exists and
+//     none should. SmartLead sends Mon-Thu anyway. Nothing is wrong.
+//   • A Monday the timer silently did not fire — no plan, no emails, and a whole
+//     sending day lost with no error anywhere to read.
+//
+// The cycle for 2026-10-03 was the first Saturday this block had to describe, and it
+// emitted exactly what a dead Monday would. So ask the timer for its own schedule and
+// say which kind of day this was. Read off systemd, not hard-coded here: the schedule
+// moved once already (06:15 from 08:15 on 2026-10-01) and a copy of it in this file
+// would be the next thing to go stale.
+export type SiegeUnitFacts = {
+  sending_day: boolean | null;
+  unit_state: string | null;
+  unit_last_result: string | null;
+  unit_last_started: string | null;
+};
+
+const NO_UNIT: SiegeUnitFacts = {
+  sending_day: null,
+  unit_state: null,
+  unit_last_result: null,
+  unit_last_started: null,
+};
+
+// systemd's weekday order, Monday first, matching its own `Mon..Fri` syntax.
+const SYSTEMD_DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+const WEEKDAY_SPEC = /^[a-z]{3}(\.\.[a-z]{3})?(,[a-z]{3}(\.\.[a-z]{3})?)*$/;
+
+/** Is `pacificDay` (YYYY-MM-DD) a day the Siege timer runs on?
+ *
+ *  `calendar` is a raw `systemctl show <timer> -p TimersCalendar` line, e.g.
+ *  `{ OnCalendar=Mon..Fri *-*-* 06:15:00 America/New_York ; next_elapse=... }`.
+ *  Only the weekday field is read — the time of day cannot make a day a non-sending
+ *  day. No weekday restriction means every day, which is the honest reading of
+ *  `OnCalendar=daily`. Anything unparseable returns null: a schedule we could not
+ *  read must not turn into a claim that the day was fine. */
+export function isSendingDay(calendar: string | null, pacificDay: string): boolean | null {
+  if (!calendar) return null;
+  const m = /OnCalendar=(.*?)(?:\s*;|\s*\}|$)/.exec(calendar);
+  const expr = (m?.[1] ?? calendar).trim();
+  if (!expr) return null;
+  const d = new Date(`${pacificDay}T12:00:00Z`);
+  if (!Number.isFinite(d.getTime())) return null;
+  // Midday UTC, so the calendar weekday of the date string is the weekday meant,
+  // whatever timezone this process runs in.
+  const want = SYSTEMD_DAYS[(d.getUTCDay() + 6) % 7]!;
+
+  const first = expr.split(/\s+/)[0]!.toLowerCase();
+  if (!WEEKDAY_SPEC.test(first)) return true; // no weekday field at all -> every day
+  for (const part of first.split(',')) {
+    const [a, b] = part.split('..');
+    const from = SYSTEMD_DAYS.indexOf(a!);
+    if (from < 0) return null; // an abbreviation we don't know -> don't guess
+    if (b === undefined) {
+      if (a === want) return true;
+      continue;
+    }
+    const to = SYSTEMD_DAYS.indexOf(b);
+    if (to < 0) return null;
+    const span = (to - from + 7) % 7;
+    const at = (SYSTEMD_DAYS.indexOf(want) - from + 7) % 7;
+    if (at <= span) return true;
+  }
+  return false;
+}
+
+export type SendPlanHealth = SiegePlanFacts & SiegeUnitFacts & {
   sent_in_cycle: number | null;
   sent_by_this_repo: number | null;
   sent_elsewhere: number | null;
@@ -151,6 +222,7 @@ export function sendPlanHealth(
   sentInCycle: number | null,
   sentByThisRepo: number | null,
   pushUnitResult: string | null = null,
+  unit: SiegeUnitFacts = NO_UNIT,
 ): SendPlanHealth {
   const elsewhere = sentInCycle === null || sentByThisRepo === null
     ? null
@@ -167,7 +239,12 @@ export function sendPlanHealth(
       : planned > 0 && elsewhere === 0;
 
   let binding: string | null = null;
-  if (facts.email_paused === true) binding = 'email_paused';
+  // No plan on disk has two causes and they need different names. Ranked first because
+  // when there is no plan there are no ceilings to press against, and a hand-driven
+  // batch reaching SmartLead does not excuse a missing plan on a sending day.
+  if (!facts.plan_found && unit.sending_day === false) binding = 'not_a_sending_day';
+  else if (!facts.plan_found && unit.sending_day === true) binding = 'plan_missing_on_sending_day';
+  else if (facts.email_paused === true) binding = 'email_paused';
   else if (approvalPending === true) binding = 'awaiting_approval';
   else if (elsewhere !== null && elsewhere > 0) {
     // Only claim a ceiling when the day actually pressed against it.
@@ -183,6 +260,7 @@ export function sendPlanHealth(
 
   return {
     ...facts,
+    ...unit,
     sent_in_cycle: sentInCycle,
     sent_by_this_repo: sentByThisRepo,
     sent_elsewhere: elsewhere,
@@ -208,7 +286,16 @@ export function sendPlanHealth(
       'took a batch 31s to 1.9s. If push_killed appears for a cycle after 2026-10-03, do ' +
       'not re-diagnose it as slowness: check that the fix is deployed, then the unit. ' +
       'plan_found:false means no plan on ' +
-      'disk (Siege did not run), which is not the same as a plan that ran and pushed nothing.',
+      'disk (Siege did not run), which is not the same as a plan that ran and pushed ' +
+      'nothing — and READ sending_day BEFORE CALLING IT A FAULT: siege-plan.timer is ' +
+      'Mon-Fri, so a weekend cycle is binding_constraint:not_a_sending_day and nothing ' +
+      'is wrong, while plan_missing_on_sending_day means a real sending day produced no ' +
+      'plan at all and the timer is what to look at. sending_day is read off the timer\'s ' +
+      'own OnCalendar, so it follows a schedule change. unit_state / unit_last_result / ' +
+      'unit_last_started describe siege-plan.service\'s MOST RECENT run whenever it ' +
+      'happened, which on a weekend is a weekday two days back — unlike ' +
+      'push_unit_result, which is null unless that run was inside this cycle. A unit_state ' +
+      'of failed left over from a prior cycle does not block the next timer firing.',
   };
 }
 
@@ -244,28 +331,61 @@ function serviceActive(name: string): boolean | null {
   }
 }
 
-/** siege-plan.service's own verdict on the run that did this cycle's sending, or null
- *  if that unit did not run inside the window. Local systemd only, no network and no
- *  token, same rule as every other probe in this file. See pushRunVerdict(). */
-function siegeUnitVerdict(sinceISO: string, untilISO: string): string | null {
+/** `systemctl show` as a property map.
+ *
+ *  BY NAME, NOT BY POSITION (2026-10-04). This used to run with `--value` and
+ *  destructure the lines in the order they were asked for. systemd prints properties in
+ *  its OWN canonical order and ignores the request order — it happens to agree for
+ *  `Result` and `ExecMainStartTimestamp`, so the old code was right by luck. Had it ever
+ *  disagreed, the timestamp would have landed in `result`, every verdict would have gone
+ *  null, and `binding_constraint` would have read `partial_push` on a killed push: the
+ *  exact wrong diagnosis the 10-02 and 10-03 debriefs spent two days undoing.
+ *
+ *  Local systemd only, no network and no token, same rule as every other probe here. */
+function showUnit(unit: string, props: string[]): Record<string, string> {
   try {
     const out = execSync(
-      'systemctl show siege-plan.service -p Result -p ExecMainStartTimestamp --value',
+      `systemctl show ${unit} ${props.map((p) => `-p ${p}`).join(' ')}`,
       { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] },
-    ).trim().split('\n').map((l) => l.trim());
-    const [result, stamp] = out;
-    // systemd prints its timestamps like "Thu 2026-10-01 10:15:25 UTC"; Date can read
-    // that once the weekday is dropped. An unparseable stamp yields null, not a guess.
-    const started = stamp ? new Date(stamp.replace(/^[A-Za-z]{3}\s+/, '')) : null;
-    return pushRunVerdict(
-      result || null,
-      started && Number.isFinite(started.getTime()) ? started.toISOString() : null,
-      sinceISO,
-      untilISO,
     );
+    const map: Record<string, string> = {};
+    for (const line of out.split('\n')) {
+      const at = line.indexOf('=');
+      // Values carry '=' of their own (TimersCalendar holds a whole OnCalendar expression),
+      // so split on the first one only.
+      if (at > 0) map[line.slice(0, at).trim()] = line.slice(at + 1).trim();
+    }
+    return map;
   } catch {
-    return null;
+    return {}; // systemctl unavailable or unit unknown — say nothing, don't claim a fault
   }
+}
+
+// systemd prints its timestamps like "Thu 2026-10-01 10:15:25 UTC"; Date can read that
+// once the weekday is dropped. An unparseable or empty stamp yields null, not a guess.
+function systemdStamp(raw: string | undefined): string | null {
+  if (!raw) return null;
+  const d = new Date(raw.replace(/^[A-Za-z]{3}\s+/, ''));
+  return Number.isFinite(d.getTime()) ? d.toISOString() : null;
+}
+
+/** What Siege's timer and service say about themselves, plus whether the cycle's PT day
+ *  was a sending day at all. See the block comment on SiegeUnitFacts. */
+function siegeUnitFacts(pacificDay: string): SiegeUnitFacts {
+  const svc = showUnit('siege-plan.service', ['Result', 'ActiveState', 'ExecMainStartTimestamp']);
+  const timer = showUnit('siege-plan.timer', ['TimersCalendar']);
+  return {
+    sending_day: isSendingDay(timer.TimersCalendar ?? null, pacificDay),
+    unit_state: svc.ActiveState || null,
+    unit_last_result: svc.Result || null,
+    unit_last_started: systemdStamp(svc.ExecMainStartTimestamp),
+  };
+}
+
+/** siege-plan.service's own verdict on the run that did this cycle's sending, or null
+ *  if that unit did not run inside the window. See pushRunVerdict(). */
+function siegeUnitVerdict(unit: SiegeUnitFacts, sinceISO: string, untilISO: string): string | null {
+  return pushRunVerdict(unit.unit_last_result, unit.unit_last_started, sinceISO, untilISO);
 }
 function sweepStateUpdatedAt(stateFile: string): string | null {
   const p = join(FINDER_REPO, 'logs', stateFile);
@@ -1793,11 +1913,14 @@ async function main(): Promise<void> {
   const burn = summarizeToday(date);
 
   const sendLog = orchestratorSendLog(sinceISO, untilISO);
+  const cycleDay = cyclePacificDay(sinceISO);
+  const siegeUnit = siegeUnitFacts(cycleDay);
   const sendPlan = sendPlanHealth(
-    readSiegePlan(cyclePacificDay(sinceISO)),
+    readSiegePlan(cycleDay),
     sent?.total ?? null,
     sendLog.sent_sum,
-    siegeUnitVerdict(sinceISO, untilISO),
+    siegeUnitVerdict(siegeUnit, sinceISO, untilISO),
+    siegeUnit,
   );
 
   // Supply-health — surface the persistent term-supply outage the finder can't self-heal.
