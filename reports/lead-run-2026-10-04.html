@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lead Run Debrief - 2026-10-04</title>
+<style>
+  :root {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --good-soft: #1f8a5b18; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+      --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+      --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --good-soft: #55c48c1c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --good-soft: #1f8a5b18; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+    --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+    --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --good-soft: #55c48c1c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 40px 22px 80px; }
+  .eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); font-weight: 600; }
+  h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.12; margin: 10px 0 6px; text-wrap: balance; letter-spacing: -.02em; }
+  h2 { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); margin: 44px 0 16px; font-weight: 700; }
+  h3 { font-size: 18px; margin: 0 0 6px; letter-spacing: -.01em; }
+  p { margin: 0 0 14px; }
+  .lede { font-size: 18px; color: var(--ink-soft); max-width: 68ch; }
+  .tag { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--amber-soft); color: var(--amber); letter-spacing: .02em; }
+  .tag.ok { background: var(--teal-soft); color: var(--teal); }
+  .tag.bad { background: var(--red-soft); color: var(--red); }
+  .tag.good { background: var(--good-soft); color: var(--good); }
+  .grid { display: grid; gap: 14px; }
+  .stats { grid-template-columns: repeat(4, 1fr); margin-top: 26px; }
+  @media (max-width: 720px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; box-shadow: var(--shadow); }
+  .stat .n { font-size: 30px; font-weight: 750; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .stat .l { font-size: 12.5px; color: var(--ink-soft); margin-top: 3px; }
+  .stat .s { font-size: 12px; margin-top: 8px; font-weight: 600; }
+  .up { color: var(--good); } .down { color: var(--red); } .warn { color: var(--amber); }
+  .accent-red { border-left: 3px solid var(--red); }
+  .accent-teal { border-left: 3px solid var(--teal); }
+  .accent-amber { border-left: 3px solid var(--amber); }
+  .accent-good { border-left: 3px solid var(--good); }
+
+  .q { border-radius: 14px; padding: 20px 22px; margin-bottom: 14px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); }
+  .q .ask { font-size: 17px; font-weight: 700; color: var(--ink); margin-bottom: 10px; display: flex; gap: 10px; align-items: baseline; }
+  .q .ask .qn { color: var(--red); font-weight: 800; flex: 0 0 auto; }
+  .q.accent-teal .ask .qn { color: var(--teal); }
+  .q.accent-good .ask .qn { color: var(--good); }
+  .q p { color: var(--ink-soft); }
+  .q b { color: var(--ink); }
+  .pill { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink); background: var(--panel-2); padding: 1px 7px; border-radius: 6px; border: 1px solid var(--line); white-space: nowrap; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+  th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); }
+  td .num { font-variant-numeric: tabular-nums; font-weight: 650; }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); box-shadow: var(--shadow); }
+  ol.recs { padding-left: 0; list-style: none; counter-reset: r; margin: 0; }
+  ol.recs li { counter-increment: r; position: relative; padding: 14px 16px 14px 52px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 10px; box-shadow: var(--shadow); }
+  ol.recs li::before { content: counter(r); position: absolute; left: 14px; top: 14px; width: 26px; height: 26px; border-radius: 8px; background: var(--teal-soft); color: var(--teal); font-weight: 800; font-size: 14px; display: grid; place-items: center; }
+  ol.recs b { color: var(--ink); }
+  .foot { margin-top: 46px; padding: 16px 18px; border-radius: 12px; background: var(--amber-soft); border: 1px solid var(--line); font-size: 14px; color: var(--ink-soft); }
+  .foot b { color: var(--ink); }
+  .muted { color: var(--ink-soft); font-size: 13.5px; }
+  code { background: var(--panel-2); border: 1px solid var(--line); border-radius: 5px; padding: 0 5px; font-size: .9em; }
+</style>
+
+<div class="wrap">
+
+  <div class="eyebrow">Lead Run Debrief · YouTube outreach</div>
+  <h1>2026-10-03: a Saturday, and the report couldn't tell it apart from a Monday the send never ran</h1>
+  <p class="lede">Saturday is not a sending day. Siege's timer runs Monday to Friday and SmartLead delivers Monday to Thursday, so <b>0 emails</b> is the correct answer to the only question that matters right now, and <b>+2 parked</b> matches Friday exactly. Nothing failed: no fatal signatures, no halt, no crashes, twenty-first straight day of $0 Anthropic. The finding is in the reporting rather than the pipeline. The daily snapshot said <code>plan_found: false</code> with every other send field empty, which is byte-for-byte what a Monday whose timer silently failed would have produced. One of those days is fine and the other loses 200 emails, and until today they looked identical. That is fixed. A second number came out of checking it: <b>548 of the 7,591 parked leads have already been emailed</b>, so the inventory left to write is <b>7,033</b>, not 7,591, and that gap widens every send day.</p>
+  <div style="margin-top:14px"><span class="tag ok">0 SENT, CORRECTLY</span> <span class="tag bad">+2 PARKED</span> <span class="tag good">7,033 LEFT TO WRITE</span> <span class="tag good">0 FAULTS</span> <span class="tag ok">OPENROUTER 61 DAYS</span> <span class="tag good">SNAPSHOT NOW NAMES THE WEEKEND</span></div>
+
+  <div class="grid stats">
+    <div class="card stat accent-teal">
+      <div class="n">0</div>
+      <div class="l">emails loaded, and none were planned</div>
+      <div class="s">Weekend. Next send is Monday 5 October</div>
+    </div>
+    <div class="card stat accent-red">
+      <div class="n">+2</div>
+      <div class="l">leads parked, 7,589 to 7,591</div>
+      <div class="s down">Second day at +2. Both from the free pass</div>
+    </div>
+    <div class="card stat accent-good">
+      <div class="n">7,033</div>
+      <div class="l">researched leads not yet emailed</div>
+      <div class="s up">548 of the shelf has already gone out</div>
+    </div>
+    <div class="card stat accent-good">
+      <div class="n">1.6%</div>
+      <div class="l">of walked leads had no website to read</div>
+      <div class="s up">Resolution healthy. Brave never had to answer</div>
+    </div>
+  </div>
+
+  <h2>The shape of the day</h2>
+
+  <p>There is very little to report, and that is the honest headline. Every lane that was asked to run, ran. The free recovery pass walked <b>600 leads across four passes</b> and found addresses for two people, both of whom verified clean and flipped to <code>approved_hold</code> at 13:00Z. That pair is the whole of the <span class="pill">+2</span>. The enrichment chain ran <b>one batch, did two leads and went idle</b>, because those two were the only new work in existence. The paid Apify lane stayed asleep on <b>$0 spendable</b>, as it will until 31 October. Discovery stayed off by order, for the eleventh debrief running.</p>
+
+  <p>And nothing was emailed, which for once needs no explanation beyond the calendar. <code>siege-plan.timer</code> is set to <code>Mon..Fri</code>, the campaigns deliver Monday to Thursday, and this cycle covered Saturday. Friday's run was cut off by its one-hour limit with 68 emails unsent, and those are not picked up over a weekend: Monday starts a fresh plan.</p>
+
+  <p>So the interesting part of this cycle is what the report itself could and couldn't say. Yesterday's debrief closed with an open item: look at <code>systemctl status siege-plan.service</code> after Monday's run to confirm the push fix. That had to be a manual instruction because the snapshot the debrief is written from carried nothing about the unit, and on a day with no plan it carried nothing about the send at all. Both of those are now in it.</p>
+
+  <p>One welcome non-event: <b>site resolution is healthy</b>. Nine of 573 walked leads logged <code>site=(none)</code>, which is 1.6% against a bar of roughly 15%, so the picked-over book is genuinely picked over rather than quietly failing. Neither Brave Search key was needed, because the leads the cursor is reading already have a stored website. Both keys remain at their spending cap and it cost nothing for the third day.</p>
+
+  <h2>The three questions</h2>
+
+  <div class="q accent-teal">
+    <div class="ask"><span class="qn">1</span> Did we find new leads?</div>
+    <p>No, and that remains the standing order. Discovery has been off since 2026-09-08 on Casey's instruction, so <b>0 new channels</b> and <b>0 campaign sessions</b> are the intended state. Every sweep stayed stopped, the keyword harvest stayed stopped, and the flag holding them off is untouched. Eleventh debrief saying this.</p>
+  </div>
+
+  <div class="q accent-amber">
+    <div class="ask"><span class="qn">2</span> Did we recover leads we already had?</div>
+    <p><b>Two.</b> Four collect passes at 150 leads each, <b>600 leads walked</b>, producing <b>18 contact points across 13 leads</b>, of which <b>2 were email addresses belonging to 2 people</b>. The verify pass picked them up at 13:00Z, checked both, rejected neither, and flipped both to <code>approved_hold</code>. That is the day's entire lead growth.</p>
+    <p>Compared with the week behind it, that is ordinary rather than poor: the free pass wrote 211 contact points and 54 addresses over the previous seven days, so 18 and 2 is a normal day's share. The lane is on its <b>seventh full walk</b> of a 2,522-lead book, which is the real reason the numbers are small. Most of what it reads it has already emptied, and no amount of money changes that.</p>
+    <p>Yesterday's address-versus-people fix earned its keep immediately. On Friday the raw address count was 32 and the number of people was 2. Today those two numbers are 2 and 2, so nothing was flattered and nothing was hidden, and the snapshot now reports both as a matter of course.</p>
+    <p>The paid lane wrote nothing because it has nothing to spend: <b>$10.00 left, $0.00 spendable</b>, the ten being a reserve it refuses to touch. It is resting, not stuck, with <b>0 price strikes</b> and its own brake un-tripped. The collect book's stranded count held at <b>3</b> for the twenty-first day, so no selector gap has reopened.</p>
+  </div>
+
+  <div class="q accent-good">
+    <div class="ask"><span class="qn">3</span> Did we email anybody?</div>
+    <p><b>Nobody, and nobody was meant to be.</b> No plan was written because the timer does not fire on a Saturday, and SmartLead would not have delivered on one anyway. There was no missing approval (Casey's standing approval has been in place since 09-30), no ceiling pressed against, and nothing dropped.</p>
+    <p>Two things are worth writing down so they are not re-diagnosed on Monday. First, the push fix from yesterday (<code>7fd02b6fd</code>, which took a batch from 31 seconds to 1.9) <b>is committed and sits at the head of the email repo</b>, so it will be in Monday's run. It has not been exercised against a live push yet. Monday is its first real test.</p>
+    <p>Second, <code>siege-plan.service</code> has been sitting in a <b><code>failed</code> state since Friday 10-02 at 10:17Z</b>, the leftover of that one-hour kill. <b>This does not block anything.</b> A systemd timer fires its unit regardless of how the last run ended, which Friday itself proved: it ran after Thursday's identical failure. The state is now reported in the snapshot so it reads as history rather than as an alarm.</p>
+    <p>The orchestrator's own send ran once at the cycle boundary and found <b>0 ready leads</b>, as expected. Siege sends off the <code>approved_hold</code> shelf; this repo's lane covers the small <code>approved</code> path, which is empty.</p>
+  </div>
+
+  <h2>What broke, what's fixed</h2>
+
+  <div class="card accent-good" style="margin-bottom:14px">
+    <h3>1. A quiet Saturday and a broken Monday produced the same snapshot</h3>
+    <p class="muted" style="margin-bottom:10px"><b>Fixed:</b> <code>youtube-outreach-orchestrator-v1</code> <code>a709b598</code>. Nothing for Casey to do.</p>
+    <p>This was the first weekend the send-plan block has had to describe. It emitted <code>plan_found: false</code>, <code>planned: null</code>, <code>binding_constraint: null</code> and nulls for everything else. That is also, exactly, what a Monday whose timer never fired would emit. One of those days is correct and expected. The other is a whole sending day gone, 200 emails not written, with no error line anywhere in the system to find it by. A report that cannot tell them apart will eventually call the bad one fine, because ten weekends of practice will have taught everyone that the shape is harmless.</p>
+    <p>So the block now asks the timer what days it runs on. Three things come out of that:</p>
+    <p><b>A verdict instead of a silence.</b> <code>binding_constraint</code> says <code>not_a_sending_day</code> when the calendar excludes the day, and <code>plan_missing_on_sending_day</code> when it doesn't. Both cases used to produce <code>null</code>, which reads as "no finding". The second one is now the loudest thing in the block. A batch driven by hand no longer covers for a missing plan either: that used to come out as <code>partial_push</code>, which claims a plan moved part of itself.</p>
+    <p><b>The schedule is read, not remembered.</b> The weekday rule comes from the timer's own <code>OnCalendar</code> line. Writing <code>Mon..Fri</code> into the gatherer would have been one line shorter and would have gone stale: that schedule already moved once, from 08:15 to 06:15 on 10-01.</p>
+    <p><b>The unit now reports on itself.</b> <code>unit_state</code>, <code>unit_last_result</code> and <code>unit_last_started</code> carry Siege's most recent run whenever it happened, so yesterday's "go and look at <code>systemctl status</code> after Monday" is answerable from the snapshot. It is deliberately separate from the existing <code>push_unit_result</code>, which stays null unless that run happened inside the cycle, because a Friday verdict must never be printed as a Saturday outcome.</p>
+    <p class="muted">Verified: typecheck clean, the gatherer's self-test passes with 14 new cases (comma lists, a range that wraps past Sunday, a calendar with no weekday field, and an unknown abbreviation refusing to guess), and run against live systemd: Friday 10-02 true, Saturday 10-03 false, Sunday 10-04 false, Monday 10-05 true. Today's snapshot now reads <code>binding_constraint: not_a_sending_day</code> with <code>push_unit_result</code> still correctly null.</p>
+  </div>
+
+  <div class="card accent-good" style="margin-bottom:14px">
+    <h3>2. The same code read systemd's answers by position, and was right by luck</h3>
+    <p class="muted" style="margin-bottom:10px"><b>Fixed:</b> same commit.</p>
+    <p>The existing probe asked systemd for two properties and then took the answers in the order it had asked for them. <b>systemd prints properties in its own fixed order and ignores the order of the request.</b> For these two it happens to agree, so the code worked, and it would have kept working right up until somebody added a third property or a systemd release reordered them.</p>
+    <p>The failure it was one edit away from is specific and familiar. The timestamp would have landed in the slot holding the result, every push verdict would have gone to <code>null</code>, and a killed push would have been reported as <code>partial_push</code>, meaning "a few leads the builder couldn't finish". That is precisely the wrong diagnosis the 10-02 and 10-03 debriefs spent two days undoing. Properties are now read by name.</p>
+  </div>
+
+  <div class="card accent-good" style="margin-bottom:14px">
+    <h3>3. The parked pool overstates what is left to email, by 548 and growing</h3>
+    <p class="muted" style="margin-bottom:10px">Measured, not fixed. No code change needed, just a number to read correctly.</p>
+    <p>The pool figure at the top of every one of these reports counts everything in <code>approved_hold</code>, and sending an email does not take a lead out of <code>approved_hold</code>. So the 7,591 includes people who have already been written to. Queried today: <b>7,033 of the shelf sit at <code>ready_data_scraped</code> and 548 sit at <code>sent_to_smartlead</code></b>. Those 548 are the cumulative output of the send path to date, and the first time this series has been able to state it as one number.</p>
+    <p>It matters because of the arithmetic it changes. The ramp is at 200 a day across four delivery days, so a full week consumes roughly <b>800</b> of the 7,033, while the only lane still adding leads contributed <b>2</b>. At that pace the inventory is about <b>nine weeks</b> of email, and the headline pool number will keep drifting further above the real figure every day the send runs. <b>7,033 is the number to watch from here, not 7,591.</b></p>
+  </div>
+
+  <div class="card accent-amber">
+    <h3>Still carried, unchanged</h3>
+    <p><b>Nothing meaningful is adding leads.</b> Discovery paused by order, the paid lane out of money until 1 November, the free lane on lap seven of a picked-over book. Eleventh debrief carrying the first of those.</p>
+    <p><b>Nine of Siege's sixteen offers still cannot run</b>, for the same small named reasons across seven debriefs. With 7,033 leads to write to, the number of distinct things we can say is now a harder ceiling than the supply of people to say them to.</p>
+    <p><b>15 of 66 YouTube keys work.</b> Settled on 09-16: quota was cut on 50 projects, so more keys do not help those accounts. It constrained nothing again, because the 100-unit keyword search is off.</p>
+    <p><b><code>scripts/backfill/halt.flag</code> still logs its "this is not the halt flag" note</b> every 30 minutes. A decoy artefact, warned about since 09-30, deliberately left alone.</p>
+  </div>
+
+  <h2>The money</h2>
+
+  <div class="card">
+    <div class="tablewrap">
+      <table>
+        <tr><th></th><th>This cycle</th><th>Prior cycle</th></tr>
+        <tr><td>Anthropic</td><td class="num"><b>$0.00</b> (21st zero)</td><td class="num">$0.00</td></tr>
+        <tr><td>OpenRouter</td><td class="num"><b>$1.82/day</b>, $110.75 left, <b>~61 days</b></td><td class="num">$1.80/day, ~62 days</td></tr>
+        <tr><td>Apify</td><td class="num"><b>$0 spent</b>, $10 left, <b>$0 spendable</b></td><td class="num">$0 spent, $0 spendable</td></tr>
+        <tr><td>Brave</td><td class="num">$0, both keys at their cap, never called</td><td class="num">$0, both keys at their cap</td></tr>
+        <tr><td>Per recovered lead</td><td class="num">not measurable (2 leads, no spend)</td><td class="num">not measurable</td></tr>
+        <tr><td>Per enriched lead</td><td class="num">$0.91 on 2 leads (meaningless, see below)</td><td class="num">$0.898 on 2 leads</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <p class="muted" style="margin-top:12px">The per-enriched-lead figure charges every dollar on the OpenRouter account to enrichment, so on a two-lead day it just divides the account's fixed daily traffic by two. Read the <b>$1.82 a day</b> instead, which is the quiet-pipeline baseline and is holding steady now that the research queue is empty. Nothing needs topping up.</p>
+
+  <h2>The cycle in numbers</h2>
+
+  <div class="card">
+    <div class="tablewrap">
+      <table>
+        <tr><th>Measure</th><th>Value</th><th>Note</th></tr>
+        <tr><td>Parked pool</td><td class="num">7,591</td><td>From 7,589. <b>+2</b>, matching Friday</td></tr>
+        <tr><td>Of which already emailed</td><td class="num">548</td><td><code>sent_to_smartlead</code>. Cumulative to date</td></tr>
+        <tr><td><b>Left to write</b></td><td class="num"><b>7,033</b></td><td>The real inventory. ~9 weeks at the current ramp</td></tr>
+        <tr><td>Waiting pool (<code>needs_contact</code>)</td><td class="num">3,513</td><td>From 3,515. The two that flipped</td></tr>
+        <tr><td>Shelf researched</td><td class="num">7,581 of 7,591</td><td><b>99.9%</b>. Ten leads have no bundle</td></tr>
+        <tr><td>Emails loaded into SmartLead</td><td class="num">0</td><td>No plan. Saturday is not a sending day</td></tr>
+        <tr><td>Free collect passes</td><td class="num">4</td><td>150 leads each, lap 7 of a 2,522 book</td></tr>
+        <tr><td>Contact points found</td><td class="num">18</td><td>Across 13 leads. 211 in the prior 7 days</td></tr>
+        <tr><td>Addresses found</td><td class="num">2</td><td>On <b>2 people</b>. Both verified, both flipped</td></tr>
+        <tr><td>Leads with no website to read</td><td class="num">9 of 573</td><td><b>1.6%</b>. Healthy; bar is roughly 15%</td></tr>
+        <tr><td>Enrichment batches</td><td class="num">1</td><td>2 leads done, 0 failed, 0 in flight</td></tr>
+        <tr><td>Paid recovery batches</td><td class="num">0</td><td>Allowance spent on 10-01. Resets 31 October</td></tr>
+        <tr><td>Campaign sessions</td><td class="num">0</td><td>Discovery paused since 09-08, as ordered</td></tr>
+        <tr><td>New channels found</td><td class="num">0</td><td>Same</td></tr>
+        <tr><td>Faults and halts</td><td class="num">0</td><td>No fatal signatures, no halt flag, no crashes</td></tr>
+        <tr><td>Stranded in the collect book</td><td class="num">3</td><td>Held for the 21st day. No selector gap</td></tr>
+        <tr><td>YouTube keys working</td><td class="num">15 of 66</td><td>Settled. Quota was cut on 50 projects</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <h2>Recommended next, ranked</h2>
+
+  <ol class="recs">
+    <li><b>Decide what October's recovery budget is.</b> Unchanged at number one, and nothing this cycle moved it. It is still the only decision that changes how many leads exist. The $100 Apify allowance went in two days and bought 472 leads at thirteen cents each. The free pass has now found two leads on each of two consecutive days and is on its seventh walk of the same book. Doing nothing is a real answer: it means the 7,033 left to write shrinks by roughly 800 a week with almost nothing refilling it until 1 November.</li>
+    <li><b>Watch Monday's push, and the snapshot will tell you.</b> Yesterday this was "go and run <code>systemctl status</code> by hand". Tuesday's debrief will carry <code>unit_state</code> and <code>unit_last_result</code> directly, so a one-line read settles it. Expected: the push finishes in minutes instead of being killed at the hour, and <code>TimeoutStartSec</code> never becomes a question again. If it is killed anyway, the cause is not slowness and the unit itself is next.</li>
+    <li><b>Unblock a few Siege offers.</b> Nine of sixteen, same named reasons for seven debriefs: a missing subject in Notion, zero follow-up bodies, a missing batch writer, an email type absent from the database vocabulary, one gated on an unrecorded video, one importing a path from the old Mac. With 7,033 researched leads, 36 inboxes and a 200-a-day ramp, variety of message is the live constraint and supply of people is not.</li>
+    <li><b>Decide the discovery pause.</b> Eleventh debrief carrying it, and the case has not weakened. The work the pause was meant to fund, enriching what we already have, finished two days ago at 99.9%.</li>
+    <li><b>Raise the Brave Search cap or add a key.</b> Under $3, still cheap, still not urgent. It cost nothing again and the keys were not even called this cycle, because the leads being walked already have stored websites. It becomes a real limit only when the cursor re-enters the part of the book without them.</li>
+    <li><b>Eventually, close the other 62 pool leaks.</b> Thirty wasted seconds per run each. Nothing else runs inside a timed loop, so nothing else is costing a send, and this stays on the list so it gets scheduled rather than rediscovered as a mystery. The pattern to copy is <code>src/db/cli-exit.ts</code>.</li>
+  </ol>
+
+  <div class="foot">
+    <b>What changed in how to read this pipeline.</b> Two numbers were replaced today, both in the direction of less flattering and more useful. The parked pool is not the inventory: <b>7,033</b> is, because 548 of the shelf has already been emailed and that gap only grows. And a send-free day is no longer one shape in the report: a weekend now says so in words, while a sending day that produced no plan says that instead, loudly. The pattern across the last four cycles is the same one each time. The pipeline keeps working; what keeps needing repair is the instrument reading it, because a number that is wrong in a comforting direction survives much longer than one that breaks something.
+  </div>
+
+  <p class="muted" style="margin-top:26px">Cycle window 2026-10-03T07:00Z to 2026-10-04T07:00Z (Saturday 2026-10-03 Pacific). Grounded metrics: <code>youtube-outreach-orchestrator-v1/logs/autopilot-debrief-2026-10-04.json</code>. Companion: <a href="lead-run-2026-10-04-analysis.md">lead-run-2026-10-04-analysis.md</a>. Six debriefs are still owed and have grounded metrics on disk: 09-19, 09-18, 09-17, 08-18, 08-17, 07-11.</p>
+
+</div>
+</html>
