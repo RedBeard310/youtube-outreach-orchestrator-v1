@@ -1,2 +1,24 @@
-migration freeze: the old database -> Postgres cutover in progress (2026-08-12T07:49:20Z)
-Remove this file to resume: rm scripts/backfill/halt.flag
+THIS FILE IS INERT. IT HALTS NOTHING. (corrected 2026-10-05)
+
+Nothing in the pipeline reads this path. The enrichment chain reads its halt flag
+at logs/backfill-2026-07/halt.flag, and scripts/backfill/chain.sh deliberately
+warns about this file rather than honouring it, because honouring it would stop
+enrichment the moment that code deployed.
+
+What it used to say, and why that was worse than saying nothing:
+
+  migration freeze: the old database -> Postgres cutover in progress (2026-08-12...)
+  Remove this file to resume: rm scripts/backfill/halt.flag
+
+Both lines were false by the time anyone read them. The Postgres cutover finished
+on 2026-08-12, and removing this file resumes nothing because nothing is stopped.
+A reader who found it would conclude enrichment had been frozen for weeks.
+
+TO ACTUALLY STOP ENRICHMENT:
+  touch /home/casey/repos/youtube-outreach-orchestrator-v1/logs/backfill-2026-07/halt.flag
+
+TO ACTUALLY STOP THE AUTOPILOT CAMPAIGN LOOP:
+  touch /home/casey/repos/youtube-outreach-orchestrator-v1/logs/autopilot-halt.flag
+
+Kept rather than deleted so chain.sh's warning stays exercised against a real
+file. Safe to delete.

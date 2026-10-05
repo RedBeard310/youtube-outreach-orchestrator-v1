@@ -226,8 +226,23 @@ while true; do
   # would reach for exactly that path. Warn rather than honour it: a tracked
   # scripts/backfill/halt.flag from the 2026-08-12 migration freeze is still on
   # disk, and treating that as live would halt enrichment the moment this deploys.
+  #
+  # ONCE A DAY, NOT EVERY PASS (2026-10-05). The loop turns every 30 minutes, so this
+  # note was writing 48 lines a cycle into a log whose real content on a quiet day is
+  # three lines: one batch launched, one finished, one idle. 48 of 51 lines saying
+  # "nothing is halted" is how a log stops being read, and this is the only place an
+  # enrichment failure would show up. Keep the warning (the wrong path is still the one
+  # somebody would reach for) and keep it discoverable in any day's tail, but stop it
+  # drowning the signal. The stamp lives beside the real halt flag so a restart does not
+  # reset it, and a missing or unreadable stamp means "warn", never "stay quiet".
   if [ -f "$(dirname "$0")/halt.flag" ]; then
-    log "note: $(dirname "$0")/halt.flag exists and is NOT the halt flag — the chain reads $HALT. Nothing is halted."
+    decoy_stamp="$DIR/.decoy-halt-flag-warned"
+    decoy_last="$(cat "$decoy_stamp" 2>/dev/null || echo 0)"
+    case "$decoy_last" in ''|*[!0-9]*) decoy_last=0 ;; esac
+    if [ "$(( $(date +%s) - decoy_last ))" -ge 86400 ]; then
+      log "note: $(dirname "$0")/halt.flag exists and is NOT the halt flag — the chain reads $HALT. Nothing is halted. (said once a day)"
+      date +%s >"$decoy_stamp" 2>/dev/null || true
+    fi
   fi
 
   # Orphan sweep (2026-08-08): a killed batch strands npm-exec'd enrichment
