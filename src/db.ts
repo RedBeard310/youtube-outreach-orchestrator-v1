@@ -380,7 +380,21 @@ export async function countSentBetween(
 // only ever counted by hand. `bundled` is the honest measure of whether enrichment has
 // work left; `ready_to_write` is what `npm run send` could fire today if the lane it
 // draws from were opened to approved_hold.
-export async function countShelf(): Promise<{ ready_to_write: number; bundled: number; total: number }> {
+//
+// `already_sent` added 2026-10-05. Sending an email does NOT move a lead out of
+// `approved_hold`, so `total` counts people who have already been written to, and the
+// gap widens by every email the send path pushes. On 2026-10-04 it was 548 of 7,591 and
+// had to be reconstructed with a hand-written SQL query to find that out — while the
+// only lane still adding leads was contributing one or two a day. A 200/day ramp across
+// four delivery days eats about 800 a week, so the headline figure and the real
+// inventory diverge faster than the inventory grows. Counted here so no report has to
+// ask: `ready_to_write` is the inventory, `total` is the label.
+export async function countShelf(): Promise<{
+  ready_to_write: number;
+  bundled: number;
+  already_sent: number;
+  total: number;
+}> {
   const base = getBase();
   const rows = await withRetry(
     () => base(tableName()).select({
@@ -391,10 +405,12 @@ export async function countShelf(): Promise<{ ready_to_write: number; bundled: n
   );
   let ready = 0;
   let bundled = 0;
+  let sent = 0;
   for (const r of rows) {
     const status = r.get('outreach_status') as string | undefined;
     if (status === 'ready_data_scraped' || status === 'enriched') ready += 1;
+    if (status === 'sent_to_smartlead') sent += 1;
     if ((r.get('enrichment_bundle_path') as string | undefined)?.trim()) bundled += 1;
   }
-  return { ready_to_write: ready, bundled, total: rows.length };
+  return { ready_to_write: ready, bundled, already_sent: sent, total: rows.length };
 }

@@ -2048,8 +2048,18 @@ async function main(): Promise<void> {
     shelf: {
       ready_to_write: shelf?.ready_to_write ?? null,
       bundled: shelf?.bundled ?? null,
+      already_sent: shelf?.already_sent ?? null,
       approved_hold_total: shelf?.total ?? null,
       bundled_pct: shelf && shelf.total > 0 ? Math.round((1000 * shelf.bundled) / shelf.total) / 10 : null,
+      note:
+        'READ ready_to_write AS THE INVENTORY, NOT approved_hold_total. A sent lead stays ' +
+        'in approved_hold, so the total also counts already_sent people who have been ' +
+        'written to and must never be written to again. On 2026-10-04 that was 548 of ' +
+        '7,591, found only by a hand-written query. The two figures diverge by every email ' +
+        'the send path pushes (roughly 800 a week at the 200/day ramp across four delivery ' +
+        'days) while the recovery lane adds one or two a day, so quoting the total overstates ' +
+        'the weeks of email in the bank and the overstatement grows. bundled_pct measures ' +
+        'enrichment against the same total on purpose: a sent lead was enriched too.',
     },
     discovered_today: {
       total: discovered.length,
