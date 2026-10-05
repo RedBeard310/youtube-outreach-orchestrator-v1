@@ -2086,13 +2086,14 @@ async function main(): Promise<void> {
         'the wrong denominator for addresses (it read 12 that day). ' +
         'A lap is one full walk of collect_book_pool; past lap 1 most leads are re-walks, so a ' +
         'low yield at a high lap count is a picked-over book rather than a fault, so read it ' +
-        'READ site_resolution BEFORE blaming a picked-over book: it describes the newest ' +
+        'against free_contact_points_prev_7d. ' +
+        'READ site_resolution BEFORE BLAMING A PICKED-OVER BOOK: it describes the newest ' +
         'completed collect pass, nine of thirteen collection methods need the creator website ' +
         'first, and collapsed:true means the lane had almost no input that pass whatever the ' +
         "book's state. brave_refusals>0 names a spent search plan; collapsed with 0 refusals is " +
         'either a resolution fault or a genuinely site-less slice, and the per-pass "Brave ' +
         'website resolution:" line in the collect log says which. ' +
-        'against free_contact_points_prev_7d. A climbing collect_book_stranded is the real fault ' +
+        'A climbing collect_book_stranded is the real fault ' +
         'signal (a selector gap has reopened). Emails here are unverified: the verify pass ' +
         'decides which ones flip to approved_hold.',
     },
