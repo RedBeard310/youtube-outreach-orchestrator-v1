@@ -17,7 +17,13 @@ import {
   type Lead,
 } from '../../src/db.ts';
 import { discoveryReportKey } from '../../src/discovery-method.ts';
-import { collectBookDepth, collectYieldBetween, loadState } from '../../src/recovery/bloodhound-lane.ts';
+import {
+  collectBookDepth,
+  collectPassAttribution,
+  collectPasses,
+  collectYieldBetween,
+  loadState,
+} from '../../src/recovery/bloodhound-lane.ts';
 import { summarizeToday, pacificDate } from './burn-ledger.js';
 
 const REPO = '/home/casey/repos/youtube-outreach-orchestrator-v1';
@@ -1844,6 +1850,46 @@ async function main(): Promise<void> {
   const laneBook = await collectBookDepth().catch(() => null);
   const laneState = loadState(join(LOGS, 'bloodhound-lane-state.json'));
 
+  // SITE RESOLUTION, THE LANE'S ONE LOAD-BEARING INPUT, WAS NOT IN THIS FILE (2026-10-05).
+  //
+  // Nine of thirteen collection methods need the creator's own website first, so the
+  // no-site rate decides the pass yield, which decides parking, which while discovery is
+  // paused is the whole output of the pipeline. The hourly check-in has measured it since
+  // 09-04 and alarmed on it correctly — it fired three times across the 10-04 cycle, once
+  // per pass, as the rate went 4%, 85%, 91%, 90%. None of that reached the snapshot the
+  // debrief is written FROM. `fatal_signatures_today` stays empty because these are
+  // observations, not fatals, so a reader working only from this file saw a quiet +1 day
+  // and nothing else. The rate had to be hand-counted out of the collect log two cycles
+  // running, which is exactly the manual step the 09-04 incident was supposed to end.
+  //
+  // Read with the SAME function the alarm uses, not a private copy of the parse. Three
+  // separate re-implementations of this pass boundary have now gone wrong (09-13, 09-22,
+  // 09-28), and a fourth here would be the worst place for it: it would let the report
+  // and the alarm disagree about the same pass.
+  const laneSite = (() => {
+    try {
+      const text = readFileSync(join(LOGS, 'bloodhound-collect.log'), 'utf8');
+      const att = collectPassAttribution(text);
+      if (!att) return null;
+      const passes = collectPasses(text);
+      return {
+        no_site_pct: att.noSitePct,
+        no_site: att.noSite,
+        sampled: att.sampled,
+        rewalk_pct: att.rewalkPct,
+        brave_refusals: att.braveRefusals,
+        leads_after_refusal: att.leadsAfterRefusal,
+        resolved_sampled: att.resolvedSampled,
+        resolved_hit: att.resolvedHit,
+        // The alarm's own threshold, so the report never invents a second bar.
+        collapsed: att.noSitePct >= Number(process.env.AUTOPILOT_NO_SITE_ALARM_PCT ?? 70),
+        pass_summary: passes.length > 0 ? passes[passes.length - 1]!.summary : null,
+      };
+    } catch {
+      return null;
+    }
+  })();
+
   // Close the window at the cycle end too. The query is open-ended, so every row the
   // sweeps write between midnight PT and whenever this actually runs used to land in
   // "today" — and the debrief is written FROM these numbers, so a rerun silently
@@ -2026,6 +2072,7 @@ async function main(): Promise<void> {
       collect_laps: laneState.collectLaps ?? null,
       last_collect_at: laneState.lastCollectAt ?? null,
       last_verify_at: laneState.lastVerifyAt ?? null,
+      site_resolution: laneSite,
       note:
         'Contact points written in the cycle, from leads.contact_points.created_at. ' +
         'READ THE free_* FIELDS AS THIS LANE: the totals also contain the paid Apify ' +
@@ -2039,6 +2086,12 @@ async function main(): Promise<void> {
         'the wrong denominator for addresses (it read 12 that day). ' +
         'A lap is one full walk of collect_book_pool; past lap 1 most leads are re-walks, so a ' +
         'low yield at a high lap count is a picked-over book rather than a fault, so read it ' +
+        'READ site_resolution BEFORE blaming a picked-over book: it describes the newest ' +
+        'completed collect pass, nine of thirteen collection methods need the creator website ' +
+        'first, and collapsed:true means the lane had almost no input that pass whatever the ' +
+        "book's state. brave_refusals>0 names a spent search plan; collapsed with 0 refusals is " +
+        'either a resolution fault or a genuinely site-less slice, and the per-pass "Brave ' +
+        'website resolution:" line in the collect log says which. ' +
         'against free_contact_points_prev_7d. A climbing collect_book_stranded is the real fault ' +
         'signal (a selector gap has reopened). Emails here are unverified: the verify pass ' +
         'decides which ones flip to approved_hold.',
