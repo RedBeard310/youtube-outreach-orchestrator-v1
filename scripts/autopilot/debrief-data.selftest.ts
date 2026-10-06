@@ -1,4 +1,4 @@
-import { apifyBatchFacts, apifyLedgerLine, classifyKeyProbe, cyclePacificDay, enrichmentChainFacts, isSendingDay, projectRecoveryBudget, MAX_MISSING_DEBRIEFS, missingDebriefs, pushRunVerdict, sendPlanHealth, siegePlanFacts, summarizeSendLines, isVerifiedOrBeyond, laneYield, priorAdvanceSource, priorSeedsAdvanced, priorSeedsWalked, reconcileAdvanced, sessionSeedsAdvanced, sessionStartMs, walkRateTrend } from './debrief-data.ts';
+import { apifyBatchFacts, apifyLedgerLine, normalizePushReason, siegePushOutcome, classifyKeyProbe, cyclePacificDay, enrichmentChainFacts, isSendingDay, projectRecoveryBudget, MAX_MISSING_DEBRIEFS, missingDebriefs, pushRunVerdict, sendPlanHealth, siegePlanFacts, summarizeSendLines, isVerifiedOrBeyond, laneYield, priorAdvanceSource, priorSeedsAdvanced, priorSeedsWalked, reconcileAdvanced, sessionSeedsAdvanced, sessionStartMs, walkRateTrend } from './debrief-data.ts';
 let fail = 0;
 const ok = (name: string, got: unknown, want: unknown) => {
   const pass = JSON.stringify(got) === JSON.stringify(want);
@@ -423,6 +423,39 @@ ok('a drained allowance affords nothing and prices nothing',
     enrichedInCycle: 133, accountSpendUsd: 19.5239, balanceUsd: 165.28,
   }); return [p.channels_affordable, p.projected_leads, p.openrouter_cost_of_projected_leads_usd]; })(),
   [0, 0, 0]);
+
+// siegePushOutcome — `partial_push` has to say what it dropped and why (2026-10-06).
+const PUSH_LOG = [
+  '[2026-10-05T10:19:43Z]   |   SENT  rec4aKcJEpS5qMJes    a@b.com  smartlead_lead=4687801266',
+  '[2026-10-05T10:21:08Z]   ! listCampaignMailboxes 429 on 4010851: Account rate limit exceeded.',
+  '[2026-10-05T10:21:08Z] ESCALATE siege push did not finish cleanly {"batch_id": "x", "rc": 1, "pushed": 0}',
+  '[2026-10-05T10:23:38Z]   |   FAIL  recLvxmU118ICzpjS    SmartLead did not add the lead (no reason given)',
+  '[2026-10-05T10:23:45Z]   |   FAIL  rec1tBuxupmUrjDI5    SmartLead did not add the lead (no reason given)',
+  '[2026-10-05T10:30:54Z]   |   FAIL  rec65GgJhvRkI5T92    SmartLead add-lead 429 Too Many Requests on campaign 4010801: Account rate limit exceeded.',
+  '[2026-10-05T10:30:54Z] ESCALATE siege could not start a campaign that has leads in it {"campaign": "4010801", "leads": 1, "http": 429}',
+  '[2026-10-05T10:32:33Z]   | Some Channel Name FAIL  236w  fails 2->2->2->2',
+  '[2026-10-06T10:19:43Z]   |   SENT  recNextCycleLeadId9    c@d.com  smartlead_lead=1',
+].join('\n');
+const PUSH = siegePushOutcome(PUSH_LOG, '2026-10-05T07:00:00.000Z', '2026-10-06T07:00:00.000Z');
+ok('counts per-lead sends and failures inside the window only, ignoring a writer\'s own FAIL',
+  [PUSH.sent, PUSH.failed], [1, 3]);
+ok('a batch that escalated having pushed nothing is counted apart from the leads',
+  [PUSH.batches_failed_before_first_lead, PUSH.escalations], [1, 2]);
+ok('identical refusals collapse to one counted reason, campaign id generalised',
+  PUSH.reasons,
+  [{ reason: 'SmartLead did not add the lead (no reason given)', leads: 2 },
+   { reason: 'SmartLead add-lead 429 Too Many Requests on campaign <id>: Account rate limit exceeded.', leads: 1 }]);
+ok('a lead id inside a reason is not kept',
+  normalizePushReason('could not roll back send row recLvxmU118ICzpjS'),
+  'could not roll back send row <lead>');
+ok('a log with nothing in the window reports zeros, not nulls — it was measured',
+  (() => { const p = siegePushOutcome(PUSH_LOG, '2026-10-01T07:00:00.000Z', '2026-10-02T07:00:00.000Z');
+    return [p.log_found, p.sent, p.failed, p.reasons.length]; })(),
+  [true, 0, 0, 0]);
+ok('push_outcome defaults to not-measured so an unreadable log never reads as a clean push',
+  (() => { const h = sendPlanHealth(siegePlanFacts(PLAN_1001), 135, 0, 'success');
+    return [h.push_outcome.log_found, h.push_outcome.sent, h.binding_constraint]; })(),
+  [false, null, 'partial_push']);
 
 console.log(fail === 0 ? '\nALL PASS' : `\n${fail} FAILED`);
 process.exit(fail === 0 ? 0 : 1);

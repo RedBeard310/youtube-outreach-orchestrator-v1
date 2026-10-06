@@ -176,6 +176,38 @@ export function isSendingDay(calendar: string | null, pacificDay: string): boole
   return false;
 }
 
+/** What the push itself said about the leads it dropped.
+ *
+ *  WHY (2026-10-06). `binding_constraint: partial_push` names a shortfall and stops
+ *  there. On 2026-10-05 it covered 60 unpushed emails of a 129 plan, and the snapshot
+ *  could not say whether that was 60 leads SmartLead declined, a batch that died before
+ *  its first lead, or a crash. Answering it took reading automator's siege log by hand
+ *  and counting, which is the manual step every one of the last four debriefs has been
+ *  about removing. The answer mattered: 53 leads were refused per-lead and 3 whole
+ *  batches died at the top, which are different faults with different fixes.
+ *
+ *  `reasons` is the refusal text SmartLead or the push gave, trimmed to its shape and
+ *  counted, most common first. It carries no addresses: the push prints the reason after
+ *  the lead id, and only the reason is kept. */
+export type SiegePushOutcome = {
+  log_found: boolean;
+  sent: number | null;
+  failed: number | null;
+  /** Batches that exited non-zero having pushed nothing, so their leads were never tried. */
+  batches_failed_before_first_lead: number | null;
+  escalations: number | null;
+  reasons: Array<{ reason: string; leads: number }>;
+};
+
+export const NO_PUSH_OUTCOME: SiegePushOutcome = {
+  log_found: false,
+  sent: null,
+  failed: null,
+  batches_failed_before_first_lead: null,
+  escalations: null,
+  reasons: [],
+};
+
 export type SendPlanHealth = SiegePlanFacts & SiegeUnitFacts & {
   sent_in_cycle: number | null;
   sent_by_this_repo: number | null;
@@ -184,6 +216,7 @@ export type SendPlanHealth = SiegePlanFacts & SiegeUnitFacts & {
   approval_pending: boolean | null;
   push_unit_result: string | null;
   binding_constraint: string | null;
+  push_outcome: SiegePushOutcome;
   note: string;
 };
 
@@ -229,6 +262,7 @@ export function sendPlanHealth(
   sentByThisRepo: number | null,
   pushUnitResult: string | null = null,
   unit: SiegeUnitFacts = NO_UNIT,
+  pushOutcome: SiegePushOutcome = NO_PUSH_OUTCOME,
 ): SendPlanHealth {
   const elsewhere = sentInCycle === null || sentByThisRepo === null
     ? null
@@ -274,6 +308,7 @@ export function sendPlanHealth(
     approval_pending: approvalPending,
     push_unit_result: pushUnitResult,
     binding_constraint: binding,
+    push_outcome: pushOutcome,
     note:
       "Siege's own plan for this cycle, read from automator/state/siege/<day>/plan.json. " +
       'Casey gave Siege standing approval on 2026-09-30, so approval_pending:true now means ' +
@@ -301,8 +336,86 @@ export function sendPlanHealth(
       'unit_last_started describe siege-plan.service\'s MOST RECENT run whenever it ' +
       'happened, which on a weekend is a weekday two days back — unlike ' +
       'push_unit_result, which is null unless that run was inside this cycle. A unit_state ' +
-      'of failed left over from a prior cycle does not block the next timer firing.',
+      'of failed left over from a prior cycle does not block the next timer firing. ' +
+      'READ push_outcome BEFORE CALLING partial_push A SOFT SHORTFALL: it carries the ' +
+      "push's own tally of what it dropped and why. On 2026-10-05, 53 of 129 planned " +
+      'emails were refused per-lead and 3 whole batches died at listCampaignMailboxes ' +
+      'before their first lead, all to one cause: SmartLead meters the ACCOUNT at 200 ' +
+      'requests a minute and the reply poller (71 campaigns every ~2 minutes) was ' +
+      'spending most of that window alongside the push. Nothing retried. Fixed in ' +
+      'youtube-email-outreach-v1 eedbbff87. A `reasons` entry naming a 429 means that is ' +
+      'happening again past the retries; a `no reason given` entry means SmartLead ' +
+      'answered 200 and imported nothing, and the same commit now prints its whole reply ' +
+      'so the next cycle can name it.',
   };
+}
+
+/** Parse the push's own log lines for one cycle. Pure, so the selftest can drive it.
+ *
+ *  Reads only lines the push prints itself. `SENT` and `FAIL` are per-lead; an
+ *  ESCALATE naming `pushed: 0` is a batch that never reached a lead at all, which is the
+ *  shape that loses leads silently — they appear in neither tally. */
+export function siegePushOutcome(log: string, sinceISO: string, untilISO: string): SiegePushOutcome {
+  const since = Date.parse(sinceISO);
+  const until = Date.parse(untilISO);
+  let sent = 0;
+  let failed = 0;
+  let deadBatches = 0;
+  let escalations = 0;
+  const reasons = new Map<string, number>();
+
+  for (const line of log.split('\n')) {
+    const stamp = /^\[(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ)\]/.exec(line);
+    if (!stamp) continue;
+    const t = Date.parse(stamp[1]!);
+    if (!Number.isFinite(t) || t < since || t >= until) continue;
+
+    // Both tallies require the lead id the push prints after the verdict. Without it this
+    // also catches lines from the batch WRITERS, which print their own FAIL for a lead whose
+    // copy failed validation (`| <channel> FAIL 236w fails 2->2->2->2` on 10-05). That lead
+    // was never pushed, so counting it here would overstate the push's losses by one and
+    // invent a reason that has nothing to do with SmartLead.
+    if (/\bSENT\s+rec[A-Za-z0-9]{8,}/.test(line)) { sent++; continue; }
+    const fail = /\bFAIL\s+rec[A-Za-z0-9]{8,}\s+(.*)$/.exec(line);
+    if (fail) {
+      failed++;
+      const reason = normalizePushReason(fail[1]!);
+      reasons.set(reason, (reasons.get(reason) ?? 0) + 1);
+      continue;
+    }
+    if (line.includes('ESCALATE')) {
+      escalations++;
+      // The driver prints its own JSON payload; "pushed": 0 is the batch that moved nothing.
+      if (/"pushed":\s*0\b/.test(line)) deadBatches++;
+    }
+  }
+
+  return {
+    log_found: true,
+    sent,
+    failed,
+    batches_failed_before_first_lead: deadBatches,
+    escalations,
+    reasons: [...reasons.entries()]
+      .map(([reason, leads]) => ({ reason, leads }))
+      .sort((a, b) => b.leads - a.leads || a.reason.localeCompare(b.reason))
+      // Enough to see the shape of a bad day without pasting a log into the snapshot.
+      .slice(0, 6),
+  };
+}
+
+/** One refusal, reduced to its shape so two of the same thing count as two.
+ *
+ *  Campaign ids, lead ids and quoted bodies vary per lead and would each become their own
+ *  "reason", turning 53 identical refusals into 53 rows. Trimmed hard for the same reason
+ *  the snapshot carries counts rather than a log. */
+export function normalizePushReason(raw: string): string {
+  return raw
+    .trim()
+    .replace(/\bon campaign \d+/g, 'on campaign <id>')
+    .replace(/\brec[A-Za-z0-9]{10,}/g, '<lead>')
+    .replace(/\s+/g, ' ')
+    .slice(0, 120);
 }
 
 // The PT day the cycle covers. The debrief fires ~00:20 PT and reports the 24h that
@@ -320,6 +433,23 @@ function readSiegePlan(day: string): SiegePlanFacts {
     return siegePlanFacts(JSON.parse(readFileSync(f, 'utf8')));
   } catch {
     return NO_PLAN;
+  }
+}
+
+// Same rule as readSiegePlan: filesystem only, no automator import, and a missing or
+// unreadable log degrades to "not measured" rather than to zeros. The log is append-only
+// and grows across months, so only the tail is read — one cycle cannot be more than a few
+// thousand lines and reading the whole file would get slower every day.
+function readSiegePushOutcome(sinceISO: string, untilISO: string): SiegePushOutcome {
+  const f = join(AUTOMATOR_REPO, 'logs', 'siege.log');
+  if (!existsSync(f)) return NO_PUSH_OUTCOME;
+  try {
+    const whole = readFileSync(f, 'utf8');
+    const lines = whole.split('\n');
+    const tail = lines.slice(Math.max(0, lines.length - 20000)).join('\n');
+    return siegePushOutcome(tail, sinceISO, untilISO);
+  } catch {
+    return NO_PUSH_OUTCOME;
   }
 }
 
@@ -1967,6 +2097,7 @@ async function main(): Promise<void> {
     sendLog.sent_sum,
     siegeUnitVerdict(siegeUnit, sinceISO, untilISO),
     siegeUnit,
+    readSiegePushOutcome(sinceISO, untilISO),
   );
 
   // Supply-health — surface the persistent term-supply outage the finder can't self-heal.
