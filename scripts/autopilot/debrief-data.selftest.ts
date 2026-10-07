@@ -448,6 +448,25 @@ ok('identical refusals collapse to one counted reason, campaign id generalised',
 ok('a lead id inside a reason is not kept',
   normalizePushReason('could not roll back send row recLvxmU118ICzpjS'),
   'could not roll back send row <lead>');
+// 2026-10-07: the 120-char cap landed 4 characters before the only field that answered the
+// question, so 106 dropped emails read as unexplained. A quoted reply keeps what it set.
+ok('a quoted SmartLead reply keeps the field it actually set',
+  normalizePushReason('SmartLead did not add the lead (no reason given; its whole reply was ' +
+    '{"ok":true,"upload_count":1,"total_leads":0,"skipped_in_other_campaign_count":1,' +
+    '"block_count":0,"duplicate_count":0,"invalid_email_count":0,"invalid_emails":[],' +
+    '"already_added_to_campaign":0,"unsubscribed_leads":[],"is_lead_limit_exhausted":false,' +
+    '"lead_import_stopped_count":0,"bounce_count":0})'),
+  'SmartLead did not add the lead (no reason given; its whole reply was ' +
+    'skipped_in_other_campaign_count=1)');
+ok('a reply that set nothing says so instead of pasting zeros',
+  normalizePushReason('refused; reply was {"ok":true,"upload_count":1,"total_leads":0}'),
+  'refused; reply was nothing set');
+ok('a reason with no quoted object is left alone',
+  normalizePushReason('SmartLead did not add the lead (skipped_in_other_campaign_count=1)'),
+  'SmartLead did not add the lead (skipped_in_other_campaign_count=1)');
+ok('a truncated body is left exactly as logged rather than guessed at',
+  normalizePushReason('reply was {"ok":true,"total_leads":0,"skippe'),
+  'reply was {"ok":true,"total_leads":0,"skippe');
 ok('a log with nothing in the window reports zeros, not nulls — it was measured',
   (() => { const p = siegePushOutcome(PUSH_LOG, '2026-10-01T07:00:00.000Z', '2026-10-02T07:00:00.000Z');
     return [p.log_found, p.sent, p.failed, p.reasons.length]; })(),

@@ -344,9 +344,19 @@ export function sendPlanHealth(
       'requests a minute and the reply poller (71 campaigns every ~2 minutes) was ' +
       'spending most of that window alongside the push. Nothing retried. Fixed in ' +
       'youtube-email-outreach-v1 eedbbff87. A `reasons` entry naming a 429 means that is ' +
-      'happening again past the retries; a `no reason given` entry means SmartLead ' +
-      'answered 200 and imported nothing, and the same commit now prints its whole reply ' +
-      'so the next cycle can name it.',
+      'happening again past the retries. EVERY OTHER REFUSAL NAMES ITS OWN COUNTER NOW, ' +
+      'so read the counter and do not reach for the rate limit a second time: on ' +
+      '2026-10-06 all 106 dropped emails were `skipped_in_other_campaign_count=1` and not ' +
+      'one 429 fired, yet they logged "no reason given" because the counter was missing ' +
+      'from a hand-kept list, and the shortfall was blamed on the rate limit for a whole ' +
+      'cycle. The cause was Siege finally sending ' +
+      'ignore_duplicate_leads_in_other_campaign:true (it had been dropped in transit until ' +
+      '10-03), so SmartLead skipped every repeat person; Casey set it false in becf7fd1a. ' +
+      'The reason is now read off SmartLead\'s own reply rather than matched against a ' +
+      'list (src/smartlead/add-lead-outcome.ts), and a quoted reply here is condensed to ' +
+      'the fields it set so the answer cannot fall off the end of the 120-character cap. ' +
+      'A `no counter set` entry is the one remaining unexplained shape: SmartLead answered ' +
+      '200, imported nothing, and set nothing.',
   };
 }
 
@@ -410,12 +420,54 @@ export function siegePushOutcome(log: string, sinceISO: string, untilISO: string
  *  "reason", turning 53 identical refusals into 53 rows. Trimmed hard for the same reason
  *  the snapshot carries counts rather than a log. */
 export function normalizePushReason(raw: string): string {
-  return raw
-    .trim()
+  return condenseQuotedReply(raw.trim())
     .replace(/\bon campaign \d+/g, 'on campaign <id>')
     .replace(/\brec[A-Za-z0-9]{10,}/g, '<lead>')
     .replace(/\s+/g, ' ')
     .slice(0, 120);
+}
+
+// Fields in a SmartLead add-lead reply that say what it DID, so never a refusal reason.
+const REPLY_OUTCOME_KEYS = ['ok', 'upload_count', 'total_leads'];
+
+function replyFieldIsSet(v: unknown): boolean {
+  if (v === undefined || v === null || v === false || v === '') return false;
+  if (typeof v === 'number') return v !== 0;
+  if (Array.isArray(v)) return v.length > 0;
+  if (typeof v === 'object') return Object.keys(v as object).length > 0;
+  return true;
+}
+
+/** A refusal that quotes a whole JSON reply loses its answer to the 120-character cap.
+ *
+ *  WHY (2026-10-07). Every one of the 106 emails the 10-06 push dropped was refused with
+ *  `skipped_in_other_campaign_count: 1`, and SmartLead's reply said so in full. But the
+ *  reason text read `...(no reason given; its whole reply was {"ok":true,"upload_count":1,`
+ *  `"total_leads":0,"skippe` — the cap landed four characters before the only field that
+ *  mattered, so the authoritative snapshot reported the day's whole shortfall as
+ *  unexplained and the key had to be dug out of automator's log by hand.
+ *
+ *  Keeping the answer is not a matter of a longer cap: the useful field can sit anywhere
+ *  in a reply SmartLead is free to grow. So a quoted object is replaced by the fields it
+ *  actually set, which is both shorter than the body and the whole diagnosis. The source
+ *  side now names the counter itself (youtube-email-outreach-v1 src/smartlead/
+ *  add-lead-outcome.ts), and this stands behind it for older log lines and for any other
+ *  caller that quotes a body. */
+function condenseQuotedReply(text: string): string {
+  const open = text.indexOf('{');
+  const close = text.lastIndexOf('}');
+  if (open === -1 || close <= open) return text;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text.slice(open, close + 1));
+  } catch {
+    return text; // Truncated or not JSON at all — leave it exactly as logged.
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return text;
+  const set = Object.entries(parsed as Record<string, unknown>)
+    .filter(([k, v]) => !REPLY_OUTCOME_KEYS.includes(k) && replyFieldIsSet(v))
+    .map(([k, v]) => `${k}=${JSON.stringify(v)}`);
+  return text.slice(0, open) + (set.length > 0 ? set.join(' ') : 'nothing set') + text.slice(close + 1);
 }
 
 // The PT day the cycle covers. The debrief fires ~00:20 PT and reports the 24h that
