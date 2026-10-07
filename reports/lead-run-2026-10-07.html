@@ -1,0 +1,190 @@
+<title>Lead Run Debrief — 2026-10-07</title>
+<style>
+  :root {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+      --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+      --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+    --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+    --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 40px 22px 80px; }
+  .eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); font-weight: 600; }
+  h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.12; margin: 10px 0 6px; text-wrap: balance; letter-spacing: -.02em; }
+  h2 { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); margin: 44px 0 16px; font-weight: 700; }
+  h3 { font-size: 18px; margin: 0 0 6px; letter-spacing: -.01em; }
+  p { margin: 0 0 14px; }
+  .lede { font-size: 18px; color: var(--ink-soft); max-width: 68ch; }
+  .tag { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--amber-soft); color: var(--amber); letter-spacing: .02em; }
+  .tag.good { background: var(--teal-soft); color: var(--teal); }
+  .grid { display: grid; gap: 14px; }
+  .stats { grid-template-columns: repeat(4, 1fr); margin-top: 26px; }
+  @media (max-width: 720px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; box-shadow: var(--shadow); }
+  .stat .n { font-size: 30px; font-weight: 750; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .stat .l { font-size: 12.5px; color: var(--ink-soft); margin-top: 3px; }
+  .stat .s { font-size: 12px; margin-top: 8px; font-weight: 600; }
+  .up { color: var(--good); } .down { color: var(--red); } .warn { color: var(--amber); }
+  .accent-red { border-left: 3px solid var(--red); }
+  .accent-teal { border-left: 3px solid var(--teal); }
+  .accent-amber { border-left: 3px solid var(--amber); }
+
+  /* shape-of-day bar strip */
+  .strip { display: flex; align-items: flex-end; gap: 2px; height: 120px; padding: 14px 14px 10px; overflow-x: auto; }
+  .bar { flex: 1 0 4px; min-width: 3px; border-radius: 2px 2px 0 0; background: var(--teal); opacity: .9; height: 100%; }
+  .bar.zero { background: var(--red); height: 34% !important; opacity: .9; }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-soft); padding: 0 14px 14px; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+
+  .q { border-radius: 14px; padding: 20px 22px; margin-bottom: 14px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); }
+  .q .ask { font-size: 17px; font-weight: 700; color: var(--ink); margin-bottom: 10px; display: flex; gap: 10px; align-items: baseline; }
+  .q .ask .qn { color: var(--red); font-weight: 800; flex: 0 0 auto; }
+  .q p { color: var(--ink-soft); }
+  .q b { color: var(--ink); }
+  .pill { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink); background: var(--panel-2); padding: 1px 7px; border-radius: 6px; border: 1px solid var(--line); white-space: nowrap; }
+  pre { background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; overflow-x: auto; font-size: 12.5px; line-height: 1.5; color: var(--ink); margin: 0 0 14px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+  th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); }
+  td .num { font-variant-numeric: tabular-nums; font-weight: 650; }
+  .fix td:first-child { color: var(--good); font-weight: 650; }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); box-shadow: var(--shadow); }
+  ol.recs { padding-left: 0; list-style: none; counter-reset: r; margin: 0; }
+  ol.recs li { counter-increment: r; position: relative; padding: 14px 16px 14px 52px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 10px; box-shadow: var(--shadow); }
+  ol.recs li::before { content: counter(r); position: absolute; left: 14px; top: 14px; width: 26px; height: 26px; border-radius: 8px; background: var(--teal-soft); color: var(--teal); font-weight: 800; font-size: 14px; display: grid; place-items: center; }
+  ol.recs b { color: var(--ink); }
+  .foot { margin-top: 46px; padding: 16px 18px; border-radius: 12px; background: var(--amber-soft); border: 1px solid var(--line); font-size: 14px; color: var(--ink-soft); }
+  .foot b { color: var(--ink); }
+  .muted { color: var(--ink-soft); font-size: 13.5px; }
+</style>
+
+<div class="wrap">
+
+  <div class="eyebrow">Lead Run Debrief · YouTube outreach</div>
+  <h1>2026-10-07 — SmartLead refused everyone we had already emailed, and said so in a field nobody read</h1>
+  <p class="lede">The push finally walked its whole plan. It attempted all 250 leads in 46 minutes and was never killed, and it still loaded only <b>139</b>. Every missing email had the same cause: SmartLead declined each person who was already sitting in another campaign. <b>Of the 139 it accepted, zero had ever been emailed. Of the 106 it refused, 103 were already marked sent.</b> Not one rate-limit error fired all day.</p>
+  <div style="margin-top:14px"><span class="tag">106 OF 250 REFUSED AS REPEATS</span> <span class="tag good">ROOT CAUSE FIXED 01:16Z</span></div>
+
+  <div class="grid stats">
+    <div class="card stat accent-amber">
+      <div class="n">139</div>
+      <div class="l">emails loaded, against a plan of 250</div>
+      <div class="s warn">up from 69 on 10-05</div>
+    </div>
+    <div class="card stat accent-red">
+      <div class="n">106</div>
+      <div class="l">refused one at a time</div>
+      <div class="s down">all of them <code>skipped_in_other_campaign_count</code></div>
+    </div>
+    <div class="card stat accent-teal">
+      <div class="n">0</div>
+      <div class="l">rate-limit errors</div>
+      <div class="s up">yesterday's wall did not reappear</div>
+    </div>
+    <div class="card stat">
+      <div class="n">6,827</div>
+      <div class="l">people on the shelf, never emailed</div>
+      <div class="s muted">of 7,593 parked, 7,583 enriched</div>
+    </div>
+  </div>
+
+  <h2>The shape of the day</h2>
+  <div class="card" style="padding:0">
+    <div class="strip" id="strip"></div>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--teal)"></span>loaded (139)</span>
+      <span><span class="dot" style="background:var(--red)"></span>refused (106)</span>
+    </div>
+  </div>
+  <p class="muted">Each bar is one lead the push tried, in order, 10:15Z to 11:01Z across 150 batches. The refusals come in blocks because Siege groups the plan by person, and a person is either new to SmartLead or not. They are not a tail collapse: the first half loaded 76 of 122 and the second half loaded 63 of 123. Nothing degraded over the hour. The push just kept meeting people it had already written to.</p>
+
+  <h2>The three questions</h2>
+
+  <div class="q accent-red">
+    <div class="ask"><span class="qn">Q1</span><span>Why did 111 of 250 planned emails not go out?</span></div>
+    <p><b>One cause, and the evidence splits perfectly.</b> SmartLead answered HTTP 200 for every refusal and set exactly one counter: <code>skipped_in_other_campaign_count: 1</code>, on all 106. Checked against our own send history, <span class="pill">103 of the 106 were already <code>sent_to_smartlead</code></span> and <span class="pill">0 of the 139 accepted had ever been emailed</span>. SmartLead was taking first-touch people and declining repeats.</p>
+    <p>It was doing that because we asked it to. Siege sends <code>ignore_duplicate_leads_in_other_campaign</code>, whose name reads backwards: <b>true</b> means skip anyone already in another campaign. Siege has asked for true since it shipped, but the live POST dropped the setting until 2026-10-03, so SmartLead used its own default and second offers went out fine through 10-02. The day the setting started arriving, repeat offers stopped. Casey set it to false at 01:16Z today (<code>becf7fd1a</code>), so the next sending day is the test.</p>
+    <p>Three of the 106 had never been emailed by us and were still refused. That is the only part of today's shortfall still unexplained, and it is 3 leads, so it is a note rather than a hunt.</p>
+  </div>
+
+  <div class="q accent-red">
+    <div class="ask"><span class="qn">Q2</span><span>Why did it take a full cycle to name a reason SmartLead handed us in plain text?</span></div>
+    <p><b>Two layers threw the answer away, one in each repo.</b> SmartLead's reply was complete and readable:</p>
+    <pre>{"ok":true,"upload_count":1,"total_leads":0,"skipped_in_other_campaign_count":1,
+ "block_count":0,"duplicate_count":0,"invalid_email_count":0,"invalid_emails":[],
+ "already_added_to_campaign":0,"unsubscribed_leads":[],"is_lead_limit_exhausted":false,
+ "lead_import_stopped_count":0,"bounce_count":0}</pre>
+    <p>The push matched that reply against a <b>hand-written list</b> of refusal counters, and <code>skipped_in_other_campaign_count</code> was not on it, so all 106 logged "no reason given". The grounded snapshot then trimmed the quoted reply to 120 characters, and the cut landed <b>four characters before the key</b>: the authoritative JSON read <code>...,"total_leads":0,"skippe</code>. So yesterday's debrief blamed the SmartLead account rate limit, which did not fire once in this cycle, and the real cause went a day unnamed.</p>
+    <p class="muted">Correction to the 10-06 debrief: the 50 silent refusals it folded into the rate-limit story were this, not the rate limit. The 3 outright 429s that day were real and separate, and the retry work shipped for them still stands.</p>
+  </div>
+
+  <div class="q accent-amber">
+    <div class="ask"><span class="qn">Q3</span><span>Everything else was quiet. Is that the pause working, or the pause running out of work?</span></div>
+    <p><b>The pause has run out of work.</b> Discovery has been off since 09-08 so every resource could go into enriching the leads we already have. That job is finished: <span class="pill">7,583 of 7,593 bundled, 99.9%</span>, and enrichment ran <b>one lead all cycle</b> because there was nothing else to enrich.</p>
+    <p>The recovery lane is in the same place. Its free collect pass is on <b>lap 8</b> of a 2,523-lead book, <span class="pill">99.3% of what it walked was a re-walk</span>, and it produced 11 contact points across 6 people and <b>one email address on one person</b>. That is a picked-over book, not a fault: website resolution was the healthiest it has been, <b>1 no-site in 150</b> against 67.5% two days ago, with zero Brave refusals. Stranded held at 3 for the 24th day. The paid Apify lane added nothing because its month is spent: $10 of the $100 allowance is left and all $10 is the reserve, so <b>$0 is spendable until 31 October</b>.</p>
+    <p>So the parked pool moved <b>7,592 to 7,593</b>. The machine is healthy and has almost nothing left to chew on.</p>
+  </div>
+
+  <h2>What broke → what's fixed</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Issue</th><th>Mechanism</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr class="fix"><td>106 of 250 emails refused as repeats</td><td>Siege sent <code>ignore_duplicate_leads_in_other_campaign: true</code>, which tells SmartLead to skip anyone already in another campaign. It only started reaching SmartLead on 10-03</td><td class="up">Fixed by Casey 01:16Z, <code>becf7fd1a</code>. Next sending day confirms it</td></tr>
+        <tr class="fix"><td>All 106 logged "no reason given"</td><td>The push matched SmartLead's reply against a hand-kept list of counters that did not include the one it used</td><td class="up">Fixed: the reason is read off the reply itself, so an unlisted counter still gets named (<code>src/smartlead/add-lead-outcome.ts</code>, 7 tests)</td></tr>
+        <tr class="fix"><td>The snapshot cut the answer off</td><td>A quoted reply was trimmed to 120 characters and the only useful field sat past the cut</td><td class="up">Fixed: a quoted reply is condensed to the fields it actually set, which is shorter than the body and is the whole diagnosis</td></tr>
+        <tr><td>3 never-emailed leads refused as repeats</td><td>Unknown. SmartLead says they are in another campaign and our records say they have never been written to</td><td class="warn">Open, 3 leads. Likely an address shared with another lead or a hand-added one</td></tr>
+        <tr><td>Enrichment and free recovery have no work left</td><td>99.9% of the shelf is bundled; the collect book is on lap 8 at 99.3% re-walk</td><td class="warn">Open, and not a code problem. It is the discovery pause</td></tr>
+        <tr><td>Apify recovery contributes nothing for 24 days</td><td>$100 monthly allowance spent; the remaining $10 is the untouchable reserve</td><td class="warn">Open. Raising the cap is Casey's spend call</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Recommended next — ranked</h2>
+  <ol class="recs">
+    <li><b>Watch the next sending day prove the duplicate flag.</b> Expect roughly 250 loaded and zero <code>skipped_in_other_campaign_count</code> in the push outcome. This is the biggest volume lever on the board by a wide margin, and it is worth more than the 111 emails it recovers per day: repeat offers are how Siege gets more than one email out of 7,593 people. While the flag was arriving, the whole repeat stream was closed.</li>
+    <li><b>Consider lifting the discovery pause.</b> It was ordered to put every resource into enriching what we have. That is done at 99.9%, enrichment had one lead to do all cycle, and the free recovery book is on its eighth lap. The pause now costs new supply and buys nothing. Casey's call alone, and nothing here has touched it.</li>
+    <li><b>Decide the Apify allowance.</b> $0 spendable until 31 October. At the measured rate the lane recovered 244 leads for $28 in its best month, so the question is whether to raise the monthly cap now or accept 24 quiet days.</li>
+    <li><b>The day cap may no longer be the ceiling worth having.</b> The plan capped at 250 while the live inboxes would have accepted 533. Once repeats flow again, the warmup ramp is the binding constraint rather than the mailboxes, which makes raising it a real lever instead of a theoretical one.</li>
+    <li><b>Six cycles still have metrics on disk and no debrief</b> (09-17, 09-18, 09-19, 08-17, 08-18, 07-11). Backfillable any time at no risk.</li>
+  </ol>
+
+  <div class="foot">
+    <b>Clean-run facts:</b> 0 fatal signatures, 0 halts, 0 crashes. <b>$0.00 Anthropic</b> for the 24th straight cycle. OpenRouter is at $2.47 a day with $104.36 left, about 42 days of runway. The push itself ran 10:15Z to 11:01Z in 46 minutes across 150 batches and was not killed, so the 10-03 pool-leak fix is still holding. 15 of 66 YouTube keys came back working after the midnight reset, which does not matter while discovery is off. This repo's own send path ran once and loaded 1 of 2 attempted. Discovery wrote 0 new channels, which is the pause doing exactly what Casey asked for on 2026-09-08.
+  </div>
+
+</div>
+
+<script>
+  // One bar per lead the push attempted, in log order: 1 = SmartLead took it, 0 = refused.
+  // Counted from automator/logs/siege.log, 2026-10-06T10:15Z to 11:01Z.
+  var seq = [1,1,1,1,1,1,1,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,1,0,0,0,0,0,0,0,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];
+  var strip = document.getElementById('strip');
+  seq.forEach(function (v) {
+    var b = document.createElement('div');
+    b.className = 'bar' + (v === 0 ? ' zero' : '');
+    b.title = v === 1 ? 'loaded' : 'refused: skipped_in_other_campaign_count=1';
+    strip.appendChild(b);
+  });
+</script>
