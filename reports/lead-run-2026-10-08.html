@@ -1,0 +1,195 @@
+<title>Lead Run Debrief — 2026-10-08</title>
+<style>
+  :root {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+      --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+      --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+    --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+    --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 40px 22px 80px; }
+  .eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); font-weight: 600; }
+  h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.12; margin: 10px 0 6px; text-wrap: balance; letter-spacing: -.02em; }
+  h2 { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); margin: 44px 0 16px; font-weight: 700; }
+  h3 { font-size: 18px; margin: 0 0 6px; letter-spacing: -.01em; }
+  p { margin: 0 0 14px; }
+  .lede { font-size: 18px; color: var(--ink-soft); max-width: 68ch; }
+  .tag { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--amber-soft); color: var(--amber); letter-spacing: .02em; }
+  .tag.good { background: var(--teal-soft); color: var(--teal); }
+  .grid { display: grid; gap: 14px; }
+  .stats { grid-template-columns: repeat(4, 1fr); margin-top: 26px; }
+  @media (max-width: 720px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; box-shadow: var(--shadow); }
+  .stat .n { font-size: 30px; font-weight: 750; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .stat .l { font-size: 12.5px; color: var(--ink-soft); margin-top: 3px; }
+  .stat .s { font-size: 12px; margin-top: 8px; font-weight: 600; }
+  .up { color: var(--good); } .down { color: var(--red); } .warn { color: var(--amber); }
+  .accent-red { border-left: 3px solid var(--red); }
+  .accent-teal { border-left: 3px solid var(--teal); }
+  .accent-amber { border-left: 3px solid var(--amber); }
+
+  /* shape-of-day bar strip */
+  .strip { display: flex; align-items: flex-end; gap: 1px; height: 120px; padding: 14px 14px 10px; overflow-x: auto; }
+  .bar { flex: 1 0 3px; min-width: 2px; border-radius: 2px 2px 0 0; background: var(--teal); opacity: .9; }
+  .bar.zero { background: var(--line); height: 4% !important; opacity: .8; }
+  .bar.dead { background: var(--red); height: 8% !important; opacity: .55; }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-soft); padding: 0 14px 14px; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+
+  .q { border-radius: 14px; padding: 20px 22px; margin-bottom: 14px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); }
+  .q .ask { font-size: 17px; font-weight: 700; color: var(--ink); margin-bottom: 10px; display: flex; gap: 10px; align-items: baseline; }
+  .q .ask .qn { color: var(--red); font-weight: 800; flex: 0 0 auto; }
+  .q p { color: var(--ink-soft); }
+  .q b { color: var(--ink); }
+  .pill { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink); background: var(--panel-2); padding: 1px 7px; border-radius: 6px; border: 1px solid var(--line); white-space: nowrap; }
+  pre { background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; overflow-x: auto; font-size: 12.5px; line-height: 1.5; color: var(--ink); margin: 0 0 14px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+  th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); }
+  td .num { font-variant-numeric: tabular-nums; font-weight: 650; }
+  .fix td:first-child { color: var(--good); font-weight: 650; }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); box-shadow: var(--shadow); }
+  ol.recs { padding-left: 0; list-style: none; counter-reset: r; margin: 0; }
+  ol.recs li { counter-increment: r; position: relative; padding: 14px 16px 14px 52px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 10px; box-shadow: var(--shadow); }
+  ol.recs li::before { content: counter(r); position: absolute; left: 14px; top: 14px; width: 26px; height: 26px; border-radius: 8px; background: var(--teal-soft); color: var(--teal); font-weight: 800; font-size: 14px; display: grid; place-items: center; }
+  ol.recs b { color: var(--ink); }
+  .foot { margin-top: 46px; padding: 16px 18px; border-radius: 12px; background: var(--amber-soft); border: 1px solid var(--line); font-size: 14px; color: var(--ink-soft); }
+  .foot b { color: var(--ink); }
+  .muted { color: var(--ink-soft); font-size: 13.5px; }
+</style>
+
+<div class="wrap">
+
+  <div class="eyebrow">Lead Run Debrief · YouTube outreach</div>
+  <h1>2026-10-08 — the last push under the one-hour ceiling, and a shelf with about three weeks left on it</h1>
+  <p class="lede">Systemd killed the day's push at exactly sixty minutes, mid-batch, after it had loaded <b>216</b> of a 503-email plan. A hand re-run in the afternoon recovered <b>120</b> more and finished cleanly, so the day closed at <b>337 loaded and 167 planned emails never pushed</b>. Casey raised the unit's ceiling from one hour to six at 16:08Z, so this was the last cycle that could end this way. The quieter number matters more: <b>6,557 people on the shelf have never been emailed, and at the rate the push spends them that is under four weeks of email.</b></p>
+  <div style="margin-top:14px"><span class="tag">167 OF 503 NEVER PUSHED</span> <span class="tag good">CEILING RAISED TO 6H AT 16:08Z</span></div>
+
+  <div class="grid stats">
+    <div class="card stat accent-amber">
+      <div class="n">337</div>
+      <div class="l">emails loaded, against a plan of 503</div>
+      <div class="s warn">216 before the kill, 120 in a hand re-run</div>
+    </div>
+    <div class="card stat accent-red">
+      <div class="n">167</div>
+      <div class="l">planned emails never pushed</div>
+      <div class="s down">129 of 239 batches never reached their builder</div>
+    </div>
+    <div class="card stat accent-red">
+      <div class="n">6,557</div>
+      <div class="l">people on the shelf, never emailed</div>
+      <div class="s down">2.6 to 3.9 weeks at the current push rate</div>
+    </div>
+    <div class="card stat">
+      <div class="n">1</div>
+      <div class="l">lead parked all cycle</div>
+      <div class="s muted">7,593 to 7,594; recovery found 3 addresses</div>
+    </div>
+  </div>
+
+  <h2>The shape of the day</h2>
+  <div class="card" style="padding:0">
+    <div class="strip" id="strip"></div>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--teal)"></span>emails loaded that minute</span>
+      <span><span class="dot" style="background:var(--red);opacity:.55"></span>dead window after the kill (11:25Z to 15:28Z)</span>
+      <span><span class="dot" style="background:var(--line)"></span>a minute inside a run with no load</span>
+    </div>
+  </div>
+  <p class="muted">One bar per minute, 10:15Z to 16:05Z, counted from <code>automator/logs/siege.log</code>. The first block is the timer run: it started at 10:25:34Z, spent nineteen minutes on inbox sync, sampling and batch building, loaded its first email at 10:34Z, and was killed at 11:25:34Z in the middle of a push batch. Nothing degraded before the kill. It was still loading eight emails a minute in its final minute. The second block is the afternoon re-run, 15:28Z to 16:00Z, which worked part of the remainder and ended on its own.</p>
+
+  <h2>The three questions</h2>
+
+  <div class="q accent-red">
+    <div class="ask"><span class="qn">Q1</span><span>Why did 167 of 503 planned emails not go out?</span></div>
+    <p><b>The clock ran out on the whole unit, not on the push.</b> <code>siege-plan.service</code> is a oneshot with five <code>ExecStart</code> steps, and <code>TimeoutStartSec</code> covers all five together. It was set to 3600. The run started at 10:25:34Z and systemd killed it at 11:25:34Z, to the second, with <span class="pill">216 of the plan loaded</span>. Of 239 batch directories written for the day, only <b>110 ever reached their email builder</b>, so 129 batches had no email to push.</p>
+    <p>A second push ran by hand from 15:28Z to 16:00Z and loaded <b>120</b> more, then finished normally. That left 167. Casey raised the ceiling to 21600 seconds, six hours, and committed it at 16:08Z (<code>174220f</code>). The live unit confirms it: <code>TimeoutStartUSec=6h</code>, no daemon-reload pending.</p>
+    <p><b>Six hours is enough, with room.</b> The two runs together loaded 336 emails in 84 minutes of pushing, which is <span class="pill">4.0 emails a minute</span>. A 503-email plan needs about two hours at that rate, plus the nineteen minutes of pre-push steps. Today's 10:15Z run is the first one under the new ceiling and is the test.</p>
+    <p class="muted">This is the same <code>push_killed</code> shape as 10-01 and 10-02, and it is <b>not</b> the slowness those cycles blamed. The pool-leak fix that took a batch from 31s to 1.9s (<code>7fd02b6fd</code>) is deployed and holding. The remaining cost really was the plan being bigger than the hour.</p>
+  </div>
+
+  <div class="q accent-teal">
+    <div class="ask"><span class="qn">Q2</span><span>The recovery lane logged "0 contact points from 0/150 leads". Is it dead?</span></div>
+    <p><b>No. It is a full re-walk of a picked-over book, and the methods worked fine.</b> The proof is direct: dry-running five of the exact leads from that pass turned up <span class="pill">21 contact points</span>, every single one of them already stored. The insert is <code>ON CONFLICT DO NOTHING</code> and reports only rows it really wrote, so a lead whose points are all on file scores zero and reads in the log exactly like a lead nothing was found on.</p>
+    <p>Everything else about the pass was healthy. Website resolution, which nine of thirteen collection methods depend on, came in at <span class="pill">3 no-site in 150</span> with <b>zero Brave refusals</b>. The lane is on <b>lap 8</b> of a 2,520-lead book at 100% re-walk. Stranded held at 3 for the 25th day, so no selector gap has reopened.</p>
+    <p><b>That ambiguity was unreadable and is now fixed in both repos.</b> The collect pass prints what the methods found alongside what was new, and names its error shapes instead of counting them, so a dead method chain and a picked-over book no longer print the same line. The grounded snapshot carries the same two numbers, so the next cycle does not have to re-run the lane by hand to answer this.</p>
+  </div>
+
+  <div class="q accent-amber">
+    <div class="ask"><span class="qn">Q3</span><span>The pause was meant to fund enrichment. Is there any enrichment left to fund?</span></div>
+    <p><b>None. The job is finished and the shelf it filled is now draining faster than anything refills it.</b> Enrichment stands at <span class="pill">7,584 of 7,594 bundled, 99.9%</span>. The chain launched <b>two batches all cycle</b>, one lead each, and spent the rest of the day writing <code>no pending inflow — idling</code>. One of the two failed on unparseable model output at stage 08; the chain moved straight on to the next lead, which succeeded.</p>
+    <p>Inflow and outflow are now three orders of magnitude apart. The free recovery lane added <b>3 addresses on 3 people</b> and parked <b>one lead</b>. The paid Apify lane added nothing, because $10 of its $100 month is left and all $10 is the untouchable reserve, so <b>$0 is spendable until 31 October</b>. Against that, the push spends 336 to 503 people a day across five sending days.</p>
+    <p>So the arithmetic on the shelf is the real headline. <span class="pill">6,557 never-emailed people</span> at 336 a day is <b>3.9 weeks</b>. At the full 503-email plan, which is what the six-hour ceiling is meant to deliver, it is <b>2.6 weeks</b>. Fixing the push makes the pipeline better at emptying the bank, and nothing is putting anything back in.</p>
+  </div>
+
+  <h2>What broke → what's fixed</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Issue</th><th>Mechanism</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr class="fix"><td>167 of 503 planned emails never pushed</td><td><code>TimeoutStartSec=3600</code> on <code>siege-plan.service</code> covers all five of the oneshot's steps, so the push inherited whatever was left of the hour. Killed mid-batch at 11:25:34Z</td><td class="up">Fixed by Casey 16:08Z, <code>174220f</code>, six hours. Live unit reads <code>6h</code>. Today's run confirms it</td></tr>
+        <tr class="fix"><td>A re-walk and a dead method chain printed the same log line</td><td>The insert counts only rows it wrote, so "+0 pts" meant both "found nothing" and "found plenty, already have it all". Method error messages were counted and discarded</td><td class="up">Fixed: the pass now names what it found, what was already on file, and its error shapes (<code>youtube-email-outreach-v1</code> <code>fb371d267</code>, verified live on a real re-walk)</td></tr>
+        <tr class="fix"><td>The grounded snapshot could not tell either apart</td><td><code>site_resolution.pass_summary</code> quoted "0 contact points from 0/150 leads" and nothing else, so a healthy lane read as an outage</td><td class="up">Fixed: <code>methods_found</code> and <code>already_on_file</code> added, parsed by the same function the hourly alarm uses (<code>1e43b08</code>). Null on older passes, which means unknowable, not zero</td></tr>
+        <tr><td>One enrichment lead failed at stage 08</td><td><code>could not parse a JSON object from model output</code> in the quick-research tool-call path</td><td class="warn">Open, 1 of 2 leads. The chain moved on and the next lead passed. Too little volume to tell a one-off from a pattern. Watch, do not patch</td></tr>
+        <tr><td>Enrichment has no work left</td><td>99.9% of the shelf is bundled. Two single-lead batches all cycle</td><td class="warn">Open, and not a code problem. It is the discovery pause doing what it was asked</td></tr>
+        <tr><td>Apify recovery contributes nothing for a 25th day</td><td>$100 monthly allowance spent. The remaining $10 is the reserve</td><td class="warn">Open. Raising the cap is Casey's spend call. Resets 31 October</td></tr>
+        <tr><td>The shelf empties in under four weeks</td><td>6,557 never-emailed people out, 336 to 503 a day across five sending days, 1 lead a day back in</td><td class="warn">Open. The decision this cycle hands over</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Recommended next — ranked</h2>
+  <ol class="recs">
+    <li><b>Watch today's push clear its whole plan under the six-hour ceiling.</b> Expect roughly 503 loaded in about two hours of pushing and a unit result of <code>success</code> rather than <code>timeout</code>. Two things get settled at once: whether six hours is the right number, and whether the duplicate-flag fix from yesterday holds across a full plan instead of a partial one. If <code>push_killed</code> appears again after this, the problem is no longer the ceiling.</li>
+    <li><b>Decide what refills the shelf, because nothing currently does.</b> The pause was ordered on 2026-09-08 so every resource could go into enriching the leads already in hand. That is done at 99.9% and the enrichment chain idled through the cycle with nothing to chew on. Meanwhile the send path spends 2.6 to 3.9 weeks of inventory. Lifting the pause is Casey's call and nothing here has touched the flag, but the trade it was making no longer exists: it is no longer buying enrichment, it is only costing supply.</li>
+    <li><b>Decide the Apify allowance.</b> $0 spendable until 31 October, so the paid recovery lane sits out another 23 days. Its best month recovered 244 leads for $28.08, about 11.5 cents each, which is the cheapest new sendable lead on the board right now that does not need the discovery pause lifted.</li>
+    <li><b>The ceiling on volume has flipped from the warmup ramp to the mailboxes.</b> Yesterday the plan capped at 250 while the inboxes would have taken 533. Today the warmup ramp allows <b>870</b> and the 51 live inboxes allow <b>503</b>, so the mailboxes are now the binding constraint. Raising the day cap buys nothing until more inboxes land, which inverts the lever that looked worth pulling yesterday.</li>
+    <li><b>Six cycles still have metrics on disk and no debrief</b> (09-17, 09-18, 09-19, 08-17, 08-18, 07-11). Backfillable any time at no risk.</li>
+  </ol>
+
+  <div class="foot">
+    <b>Clean-run facts:</b> 0 fatal signatures, 0 halts, 0 crashes. <b>$0.00 Anthropic</b> for the 25th straight cycle. OpenRouter is at $2.87 a day with $101.49 left, about 35 days of runway. 15 of 66 YouTube keys came back working after the midnight reset and 50 were still exhausted after it, which does not matter while discovery is off. Discovery wrote 0 new channels, which is the pause doing exactly what Casey asked for on 2026-09-08. This repo's own send path ran once and loaded 1 of 1 attempted; the other 336 came from Siege, which is the normal split now. Of the 337 loaded, 303 were <code>approved_hold</code> and 34 <code>approved</code>.
+  </div>
+
+</div>
+
+<script>
+  // Emails loaded per minute, 10:15Z to 16:05Z on 2026-10-07, counted from
+  // automator/logs/siege.log. Index 70 is the 11:25Z kill; index 313 is the 15:28Z re-run.
+  var seq = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,4,0,9,2,8,0,0,0,4,9,0,2,6,4,0,3,12,0,0,0,1,14,8,0,3,0,3,9,5,10,5,11,10,2,7,9,11,0,3,12,0,0,3,11,0,0,0,0,6,8,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,4,9,2,6,4,0,0,5,6,3,4,0,4,4,0,6,8,6,0,2,6,7,2,2,4,0,0,3,9,0,0,11,3,0,0,0,0,0];
+  var KILL = 70, RESUME = 313, PEAK = 14;
+  var strip = document.getElementById('strip');
+  seq.forEach(function (v, i) {
+    var b = document.createElement('div');
+    var dead = i > KILL && i < RESUME;
+    b.className = 'bar' + (dead ? ' dead' : v === 0 ? ' zero' : '');
+    if (!dead && v > 0) b.style.height = Math.round((v / PEAK) * 100) + '%';
+    var mins = 10 * 60 + 15 + i;
+    var clock = String(Math.floor(mins / 60)).padStart(2, '0') + ':' + String(mins % 60).padStart(2, '0') + 'Z';
+    b.title = dead ? clock + ' — killed, nothing running' : clock + ' — ' + v + ' loaded';
+    strip.appendChild(b);
+  });
+</script>
