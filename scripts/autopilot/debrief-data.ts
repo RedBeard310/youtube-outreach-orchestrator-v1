@@ -2066,6 +2066,15 @@ async function main(): Promise<void> {
         // The alarm's own threshold, so the report never invents a second bar.
         collapsed: att.noSitePct >= Number(process.env.AUTOPILOT_NO_SITE_ALARM_PCT ?? 70),
         pass_summary: passes.length > 0 ? passes[passes.length - 1]!.summary : null,
+        // A ZERO-POINT PASS WAS UNREADABLE FROM THIS FILE ALONE (2026-10-08). pass_summary
+        // said "Collected 0 contact points from 0/150 leads" and the methods were in fact
+        // working: a hand dry-run of five of those leads turned up 21 points, all of them
+        // already stored, because the insert counts only rows it really writes. These two
+        // fields carry that distinction so the next reader does not have to re-run the
+        // lane by hand. Null on passes logged before the collect CLI started writing the
+        // line — not zero. See CollectPass in src/recovery/bloodhound-lane.ts.
+        methods_found: passes.length > 0 ? passes[passes.length - 1]!.found : null,
+        already_on_file: passes.length > 0 ? passes[passes.length - 1]!.alreadyOnFile : null,
       };
     } catch {
       return null;
@@ -2276,6 +2285,14 @@ async function main(): Promise<void> {
         "book's state. brave_refusals>0 names a spent search plan; collapsed with 0 refusals is " +
         'either a resolution fault or a genuinely site-less slice, and the per-pass "Brave ' +
         'website resolution:" line in the collect log says which. ' +
+        'AND READ site_resolution.methods_found BEFORE CALLING A ZERO-POINT PASS DEAD: the ' +
+        'insert counts only rows it really wrote, so a lead whose points are all already ' +
+        'stored scores 0 and reads identically to a lead the methods found nothing on. On ' +
+        '2026-10-08 pass_summary said "0 contact points from 0/150 leads" and the methods ' +
+        'were fine — a dry-run of five of those leads turned up 21 points, every one already ' +
+        'on file. methods_found>0 with 0 points is a full re-walk of a picked-over book and ' +
+        'is not a fault; methods_found:0 is the shape worth chasing. Both are null for passes ' +
+        'logged before 2026-10-08, which means unknowable, NOT zero. ' +
         'A climbing collect_book_stranded is the real fault ' +
         'signal (a selector gap has reopened). Emails here are unverified: the verify pass ' +
         'decides which ones flip to approved_hold.',

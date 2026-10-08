@@ -1262,23 +1262,57 @@ export function collectRewalkCause(
   return { cause, rewinds, searchDeadRewinds, laps, cursor, cursorMoved };
 }
 
-/** One completed collect pass, read off its summary line. */
-export type CollectPass = { points: number; hit: number; of: number; rate: number; summary: string };
+/** One completed collect pass, read off its summary line.
+ *
+ *  `found` / `alreadyOnFile` come from the separate line the collect CLI writes after
+ *  the summary (youtube-email-outreach-v1 fb371d267, 2026-10-08). THEY ARE THE ONLY WAY
+ *  TO TELL A PICKED-OVER BOOK FROM A DEAD PASS: `points` counts rows really inserted, so
+ *  a lead whose points are all already stored scores 0 and looks exactly like a lead the
+ *  methods found nothing on. The 2026-10-08 pass read "0 contact points from 0/150
+ *  leads" while the methods were working fine. Both are null for passes logged before
+ *  that date, where the two shapes are genuinely indistinguishable — do not read a null
+ *  as zero. */
+export type CollectPass = {
+  points: number;
+  hit: number;
+  of: number;
+  rate: number;
+  summary: string;
+  found: number | null;
+  alreadyOnFile: number | null;
+};
 
 /** Every COMPLETED pass in a collect log, oldest first. A pass still running has
  *  written no summary line yet and is deliberately not counted. */
 export function collectPasses(logText: string, minSample = 30): CollectPass[] {
   const SUMMARY = /^Collected (\d+) contact points from (\d+)\/(\d+) leads\.$/;
+  const FOUND = /^\[bloodhound\] Methods found (\d+) point\(s\) on (\d+)\/(\d+) leads; (\d+) were already on file\./;
   const out: CollectPass[] = [];
+  // Whether the newest summary line was ACCEPTED into `out`. A short tail-of-lap batch is
+  // skipped above, and without this flag its found-line would attach to the previous
+  // (unrelated) pass, which is the sort of off-by-one that has gone wrong in this parser
+  // three times already.
+  let openPass = false;
   for (const raw of logText.split('\n')) {
     const line = raw.trim();
+    const f = FOUND.exec(line);
+    if (f) {
+      if (openPass) {
+        const pass = out[out.length - 1]!;
+        pass.found = Number(f[1]);
+        pass.alreadyOnFile = Number(f[4]);
+      }
+      openPass = false;
+      continue;
+    }
     const m = SUMMARY.exec(line);
     if (!m) continue;
     const hit = Number(m[2]), of = Number(m[3]);
     // A short batch makes the hit rate noisy — it is the tail of a lap, not a
     // sample of the lane.
-    if (of < minSample) continue;
-    out.push({ points: Number(m[1]), hit, of, rate: hit / of, summary: line });
+    if (of < minSample) { openPass = false; continue; }
+    out.push({ points: Number(m[1]), hit, of, rate: hit / of, summary: line, found: null, alreadyOnFile: null });
+    openPass = true;
   }
   return out;
 }
