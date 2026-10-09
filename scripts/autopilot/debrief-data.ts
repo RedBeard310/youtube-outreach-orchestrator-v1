@@ -193,6 +193,10 @@ export type SiegePushOutcome = {
   log_found: boolean;
   sent: number | null;
   failed: number | null;
+  /** Planned emails the push declined to even offer SmartLead — almost always a draft the
+   *  writer's own quality gate rejected. A refusal by us, not by SmartLead, which is why
+   *  it is counted apart from `failed`. See the block comment on siegePushOutcome(). */
+  skipped: number | null;
   /** Batches that exited non-zero having pushed nothing, so their leads were never tried. */
   batches_failed_before_first_lead: number | null;
   escalations: number | null;
@@ -203,6 +207,7 @@ export const NO_PUSH_OUTCOME: SiegePushOutcome = {
   log_found: false,
   sent: null,
   failed: null,
+  skipped: null,
   batches_failed_before_first_lead: null,
   escalations: null,
   reasons: [],
@@ -356,20 +361,45 @@ export function sendPlanHealth(
       'list (src/smartlead/add-lead-outcome.ts), and a quoted reply here is condensed to ' +
       'the fields it set so the answer cannot fall off the end of the 120-character cap. ' +
       'A `no counter set` entry is the one remaining unexplained shape: SmartLead answered ' +
-      '200, imported nothing, and set nothing.',
+      '200, imported nothing, and set nothing. ' +
+      'AND READ push_outcome.skipped: it is planned emails WE declined to offer SmartLead, ' +
+      'nearly always a draft the writer\'s own quality gate rejected after its retries, ' +
+      'so it is a different fix from anything `failed` names — tighten the skill, not the ' +
+      'push. It was unreadable before 2026-10-09: on 10-08 the first clean full-plan push ' +
+      'logged sent 561 and failed 1 against a plan of 567, and the other five were SKIPs ' +
+      'the parser never counted, so five sixths of the shortfall had no counter and no ' +
+      'reason. Their reasons were in the log all along (an em dash outside the sign-off ' +
+      'twice, bare-title format, opener shape, a rank superlative). `reasons` now covers ' +
+      'failed and skipped together, because the question is why a planned email did not go.',
   };
 }
 
 /** Parse the push's own log lines for one cycle. Pure, so the selftest can drive it.
  *
- *  Reads only lines the push prints itself. `SENT` and `FAIL` are per-lead; an
+ *  Reads only lines the push prints itself. `SENT`, `FAIL` and `SKIP` are per-lead; an
  *  ESCALATE naming `pushed: 0` is a batch that never reached a lead at all, which is the
- *  shape that loses leads silently — they appear in neither tally. */
+ *  shape that loses leads silently — they appear in neither tally.
+ *
+ *  WHY `SKIP` IS COUNTED (2026-10-09). The push prints
+ *  `SKIP  <lead>    batch report marked it failed` for a planned email whose draft the
+ *  writer's own quality gate rejected after its retries. That email was in the plan and
+ *  never went out, so it belongs in the arithmetic — but this parser only read SENT and
+ *  FAIL, so on 2026-10-08 the snapshot showed `sent: 561, failed: 1` against a plan of
+ *  567 and five of the six unpushed emails had no counter and no reason anywhere. The
+ *  reasons were in the log all along (em dash outside the sign-off ×2, bare-title format,
+ *  opener shape, a rank superlative), and they name a different fix from anything
+ *  SmartLead does: tighten the skill, not the push.
+ *
+ *  Counted apart from `failed` on purpose. `failed` is SmartLead refusing a lead we
+ *  offered it; `skipped` is us declining to offer one. Mixing them would have made the
+ *  first clean full-plan push read as six SmartLead rejections. `reasons` covers both,
+ *  since the question it answers is "why did a planned email not go out". */
 export function siegePushOutcome(log: string, sinceISO: string, untilISO: string): SiegePushOutcome {
   const since = Date.parse(sinceISO);
   const until = Date.parse(untilISO);
   let sent = 0;
   let failed = 0;
+  let skipped = 0;
   let deadBatches = 0;
   let escalations = 0;
   const reasons = new Map<string, number>();
@@ -393,6 +423,13 @@ export function siegePushOutcome(log: string, sinceISO: string, untilISO: string
       reasons.set(reason, (reasons.get(reason) ?? 0) + 1);
       continue;
     }
+    const skip = /\bSKIP\s+rec[A-Za-z0-9]{8,}\s+(.*)$/.exec(line);
+    if (skip) {
+      skipped++;
+      const reason = normalizePushReason(skip[1]!);
+      reasons.set(reason, (reasons.get(reason) ?? 0) + 1);
+      continue;
+    }
     if (line.includes('ESCALATE')) {
       escalations++;
       // The driver prints its own JSON payload; "pushed": 0 is the batch that moved nothing.
@@ -404,6 +441,7 @@ export function siegePushOutcome(log: string, sinceISO: string, untilISO: string
     log_found: true,
     sent,
     failed,
+    skipped,
     batches_failed_before_first_lead: deadBatches,
     escalations,
     reasons: [...reasons.entries()]
@@ -561,13 +599,36 @@ function systemdStamp(raw: string | undefined): string | null {
  *  was a sending day at all. See the block comment on SiegeUnitFacts. */
 function siegeUnitFacts(pacificDay: string): SiegeUnitFacts {
   const svc = showUnit('siege-plan.service', ['Result', 'ActiveState', 'ExecMainStartTimestamp']);
-  const timer = showUnit('siege-plan.timer', ['TimersCalendar']);
+  const timer = showUnit('siege-plan.timer', ['TimersCalendar', 'LastTriggerUSec']);
   return {
     sending_day: isSendingDay(timer.TimersCalendar ?? null, pacificDay),
     unit_state: svc.ActiveState || null,
     unit_last_result: svc.Result || null,
-    unit_last_started: systemdStamp(svc.ExecMainStartTimestamp),
+    unit_last_started: unitStartedAt(svc.ExecMainStartTimestamp, timer.LastTriggerUSec),
   };
+}
+
+/** When the push run that left `Result` behind actually started.
+ *
+ *  WHY THE FALLBACK (2026-10-09). A `systemctl daemon-reload` clears an inactive unit's
+ *  `ExecMainStartTimestamp` and `ActiveEnterTimestamp` while keeping `Result`. Casey
+ *  edited `siege-plan.service` to raise `TimeoutStartSec` to six hours and reloaded twice
+ *  on 2026-10-08, hours after that day's run had finished cleanly — so the snapshot read
+ *  `unit_last_result: success` with `unit_last_started: null`, pushRunVerdict() could not
+ *  place the run inside the cycle, and `push_unit_result` came out null on the one cycle
+ *  whose verdict settled whether the new ceiling worked. Editing a unit should not blind
+ *  the report on the run that prompted the edit.
+ *
+ *  The timer's own `LastTriggerUSec` survives the reload and is within seconds of when
+ *  the service started, so it answers the question the service has forgotten. Service
+ *  first, timer only as a fallback: if the unit was last run by hand the service stamp is
+ *  the true one, and a blank service stamp plus a stale timer stamp still yields no
+ *  verdict rather than a wrong one, because pushRunVerdict() checks the window. */
+export function unitStartedAt(
+  execMainStart: string | undefined,
+  timerLastTrigger: string | undefined,
+): string | null {
+  return systemdStamp(execMainStart) ?? systemdStamp(timerLastTrigger);
 }
 
 /** siege-plan.service's own verdict on the run that did this cycle's sending, or null

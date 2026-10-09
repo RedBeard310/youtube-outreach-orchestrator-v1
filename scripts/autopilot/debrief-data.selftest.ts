@@ -1,4 +1,4 @@
-import { apifyBatchFacts, apifyLedgerLine, normalizePushReason, siegePushOutcome, classifyKeyProbe, cyclePacificDay, enrichmentChainFacts, isSendingDay, projectRecoveryBudget, MAX_MISSING_DEBRIEFS, missingDebriefs, pushRunVerdict, sendPlanHealth, siegePlanFacts, summarizeSendLines, isVerifiedOrBeyond, laneYield, priorAdvanceSource, priorSeedsAdvanced, priorSeedsWalked, reconcileAdvanced, sessionSeedsAdvanced, sessionStartMs, walkRateTrend } from './debrief-data.ts';
+import { apifyBatchFacts, apifyLedgerLine, normalizePushReason, siegePushOutcome, classifyKeyProbe, cyclePacificDay, enrichmentChainFacts, isSendingDay, projectRecoveryBudget, MAX_MISSING_DEBRIEFS, missingDebriefs, pushRunVerdict, unitStartedAt, sendPlanHealth, siegePlanFacts, summarizeSendLines, isVerifiedOrBeyond, laneYield, priorAdvanceSource, priorSeedsAdvanced, priorSeedsWalked, reconcileAdvanced, sessionSeedsAdvanced, sessionStartMs, walkRateTrend } from './debrief-data.ts';
 let fail = 0;
 const ok = (name: string, got: unknown, want: unknown) => {
   const pass = JSON.stringify(got) === JSON.stringify(want);
@@ -475,6 +475,49 @@ ok('push_outcome defaults to not-measured so an unreadable log never reads as a 
   (() => { const h = sendPlanHealth(siegePlanFacts(PLAN_1001), 135, 0, 'success');
     return [h.push_outcome.log_found, h.push_outcome.sent, h.binding_constraint]; })(),
   [false, null, 'partial_push']);
+
+// 2026-10-09: five of the six emails a 567-plan did not push were SKIPs the parser never
+// counted, so five sixths of the shortfall had no counter and no reason. Verbatim shapes.
+const SKIP_LOG = [
+  '[2026-10-08T10:36:03Z]   |   SKIP  recIUDe7gmSe4yYZ7    batch report marked it failed',
+  '[2026-10-08T10:36:03Z]   |   SENT  recnhfAv4wUJgjXm2    a@b.com  smartlead_lead=4714363803',
+  '[2026-10-08T10:45:25Z]   |   FAIL  recExVtKOSsDlDFNU    SmartLead did not add the lead (already_added_to_campaign=1)',
+  '[2026-10-08T11:26:18Z]   |   SKIP  recfa2yYgXeZzTzgO    batch report marked it failed',
+  '[2026-10-08T11:30:39Z]   |     still broken: em dash — 1 em dash(es) outside the sign-off',
+  '[2026-10-08T11:43:40Z]   | BiggerPockets Money        FAIL  ethos 125  fails 1->1->1',
+].join('\n');
+const SKIPS = siegePushOutcome(SKIP_LOG, '2026-10-08T07:00:00.000Z', '2026-10-09T07:00:00.000Z');
+ok('a skipped lead is counted apart from a SmartLead refusal',
+  [SKIPS.sent, SKIPS.failed, SKIPS.skipped], [1, 1, 2]);
+ok('a skip carries its reason alongside the refusals',
+  SKIPS.reasons,
+  [{ reason: 'batch report marked it failed', leads: 2 },
+   { reason: 'SmartLead did not add the lead (already_added_to_campaign=1)', leads: 1 }]);
+ok('a writer\'s own gate line is still not a push loss (no lead id on it)',
+  (() => { const p = siegePushOutcome(
+    '[2026-10-08T11:43:40Z]   | BiggerPockets Money        FAIL  ethos 125  fails 1->1->1\n'
+    + '[2026-10-08T11:43:40Z]   |     still broken: em-dash — em or en dash outside the sign-off',
+    '2026-10-08T07:00:00.000Z', '2026-10-09T07:00:00.000Z');
+    return [p.sent, p.failed, p.skipped, p.reasons.length]; })(),
+  [0, 0, 0, 0]);
+
+// unitStartedAt — a daemon-reload must not blind the verdict on the run it followed.
+ok('the service\'s own stamp wins when it has one',
+  unitStartedAt('Thu 2026-10-08 10:15:34 UTC', 'Thu 2026-10-08 10:15:31 UTC'),
+  '2026-10-08T10:15:34.000Z');
+ok('a stamp cleared by daemon-reload falls back to the timer',
+  unitStartedAt('', 'Thu 2026-10-08 10:15:31 UTC'), '2026-10-08T10:15:31.000Z');
+ok('a timer that never fired claims nothing', unitStartedAt('', 'n/a'), null);
+ok('neither stamp claims nothing', unitStartedAt(undefined, undefined), null);
+// The fallback cannot invent a verdict for a cycle: the window check still decides.
+ok('a fallback stamp outside the window still yields no verdict',
+  pushRunVerdict('success', unitStartedAt('', 'Thu 2026-10-08 10:15:31 UTC'),
+    '2026-10-09T07:00:00.000Z', '2026-10-10T07:00:00.000Z'),
+  null);
+ok('a fallback stamp inside the window carries the verdict the reload hid',
+  pushRunVerdict('success', unitStartedAt('', 'Thu 2026-10-08 10:15:31 UTC'),
+    '2026-10-08T07:00:00.000Z', '2026-10-09T07:00:00.000Z'),
+  'success');
 
 console.log(fail === 0 ? '\nALL PASS' : `\n${fail} FAILED`);
 process.exit(fail === 0 ? 0 : 1);
