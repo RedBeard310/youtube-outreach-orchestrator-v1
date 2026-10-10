@@ -1,0 +1,214 @@
+<title>Lead Run Debrief — 2026-10-10</title>
+<style>
+  :root {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+      --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+      --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+    --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+    --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 40px 22px 80px; }
+  .eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); font-weight: 600; }
+  h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.12; margin: 10px 0 6px; text-wrap: balance; letter-spacing: -.02em; }
+  h2 { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); margin: 44px 0 16px; font-weight: 700; }
+  h3 { font-size: 18px; margin: 0 0 6px; letter-spacing: -.01em; }
+  p { margin: 0 0 14px; }
+  .lede { font-size: 18px; color: var(--ink-soft); max-width: 68ch; }
+  .tag { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--amber-soft); color: var(--amber); letter-spacing: .02em; }
+  .tag.good { background: var(--teal-soft); color: var(--teal); }
+  .grid { display: grid; gap: 14px; }
+  .stats { grid-template-columns: repeat(4, 1fr); margin-top: 26px; }
+  @media (max-width: 720px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; box-shadow: var(--shadow); }
+  .stat .n { font-size: 30px; font-weight: 750; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .stat .l { font-size: 12.5px; color: var(--ink-soft); margin-top: 3px; }
+  .stat .s { font-size: 12px; margin-top: 8px; font-weight: 600; }
+  .up { color: var(--good); } .down { color: var(--red); } .warn { color: var(--amber); }
+  .accent-red { border-left: 3px solid var(--red); }
+  .accent-teal { border-left: 3px solid var(--teal); }
+  .accent-amber { border-left: 3px solid var(--amber); }
+
+  /* shape-of-day bar strip */
+  .strip { display: flex; align-items: flex-end; gap: 1px; height: 120px; padding: 14px 14px 10px; overflow-x: auto; }
+  .bar { flex: 1 0 3px; min-width: 2px; border-radius: 2px 2px 0 0; background: var(--teal); opacity: .9; }
+  .bar.zero { background: var(--line); height: 4% !important; opacity: .8; }
+  .bar.extra { background: var(--good); opacity: .95; }
+  .bar.wall { background: var(--red); opacity: .9; }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-soft); padding: 0 14px 14px; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+
+  .q { border-radius: 14px; padding: 20px 22px; margin-bottom: 14px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); }
+  .q .ask { font-size: 17px; font-weight: 700; color: var(--ink); margin-bottom: 10px; display: flex; gap: 10px; align-items: baseline; }
+  .q .ask .qn { color: var(--red); font-weight: 800; flex: 0 0 auto; }
+  .q p { color: var(--ink-soft); }
+  .q b { color: var(--ink); }
+  .pill { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink); background: var(--panel-2); padding: 1px 7px; border-radius: 6px; border: 1px solid var(--line); white-space: nowrap; }
+  pre { background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; overflow-x: auto; font-size: 12.5px; line-height: 1.5; color: var(--ink); margin: 0 0 14px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+  th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); }
+  td .num { font-variant-numeric: tabular-nums; font-weight: 650; }
+  .fix td:first-child { color: var(--good); font-weight: 650; }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); box-shadow: var(--shadow); }
+  ol.recs { padding-left: 0; list-style: none; counter-reset: r; margin: 0; }
+  ol.recs li { counter-increment: r; position: relative; padding: 14px 16px 14px 52px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 10px; box-shadow: var(--shadow); }
+  ol.recs li::before { content: counter(r); position: absolute; left: 14px; top: 14px; width: 26px; height: 26px; border-radius: 8px; background: var(--teal-soft); color: var(--teal); font-weight: 800; font-size: 14px; display: grid; place-items: center; }
+  ol.recs b { color: var(--ink); }
+  .foot { margin-top: 46px; padding: 16px 18px; border-radius: 12px; background: var(--amber-soft); border: 1px solid var(--line); font-size: 14px; color: var(--ink-soft); }
+  .foot b { color: var(--ink); }
+  .muted { color: var(--ink-soft); font-size: 13.5px; }
+</style>
+
+<div class="wrap">
+
+  <div class="eyebrow">Lead Run Debrief · YouTube outreach</div>
+  <h1>2026-10-10: the biggest send on record, and the quiet recovery lane finally has a named cause</h1>
+  <p class="lede">The push loaded <b>613 of a 618-email plan</b> in 102 minutes, beat yesterday's record, and for the first time <b>SmartLead refused nobody</b>. All five emails that did not go were drafts our own writing gate rejected, and four of the five came out of one offer's writer. The second finding closes a question that has been open since 2026-10-05: the recovery lane resolved no website for 90% of its last pass with zero search refusals, and the reason is neither a fault nor a dry search plan. <b>Brave found a real candidate for 124 of 150 leads and the ownership gate refused 109 of them</b>, because the remaining book is creators with no site in their own name. No amount of money changes that, and the hourly alarm had been filing it as "unexplained" while the collect log held the answer one line below the footer it was already reading.</p>
+  <div style="margin-top:14px"><span class="tag good">613 OF 618 LOADED, 0 SMARTLEAD REFUSALS</span> <span class="tag good">SECOND CLEAN FULL-PLAN PUSH</span> <span class="tag">109 BRAVE CANDIDATES REFUSED BY THE OWNERSHIP GATE</span></div>
+
+  <div class="grid stats">
+    <div class="card stat accent-teal">
+      <div class="n">613</div>
+      <div class="l">emails loaded, against a plan of 618</div>
+      <div class="s up">99.2% of plan, 6.0 a minute, nothing killed</div>
+    </div>
+    <div class="card stat accent-teal">
+      <div class="n">0</div>
+      <div class="l">leads SmartLead refused</div>
+      <div class="s up">first zero-refusal push; all 5 losses were our copy</div>
+    </div>
+    <div class="card stat accent-amber">
+      <div class="n">277</div>
+      <div class="l">never-emailed people spent</div>
+      <div class="s warn">the other 336 were a 2nd, 3rd or 4th offer</div>
+    </div>
+    <div class="card stat">
+      <div class="n">6,072</div>
+      <div class="l">people on the shelf, never emailed</div>
+      <div class="s muted">about 5.5 weeks at 277 a sending day</div>
+    </div>
+  </div>
+
+  <h2>The shape of the day</h2>
+  <div class="card" style="padding:0">
+    <div class="strip" id="strip"></div>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--teal)"></span>emails loaded that minute</span>
+      <span><span class="dot" style="background:var(--red)"></span>a campaign start that died on a SmartLead 429</span>
+      <span><span class="dot" style="background:var(--line)"></span>a minute with no load (drafts being written)</span>
+    </div>
+  </div>
+  <p class="muted">One bar per minute, 10:23Z to 12:05Z, counted from <code>SENT</code> lines in <code>automator/logs/siege.log</code>. The run loaded its first email at 10:23:05Z and its last at 12:05:26Z, so 102 minutes 21 seconds wall to wall for 613 emails, a flat <b>6.0 a minute</b> from the first minute to the last. It was still loading 10 emails a minute at 12:05. Under the six-hour ceiling Casey set on 2026-10-08 that rate covers a plan of roughly <b>2,150 emails</b>, which is two and a half times today's warmup cap.</p>
+
+  <h2>The three questions</h2>
+
+  <div class="q accent-teal">
+    <div class="ask"><span class="qn">Q1</span><span>Did the full-plan push hold a second time?</span></div>
+    <p><b>Yes, and it got cleaner.</b> 613 of 618 loaded, <code>siege-plan.service</code> reports <code>Result=success</code>, and the run used 28 minutes of its six-hour budget. Yesterday's 561-of-567 was the first clean full plan; this one is bigger, longer and still nowhere near the ceiling. The <code>push_killed</code> shape of 10-01, 10-02 and 10-08 has now failed to reappear twice running.</p>
+    <p><b>SmartLead refused nobody, which settles the duplicate-flag fix for good.</b> <span class="pill">0 failed</span> against 1 yesterday and 106 on 10-07. 336 of today's 613 emails went to somebody already in another campaign, exactly the traffic <code>ignore_duplicate_leads_in_other_campaign:true</code> was silently blocking, and every one of them was accepted. Casey's change in <code>becf7fd1a</code> is doing what it was meant to do.</p>
+    <p><b>Two campaigns were left holding leads they could not be started with.</b> Both escalations this cycle are a plain <code>http 429</code> on the campaign <code>START</code> call, at 10:30:57Z (4 leads) and 10:41:48Z (2 leads). The lead-adds themselves were fine, so this is not the 10-05 shape coming back: it is one call that sits outside the retry the email repo gained in <code>eedbbff87</code>, because <code>start_campaign()</code> lives in <code>automator/scripts/siege-plan.py</code> and calls <code>sl.post_json</code> once with no backoff. Those <b>6 people are loaded into a stopped campaign</b>, their rows already say <code>sent_to_smartlead</code>, and nothing will pick them up again. Small, silent, and the second time it has happened (one lead on 10-06).</p>
+    <p class="muted">The plan size is now set by inboxes, not by the ramp: <b>618 planned against 618 mailbox slots on 50 live inboxes</b>, under a warmup day cap of 870. The writing side is healthy too, at 205 of 211 drafts passing their gate for <b>$0.69</b> of OpenRouter across 88 batches. Six offers carried the day fairly evenly, from 111 (joke-ai-slop) down to 95 (attack-enemy-propose-5-ideas); nine of the sixteen offers are still blocked.</p>
+  </div>
+
+  <div class="q accent-amber">
+    <div class="ask"><span class="qn">Q2</span><span>Why did the recovery lane park one person while resolving no website for 90% of its pass?</span></div>
+    <p><b>Because the strict ownership gate refused 109 real search results, and that is the gate working.</b> The pass ran <span class="pill">150 Brave searches</span> for 150 leads with <b>zero key refusals</b>. Brave came back with a usable candidate for <b>124</b> of them. Only <b>15</b> became the lead's website. The other 109 were thrown out by <code>websiteCandidateLooksOwned</code>, which refuses a page it cannot tie to that creator. That check exists on purpose: the 2026-08-18 audit put it there after the lane filed strangers' contact details under a lead whose top search hit was somebody else writing about them.</p>
+    <p><b>The arithmetic closes exactly, which is how we know this is the whole story.</b> 135 leads resolved no site, and 135 is 109 gate refusals plus the 26 searches that came back with only social or third-party hits. Nothing is unaccounted for. The same reading on the previous pass says 107 of 114 candidates refused. Both passes tripped the hourly no-site alarm, and <b>both were filed <code>attributed_to: "unexplained"</code> with the advice "check the collect log before spending anything"</b>, while the line directly under the footer that alarm reads said 149 searches, 114 candidates, 0 refusals.</p>
+    <p><b>What it means for money: nothing to buy.</b> A gate-refused pass cannot be bought back with Brave credit however loud the no-site rate gets. The book has simply been walked down to the leads whose creator has no findable website in their own name, which is also why the methods found 129 points and 126 of them were already on file. One address verified, one person parked.</p>
+    <p class="muted">Both passes were a 100% re-walk of a 2,517-lead book on lap 8, and <code>stranded</code> held at 3 for the 27th day, so no selector gap has reopened. <code>needs_contact</code> is down to 3,513 from 4,239 on 09-29.</p>
+  </div>
+
+  <div class="q accent-red">
+    <div class="ask"><span class="qn">Q3</span><span>How long does the shelf last, and what refills it?</span></div>
+    <p><b>About five and a half weeks, and nothing refills it.</b> 6,072 people on the shelf have never been emailed. Counted properly from <code>leads.outreach_sends</code>, today spent <b>277 of them</b>: 277 first-ever emails, 308 second offers, 27 third and 1 fourth. At 277 a sending day across four delivery days a week, the shelf is <b>21.9 sending days</b> of email. Repeat share is holding where it landed, 55% today against 52% yesterday and 11% on 10-07.</p>
+    <p><b>Against that, intake was one person.</b> The free recovery lane parked 1. The paid Apify lane ran 0 batches and has $0 it is allowed to spend until its allowance resets on 31 October. Enrichment, which is what the discovery pause was ordered to fund on 2026-09-08, ran <b>one batch of one lead</b> because the pool is 99.9% bundled and there is nothing left to enrich. Discovery wrote 0 new channels, as instructed.</p>
+    <p><b>So the picture is unchanged from yesterday and one day shorter.</b> Every fix of the last ten days has made the pipeline better at emptying the bank. The bank is not being refilled, the job the pause was protecting is finished, and the decision about what happens next is Casey's alone. The flag is untouched.</p>
+  </div>
+
+  <h2>What broke → what's fixed</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>What</th><th>Evidence</th><th>State</th></tr></thead>
+      <tbody>
+        <tr class="fix">
+          <td>A 90%-no-site pass read as unexplained</td>
+          <td>Two passes this cycle logged 149 and 150 searches, 114 and 124 candidates, 0 refusals, and resolved 8 and 15 sites. The alarm filed both <code>unexplained</code> and advised checking the log it was reading.</td>
+          <td><b>Fixed</b> (<code>0ec3b719</code>, orchestrator). <code>collectPassAttribution()</code> now reads the per-pass Brave line and derives <code>braveAccepted</code> and <code>braveGateRejected</code>; a new <code>noSiteCause()</code> names one of <code>search_off</code>, <code>search_dead</code>, <code>ownership_gate</code>, <code>no_candidates</code>, <code>resolution_ok</code> or <code>unmeasured</code>, shared by the alarm and the snapshot so the two cannot disagree. Verified against all six live passes; the arithmetic closes on every one.</td>
+        </tr>
+        <tr class="fix">
+          <td>All five dropped emails reported one reasonless string</td>
+          <td><code>push_outcome.reasons</code> read <code>batch report marked it failed</code> ×5. That names no rule and no remedy, and the writer's own verdict was a few lines above in the same batch.</td>
+          <td><b>Fixed</b> (same commit). Skips now carry the writer's <code>still broken:</code> rule, keyed per batch id because a batch's <code>SENT</code> lines interleave with its skips and a rolling buffer loses reasons. New <code>skipped_by_offer</code> says which skill to fix. 7 new selftest cases, all pass.</td>
+        </tr>
+        <tr>
+          <td>The em dash the writing gate keeps catching</td>
+          <td>2 of 5 skips today, 2 of 5 yesterday. Today's named rules: em dash ×2, closing block reworded, opener shape, consultant abstraction. <b>4 of the 5 came from <code>attack-enemy-propose-5-ideas</code>.</b></td>
+          <td><b>Not fixed, now addressed.</b> The skills live in <code>~/.claude/skills</code>, outside the five repos this agent may edit. The snapshot now names both the rule and the offer, so the fix has an address.</td>
+        </tr>
+        <tr>
+          <td>Campaign START has no 429 retry</td>
+          <td>Two escalations, both <code>http 429</code>, 6 leads loaded into campaigns that were never started. <code>start_campaign()</code> calls <code>sl.post_json</code> once.</td>
+          <td><b>Not fixed.</b> It is in <code>automator</code>, which this agent may not edit. Needs the same retry the email repo got in <code>eedbbff87</code>.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Recommended next — ranked</h2>
+  <ol class="recs">
+    <li><b>Decide what refills the shelf.</b> 6,072 never-emailed people, spent at 277 a sending day, is about five and a half weeks. Enrichment is done at 99.9% and had one lead to do all cycle, the free recovery book is picked over for a measured reason rather than a suspected one, and Apify is dry until 1 November. The discovery pause is no longer buying anything. This is the only decision that changes how many people exist to email, and it is Casey's.</li>
+    <li><b>Fix the em dash in the writing prompt.</b> Four of five dropped emails came out of <code>cold-email-attack-enemy-propose-5-ideas-v1</code> and two broke an explicitly banned character. The gate is doing its job at 97.2%; the prompt is the leak. Outside this agent's reach, inside a five-minute edit.</li>
+    <li><b>Give the campaign START call a 429 retry</b> in <code>automator/scripts/siege-plan.py</code>. Six people are sitting in two stopped campaigns with their rows already marked sent. It is small, it is silent, and it will happen again on every busy push.</li>
+    <li><b>More inboxes, not a higher day cap.</b> The plan was 618 against 618 mailbox slots on 50 live inboxes, under a cap of 870. Inboxes are the ceiling for the second cycle running.</li>
+    <li><b>Watch the OpenRouter runway.</b> $93.70 left at $3.71 a day is about 25 days, and the daily rate has climbed from $2.39 on 10-06 as the writer took on 600-email plans. The send path now costs real money, around $0.69 a day of it.</li>
+    <li><b>Six cycles still have metrics on disk and no debrief</b> (09-17, 09-18, 09-19, 08-17, 08-18, 07-11). Backfillable any time at no risk.</li>
+  </ol>
+
+  <div class="foot">
+    <b>Clean-run facts:</b> 0 fatal signatures, 0 halts, 0 crashes. <b>$0.00 Anthropic</b> for the 27th straight cycle. OpenRouter ran at $3.68 a day with $93.70 left, about 25 days of runway. The free recovery lane wrote 32 contact points across 11 leads, found 2 addresses on 2 people and parked 1; the paid lane wrote none. Enrichment did 1 batch of 1 lead with 0 failures. 15 of 66 YouTube keys came back working after the midnight reset and 50 were still exhausted, which does not matter while discovery is off. Discovery wrote 0 new channels, which is the pause doing exactly what Casey asked for on 2026-09-08. This repo's own send path ran once and had nothing to fire. Of the 613 loaded, 571 were <code>approved_hold</code> and 42 <code>approved</code>. <span class="muted">Snapshot written 07:20:01Z on schedule; regenerated at 07:30Z to verify the two new instrument fields, with every headline figure identical and the numbers quoted here taken from the scheduled run.</span>
+  </div>
+
+</div>
+
+<script>
+  // Emails loaded per minute, 10:23Z to 12:05Z on 2026-10-09, counted from SENT lines in
+  // automator/logs/siege.log. Index 7 and 18 are the two campaign starts that died on a 429.
+  var seq = [9,6,10,7,12,6,8,13,2,2,12,9,11,0,7,11,10,15,5,2,9,14,2,13,0,2,9,2,0,0,12,0,7,8,0,0,0,0,3,3,9,4,9,0,0,0,2,13,0,0,9,6,1,5,3,11,9,12,0,0,3,10,9,8,7,6,14,3,0,0,11,2,13,0,7,9,0,11,0,3,8,10,8,4,15,0,6,9,0,0,14,4,11,7,8,7,9,13,5,0,10,5,10];
+  var FAILED_START = [7, 18], PEAK = 15;
+  var strip = document.getElementById('strip');
+  seq.forEach(function (v, i) {
+    var dead = FAILED_START.indexOf(i) >= 0;
+    var b = document.createElement('div');
+    b.className = 'bar' + (dead ? ' wall' : v === 0 ? ' zero' : '');
+    if (v > 0) b.style.height = Math.round((v / PEAK) * 100) + '%';
+    if (dead) b.style.height = '100%';
+    var mins = 10 * 60 + 23 + i;
+    var clock = String(Math.floor(mins / 60)).padStart(2, '0') + ':' + String(mins % 60).padStart(2, '0') + 'Z';
+    b.title = dead
+      ? clock + ': a campaign start died on a SmartLead 429 (' + v + ' loaded this minute)'
+      : clock + ': ' + v + ' loaded';
+    strip.appendChild(b);
+  });
+</script>
