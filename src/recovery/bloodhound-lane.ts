@@ -1500,6 +1500,42 @@ export function collectPassAttribution(
   /** Of those, how many resolved no website at all. The upper bound on what the
    *  spent plan cost this pass. */
   noSiteAfterRefusal: number;
+  /** What Brave itself did in this pass, read off the one line the collect CLI
+   *  prints beside the footer (youtube-email-outreach-v1, 2026-10-05). All null
+   *  for a pass logged before that line existed, which means unknowable, NOT
+   *  zero. See `braveGateRejected` for why this is here. */
+  braveSearches: number | null;
+  braveCandidates: number | null;
+  braveSocialOnly: number | null;
+  /** Leads that needed a search while NO key was configured — the 2026-10-05
+   *  fault, which prints a different line and no counts. */
+  braveUnconfigured: number | null;
+  /** Of `braveCandidates`, how many became the lead's site. Derived: the leads
+   *  that never needed a search already held one, so
+   *  `resolvedSampled - (sampled - braveSearches)` is what Brave contributed. */
+  braveAccepted: number | null;
+  /** Brave found a candidate and the strict ownership gate refused it.
+   *
+   *  WHY THIS READING EXISTS (2026-10-10). A no-site pass had three named causes
+   *  (every key refused, a non-refusal error, Brave answering with only social
+   *  hits) and a fourth nobody counted: Brave answers fine, returns a real
+   *  candidate, and `websiteCandidateLooksOwned` refuses it because the page
+   *  cannot be tied to that creator. That gate is correct and deliberate (the
+   *  2026-08-18 audit put it there to stop strangers' emails being filed under a
+   *  lead), but it is invisible, so the pass reads as "no website found".
+   *
+   *  It is now the dominant cause and it was being misread. The two passes in the
+   *  2026-10-10 cycle logged 149 and 150 searches with 114 and 124 candidates and
+   *  ZERO refusals, and resolved a site for 8 and 15 of 150 leads: the gate
+   *  refused 107 and 109 real candidates. The hourly alarm filed both
+   *  `attributed_to: "unexplained"` and printed "check the collect log before
+   *  spending anything" — while the collect log held the answer on the line below
+   *  the footer it was already reading. Same bug class as 09-12, 09-13, 09-22 and
+   *  09-27: a claim about cause with no measurement behind it.
+   *
+   *  The consequence is a spend decision: a gate-refused pass cannot be bought
+   *  back with Brave credit, however loud the no-site rate. */
+  braveGateRejected: number | null;
   historyPasses: number;
 } | null {
   const minSample = opts.minSample ?? 30;
@@ -1550,6 +1586,49 @@ export function collectPassAttribution(
     if (m) before.add(m[1]!);
   }
   const seenBefore = ids.filter((id) => before.has(id)).length;
+
+  // The Brave line sits AFTER the footer, beside the methods-found line, so it is
+  // outside the pass window read above — same shape as collectPasses()' FOUND line.
+  // Scan only the few lines between this footer and the next pass's first lead, so a
+  // later pass's line can never be read as evidence about this one (the 2026-09-22
+  // mistake).
+  const BRAVE = /^\[bloodhound\] Brave website resolution: (\d+) searches, (\d+) resolved a candidate site, (\d+) answered with only social\/third-party hits, (\d+) hit a key refusal, (\d+) errored\./;
+  const BRAVE_OFF = /^\[bloodhound\] Brave website resolution was OFF: no BRAVE_SEARCH_API_KEY is set in this process, so (\d+) lead\(s\)/;
+  let braveSearches: number | null = null;
+  let braveCandidates: number | null = null;
+  let braveSocialOnly: number | null = null;
+  let braveUnconfigured: number | null = null;
+  for (const raw of lines.slice(ends[pick]!.at + 1, ends[pick]!.at + 9)) {
+    const line = raw.trim();
+    if (/^\[rec\w+\]/.test(line)) break; // the next pass has started
+    const off = BRAVE_OFF.exec(line);
+    if (off) {
+      braveUnconfigured = Number(off[1]);
+      braveSearches = 0;
+      braveCandidates = 0;
+      braveSocialOnly = 0;
+      break;
+    }
+    const b = BRAVE.exec(line);
+    if (b) {
+      braveSearches = Number(b[1]);
+      braveCandidates = Number(b[2]);
+      braveSocialOnly = Number(b[3]);
+      braveUnconfigured = 0;
+      break;
+    }
+  }
+  // Leads that never needed a search already held a site, so the rest of what
+  // resolved is Brave's contribution. Clamped: the lead lines and the counters come
+  // from the same process but not the same statement, so a truncated log must
+  // under-claim rather than go negative.
+  const braveAccepted = braveSearches === null
+    ? null
+    : Math.max(0, Math.min(braveCandidates ?? 0, resolvedSampled - (ids.length - braveSearches)));
+  const braveGateRejected = braveCandidates === null || braveAccepted === null
+    ? null
+    : Math.max(0, braveCandidates - braveAccepted);
+
   return {
     sampled: ids.length,
     noSite,
@@ -1562,6 +1641,55 @@ export function collectPassAttribution(
     braveRefusedAfterLeads,
     leadsAfterRefusal,
     noSiteAfterRefusal,
+    braveSearches,
+    braveCandidates,
+    braveSocialOnly,
+    braveUnconfigured,
+    braveAccepted,
+    braveGateRejected,
     historyPasses: pick,
   };
+}
+
+/** The cause of a no-site pass, named from the pass's own counters.
+ *
+ *  Exists so the hourly alarm and the daily snapshot cannot disagree about why a
+ *  pass resolved no websites — the exact disagreement that produced
+ *  `attributed_to: "unexplained"` twice in the 2026-10-10 cycle while the collect
+ *  log carried the answer. Ordered by what a reader should act on:
+ *
+ *   - `search_off`       no key configured. A fault, free to fix. (2026-10-05)
+ *   - `search_dead`      every key refused inside the pass. Costs money to fix.
+ *   - `ownership_gate`   Brave answered with real candidates and the strict
+ *                        ownership gate refused most of them. NOT buyable.
+ *   - `no_candidates`    Brave answered and the hits were social/third-party.
+ *                        A genuinely site-less slice of the book. NOT buyable.
+ *   - `resolution_ok`    the pass resolved sites for most of its leads; whatever
+ *                        is wrong is not website resolution.
+ *   - `unmeasured`       the pass predates the Brave summary line (2026-10-05).
+ *                        Unknowable, not zero.
+ *
+ *  The two faults are named ahead of `resolution_ok` on purpose: a pass can search with
+ *  no key, or burn through its plan, and still resolve most of its leads off stored
+ *  sites. That is worth saying. Read `noSitePct` beside this to know whether it cost the
+ *  pass anything. */
+export type NoSiteCause =
+  | 'search_off'
+  | 'search_dead'
+  | 'ownership_gate'
+  | 'no_candidates'
+  | 'resolution_ok'
+  | 'unmeasured';
+
+export function noSiteCause(
+  att: NonNullable<ReturnType<typeof collectPassAttribution>>,
+  alarmPct = 70,
+): NoSiteCause {
+  if ((att.braveUnconfigured ?? 0) > 0) return 'search_off';
+  if (att.braveRefusals > 0) return 'search_dead';
+  if (att.noSitePct < alarmPct) return 'resolution_ok';
+  if (att.braveCandidates === null || att.braveGateRejected === null) return 'unmeasured';
+  // Which half of the no-site leads is bigger: the ones Brave could not find a
+  // candidate for, or the ones whose candidate the gate threw out.
+  return att.braveGateRejected >= (att.braveSocialOnly ?? 0) ? 'ownership_gate' : 'no_candidates';
 }

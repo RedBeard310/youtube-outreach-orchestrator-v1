@@ -1,4 +1,4 @@
-import { apifyBatchFacts, apifyLedgerLine, normalizePushReason, siegePushOutcome, classifyKeyProbe, cyclePacificDay, enrichmentChainFacts, isSendingDay, projectRecoveryBudget, MAX_MISSING_DEBRIEFS, missingDebriefs, pushRunVerdict, unitStartedAt, sendPlanHealth, siegePlanFacts, summarizeSendLines, isVerifiedOrBeyond, laneYield, priorAdvanceSource, priorSeedsAdvanced, priorSeedsWalked, reconcileAdvanced, sessionSeedsAdvanced, sessionStartMs, walkRateTrend } from './debrief-data.ts';
+import { apifyBatchFacts, apifyLedgerLine, normalizePushReason, offerFromBatchId, siegePushOutcome, classifyKeyProbe, cyclePacificDay, enrichmentChainFacts, isSendingDay, projectRecoveryBudget, MAX_MISSING_DEBRIEFS, missingDebriefs, pushRunVerdict, unitStartedAt, sendPlanHealth, siegePlanFacts, summarizeSendLines, isVerifiedOrBeyond, laneYield, priorAdvanceSource, priorSeedsAdvanced, priorSeedsWalked, reconcileAdvanced, sessionSeedsAdvanced, sessionStartMs, walkRateTrend } from './debrief-data.ts';
 let fail = 0;
 const ok = (name: string, got: unknown, want: unknown) => {
   const pass = JSON.stringify(got) === JSON.stringify(want);
@@ -500,6 +500,57 @@ ok('a writer\'s own gate line is still not a push loss (no lead id on it)',
     '2026-10-08T07:00:00.000Z', '2026-10-09T07:00:00.000Z');
     return [p.sent, p.failed, p.skipped, p.reasons.length]; })(),
   [0, 0, 0, 0]);
+
+// 2026-10-10: the SKIP line says only `batch report marked it failed`, which names no rule
+// and no remedy. The writer's verdict a few lines up does. Verbatim shapes from the cycle,
+// including the interleaved SENT that defeated a rolling buffer and made per-batch keying
+// necessary.
+const GATE_LOG = [
+  '[2026-10-09T10:24:44Z] $ node /home/casey/.claude/skills/cold-email-attack-enemy-propose-5-ideas-v1/scripts/run-batch.mjs --leads /home/casey/repos/automator/state/siege/2026-10-09/siege-2026-10-09-22824615-attack-enemy-propose-5-ideas-e8e54c/leads.json ...',
+  '[2026-10-09T10:24:44Z]   | Griff & Alyssa             FAIL  242w  fails 2->1->1->1',
+  '[2026-10-09T10:24:44Z]   |     still broken: em dash — 1 em dash(es) outside the sign-off',
+  '[2026-10-09T10:24:46Z]   |   batch_id   = siege-2026-10-09-22824615-attack-enemy-propose-5-ideas-e8e54c',
+  '[2026-10-09T10:24:46Z]   |   SENT  rec4f871yMuUE1zhO    oscar@detailgroove.co  smartlead_lead=4721059495',
+  '[2026-10-09T10:24:46Z]   |   SKIP  recIUDe7gmSe4yYZ7    batch report marked it failed',
+  '[2026-10-09T12:00:22Z] $ node /home/casey/.claude/skills/cold-email-joke-AI-slop-v1/scripts/run-batch.mjs --leads /home/casey/repos/automator/state/siege/2026-10-09/siege-2026-10-09-23650563-joke-ai-slop-1484cc/leads.json ...',
+  '[2026-10-09T12:00:22Z]   |     still broken: say-the-action — consultant abstraction "Streamline": name what actually happens',
+  '[2026-10-09T12:00:24Z]   |   batch_id   = siege-2026-10-09-23650563-joke-ai-slop-1484cc',
+  '[2026-10-09T12:00:24Z]   |   SKIP  rec7lROlWkJgP64Zf    batch report marked it failed',
+].join('\n');
+const GATED = siegePushOutcome(GATE_LOG, '2026-10-09T07:00:00.000Z', '2026-10-10T07:00:00.000Z');
+ok('a skip reports the rule the writer\'s gate broke, not the push\'s placeholder',
+  GATED.reasons,
+  [{ reason: 'quality gate: em dash — 1 em dash(es) outside the sign-off', leads: 1 },
+   { reason: 'quality gate: say-the-action — consultant abstraction "Streamline": name what actually happens', leads: 1 }]);
+ok('a skip is attributed to the offer whose writer made the draft',
+  GATED.skipped_by_offer,
+  [{ offer: 'attack-enemy-propose-5-ideas', leads: 1 }, { offer: 'joke-ai-slop', leads: 1 }]);
+ok('an interleaved SENT does not consume the batch\'s gate reason',
+  [GATED.sent, GATED.skipped], [1, 2]);
+ok('a skip with no writer verdict in the log keeps the push\'s own string',
+  (() => { const p = siegePushOutcome(
+    '[2026-10-09T10:24:46Z]   |   batch_id   = siege-2026-10-09-22824615-attack-enemy-propose-5-ideas-e8e54c\n'
+    + '[2026-10-09T10:24:46Z]   |   SKIP  recIUDe7gmSe4yYZ7    batch report marked it failed',
+    '2026-10-09T07:00:00.000Z', '2026-10-10T07:00:00.000Z');
+    return p.reasons; })(),
+  [{ reason: 'batch report marked it failed', leads: 1 }]);
+ok('a second skip in one batch takes the second verdict, not the first again',
+  (() => { const p = siegePushOutcome([
+    '[2026-10-09T11:28:35Z] $ node /x/scripts/run-batch.mjs --leads /s/siege-2026-10-09-23650470-attack-enemy-propose-5-ideas-e8e54c/leads.json',
+    '[2026-10-09T11:28:35Z]   |     still broken: opener — must start "Hey <First name>,"',
+    '[2026-10-09T11:28:35Z]   |     still broken: closing block — the locked closing block is missing or reworded',
+    '[2026-10-09T11:28:37Z]   |   batch_id   = siege-2026-10-09-23650470-attack-enemy-propose-5-ideas-e8e54c',
+    '[2026-10-09T11:28:37Z]   |   SKIP  reckQDgAvSDDTT2yH    batch report marked it failed',
+    '[2026-10-09T11:28:37Z]   |   SKIP  recd8rH73DWjHpjsn    batch report marked it failed',
+  ].join('\n'), '2026-10-09T07:00:00.000Z', '2026-10-10T07:00:00.000Z');
+    return [p.reasons.map((r) => r.reason), p.skipped_by_offer]; })(),
+  [['quality gate: closing block — the locked closing block is missing or reworded',
+    'quality gate: opener — must start "Hey <First name>,"'],
+   [{ offer: 'attack-enemy-propose-5-ideas', leads: 2 }]]);
+ok('a batch id of an unreadable shape names no offer rather than guessing one',
+  [offerFromBatchId('siege-2026-10-09-23650563-joke-ai-slop-1484cc'),
+    offerFromBatchId('siege-nonsense'), offerFromBatchId('siege-2026-10-09-23650563-joke-ai-slop')],
+  ['joke-ai-slop', null, null]);
 
 // unitStartedAt — a daemon-reload must not blind the verdict on the run it followed.
 ok('the service\'s own stamp wins when it has one',

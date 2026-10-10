@@ -23,6 +23,7 @@ import {
   collectPasses,
   collectYieldBetween,
   loadState,
+  noSiteCause,
 } from '../../src/recovery/bloodhound-lane.ts';
 import { summarizeToday, pacificDate } from './burn-ledger.js';
 
@@ -201,6 +202,9 @@ export type SiegePushOutcome = {
   batches_failed_before_first_lead: number | null;
   escalations: number | null;
   reasons: Array<{ reason: string; leads: number }>;
+  /** Which offer's writer produced the skipped drafts, so the fix has an address.
+   *  Empty when nothing was skipped. See siegePushOutcome(). */
+  skipped_by_offer: Array<{ offer: string; leads: number }>;
 };
 
 export const NO_PUSH_OUTCOME: SiegePushOutcome = {
@@ -211,6 +215,7 @@ export const NO_PUSH_OUTCOME: SiegePushOutcome = {
   batches_failed_before_first_lead: null,
   escalations: null,
   reasons: [],
+  skipped_by_offer: [],
 };
 
 export type SendPlanHealth = SiegePlanFacts & SiegeUnitFacts & {
@@ -393,7 +398,21 @@ export function sendPlanHealth(
  *  Counted apart from `failed` on purpose. `failed` is SmartLead refusing a lead we
  *  offered it; `skipped` is us declining to offer one. Mixing them would have made the
  *  first clean full-plan push read as six SmartLead rejections. `reasons` covers both,
- *  since the question it answers is "why did a planned email not go out". */
+ *  since the question it answers is "why did a planned email not go out".
+ *
+ *  THE SKIP LINE DOES NOT CARRY ITS OWN REASON (2026-10-10). It says
+ *  `batch report marked it failed` and nothing else, so counting SKIPs bought the
+ *  arithmetic and not the diagnosis: all five of the 2026-10-10 shortfall reported that
+ *  one string, which names no rule and no remedy. The real reason is printed by the
+ *  batch WRITER a few lines above, as `still broken: <rule> — <detail>` under its own
+ *  `<channel> FAIL <words> fails ...` line, inside the same batch directory. So keep the
+ *  writer's reasons per batch id and spend them, in order, on that batch's SKIPs. Reading
+ *  them in cycle order rather than per batch was tried first and loses reasons: a batch's
+ *  SENT lines interleave with its SKIPs, so a rolling buffer gets cleared mid-batch.
+ *
+ *  `skipped_by_offer` comes from the same loop because the fix is a different one per
+ *  skill: on 2026-10-10 four of the five skips came out of ONE offer's writer
+ *  (attack-enemy-propose-5-ideas) and the snapshot could not say so. */
 export function siegePushOutcome(log: string, sinceISO: string, untilISO: string): SiegePushOutcome {
   const since = Date.parse(sinceISO);
   const until = Date.parse(untilISO);
@@ -403,12 +422,32 @@ export function siegePushOutcome(log: string, sinceISO: string, untilISO: string
   let deadBatches = 0;
   let escalations = 0;
   const reasons = new Map<string, number>();
+  const skippedByOffer = new Map<string, number>();
+  // Writer verdicts waiting to be claimed by a SKIP, keyed by batch id. Filled from the
+  // writer's `still broken:` lines; drained in order by that batch's SKIP lines.
+  const gateReasons = new Map<string, string[]>();
+  const gateUsed = new Map<string, number>();
+  // The batch whose lines we are currently inside. Both the writer invocation (a path
+  // ending `<batch-id>/leads.json`) and the push header (`batch_id = <batch-id>`) name it.
+  let batch: string | null = null;
 
   for (const line of log.split('\n')) {
     const stamp = /^\[(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ)\]/.exec(line);
     if (!stamp) continue;
     const t = Date.parse(stamp[1]!);
     if (!Number.isFinite(t) || t < since || t >= until) continue;
+
+    const writerBatch = /\/(siege-[A-Za-z0-9-]+)\/leads\.json/.exec(line);
+    if (writerBatch) batch = writerBatch[1]!;
+    const pushBatch = /batch_id\s+=\s+(siege-[A-Za-z0-9-]+)/.exec(line);
+    if (pushBatch) batch = pushBatch[1]!;
+    const broken = /\bstill broken:\s*(.+)$/.exec(line);
+    if (broken && batch) {
+      const list = gateReasons.get(batch) ?? [];
+      list.push(broken[1]!.trim());
+      gateReasons.set(batch, list);
+      continue;
+    }
 
     // Both tallies require the lead id the push prints after the verdict. Without it this
     // also catches lines from the batch WRITERS, which print their own FAIL for a lead whose
@@ -426,7 +465,17 @@ export function siegePushOutcome(log: string, sinceISO: string, untilISO: string
     const skip = /\bSKIP\s+rec[A-Za-z0-9]{8,}\s+(.*)$/.exec(line);
     if (skip) {
       skipped++;
-      const reason = normalizePushReason(skip[1]!);
+      if (batch) {
+        const offer = offerFromBatchId(batch);
+        if (offer) skippedByOffer.set(offer, (skippedByOffer.get(offer) ?? 0) + 1);
+      }
+      // Prefer the writer's own verdict; fall back to the push's placeholder string when
+      // the log holds none (a batch whose writer output rotated out, say).
+      const queue = batch ? gateReasons.get(batch) ?? [] : [];
+      const i = batch ? gateUsed.get(batch) ?? 0 : 0;
+      if (batch) gateUsed.set(batch, i + 1);
+      const raw = i < queue.length ? `quality gate: ${queue[i]!}` : skip[1]!;
+      const reason = normalizePushReason(raw);
       reasons.set(reason, (reasons.get(reason) ?? 0) + 1);
       continue;
     }
@@ -449,7 +498,23 @@ export function siegePushOutcome(log: string, sinceISO: string, untilISO: string
       .sort((a, b) => b.leads - a.leads || a.reason.localeCompare(b.reason))
       // Enough to see the shape of a bad day without pasting a log into the snapshot.
       .slice(0, 6),
+    skipped_by_offer: [...skippedByOffer.entries()]
+      .map(([offer, leads]) => ({ offer, leads }))
+      .sort((a, b) => b.leads - a.leads || a.offer.localeCompare(b.offer))
+      .slice(0, 8),
   };
+}
+
+/** The offer name inside a Siege batch id.
+ *
+ *  Ids look like `siege-2026-10-09-23650563-joke-ai-slop-1484cc`: the prefix, the day,
+ *  the campaign id, the offer, and a hash. Taking the middle by position rather than by
+ *  regex over a list of offer names, so a new offer needs no change here. Returns null
+ *  for a shape it cannot read, because a wrong offer name would point a fix at the wrong
+ *  skill. */
+export function offerFromBatchId(batchId: string): string | null {
+  const m = /^siege-\d{4}-\d\d-\d\d-\d+-(.+)-[0-9a-f]{6}$/.exec(batchId);
+  return m ? m[1]! : null;
 }
 
 /** One refusal, reduced to its shape so two of the same thing count as two.
@@ -2126,6 +2191,18 @@ async function main(): Promise<void> {
         resolved_hit: att.resolvedHit,
         // The alarm's own threshold, so the report never invents a second bar.
         collapsed: att.noSitePct >= Number(process.env.AUTOPILOT_NO_SITE_ALARM_PCT ?? 70),
+        // WHY A COLLAPSED PASS COLLAPSED (2026-10-10). `collapsed: true` with
+        // `brave_refusals: 0` had two readings in the note below and the truth was a
+        // third: Brave answers, returns a real candidate, and the strict ownership gate
+        // refuses it. Measured on the two passes in this cycle, the gate threw out 107
+        // and 109 of 114 and 124 candidates. `cause` is named by the same function the
+        // hourly alarm uses, so the report and the alarm cannot disagree.
+        brave_searches: att.braveSearches,
+        brave_candidates: att.braveCandidates,
+        brave_accepted: att.braveAccepted,
+        gate_rejected: att.braveGateRejected,
+        social_only: att.braveSocialOnly,
+        cause: noSiteCause(att, Number(process.env.AUTOPILOT_NO_SITE_ALARM_PCT ?? 70)),
         pass_summary: passes.length > 0 ? passes[passes.length - 1]!.summary : null,
         // A ZERO-POINT PASS WAS UNREADABLE FROM THIS FILE ALONE (2026-10-08). pass_summary
         // said "Collected 0 contact points from 0/150 leads" and the methods were in fact
@@ -2343,9 +2420,22 @@ async function main(): Promise<void> {
         'READ site_resolution BEFORE BLAMING A PICKED-OVER BOOK: it describes the newest ' +
         'completed collect pass, nine of thirteen collection methods need the creator website ' +
         'first, and collapsed:true means the lane had almost no input that pass whatever the ' +
-        "book's state. brave_refusals>0 names a spent search plan; collapsed with 0 refusals is " +
-        'either a resolution fault or a genuinely site-less slice, and the per-pass "Brave ' +
-        'website resolution:" line in the collect log says which. ' +
+        "book's state. brave_refusals>0 names a spent search plan. " +
+        'READ site_resolution.cause RATHER THAN GUESSING AT A COLLAPSED PASS (2026-10-10): ' +
+        'collapsed with 0 refusals used to be read as "either a resolution fault or a ' +
+        'site-less slice" and was in fact a third thing — Brave answers, returns a real ' +
+        'candidate, and the strict ownership gate refuses it because the page cannot be ' +
+        'tied to that creator (the gate is deliberate, 2026-08-18 audit). The two passes in ' +
+        'the 2026-10-10 cycle ran 149 and 150 searches with ZERO refusals, found candidates ' +
+        'for 114 and 124, and kept 8 and 15: the gate threw out 107 and 109. The hourly ' +
+        'alarm filed both `unexplained` and said "check the collect log before spending ' +
+        'anything" while the log held the answer one line under the footer it was reading. ' +
+        'cause is one of search_off (a configuration fault, free to fix), search_dead (costs ' +
+        'money), ownership_gate or no_candidates (NEITHER is buyable — Brave credit changes ' +
+        'nothing), resolution_ok, or unmeasured (the pass predates the counters, which means ' +
+        'unknowable and NOT zero). brave_searches/brave_candidates/brave_accepted/' +
+        'gate_rejected/social_only are the arithmetic behind it, named by the same function ' +
+        'the alarm uses so the two cannot disagree. ' +
         'AND READ site_resolution.methods_found BEFORE CALLING A ZERO-POINT PASS DEAD: the ' +
         'insert counts only rows it really wrote, so a lead whose points are all already ' +
         'stored scores 0 and reads identically to a lead the methods found nothing on. On ' +

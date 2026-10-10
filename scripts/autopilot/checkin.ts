@@ -31,6 +31,7 @@ import {
   collectYield,
   laneOptsFromEnv,
   loadState,
+  noSiteCause,
   runBloodhoundLane,
   runRecoveryDuringOpenRouterHalt,
 } from '../../src/recovery/bloodhound-lane.ts';
@@ -1307,9 +1308,18 @@ async function main(): Promise<void> {
         // byte-identical summary line, and the count is monotone.
         const passKey = `${passes.length}:${summary}`;
         if (att.noSitePct >= NO_SITE_ALARM_PCT && !alreadyObserved('bloodhound_site_resolution_collapsed', passKey)) {
-          const cause = att.braveRefusals > 0
-            ? `The search plan is the cause: ${braveCost(att)} Raise its cap or add BRAVE_SEARCH_API_KEY[_N] keys.`
-            : 'No Brave key refused inside this pass, so search credit is not what broke: this is either a new failure mode in website resolution or a genuinely site-less slice of the book. Check the collect log before spending anything.';
+          // Named from the pass's own Brave counters, so this alarm can no longer file
+          // the answer the collect log already carries as "unexplained" (2026-10-10).
+          const why = noSiteCause(att, NO_SITE_ALARM_PCT);
+          const cause = why === 'search_off'
+            ? `Website resolution was OFF: no Brave key was configured in that process, so ${att.braveUnconfigured} lead(s) that needed a lookup got none. A configuration fault, not a spend decision — see the 2026-10-05 fix.`
+            : why === 'search_dead'
+              ? `The search plan is the cause: ${braveCost(att)} Raise its cap or add BRAVE_SEARCH_API_KEY[_N] keys.`
+              : why === 'ownership_gate'
+                ? `SPENDING NOTHING WOULD CHANGE THIS. Brave ran ${att.braveSearches} searches with 0 key refusals and found a real candidate for ${att.braveCandidates} of them; the strict ownership gate refused ${att.braveGateRejected} because the page could not be tied to that creator, and only ${att.braveAccepted} became a site. The gate is deliberate (2026-08-18 audit). The constraint is that this stretch of the book has no findable site in the creator's own name.`
+                : why === 'no_candidates'
+                  ? `Brave answered for all ${att.braveSearches} lookups with 0 key refusals and ${att.braveSocialOnly} came back with only social/third-party hits, so this is a genuinely site-less slice of the book, not a fault and not a spend decision.`
+                  : 'No Brave key refused inside this pass and the pass predates the per-pass Brave counters, so the cause is unmeasured. Check the collect log before spending anything.';
           appendFileSync(OBSERVATIONS, JSON.stringify({
             ts: new Date().toISOString(), kind: 'bloodhound_site_resolution_collapsed',
             no_site: att.noSite, sampled: att.sampled, pct: Number(att.noSitePct.toFixed(1)), summary, pass_key: passKey,
@@ -1318,7 +1328,12 @@ async function main(): Promise<void> {
             pass_no_site_after_refusal: att.noSiteAfterRefusal,
             pass_brave_refused_after_leads: att.braveRefusedAfterLeads,
             pass_rewalk_pct: Number(att.rewalkPct.toFixed(1)),
-            attributed_to: att.braveRefusals > 0 ? 'search_dead' : 'unexplained',
+            pass_brave_searches: att.braveSearches,
+            pass_brave_candidates: att.braveCandidates,
+            pass_brave_accepted: att.braveAccepted,
+            pass_brave_gate_rejected: att.braveGateRejected,
+            pass_brave_social_only: att.braveSocialOnly,
+            attributed_to: why,
             detail: `The recovery lane's last completed collect pass resolved NO website for ${att.noSite} of ${att.sampled} leads (${att.noSitePct.toFixed(0)}%, alarm at ${NO_SITE_ALARM_PCT}%). 9 of its 10 collection methods need a website, so its yield collapses and the verify half starves on an empty queue — this is what took 2026-09-04 from 627 parked to 71. Pass summary: "${summary}". ${cause} Not escalating — the remedy is a spend call a fix-agent cannot make.`,
           }) + '\n');
           console.log(`[checkin ${day}] OBSERVATION bloodhound_site_resolution_collapsed — ${att.noSite}/${att.sampled} (${att.noSitePct.toFixed(0)}%) leads resolved no website`);
@@ -1388,7 +1403,12 @@ async function main(): Promise<void> {
           ? att.braveRefusals > 0
           : logText.split('\n').slice(-400).some((l) => l.includes('Brave Search API key'));
         const resolutionDown = att !== null && att.noSitePct >= NO_SITE_ALARM_PCT;
-        const spendWouldHelp = att === null || resolutionDown || braveRefused;
+        // A no-site pass is only a spend decision when search credit is what ran out.
+        // Since 2026-10-10 the pass says which, so a gate-refused or genuinely
+        // site-less slice stops reading as "buy more Brave" (see noSiteCause()).
+        const why = att === null ? null : noSiteCause(att, NO_SITE_ALARM_PCT);
+        const spendWouldHelp = att === null || braveRefused
+          || (resolutionDown && why === 'unmeasured');
         let cause: string;
         if (att && !resolutionDown) {
           const rewalking = att.rewalkPct >= REWALK_CAUSE_PCT;
@@ -1402,12 +1422,20 @@ async function main(): Promise<void> {
         } else if (braveRefused) {
           cause = `This pass resolved no website for ${att ? `${att.noSite} of ${att.sampled} leads (${att.noSitePct.toFixed(0)}%)` : 'most of its leads'} and the lane logged a Brave Search refusal, so the search plan is the cause: raise the plan cap or add BRAVE_SEARCH_API_KEY[_N] keys.` +
             (att ? ` In this pass, ${braveCost(att)}` : '');
+        } else if (att && why === 'ownership_gate') {
+          cause = `This pass resolved no website for ${att.noSite} of ${att.sampled} leads (${att.noSitePct.toFixed(0)}%) and SPENDING NOTHING WOULD CHANGE IT: Brave ran ${att.braveSearches} searches with 0 key refusals and found a candidate for ${att.braveCandidates}, but the strict ownership gate refused ${att.braveGateRejected} of them as not tied to that creator and only ${att.braveAccepted} became a site. The gate is deliberate (2026-08-18 audit); this stretch of the book has no findable site in the creator's own name.`;
+        } else if (att && why === 'no_candidates') {
+          cause = `This pass resolved no website for ${att.noSite} of ${att.sampled} leads (${att.noSitePct.toFixed(0)}%) and it is the book, not the plumbing: Brave answered all ${att.braveSearches} lookups with 0 key refusals and ${att.braveSocialOnly} returned only social/third-party hits. A site-less slice, nothing to buy and nothing to fix.`;
+        } else if (att && why === 'search_off') {
+          cause = `Website resolution was OFF for this pass: no Brave key was configured in that process, so ${att.braveUnconfigured} lead(s) needing a lookup got none. Configuration, not credit — see the 2026-10-05 fix.`;
         } else {
-          cause = 'No Brave refusal line was logged, so check the collect log for a new failure mode before assuming the backlog thinned.';
+          cause = 'No Brave refusal line was logged and this pass predates the per-pass Brave counters, so check the collect log for a new failure mode before assuming the backlog thinned.';
         }
-        const escalation = spendWouldHelp
-          ? 'Not escalating — the remedy is a spend call a fix-agent cannot make.'
-          : 'Not escalating — nothing is faulting, and no code change makes a mined-out book yield again.';
+        const escalation = why === 'search_off'
+          ? 'Not escalating — the remedy is configuration a fix-agent may not touch, not spend.'
+          : spendWouldHelp
+            ? 'Not escalating — the remedy is a spend call a fix-agent cannot make.'
+            : 'Not escalating — nothing is faulting, and no code change makes a mined-out book yield again.';
         const memory = y.baselineSource === 'long'
           ? ` The short ${y.shortPasses}-pass median has already sagged to ${((y.baselineShort ?? 0) * 100).toFixed(0)}%, so the baseline is being held up by the ${y.longPasses}-pass one — the slide has been running long enough to start erasing its own evidence.`
           : '';
@@ -1433,6 +1461,14 @@ async function main(): Promise<void> {
           pass_leads_after_refusal: att === null ? null : att.leadsAfterRefusal,
           pass_no_site_after_refusal: att === null ? null : att.noSiteAfterRefusal,
           pass_brave_refused_after_leads: att === null ? null : att.braveRefusedAfterLeads,
+          // What Brave did and what the ownership gate did with it (2026-10-10). The
+          // reason a 90%-no-site pass with zero refusals is not a spend decision.
+          pass_brave_searches: att?.braveSearches ?? null,
+          pass_brave_candidates: att?.braveCandidates ?? null,
+          pass_brave_accepted: att?.braveAccepted ?? null,
+          pass_brave_gate_rejected: att?.braveGateRejected ?? null,
+          pass_brave_social_only: att?.braveSocialOnly ?? null,
+          pass_no_site_cause: why,
           // Two causes can be true at once and the record now says so, because a
           // re-walked book and a dead search plan need opposite answers (wait
           // vs. spend) and 2026-09-27 was both.
