@@ -1,0 +1,232 @@
+<title>Lead Run Debrief — 2026-10-11</title>
+<style>
+  :root {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+      --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+      --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+    --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+    --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 40px 22px 80px; }
+  .eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); font-weight: 600; }
+  h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.12; margin: 10px 0 6px; text-wrap: balance; letter-spacing: -.02em; }
+  h2 { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); margin: 44px 0 16px; font-weight: 700; }
+  h3 { font-size: 18px; margin: 0 0 6px; letter-spacing: -.01em; }
+  p { margin: 0 0 14px; }
+  .lede { font-size: 18px; color: var(--ink-soft); max-width: 68ch; }
+  .tag { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--amber-soft); color: var(--amber); letter-spacing: .02em; }
+  .tag.good { background: var(--teal-soft); color: var(--teal); }
+  .grid { display: grid; gap: 14px; }
+  .stats { grid-template-columns: repeat(4, 1fr); margin-top: 26px; }
+  @media (max-width: 720px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; box-shadow: var(--shadow); }
+  .stat .n { font-size: 30px; font-weight: 750; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .stat .l { font-size: 12.5px; color: var(--ink-soft); margin-top: 3px; }
+  .stat .s { font-size: 12px; margin-top: 8px; font-weight: 600; }
+  .up { color: var(--good); } .down { color: var(--red); } .warn { color: var(--amber); }
+  .accent-red { border-left: 3px solid var(--red); }
+  .accent-teal { border-left: 3px solid var(--teal); }
+  .accent-amber { border-left: 3px solid var(--amber); }
+
+  /* shape-of-day bar strip */
+  .strip { display: flex; align-items: flex-end; gap: 1px; height: 120px; padding: 14px 14px 10px; overflow-x: auto; }
+  .bar { flex: 1 0 3px; min-width: 2px; border-radius: 2px 2px 0 0; background: var(--teal); opacity: .9; }
+  .bar.zero { background: var(--line); height: 4% !important; opacity: .8; }
+  .bar.extra { background: var(--good); opacity: .95; }
+  .bar.wall { background: var(--red); opacity: .9; }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-soft); padding: 0 14px 14px; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+
+  .q { border-radius: 14px; padding: 20px 22px; margin-bottom: 14px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); }
+  .q .ask { font-size: 17px; font-weight: 700; color: var(--ink); margin-bottom: 10px; display: flex; gap: 10px; align-items: baseline; }
+  .q .ask .qn { color: var(--red); font-weight: 800; flex: 0 0 auto; }
+  .q p { color: var(--ink-soft); }
+  .q b { color: var(--ink); }
+  .pill { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink); background: var(--panel-2); padding: 1px 7px; border-radius: 6px; border: 1px solid var(--line); white-space: nowrap; }
+  pre { background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; overflow-x: auto; font-size: 12.5px; line-height: 1.5; color: var(--ink); margin: 0 0 14px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+  th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); }
+  td .num { font-variant-numeric: tabular-nums; font-weight: 650; }
+  .fix td:first-child { color: var(--good); font-weight: 650; }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); box-shadow: var(--shadow); }
+  ol.recs { padding-left: 0; list-style: none; counter-reset: r; margin: 0; }
+  ol.recs li { counter-increment: r; position: relative; padding: 14px 16px 14px 52px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 10px; box-shadow: var(--shadow); }
+  ol.recs li::before { content: counter(r); position: absolute; left: 14px; top: 14px; width: 26px; height: 26px; border-radius: 8px; background: var(--teal-soft); color: var(--teal); font-weight: 800; font-size: 14px; display: grid; place-items: center; }
+  ol.recs b { color: var(--ink); }
+  .foot { margin-top: 46px; padding: 16px 18px; border-radius: 12px; background: var(--amber-soft); border: 1px solid var(--line); font-size: 14px; color: var(--ink-soft); }
+  .foot b { color: var(--ink); }
+  .muted { color: var(--ink-soft); font-size: 13.5px; }
+</style>
+
+
+<style>
+  /* Per-pass funnel bars. Four passes is too few for the usual minute strip, and the
+     story here is the ratio inside each bar, not a time series. */
+  .passes { display: grid; gap: 10px; padding: 16px 18px; }
+  .prow { display: grid; grid-template-columns: 170px 1fr 148px; gap: 12px; align-items: center; font-size: 13px; }
+  @media (max-width: 720px) { .prow { grid-template-columns: 1fr; gap: 4px; } }
+  .prow .who { color: var(--ink-soft); }
+  .prow .who b { color: var(--ink); }
+  .track { height: 20px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; display: flex; }
+  .track .old { background: var(--line); height: 100%; }
+  .track .fresh { background: var(--good); height: 100%; min-width: 2px; }
+  .prow .right { color: var(--ink-soft); font-variant-numeric: tabular-nums; text-align: right; }
+  .prow .right b { color: var(--ink); }
+</style>
+
+<div class="wrap">
+
+  <div class="eyebrow">Lead Run Debrief · YouTube outreach</div>
+  <h1>2026-10-11: a quiet Saturday, and the biggest error in the recovery lane turned out to be a method that has never once worked</h1>
+  <p class="lede">Nothing sent, because Saturday is not a sending day. The cycle's whole output was <b>two people parked</b>. With the push out of the way, the thing worth reading is the free recovery lane, which this cycle ran three passes of two completely different shapes, and <b>both shapes say the book is finished</b>: on the slice with no stored websites the ownership gate refused almost every search result, and on the slices that did have websites the methods fired at full strength and found <b>1,042 contact points and 1,027 of them were already on file</b>. Inside that, a new instrument caught something nobody had looked for: <b><code>09-finra</code> is the single largest error in every pass and it has produced zero contact points in its entire life</b>, because its API path was retired and answers 404 to every call.</p>
+  <div style="margin-top:14px"><span class="tag">NOT A SENDING DAY · 0 EMAILS BY DESIGN</span> <span class="tag">2 PARKED</span> <span class="tag good">A DEAD METHOD FOUND AND CUT</span></div>
+
+  <div class="grid stats">
+    <div class="card stat">
+      <div class="n">0</div>
+      <div class="l">emails loaded</div>
+      <div class="s muted">Saturday; the Siege timer is Mon–Fri</div>
+    </div>
+    <div class="card stat accent-amber">
+      <div class="n">2</div>
+      <div class="l">people parked in <code>approved_hold</code></div>
+      <div class="s warn">7,596 → 7,598</div>
+    </div>
+    <div class="card stat accent-teal">
+      <div class="n">1,117</div>
+      <div class="l">of 1,132 contact points already on file</div>
+      <div class="s up">98.7% re-walk across three passes</div>
+    </div>
+    <div class="card stat accent-red">
+      <div class="n">6,074</div>
+      <div class="l">people on the shelf, never emailed</div>
+      <div class="s muted">about 5.5 weeks at 277 a sending day</div>
+    </div>
+  </div>
+
+  <h2>The shape of the day</h2>
+  <div class="card" style="padding:0">
+    <div class="passes">
+      <div class="prow">
+        <div class="who"><b>Pass 1</b> · 125 leads<br><span class="muted">0 had a site on file</span></div>
+        <div class="track"><div class="old" style="width:8.6%"></div><div class="fresh" style="width:0%"></div></div>
+        <div class="right"><b>90</b> found · <b>0</b> new</div>
+      </div>
+      <div class="prow">
+        <div class="who"><b>Pass 2</b> · 150 leads<br><span class="muted">126 had a site on file</span></div>
+        <div class="track"><div class="old" style="width:85.5%"></div><div class="fresh" style="width:2.2%"></div></div>
+        <div class="right"><b>519</b> found · <b>13</b> new</div>
+      </div>
+      <div class="prow">
+        <div class="who"><b>Pass 3</b> · 150 leads<br><span class="muted">120 had a site on file</span></div>
+        <div class="track"><div class="old" style="width:88%"></div><div class="fresh" style="width:0.3%"></div></div>
+        <div class="right"><b>523</b> found · <b>2</b> new</div>
+      </div>
+      <div class="prow">
+        <div class="who"><b>Pass 4</b> · 150 leads<br><span class="muted">just past the cycle, 07:01Z</span></div>
+        <div class="track"><div class="old" style="width:99.3%"></div><div class="fresh" style="width:0.7%"></div></div>
+        <div class="right"><b>592</b> found · <b>4</b> new</div>
+      </div>
+    </div>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--line)"></span>points the methods found that were already stored</span>
+      <span><span class="dot" style="background:var(--good)"></span>points that were new</span>
+    </div>
+  </div>
+  <p class="muted">Bar width is points found against the widest pass, so the four bars are comparable. Read against <b>how many of each pass's leads already had a website on file</b>: pass 1 had none, so nine of the thirteen collection methods could not run and the pass found 90 points on 125 leads. Passes 2 to 4 had 126, 120 and 145, so the methods ran properly and found 519, 523 and 592. That is the same lane on the same book, four hours apart, looking broken and then looking healthy. Counted from <code>logs/bloodhound-collect.log</code> via <code>collectPasses()</code>; passes 1 to 3 are inside the cycle and account for exactly the 15 contact points and 7 people the snapshot reports.</p>
+
+  <h2>The three questions</h2>
+
+  <div class="q">
+    <div class="ask"><span class="qn">Q1</span><span>Nothing sent. Is that a fault?</span></div>
+    <p><b>No. It was Saturday.</b> <code>siege-plan.timer</code> runs Monday to Friday, so the snapshot reports <code>sending_day: false</code> and <code>binding_constraint: not_a_sending_day</code>, and no plan was written because no plan was due. The push log carries zeros rather than a gap, so this is a schedule reading its own calendar and not a run that died quietly.</p>
+    <p class="muted">This repo's own send path ran once and had nothing to fire: <code>attempted=0 sent=0 failed=0</code>. <code>siege-plan.service</code>'s last run was Friday at 12:05Z and reported <code>success</code>, which is the run the 10-10 debrief covered. Nothing restarted, nothing escalated, no halt flag, and the 429 that stranded six people in two stopped campaigns on Friday did not recur because there was no push to recur in.</p>
+  </div>
+
+  <div class="q accent-teal">
+    <div class="ask"><span class="qn">Q2</span><span>The recovery lane found 1,042 contact points and parked two people. Which is it, a broken lane or a finished book?</span></div>
+    <p><b>A finished book, and this cycle proved it from both directions at once.</b> Yesterday's debrief answered the first half: on a slice where no lead has a stored website, Brave answers, the strict ownership gate refuses the candidate because the page cannot be tied to that creator, and the methods have nothing to work with. That shape repeated here in pass 1: <span class="pill">125 searches</span>, 105 real candidates, <b>97 refused by the gate</b>, 8 accepted, and 90 points found on 125 leads.</p>
+    <p><b>The second half is new, and it is the stronger half.</b> Passes 2, 3 and 4 walked slices where most leads already had a website on file, so the gate never came into it and nine more methods could run. They found <b>519, 523 and 592</b> points. Of those <b>1,634</b> points, <b>1,615 were already stored</b>. The methods are not weak and resolution is not down: on the stretch of the book we can collect from, the collecting is already done. <b>19 new points off 450 leads</b> is the whole remaining yield.</p>
+    <p class="muted">Both alarms went quiet on their own after pass 1 without anyone touching anything, which is the attribution fix behaving: the 11:11Z <code>bloodhound_site_resolution_collapsed</code> record reads <code>attributed_to: "ownership_gate"</code> and states plainly that spending nothing would change it. That is the first production outing of yesterday's <code>noSiteCause()</code>, and it named the cause correctly with no human in the loop. Lap 9 of a 2,515-lead book, <code>stranded</code> held at 3 for the 28th day, <code>needs_contact</code> down to 3,511.</p>
+  </div>
+
+  <div class="q accent-amber">
+    <div class="ask"><span class="qn">Q3</span><span>What was the biggest single thing going wrong in those passes?</span></div>
+    <p><b>A method that has never worked, running once per lead on a 12-second timeout.</b> The new error instrument says the commonest error shape in the newest pass was <code>09-finra: FINRA N</code>, <b>53 of its 442 errors</b>, and the same shape topped the two passes before it at 44 and 28. Checked against the database, <code>leads.contact_points</code> holds <b>zero rows</b> from that method against 15,031 from <code>34-channel-page</code>. Probed directly, its endpoint answers <span class="pill">404 Invalid resource</span>: the API path was retired and nobody noticed, because an error buried in a 442-error total reads as weather.</p>
+    <p><b>It could not have worked anyway.</b> The method searched a national register of financial advisers using <code>hostFirstName</code>, and of the 2,194 <code>needs_contact</code> leads that have one, <b>23 hold a full name</b>. Searching FINRA for "Jane" returns hundreds of people, and filing one of them is exactly the stranger-filing bug the 2026-08-18 audit closed. So two independent faults, both silent, in a method that costs ~50 futile requests a pass.</p>
+    <p class="muted">Both are fixed below. The honest footnote: fixing it does not park anybody. The lane's yield is set by the book, not by this method. What it buys is ~50 fewer dead requests a pass and an error report where the top shape means something.</p>
+  </div>
+
+  <h2>What broke → what's fixed</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>What</th><th>Evidence</th><th>State</th></tr></thead>
+      <tbody>
+        <tr class="fix">
+          <td>A collection method dead since before it was measured</td>
+          <td><code>09-finra</code> topped the error shapes in every recent pass (53, 44, 28), has <b>0 rows</b> in <code>leads.contact_points</code>, and its endpoint returns <code>404 Invalid resource</code> to a direct probe. It also searched on a first name alone, which 2,171 of those 2,194 are, and could never tie a hit to a creator.</td>
+          <td><b>Fixed</b> (<code>ee1abd7c8</code>, email repo). It now skips when there is no surname to match on, so the 99% case makes no request at all, and an exact first-and-last match is required before anything is filed. The retired path and the live BrokerCheck endpoint that does answer are both written into the file for whoever rebuilds it.</td>
+        </tr>
+        <tr class="fix">
+          <td>A dead dependency was asked once per lead, all pass, forever</td>
+          <td>50 POSTs a pass on a 12-second timeout, every one answered 404, for at least ten passes.</td>
+          <td><b>Fixed</b> (same commit). A breaker in <code>src/bloodhound/breaker.ts</code> takes a method out of the pass once it has run 10 leads, errored on all of them, produced no points and returned exactly one error shape. It is per-process, so the next pass re-tries and the lane heals itself if the endpoint returns. 15 selftest cases, including the three that matter: a producer that errors on a content outcome, varied causes, and one clean lead are all kept alive.</td>
+        </tr>
+        <tr class="fix">
+          <td>Nothing in the authoritative snapshot could say a method was dead</td>
+          <td>The 10-08 fix put the error shapes in the collect log. The snapshot the debrief is written from carried <code>methods_found</code> and nothing else, so twelve debriefs read "the methods worked" and were right about the wrong question.</td>
+          <td><b>Fixed</b> (<code>c3c5d93</code>, orchestrator). <code>CollectPass</code> now carries <code>methodErrors</code>, <code>topErrorShape</code>, <code>topErrorCount</code> and <code>deadMethods</code>, surfaced as <code>site_resolution.top_method_error</code>. Verified against all 154 passes in the live log; the regenerated snapshot reads <code>09-finra: FINRA N</code> ×53 of 442 and every headline figure was unchanged.</td>
+        </tr>
+        <tr>
+          <td>Yesterday's no-site attribution, in production</td>
+          <td>The 11:11Z alarm filed <code>attributed_to: "ownership_gate"</code> with the arithmetic (125 searches, 105 candidates, 97 refused, 8 accepted) and said spending nothing would change it. The two alarms the day before, pre-fix, both read <code>unexplained</code>.</td>
+          <td><b>Verified, no action.</b> First unattended outing and it named the cause correctly.</td>
+        </tr>
+        <tr>
+          <td>Campaign <code>START</code> has no 429 retry</td>
+          <td>No new evidence: there was no push this cycle. Friday's two escalations left 6 people in stopped campaigns with their rows marked sent.</td>
+          <td><b>Still open.</b> It lives in <code>automator</code>, which this agent may not edit. Carried from 10-10.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Recommended next — ranked</h2>
+  <ol class="recs">
+    <li><b>Decide what refills the shelf.</b> 6,074 never-emailed people at 277 a sending day is 21.9 sending days, about five and a half weeks. This cycle added two. Enrichment is finished at 99.9% and had two leads to do all day, the free recovery book now has evidence from both directions that it is collected out, and Apify has $0 it may spend until 1 November. Thirteenth consecutive debrief to say this, and it is still the only decision that changes how many people exist to email. Casey's call; the pause flag is untouched.</li>
+    <li><b>The OpenRouter runway is better than yesterday's number.</b> Yesterday read 25 days, but that rate was measured on the biggest send day on record. A non-sending day costs <b>$1.92</b> against Friday's $3.68, so four sending days and three quiet ones is about $2.93 a day, and $91.78 is roughly <b>31 days</b>. Still the one bill worth watching, and it is the send path now, not enrichment.</li>
+    <li><b>Give the campaign <code>START</code> call a 429 retry</b> in <code>automator/scripts/siege-plan.py</code>. Six people are still sitting in two stopped campaigns with their rows marked sent, and the next busy push will do it again.</li>
+    <li><b>Fix the em dash in <code>cold-email-attack-enemy-propose-5-ideas-v1</code>.</b> No new evidence today, but four of Friday's five dropped emails came from that one writer and two broke an explicitly banned character. Outside this agent's reach, inside a five-minute edit.</li>
+    <li><b>More inboxes, not a higher day cap.</b> Friday planned 618 against 618 mailbox slots on 50 live inboxes under a cap of 870. Unchanged by a quiet weekend.</li>
+    <li><b>The next two error shapes are now visible, and they are worth one look each.</b> <code>17-podcast: iTunes N</code> ran 78 in one pass and <code>34-channel-page: page rendered with no outbound links</code> ran 63 in another. Both methods do produce (552 and 15,031 points), so neither is a <code>09-finra</code>, but nobody has ever checked their failure rate because until this cycle nothing counted it.</li>
+    <li><b>Six cycles still have metrics on disk and no debrief</b> (09-17, 09-18, 09-19, 08-17, 08-18, 07-11). No risk, backfillable any time.</li>
+  </ol>
+
+  <div class="foot">
+    <b>Clean-run facts:</b> 0 fatal signatures, 0 halts, 0 crashes. <b>$0.00 Anthropic</b> for the 28th straight cycle. OpenRouter ran at $1.92 a day with $91.78 left. The free recovery lane wrote 15 contact points across 7 leads, found 2 addresses on 2 people and parked 2; the paid Apify lane ran 0 batches and has $10 left of its $100 month, all of it reserve, so $0 spendable until 31 October, with 0 price strikes. Enrichment did 2 batches of 2 leads with 0 failures against a pool that is 99.9% bundled. Brave ran 179 searches across the cycle's three passes with 0 key refusals, roughly $0.90. 15 of 66 YouTube keys came back working after the midnight reset and 50 were still exhausted, which does not matter while discovery is off. Discovery wrote 0 new channels, which is the pause doing exactly what Casey asked for on 2026-09-08. <span class="muted">Snapshot written 07:20:13Z on schedule; regenerated at 07:30Z to pick up the new error-shape fields. Every headline figure was identical; the two that moved are the measurement window itself (<code>measured_minutes_after_cycle_end</code> 20 → 31) and OpenRouter's balance ticking down $0.07, and the regenerated file is the one left on disk.</span>
+  </div>
+
+</div>
