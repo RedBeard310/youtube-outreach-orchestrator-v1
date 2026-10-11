@@ -1271,7 +1271,16 @@ export function collectRewalkCause(
  *  methods found nothing on. The 2026-10-08 pass read "0 contact points from 0/150
  *  leads" while the methods were working fine. Both are null for passes logged before
  *  that date, where the two shapes are genuinely indistinguishable — do not read a null
- *  as zero. */
+ *  as zero.
+ *
+ *  `methodErrors` / `topErrorShape` / `deadMethods` come from the two lines after that
+ *  one. A METHOD CAN BE TOTALLY DEAD AND NOTHING IN THE SNAPSHOT SAYS SO (2026-10-11):
+ *  `09-finra` has produced zero contact points in its entire life because its API path
+ *  is retired, it was the largest single error shape in every recent pass (25-53 futile
+ *  POSTs a pass on a 12s timeout), and finding that out meant reading the collect log by
+ *  hand. The 10-08 fix put the shapes in the LOG; this carries the top one into the file
+ *  the debrief is written from, which is the same gap the no-site rate had on 10-05.
+ *  Null for passes logged before the lines existed — not zero. */
 export type CollectPass = {
   points: number;
   hit: number;
@@ -1280,6 +1289,13 @@ export type CollectPass = {
   summary: string;
   found: number | null;
   alreadyOnFile: number | null;
+  /** Total method errors in the pass. */
+  methodErrors: number | null;
+  /** The single commonest error shape, e.g. `09-finra: FINRA N`. */
+  topErrorShape: string | null;
+  topErrorCount: number | null;
+  /** Method ids the collect CLI's breaker took out of the pass. */
+  deadMethods: string[] | null;
 };
 
 /** Every COMPLETED pass in a collect log, oldest first. A pass still running has
@@ -1287,22 +1303,40 @@ export type CollectPass = {
 export function collectPasses(logText: string, minSample = 30): CollectPass[] {
   const SUMMARY = /^Collected (\d+) contact points from (\d+)\/(\d+) leads\.$/;
   const FOUND = /^\[bloodhound\] Methods found (\d+) point\(s\) on (\d+)\/(\d+) leads; (\d+) were already on file\./;
+  // Printed after the found-line (youtube-email-outreach-v1 fb371d267 / ee1abd7c8).
+  const ERRORS = /^\[bloodhound\] Method errors: (\d+) across (\d+) shape\(s\) — (\d+)x ([^|;]+)/;
+  const DEAD = /^\[bloodhound\] Breaker tripped on \d+ method\(s\): (.+)$/;
   const out: CollectPass[] = [];
-  // Whether the newest summary line was ACCEPTED into `out`. A short tail-of-lap batch is
-  // skipped above, and without this flag its found-line would attach to the previous
+  // The newest summary line ACCEPTED into `out`, or null. A short tail-of-lap batch is
+  // skipped below, and without this its trailing lines would attach to the previous
   // (unrelated) pass, which is the sort of off-by-one that has gone wrong in this parser
-  // three times already.
-  let openPass = false;
+  // three times already. It stays set past the found-line because the error and breaker
+  // lines come after it and belong to the same pass.
+  let current: CollectPass | null = null;
   for (const raw of logText.split('\n')) {
     const line = raw.trim();
     const f = FOUND.exec(line);
     if (f) {
-      if (openPass) {
-        const pass = out[out.length - 1]!;
-        pass.found = Number(f[1]);
-        pass.alreadyOnFile = Number(f[4]);
+      if (current) {
+        current.found = Number(f[1]);
+        current.alreadyOnFile = Number(f[4]);
       }
-      openPass = false;
+      continue;
+    }
+    const e = ERRORS.exec(line);
+    if (e) {
+      if (current) {
+        current.methodErrors = Number(e[1]);
+        current.topErrorCount = Number(e[3]);
+        current.topErrorShape = e[4]!.trim();
+      }
+      continue;
+    }
+    const d = DEAD.exec(line);
+    if (d) {
+      if (current) {
+        current.deadMethods = d[1]!.split('|').map((s) => s.trim().split(' ')[0]!).filter(Boolean);
+      }
       continue;
     }
     const m = SUMMARY.exec(line);
@@ -1310,9 +1344,14 @@ export function collectPasses(logText: string, minSample = 30): CollectPass[] {
     const hit = Number(m[2]), of = Number(m[3]);
     // A short batch makes the hit rate noisy — it is the tail of a lap, not a
     // sample of the lane.
-    if (of < minSample) { openPass = false; continue; }
-    out.push({ points: Number(m[1]), hit, of, rate: hit / of, summary: line, found: null, alreadyOnFile: null });
-    openPass = true;
+    if (of < minSample) { current = null; continue; }
+    const pass: CollectPass = {
+      points: Number(m[1]), hit, of, rate: hit / of, summary: line,
+      found: null, alreadyOnFile: null,
+      methodErrors: null, topErrorShape: null, topErrorCount: null, deadMethods: null,
+    };
+    out.push(pass);
+    current = pass;
   }
   return out;
 }

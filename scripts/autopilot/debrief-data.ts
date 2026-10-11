@@ -2213,6 +2213,19 @@ async function main(): Promise<void> {
         // line — not zero. See CollectPass in src/recovery/bloodhound-lane.ts.
         methods_found: passes.length > 0 ? passes[passes.length - 1]!.found : null,
         already_on_file: passes.length > 0 ? passes[passes.length - 1]!.alreadyOnFile : null,
+        // A DEAD METHOD WAS INVISIBLE FROM THIS FILE (2026-10-11). `09-finra` has
+        // produced zero contact points in its life — its API path is retired and
+        // answers 404 to every call — and it was the largest error shape in every
+        // recent pass. The 10-08 fix put the shapes in the collect log; nothing
+        // carried them here, so twelve debriefs read `methods_found` and called the
+        // methods healthy. top_method_error names the commonest shape and
+        // methods_dead names whatever the collect CLI's breaker took out of the pass.
+        // A shape holding most of method_errors is the one to chase. Null before the
+        // lines existed, not zero.
+        method_errors: passes.length > 0 ? passes[passes.length - 1]!.methodErrors : null,
+        top_method_error: passes.length > 0 ? passes[passes.length - 1]!.topErrorShape : null,
+        top_method_error_count: passes.length > 0 ? passes[passes.length - 1]!.topErrorCount : null,
+        methods_dead: passes.length > 0 ? passes[passes.length - 1]!.deadMethods : null,
       };
     } catch {
       return null;
