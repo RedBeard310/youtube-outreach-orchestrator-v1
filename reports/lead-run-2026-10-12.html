@@ -1,0 +1,261 @@
+<title>Lead Run Debrief — 2026-10-12</title>
+<style>
+  :root {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+      --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+      --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+    --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+    --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 40px 22px 80px; }
+  .eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); font-weight: 600; }
+  h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.12; margin: 10px 0 6px; text-wrap: balance; letter-spacing: -.02em; }
+  h2 { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); margin: 44px 0 16px; font-weight: 700; }
+  h3 { font-size: 18px; margin: 0 0 6px; letter-spacing: -.01em; }
+  p { margin: 0 0 14px; }
+  .lede { font-size: 18px; color: var(--ink-soft); max-width: 68ch; }
+  .tag { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--amber-soft); color: var(--amber); letter-spacing: .02em; }
+  .tag.good { background: var(--teal-soft); color: var(--teal); }
+  .grid { display: grid; gap: 14px; }
+  .stats { grid-template-columns: repeat(4, 1fr); margin-top: 26px; }
+  @media (max-width: 720px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; box-shadow: var(--shadow); }
+  .stat .n { font-size: 30px; font-weight: 750; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .stat .l { font-size: 12.5px; color: var(--ink-soft); margin-top: 3px; }
+  .stat .s { font-size: 12px; margin-top: 8px; font-weight: 600; }
+  .up { color: var(--good); } .down { color: var(--red); } .warn { color: var(--amber); }
+  .accent-red { border-left: 3px solid var(--red); }
+  .accent-teal { border-left: 3px solid var(--teal); }
+  .accent-amber { border-left: 3px solid var(--amber); }
+
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-soft); padding: 0 14px 14px; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+
+  .q { border-radius: 14px; padding: 20px 22px; margin-bottom: 14px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); }
+  .q .ask { font-size: 17px; font-weight: 700; color: var(--ink); margin-bottom: 10px; display: flex; gap: 10px; align-items: baseline; }
+  .q .ask .qn { color: var(--red); font-weight: 800; flex: 0 0 auto; }
+  .q p { color: var(--ink-soft); }
+  .q b { color: var(--ink); }
+  .pill { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink); background: var(--panel-2); padding: 1px 7px; border-radius: 6px; border: 1px solid var(--line); white-space: nowrap; }
+  pre { background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; overflow-x: auto; font-size: 12.5px; line-height: 1.5; color: var(--ink); margin: 0 0 14px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+  th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); }
+  td .num { font-variant-numeric: tabular-nums; font-weight: 650; }
+  .fix td:first-child { color: var(--good); font-weight: 650; }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); box-shadow: var(--shadow); }
+  ol.recs { padding-left: 0; list-style: none; counter-reset: r; margin: 0; }
+  ol.recs li { counter-increment: r; position: relative; padding: 14px 16px 14px 52px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 10px; box-shadow: var(--shadow); }
+  ol.recs li::before { content: counter(r); position: absolute; left: 14px; top: 14px; width: 26px; height: 26px; border-radius: 8px; background: var(--teal-soft); color: var(--teal); font-weight: 800; font-size: 14px; display: grid; place-items: center; }
+  ol.recs b { color: var(--ink); }
+  .foot { margin-top: 46px; padding: 16px 18px; border-radius: 12px; background: var(--amber-soft); border: 1px solid var(--line); font-size: 14px; color: var(--ink-soft); }
+  .foot b { color: var(--ink); }
+  .muted { color: var(--ink-soft); font-size: 13.5px; }
+</style>
+
+
+<style>
+  /* Per-pass funnel bars. Four passes is too few for the usual minute strip, and the
+     story here is the ratio inside each bar, not a time series. */
+  .passes { display: grid; gap: 10px; padding: 16px 18px; }
+  .prow { display: grid; grid-template-columns: 170px 1fr 148px; gap: 12px; align-items: center; font-size: 13px; }
+  @media (max-width: 720px) { .prow { grid-template-columns: 1fr; gap: 4px; } }
+  .prow .who { color: var(--ink-soft); }
+  .prow .who b { color: var(--ink); }
+  .track { height: 20px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; display: flex; }
+  .track .old { background: var(--line); height: 100%; }
+  .track .fresh { background: var(--good); height: 100%; min-width: 2px; }
+  .prow .right { color: var(--ink-soft); font-variant-numeric: tabular-nums; text-align: right; }
+  .prow .right b { color: var(--ink); }
+
+  /* Per-method lifetime production, newest silence first. */
+  .mrow { display: grid; grid-template-columns: 150px 1fr 120px; gap: 12px; align-items: center; font-size: 13px; }
+  @media (max-width: 720px) { .mrow { grid-template-columns: 1fr; gap: 4px; } }
+  .mrow code { color: var(--ink); }
+  .mrow .bar2 { height: 14px; border-radius: 5px; background: var(--good); opacity: .85; min-width: 3px; }
+  .mrow .bar2.quiet { background: var(--amber); }
+  .mrow .bar2.dead { background: var(--red); }
+  .mrow .age { color: var(--ink-soft); text-align: right; font-variant-numeric: tabular-nums; }
+  .mrow .age b { color: var(--ink); }
+</style>
+
+<div class="wrap">
+
+  <div class="eyebrow">Lead Run Debrief · YouTube outreach</div>
+  <h1>2026-10-12: a quiet Sunday, and a method that worked for two days in August has been collecting 403s ever since</h1>
+  <p class="lede">Nothing sent, because Sunday is not a sending day. The cycle's whole output was <b>two people parked</b>, off four collect passes that walked 600 leads and found <b>2,479 contact points of which 2,467 were already on file</b>. Yesterday's fix retired the one error shape big enough to read, and that immediately exposed the instrument's own flaw: the newest pass logged <b>458 errors across 432 shapes with a top shape of four</b>, because a shape carries the hostname and the hostname is per lead. Counting the same errors by cause instead named two real faults in one pass. The larger one: <b><code>18-rdap</code> wrote 336 contact points on 18 and 19 August and not one in the 53 days since</b>, because its host went behind Cloudflare and the method sends no User-Agent, so every request has come back a 403 challenge page.</p>
+  <div style="margin-top:14px"><span class="tag">NOT A SENDING DAY · 0 EMAILS BY DESIGN</span> <span class="tag">2 PARKED</span> <span class="tag good">A LIVE METHOD FOUND DEAD AND REVIVED</span></div>
+
+  <div class="grid stats">
+    <div class="card stat">
+      <div class="n">0</div>
+      <div class="l">emails loaded</div>
+      <div class="s muted">Sunday; the Siege timer is Mon to Fri</div>
+    </div>
+    <div class="card stat accent-amber">
+      <div class="n">2</div>
+      <div class="l">people parked in <code>approved_hold</code></div>
+      <div class="s warn">7,598 to 7,600</div>
+    </div>
+    <div class="card stat accent-teal">
+      <div class="n">99.5%</div>
+      <div class="l">of found contact points were already stored</div>
+      <div class="s up">2,467 of 2,479 across four passes</div>
+    </div>
+    <div class="card stat accent-red">
+      <div class="n">6,075</div>
+      <div class="l">people on the shelf, never emailed</div>
+      <div class="s muted">about 5.5 weeks at 277 a sending day</div>
+    </div>
+  </div>
+
+  <h2>The shape of the day</h2>
+  <div class="card" style="padding:0">
+    <div class="passes">
+      <div class="prow">
+        <div class="who"><b>Pass 1</b> · 150 leads<br><span class="muted">145 had a site on file</span></div>
+        <div class="track"><div class="old" style="width:85.6%"></div><div class="fresh" style="width:0.6%"></div></div>
+        <div class="right"><b>592</b> found · <b>4</b> new</div>
+      </div>
+      <div class="prow">
+        <div class="who"><b>Pass 2</b> · 150 leads<br><span class="muted">147 had a site on file</span></div>
+        <div class="track"><div class="old" style="width:99.7%"></div><div class="fresh" style="width:0.3%"></div></div>
+        <div class="right"><b>687</b> found · <b>2</b> new</div>
+      </div>
+      <div class="prow">
+        <div class="who"><b>Pass 3</b> · 150 leads<br><span class="muted">145 had a site on file</span></div>
+        <div class="track"><div class="old" style="width:88.9%"></div><div class="fresh" style="width:0.6%"></div></div>
+        <div class="right"><b>615</b> found · <b>4</b> new</div>
+      </div>
+      <div class="prow">
+        <div class="who"><b>Pass 4</b> · 150 leads<br><span class="muted">148 had a site on file</span></div>
+        <div class="track"><div class="old" style="width:84.9%"></div><div class="fresh" style="width:0.3%"></div></div>
+        <div class="right"><b>585</b> found · <b>2</b> new</div>
+      </div>
+    </div>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--line)"></span>points the methods found that were already stored</span>
+      <span><span class="dot" style="background:var(--good)"></span>points that were new</span>
+    </div>
+  </div>
+  <p class="muted">Bar width is points found against the widest pass, so the four are comparable. Every pass is the same shape: the methods work, they find 4 to 5 points a lead, and almost all of it is already in the table. The four new-point counts (4, 2, 4, 2) add up to exactly the <span class="pill">12</span> contact points and <span class="pill">10</span> people the snapshot counts from the database, so the log and the table agree with no gap to explain. Counted from <code>logs/bloodhound-collect.log</code> through <code>collectPasses()</code>. Pass 1 was dispatched 93 seconds into the cycle at 07:01Z and the 10-11 debrief labelled it "just past the cycle"; it belongs here, and it is counted once.</p>
+
+  <h2>The three questions</h2>
+
+  <div class="q">
+    <div class="ask"><span class="qn">Q1</span><span>Nothing sent, for the second cycle running. Is that a fault yet?</span></div>
+    <p><b>No. It was Sunday.</b> <code>siege-plan.timer</code> runs Monday to Friday, so the snapshot reports <code>sending_day: false</code>, <code>plan_found: false</code> and <code>binding_constraint: not_a_sending_day</code>. No plan was due and none was written. <code>push_unit_result</code> is null because no push belongs to this window, and <code>unit_state: inactive</code> with <code>unit_last_result: success</code> describes Friday's 12:05Z run, which the 10-10 debrief already covered.</p>
+    <p class="muted">This repo's own send path ran once and had nothing to fire: <code>attempted=0 sent=0 failed=0</code>. The weekend reading has now held correctly for three consecutive weekend cycles, which is the 10-04 fix doing its job. Monday is the next sending day.</p>
+  </div>
+
+  <div class="q accent-teal">
+    <div class="ask"><span class="qn">Q2</span><span>Four passes walked 600 leads and parked two people. Is the lane working?</span></div>
+    <p><b>Yes, and the book is what is finished.</b> The methods found <b>2,479 contact points on 596 of the 600 leads</b>, and <b>2,467 of them were already in the table</b>. That is a 99.5% re-walk: nine of thirteen methods ran at full strength on nearly every lead and turned up the same addresses they turned up last lap. Twelve points were genuinely new, spread over ten people. Three of those were email addresses on three people, and two of the three verified and parked.</p>
+    <p><b>Website resolution was not the constraint, and this time the arithmetic is unarguable.</b> Brave ran <b>15 searches across 600 leads</b>, because 145 to 148 of every 150 already had a site stored. Zero key refusals, <code>cause: resolution_ok</code>, <code>no_site: 1 of 150</code> on the newest pass. The cursor is on lap 9 of a 2,514-lead book, <code>stranded</code> held at 3 for the 29th straight day, and <code>needs_contact</code> is 3,512.</p>
+    <p class="muted">Cost of the collecting: about <b>7 cents</b> of Brave. The lane is close to free and it is close to empty, and those two facts are the same fact.</p>
+  </div>
+
+  <div class="q accent-amber">
+    <div class="ask"><span class="qn">Q3</span><span>Yesterday's fix worked. So why did the error report get harder to read, not easier?</span></div>
+    <p><b>Because the one shape big enough to read was the thing it retired.</b> <code>09-finra</code> was 53 of pass 1's 442 errors and then vanished: it does not appear in the top shapes of passes 2, 3 or 4 at all, which is yesterday's commit going live mid-cycle and working. What was left behind is a tally that cannot name anything. Pass 4 logged <b>458 errors across 432 shapes</b>, the largest holding <b>4 of them, under 1%</b>, with <b>426 shapes in the unnamed tail</b>. The cause is structural: an error shape keeps the hostname on purpose, because the dead-method breaker needs one shape to mean "fails the same way on every lead". The hostname is per lead, so 150 identical failures become 150 shapes.</p>
+    <p><b>Counting the same errors by cause instead takes one pass to answer it.</b> On a six-lead probe, nine shapes collapsed into three causes, and two of the three were real faults rather than weather. The first: the shared fetch guard allowed <code>application/xml</code> and refused <code>text/xml</code>, <b>which is how most sitemaps are served</b>, so <code>28-sitemap</code>, the only method that finds the contact and team pages a homepage never links to, was throwing those sitemaps away unread. The second is the bigger one, and it needed a second instrument to size: <b><code>18-rdap</code> has written 336 contact points in its life, all of them on 18 and 19 August, and nothing in the 53 days since.</b> It sends no User-Agent. Three domains probed the same minute returned <b>403 with no header and 200 with one</b>.</p>
+    <p class="muted">Nothing already built could have caught that. The pass footer counts points in total, so a method going dark hides behind <code>34-channel-page</code>'s 15,036. The shape tally keys on the hostname. The breaker needs one shape, so it was blind to it too. And the no-site rate was healthy throughout, because resolution really was fine. The gap was that no instrument asked the simplest question available: when did each method last produce anything?</p>
+  </div>
+
+  <h2>Which methods have gone quiet</h2>
+  <div class="card" style="padding:16px 18px">
+    <div class="passes" style="padding:0">
+      <div class="mrow"><code>04-holehe</code><div class="bar2 dead" style="width:100%"></div><div class="age"><b>54</b> days · 51 pts</div></div>
+      <div class="mrow"><code>18-rdap</code><div class="bar2 dead" style="width:98%"></div><div class="age"><b>53</b> days · 336 pts</div></div>
+      <div class="mrow"><code>26-instagram</code><div class="bar2 quiet" style="width:44%"></div><div class="age"><b>24</b> days · 279 pts</div></div>
+      <div class="mrow"><code>19-github</code><div class="bar2 quiet" style="width:30%"></div><div class="age"><b>16</b> days · 17 pts</div></div>
+      <div class="mrow"><code>14-external-links</code><div class="bar2 quiet" style="width:26%"></div><div class="age"><b>14</b> days · 79 pts</div></div>
+      <div class="mrow"><code>17-podcast</code><div class="bar2" style="width:9%"></div><div class="age"><b>5</b> days · 552 pts</div></div>
+      <div class="mrow"><code>33-about-text</code><div class="bar2" style="width:7%"></div><div class="age"><b>4</b> days · 3,947 pts</div></div>
+      <div class="mrow"><code>28-sitemap</code><div class="bar2" style="width:7%"></div><div class="age"><b>4</b> days · 154 pts</div></div>
+      <div class="mrow"><code>34-channel-page</code><div class="bar2" style="width:3%"></div><div class="age"><b>0</b> days · 15,036 pts</div></div>
+      <div class="mrow"><code>02-subpages</code><div class="bar2" style="width:3%"></div><div class="age"><b>0</b> days · 4,756 pts</div></div>
+      <div class="mrow"><code>16-jsonld</code><div class="bar2" style="width:3%"></div><div class="age"><b>0</b> days · 2,992 pts</div></div>
+      <div class="mrow"><code>01-mailto</code><div class="bar2" style="width:3%"></div><div class="age"><b>0</b> days · 1,192 pts</div></div>
+    </div>
+  </div>
+  <p class="muted">Bar length is days since that method last wrote a contact point. Red is over 50 days, amber is over 14. One grouped query over <code>leads.contact_points</code>, no network and no model, now part of every debrief as <code>recovery_lane.methods</code> and <code>methods_quiet</code>. <b>Quiet is not the same as broken:</b> a method whose niche is rare in the current slice goes quiet honestly, and the Apify lanes are excluded because their silence is a spent budget. The point is to put the number in front of a reader daily rather than to decide for them. <code>18-rdap</code> is the proof it was worth building: that row would have been red in the third week of August.</p>
+
+  <h2>What broke → what's fixed</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>What</th><th>Evidence</th><th>State</th></tr></thead>
+      <tbody>
+        <tr class="fix">
+          <td>A producing method went dead eight weeks ago and nobody knew</td>
+          <td><code>18-rdap</code>: 336 points on 18 and 19 August, <b>0 in the 53 days since</b>. Header-less requests to <code>rdap.org</code> for three live domains all returned <b>403</b>; with a User-Agent all three returned <b>200</b> through the registry redirect. One futile request per lead with a website, on a 15-second timeout, every pass.</td>
+          <td><b>Fixed</b> (<code>1665d526b</code>, email repo). The method sends the shared browser User-Agent, which is now exported from <code>web.ts</code> so the next method making its own fetch inherits it.</td>
+        </tr>
+        <tr class="fix">
+          <td>The fetch guard refused <code>text/xml</code>, so sitemaps were discarded unread</td>
+          <td>The allow-list named <code>application/xml</code> and not <code>text/xml</code>. <code>www.offgridpower.solutions</code> answers <code>text/xml;charset=utf-8</code> with 233 KB of real sitemap. <code>application/rss+xml</code>, which is <code>17-podcast</code>'s own format, and <code>text/markdown</code> were refused by the same list.</td>
+          <td><b>Fixed</b> (same commit). Any <code>text/*</code> and any XML flavour pass; the 1 MB read cap is what keeps a surprise payload cheap. An absent content-type still fails, deliberately.</td>
+        </tr>
+        <tr class="fix">
+          <td>The error tally could not name a cause once its one readable shape was gone</td>
+          <td>Pass 4: 458 errors, 432 shapes, top shape 4 (0.9%), 426 shapes unnamed. The shape key carries the hostname, which is per lead.</td>
+          <td><b>Fixed</b> (same commit, plus <code>bbdd082</code> in the orchestrator). A second coarser tally drops every per-lead token and prints beside the shapes; nine shapes became three causes on the first probe. <code>CollectPass</code> carries <code>topErrorCause</code> and its share into the snapshot the debrief is written from.</td>
+        </tr>
+        <tr class="fix">
+          <td>No instrument asked when a method last produced anything</td>
+          <td>Four instruments were live and all four were blind to a dead method: the footer counts points in total, the shape tally keys on the hostname, the breaker needs one shape to arm, and the no-site rate was healthy.</td>
+          <td><b>Fixed</b> (<code>ab1e143</code>, orchestrator). <code>methodProduction()</code> reports lifetime points and days since the last one per method; the debrief carries <code>methods_quiet</code>. It names five quiet free methods today.</td>
+        </tr>
+        <tr>
+          <td>Measured effect of the two method fixes</td>
+          <td>On a fixed six-lead slice, method errors went <b>9 to 2</b>: the four sitemap content-type errors and three of the four RDAP 403s are gone. The remaining RDAP error is an honest per-domain 404.</td>
+          <td><b>Verified before committing.</b> Point yield on that slice was unchanged at 28, which is expected: those six sites' hidden pages held nothing new.</td>
+        </tr>
+        <tr>
+          <td>Campaign <code>START</code> has no 429 retry</td>
+          <td>No new evidence: there was no push this cycle either. Friday's two escalations left 6 people in stopped campaigns with their rows marked sent.</td>
+          <td><b>Still open.</b> It lives in <code>automator</code>, which this agent may not edit. Carried from 10-10.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Recommended next — ranked</h2>
+  <ol class="recs">
+    <li><b>Decide what refills the shelf.</b> 6,075 never-emailed people at 277 a sending day is about five and a half weeks. This cycle added two. Enrichment is finished (99.9% bundled, 1 lead left to do), the recovery book is collected out at a 99.5% re-walk, Apify is dry until 1 November, and discovery is paused by your own order. This is the fourteenth consecutive debrief to put this first, and nothing below it changes the answer.</li>
+    <li><b>Give the other four quiet methods one look each, now that something counts them.</b> <code>04-holehe</code> (51 points, 54 days), <code>26-instagram</code> (279 points, 24 days), <code>19-github</code> (17 points, 16 days), <code>14-external-links</code> (79 points, 14 days). <code>18-rdap</code> turned out to be a one-line fix worth 336 points, so the expected value here is real, and checking costs one dry run each.</li>
+    <li><b>Confirm the RDAP fix actually writes points again on the next real pass.</b> The probes returned 200 and the records parsed, but all three test domains were privacy-redacted and exposed only the registrar. If the next pass shows <code>18-rdap</code> producing nothing while answering 200, the method is honestly quiet on this book and the fix buys quota rather than leads.</li>
+    <li><b>The OpenRouter runway is comfortable.</b> $90.05 left at $1.73 a day, about 52 days. Nothing to decide this week.</li>
+    <li><b>Give the campaign <code>START</code> call a 429 retry</b> in <code>automator/scripts/siege-plan.py</code>. Six people are still sitting in two stopped campaigns with their rows marked sent, and the next busy push will do it again.</li>
+    <li><b>Fix the em dash in <code>cold-email-attack-enemy-propose-5-ideas-v1</code>.</b> No new evidence this cycle. Carried.</li>
+    <li><b>More inboxes, not a higher day cap.</b> Friday planned 618 against 618 mailbox slots on 50 live inboxes under a cap of 870. Unchanged by a quiet weekend.</li>
+    <li><b>Six cycles still have metrics on disk and no debrief</b> (09-17, 09-18, 09-19, 08-17, 08-18, 07-11). No risk, backfillable any time.</li>
+  </ol>
+
+  <div class="foot">
+    <b>Clean-run facts:</b> 0 fatal signatures, 0 halts, 0 crashes. <b>$0.00 Anthropic</b> for the 29th straight cycle. OpenRouter ran at $1.73 a day with $90.05 left. Apify sat out the cycle with $0.00 spendable and 0 price strikes until the allowance resets on 31 October. Enrichment ran 1 batch for 1 lead and has nothing left to do. The YouTube key pool probed 20 minutes after the reset at <b>15 working of 66</b>, 50 still exhausted, which binds nothing while discovery is paused. <b>0 new channels discovered, by your 2026-09-08 order</b>, and the flag is untouched.
+  </div>
+
+</div>
