@@ -663,6 +663,72 @@ export async function collectYieldBetween(
   };
 }
 
+/** One collection method's lifetime record: how many contact points it has ever
+ *  written, and how long ago the last one was. */
+export type MethodProduction = {
+  source: string;
+  points: number;
+  last_point_date: string | null;
+  days_since_last_point: number | null;
+  /** True when this method has produced before and has produced nothing lately. */
+  quiet: boolean;
+};
+
+/**
+ * Per-method lifetime production, newest-silence first.
+ *
+ * WHY THIS EXISTS (2026-10-12). A method can stop working completely and nothing says
+ * so. `18-rdap` wrote 336 contact points on 2026-08-18 and 2026-08-19 — the lane's
+ * eighth-largest producer — and then not one since, 53 days as this was written, because rdap.org
+ * went behind Cloudflare and the method sends no User-Agent, so every request has been
+ * answered with a 403 challenge page. It cost one futile request per lead with a
+ * website, on a 15-second timeout, every pass for eight weeks.
+ *
+ * NONE of the instruments built in the three days before this could see it. The pass
+ * footer counts points in total, so a third of the methods going dark is invisible
+ * behind `34-channel-page`'s 15,000. The error tally keyed on a shape that carries the
+ * hostname, so 150 identical failures logged as 150 distinct shapes and the largest
+ * read as 4. The breaker needs one shape to arm, so it could not see it either. And the
+ * no-site rate was fine all along, because resolution was working.
+ *
+ * This is the cheapest possible detector for that whole class: a method that produced
+ * before and has produced nothing since is either picked over or broken, and either way
+ * it is worth one look. One grouped query, no network, no model. `quiet` is deliberately
+ * a low bar rather than an alarm — the point is to put the number in front of a reader
+ * once a day, not to decide for them.
+ */
+export async function methodProduction(quietAfterDays = 14): Promise<MethodProduction[]> {
+  const rows = await query<Record<string, string | number | null>>(
+    `SELECT cp.source AS source,
+            count(*) AS points,
+            max(cp.created_at) AS last_point
+       FROM leads.contact_points cp
+      WHERE cp.source IS NOT NULL
+      GROUP BY cp.source`,
+  );
+  const now = Date.now();
+  const out: MethodProduction[] = rows.map((r) => {
+    const last = r.last_point ? new Date(String(r.last_point)) : null;
+    const days = last && !Number.isNaN(last.getTime())
+      ? Math.floor((now - last.getTime()) / 86_400_000)
+      : null;
+    const points = Number(r.points ?? 0);
+    return {
+      source: String(r.source),
+      points,
+      last_point_date: last && !Number.isNaN(last.getTime())
+        ? last.toISOString().slice(0, 10)
+        : null,
+      days_since_last_point: days,
+      // A paid lane is quiet because its month is spent, which is budget, not breakage.
+      quiet: points > 0 && days !== null && days >= quietAfterDays
+        && !PAID_POINT_SOURCE_PREFIXES.some((p) => String(r.source).startsWith(p)),
+    };
+  });
+  out.sort((a, b) => (b.days_since_last_point ?? -1) - (a.days_since_last_point ?? -1));
+  return out;
+}
+
 export async function selectUntouchedBatch(
   limit: number,
   cursor?: CollectCursor,

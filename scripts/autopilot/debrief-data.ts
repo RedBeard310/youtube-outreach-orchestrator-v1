@@ -23,6 +23,7 @@ import {
   collectPasses,
   collectYieldBetween,
   loadState,
+  methodProduction,
   noSiteCause,
 } from '../../src/recovery/bloodhound-lane.ts';
 import { summarizeToday, pacificDate } from './burn-ledger.js';
@@ -2156,6 +2157,9 @@ async function main(): Promise<void> {
   // as the two above. See collectYieldBetween() for what each number means.
   const laneYieldNow = await collectYieldBetween(sinceISO, untilISO).catch(() => null);
   const laneBook = await collectBookDepth().catch(() => null);
+  // Per-method lifetime production. See methodProduction() for the eight weeks of
+  // silent 403s this exists to make visible.
+  const laneMethods = await methodProduction().catch(() => null);
   const laneState = loadState(join(LOGS, 'bloodhound-lane-state.json'));
 
   // SITE RESOLUTION, THE LANE'S ONE LOAD-BEARING INPUT, WAS NOT IN THIS FILE (2026-10-05).
@@ -2433,6 +2437,17 @@ async function main(): Promise<void> {
       last_collect_at: laneState.lastCollectAt ?? null,
       last_verify_at: laneState.lastVerifyAt ?? null,
       site_resolution: laneSite,
+      // A METHOD CAN GO COMPLETELY DEAD AND EVERY OTHER FIELD HERE STAYS NORMAL
+      // (2026-10-12). `18-rdap` wrote 336 points on 18-19 Aug, the lane's eighth-biggest
+      // producer, and nothing since (53 days when this was written): rdap.org went behind Cloudflare and
+      // the method sends no User-Agent, so it has been collecting 403 challenge pages at
+      // one futile 15-second request per lead ever since. methods_quiet is every free
+      // method that has produced before and produced nothing in 14 days — the cheapest
+      // detector for the class, because the pass footer, the error tally and the breaker
+      // were all blind to it. QUIET IS NOT BROKEN: a method whose niche is rare in the
+      // current slice goes quiet honestly. It means look, not fix.
+      methods: laneMethods,
+      methods_quiet: laneMethods ? laneMethods.filter((m) => m.quiet) : null,
       note:
         'Contact points written in the cycle, from leads.contact_points.created_at. ' +
         'READ THE free_* FIELDS AS THIS LANE: the totals also contain the paid Apify ' +
