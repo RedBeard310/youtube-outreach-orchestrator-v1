@@ -2222,9 +2222,26 @@ async function main(): Promise<void> {
         // methods_dead names whatever the collect CLI's breaker took out of the pass.
         // A shape holding most of method_errors is the one to chase. Null before the
         // lines existed, not zero.
+        //
+        // THE SHAPE STOPPED NAMING ANYTHING THE DAY AFTER THAT FIX (2026-10-12). A shape
+        // keeps the hostname, and the host is per-lead, so with `09-finra` retired the
+        // newest pass read 458 errors across 432 shapes and a top shape of 4 — under 1%,
+        // with 426 shapes in the tail. top_method_cause is the same errors counted with
+        // the per-lead tokens dropped, which is the count that can hold a majority:
+        // READ IT FIRST, and read top_method_cause_pct before chasing anything. The
+        // first pass to carry both lines turned nine shapes into three causes and named
+        // two real faults on sight — `28-sitemap: non-HTML content-type` (the fetch gate
+        // refused `text/xml`, which is how most sitemaps are served) and `18-rdap: RDAP
+        // N` (that method sent no User-Agent, so Cloudflare answered 403 on every lead
+        // with a website). Both fixed the same day; errors on a six-lead slice went 9 to
+        // 2. Null before the line existed, not zero.
         method_errors: passes.length > 0 ? passes[passes.length - 1]!.methodErrors : null,
         top_method_error: passes.length > 0 ? passes[passes.length - 1]!.topErrorShape : null,
         top_method_error_count: passes.length > 0 ? passes[passes.length - 1]!.topErrorCount : null,
+        top_method_cause: passes.length > 0 ? passes[passes.length - 1]!.topErrorCause : null,
+        top_method_cause_count: passes.length > 0 ? passes[passes.length - 1]!.topErrorCauseCount : null,
+        top_method_cause_pct: passes.length > 0 ? passes[passes.length - 1]!.topErrorCausePct : null,
+        method_causes: passes.length > 0 ? passes[passes.length - 1]!.errorCauseShapes : null,
         methods_dead: passes.length > 0 ? passes[passes.length - 1]!.deadMethods : null,
       };
     } catch {
@@ -2457,6 +2474,21 @@ async function main(): Promise<void> {
         'on file. methods_found>0 with 0 points is a full re-walk of a picked-over book and ' +
         'is not a fault; methods_found:0 is the shape worth chasing. Both are null for passes ' +
         'logged before 2026-10-08, which means unknowable, NOT zero. ' +
+        'READ top_method_cause, NOT top_method_error, WHEN method_errors IS LARGE ' +
+        '(2026-10-12): an error shape keeps the hostname and the hostname is per-lead, so ' +
+        'the day after the breaker retired the one shape big enough to read, a pass logged ' +
+        '458 errors across 432 shapes with a top shape of 4 — under 1% of them — and 426 ' +
+        'shapes in the unnamed tail. The cause key drops the per-lead tokens, so ' +
+        '"fetch failed" and "cross-domain redirect" each become one row with a real count; ' +
+        'top_method_cause_pct is the share it holds, and a cause holding most of a pass is ' +
+        'ONE fault to chase while a flat spread is the web being the web. The first pass ' +
+        'carrying both lines collapsed nine shapes into three causes and named two real ' +
+        'faults on sight: the fetch gate was refusing text/xml, which is how most sitemaps ' +
+        'are served, so 28-sitemap (the method that finds the contact and team pages a ' +
+        'homepage never links) threw every one away unread; and 18-rdap sent no ' +
+        'User-Agent, so Cloudflare answered 403 for every lead with a website and the ' +
+        'method had never once read a registration record. Both fixed 2026-10-12. Null ' +
+        'before the line existed, NOT zero. ' +
         'A climbing collect_book_stranded is the real fault ' +
         'signal (a selector gap has reopened). Emails here are unverified: the verify pass ' +
         'decides which ones flip to approved_hold.',

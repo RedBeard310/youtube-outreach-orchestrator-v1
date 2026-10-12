@@ -1294,6 +1294,20 @@ export type CollectPass = {
   /** The single commonest error shape, e.g. `09-finra: FINRA N`. */
   topErrorShape: string | null;
   topErrorCount: number | null;
+  /** The same errors counted by CAUSE, which is the count that aggregates
+   *  (youtube-email-outreach-v1, 2026-10-12). A shape keeps the hostname, so the day
+   *  after the breaker retired `09-finra` the newest pass read 458 errors across 432
+   *  shapes with a top shape of 4 — under 1% — and 426 shapes in the unnamed tail. The
+   *  count survived and the reason did not, which is the same blind spot as a bare
+   *  no-site rate. The cause key drops every per-lead token, so `fetch failed` and
+   *  `cross-domain redirect` become one row each: on the first pass with both lines the
+   *  nine shapes were three causes. READ topErrorCausePct: a cause holding most of a
+   *  pass is one fault to chase, and a flat spread is just the web being the web. Null
+   *  for passes logged before the line existed, not zero. */
+  topErrorCause: string | null;
+  topErrorCauseCount: number | null;
+  errorCauseShapes: number | null;
+  topErrorCausePct: number | null;
   /** Method ids the collect CLI's breaker took out of the pass. */
   deadMethods: string[] | null;
 };
@@ -1305,6 +1319,8 @@ export function collectPasses(logText: string, minSample = 30): CollectPass[] {
   const FOUND = /^\[bloodhound\] Methods found (\d+) point\(s\) on (\d+)\/(\d+) leads; (\d+) were already on file\./;
   // Printed after the found-line (youtube-email-outreach-v1 fb371d267 / ee1abd7c8).
   const ERRORS = /^\[bloodhound\] Method errors: (\d+) across (\d+) shape\(s\) — (\d+)x ([^|;]+)/;
+  // Printed immediately after the shape line (youtube-email-outreach-v1, 2026-10-12).
+  const CAUSES = /^\[bloodhound\] Method error causes: (\d+) across (\d+) cause\(s\), top (\d+)% — (\d+)x ([^|;]+)/;
   const DEAD = /^\[bloodhound\] Breaker tripped on \d+ method\(s\): (.+)$/;
   const out: CollectPass[] = [];
   // The newest summary line ACCEPTED into `out`, or null. A short tail-of-lap batch is
@@ -1332,6 +1348,16 @@ export function collectPasses(logText: string, minSample = 30): CollectPass[] {
       }
       continue;
     }
+    const c = CAUSES.exec(line);
+    if (c) {
+      if (current) {
+        current.errorCauseShapes = Number(c[2]);
+        current.topErrorCausePct = Number(c[3]);
+        current.topErrorCauseCount = Number(c[4]);
+        current.topErrorCause = c[5]!.trim();
+      }
+      continue;
+    }
     const d = DEAD.exec(line);
     if (d) {
       if (current) {
@@ -1349,6 +1375,8 @@ export function collectPasses(logText: string, minSample = 30): CollectPass[] {
       points: Number(m[1]), hit, of, rate: hit / of, summary: line,
       found: null, alreadyOnFile: null,
       methodErrors: null, topErrorShape: null, topErrorCount: null, deadMethods: null,
+      topErrorCause: null, topErrorCauseCount: null, errorCauseShapes: null,
+      topErrorCausePct: null,
     };
     out.push(pass);
     current = pass;
