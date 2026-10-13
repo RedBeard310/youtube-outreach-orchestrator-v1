@@ -58,6 +58,12 @@ export type SiegePlanFacts = {
   mailbox_slots: number | null;
   live_inboxes: number | null;
   offers_blocked: number | null;
+  /** Total messages a day the live mailboxes allow, before follow-ups take their share. */
+  mailbox_capacity: number | null;
+  /** Follow-ups the live mailboxes owe today. These are spent before any new person. */
+  followups_due: number | null;
+  /** Live mailboxes with no room left at all for a new person. */
+  inboxes_full: number | null;
 };
 
 const NO_PLAN: SiegePlanFacts = {
@@ -69,6 +75,9 @@ const NO_PLAN: SiegePlanFacts = {
   mailbox_slots: null,
   live_inboxes: null,
   offers_blocked: null,
+  mailbox_capacity: null,
+  followups_due: null,
+  inboxes_full: null,
 };
 
 const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
@@ -104,6 +113,32 @@ export function siegePlanFacts(raw: unknown): SiegePlanFacts {
       : s.offer_problems && typeof s.offer_problems === 'object'
         ? Object.keys(s.offer_problems).length
         : null,
+    // WHY mailbox_slots COLLAPSED, WHICH THE SLOT COUNT ALONE CANNOT SAY (2026-10-13).
+    //
+    // `mailbox_slots` is a remainder: a mailbox's daily allowance minus the follow-ups it
+    // already owes. So a healthy fleet and a crippled one report the same small number,
+    // and the reader cannot tell a suspension wave from a follow-up wave. On 2026-10-12
+    // the fleet was the HEALTHIEST it had been all week — 57 of 58 inboxes live against
+    // 50 on Friday, and the highest daily allowance of the three days, 855 — and slots
+    // still fell from 618 to 76, because 1,495 follow-ups came due in one day and 50 of
+    // the 57 live mailboxes had no room left at all. Reading that took opening
+    // automator's own plan by hand, and the mailbox_slots comment above has been naming
+    // this shape since 09-29 without ever carrying the number that proves it.
+    //
+    // It is structural, not weather: every offer is a three-email sequence on days 0, 4
+    // and 10, and SmartLead sends Monday to Thursday, so a weekend's worth of due
+    // follow-ups piles onto Monday on top of Monday's own. A big first-touch day
+    // mortgages the next week's capacity. Capacity against the follow-up bill is what
+    // sizes the fleet; the slot remainder on its own argues for nothing.
+    mailbox_capacity: live === null
+      ? null
+      : live.reduce((t, i) => t + (num(i.message_per_day) ?? 0), 0),
+    followups_due: live === null
+      ? null
+      : live.reduce((t, i) => t + (num(i.followups_due) ?? 0), 0),
+    inboxes_full: live === null
+      ? null
+      : live.filter((i) => (num(i.free_before_fill) ?? 0) === 0).length,
   };
 }
 
@@ -324,6 +359,17 @@ export function sendPlanHealth(
       "Siege's own plan for this cycle, read from automator/state/siege/<day>/plan.json. " +
       'Casey gave Siege standing approval on 2026-09-30, so approval_pending:true now means ' +
       'the run did not reach the push at all, not that a person left a batch standing. ' +
+      'DO NOT READ A SMALL mailbox_slots AS A SICK FLEET (2026-10-13): it is a remainder, ' +
+      'a mailbox\'s daily allowance minus the follow-ups it already owes, so a suspension ' +
+      'wave and a follow-up wave report the same small number. On 2026-10-12 the fleet was ' +
+      'the healthiest of the week, 57 of 58 live against 50 on Friday and the highest ' +
+      'allowance of the three days at 855, and slots still fell 618 to 76 because ' +
+      'followups_due was 1,495 in one day and inboxes_full was 50 of 57. That is ' +
+      'structural: every offer is a three-email sequence on days 0, 4 and 10 and SmartLead ' +
+      'sends Mon-Thu, so a weekend of due follow-ups lands on Monday on top of Monday\'s ' +
+      'own, and a big first-touch day mortgages the next week. mailbox_capacity against ' +
+      'followups_due is what sizes the fleet; the slot remainder on its own argues for ' +
+      'nothing. ' +
       'day_cap is the warmup ramp and ' +
       'mailbox_slots is what the live inboxes would accept; the smaller one is the real ' +
       'ceiling. push_unit_result is siege-plan.service\'s own verdict on the run that sent ' +

@@ -221,9 +221,9 @@ const PLAN_29 = {
     day: '2026-09-29', email_paused: false, day_cap: 150,
     offer_problems: { 'super-fan': ['paused'], 'time-offer': ['no video'] },
     inboxes: [
-      { live: true, free_before_fill: 8 },
-      { live: true, free_before_fill: 8 },
-      { live: false, free_before_fill: 0 },
+      { live: true, free_before_fill: 8, message_per_day: 15, followups_due: 7 },
+      { live: true, free_before_fill: 8, message_per_day: 15, followups_due: 7 },
+      { live: false, free_before_fill: 0, message_per_day: 15, followups_due: 99 },
     ],
   },
   assignments: new Array(150).fill({ lead_id: 'x' }),
@@ -231,15 +231,40 @@ const PLAN_29 = {
 ok('plan facts read off the real shape',
   siegePlanFacts(PLAN_29),
   { plan_found: true, plan_day: '2026-09-29', email_paused: false, day_cap: 150,
-    planned: 150, mailbox_slots: 16, live_inboxes: 2, offers_blocked: 2 });
+    planned: 150, mailbox_slots: 16, live_inboxes: 2, offers_blocked: 2,
+    mailbox_capacity: 30, followups_due: 14, inboxes_full: 0 });
 ok('blocked offers count as an array too',
   siegePlanFacts({ summary: { offer_problems: [{ offer: 'a' }] } }).offers_blocked, 1);
 ok('a dead inbox contributes no slots',
   siegePlanFacts({ summary: { inboxes: [{ live: false, free_before_fill: 12 }] } }).mailbox_slots, 0);
+ok('a dead inbox owes no follow-ups we can act on either',
+  siegePlanFacts({ summary: { inboxes: [{ live: false, message_per_day: 15, followups_due: 40 }] } }),
+  { plan_found: true, plan_day: null, email_paused: null, day_cap: null, planned: null,
+    mailbox_slots: 0, live_inboxes: 0, offers_blocked: null,
+    mailbox_capacity: 0, followups_due: 0, inboxes_full: 0 });
+// THE 2026-10-12 SHAPE: the healthiest fleet of the week and the worst new-person
+// volume of the week, because follow-ups outran the whole allowance. The slot count
+// alone reads identically to a suspension wave, which is why the three fields exist.
+ok('follow-ups eating the fleet is readable, not just the small slot count',
+  siegePlanFacts({
+    summary: {
+      day: '2026-10-12', day_cap: 870,
+      inboxes: [
+        { live: true, message_per_day: 15, followups_due: 23, free_before_fill: 0 },
+        { live: true, message_per_day: 15, followups_due: 30, free_before_fill: 0 },
+        { live: true, message_per_day: 15, followups_due: 2, free_before_fill: 13 },
+      ],
+    },
+    assignments: new Array(13).fill({ lead_id: 'x' }),
+  }),
+  { plan_found: true, plan_day: '2026-10-12', email_paused: null, day_cap: 870,
+    planned: 13, mailbox_slots: 13, live_inboxes: 3, offers_blocked: null,
+    mailbox_capacity: 45, followups_due: 55, inboxes_full: 2 });
 ok('a renamed key costs one null, not the block',
   siegePlanFacts({ summary: { day_cap: 'oops' }, assignments: [1] }),
   { plan_found: true, plan_day: null, email_paused: null, day_cap: null,
-    planned: 1, mailbox_slots: null, live_inboxes: null, offers_blocked: null });
+    planned: 1, mailbox_slots: null, live_inboxes: null, offers_blocked: null,
+    mailbox_capacity: null, followups_due: null, inboxes_full: null });
 ok('garbage is no plan', siegePlanFacts('nope').plan_found, false);
 ok('null is no plan', siegePlanFacts(null).plan_found, false);
 
