@@ -2157,9 +2157,10 @@ async function main(): Promise<void> {
   // as the two above. See collectYieldBetween() for what each number means.
   const laneYieldNow = await collectYieldBetween(sinceISO, untilISO).catch(() => null);
   const laneBook = await collectBookDepth().catch(() => null);
-  // Per-method lifetime production. See methodProduction() for the eight weeks of
-  // silent 403s this exists to make visible.
-  const laneMethods = await methodProduction().catch(() => null);
+  // Per-method lifetime production, PLUS what each one produced inside this cycle. See
+  // methodProduction() for the eight weeks of silent 403s this exists to make visible,
+  // and for why lifetime alone cannot say who found today's leads.
+  const laneMethods = await methodProduction(14, { sinceISO, untilISO }).catch(() => null);
   const laneState = loadState(join(LOGS, 'bloodhound-lane-state.json'));
 
   // SITE RESOLUTION, THE LANE'S ONE LOAD-BEARING INPUT, WAS NOT IN THIS FILE (2026-10-05).
@@ -2448,6 +2449,23 @@ async function main(): Promise<void> {
       // current slice goes quiet honestly. It means look, not fix.
       methods: laneMethods,
       methods_quiet: laneMethods ? laneMethods.filter((m) => m.quiet) : null,
+      // WHICH METHODS ACTUALLY FOUND THIS CYCLE'S LEADS (2026-10-13). `methods` above
+      // ranks by silence and `points` is a lifetime total, so neither can answer the
+      // question a reader has every morning: what produced today, and did yesterday's
+      // fix take? On the first cycle after the sitemap and RDAP fixes shipped, the answer
+      // was that `28-sitemap` wrote 16 of 44 points, 16 of 23 email addresses and every
+      // one of the day's 4 parks, while `18-rdap` produced for the first time in 55 days.
+      // Both readings took hand SQL. This list is that query, ranked by email addresses
+      // first because an address is the only point kind that can park anybody — one
+      // creator with a mailto on every page writes dozens of plain points alone.
+      methods_producing: laneMethods
+        ? laneMethods
+          .filter((m) => (m.points_in_cycle ?? 0) > 0)
+          .sort((a, b) =>
+            (b.email_points_in_cycle ?? 0) - (a.email_points_in_cycle ?? 0)
+            || (b.points_in_cycle ?? 0) - (a.points_in_cycle ?? 0)
+          )
+        : null,
       note:
         'Contact points written in the cycle, from leads.contact_points.created_at. ' +
         'READ THE free_* FIELDS AS THIS LANE: the totals also contain the paid Apify ' +
@@ -2504,6 +2522,16 @@ async function main(): Promise<void> {
         'User-Agent, so Cloudflare answered 403 for every lead with a website and the ' +
         'method had never once read a registration record. Both fixed 2026-10-12. Null ' +
         'before the line existed, NOT zero. ' +
+        'BOTH OF THOSE FIXES PAID OFF INSIDE ONE CYCLE AND methods COULD NOT SHOW IT, ' +
+        'WHICH IS WHY methods_producing EXISTS (2026-10-13): methods ranks by silence and ' +
+        'its points field is a lifetime total dominated by 34-channel-page, so the morning ' +
+        'question (what produced today, and did yesterday fix anything) took hand SQL. ' +
+        'methods_producing is that query — every method with a point in the window, ranked ' +
+        'by email addresses first, because an address is the only point kind that can park ' +
+        'anybody. On 2026-10-13 it read 28-sitemap 16 points / 16 addresses / 5 people, ' +
+        'carrying every one of the day\'s 4 parks, and 18-rdap producing for the first time ' +
+        'in 55 days. points_in_cycle/email_points_in_cycle/leads_in_cycle are null, not 0, ' +
+        'on a snapshot written without a window: unknown and measured-as-nothing differ. ' +
         'A climbing collect_book_stranded is the real fault ' +
         'signal (a selector gap has reopened). Emails here are unverified: the verify pass ' +
         'decides which ones flip to approved_hold.',

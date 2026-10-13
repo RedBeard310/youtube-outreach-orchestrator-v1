@@ -672,6 +672,12 @@ export type MethodProduction = {
   days_since_last_point: number | null;
   /** True when this method has produced before and has produced nothing lately. */
   quiet: boolean;
+  /** Contact points this method wrote inside the window, or null if none was passed. */
+  points_in_cycle: number | null;
+  /** Of those, how many were email addresses — the only kind that can park anyone. */
+  email_points_in_cycle: number | null;
+  /** How many distinct people it found them on. Addresses per person varies wildly. */
+  leads_in_cycle: number | null;
 };
 
 /**
@@ -696,8 +702,23 @@ export type MethodProduction = {
  * it is worth one look. One grouped query, no network, no model. `quiet` is deliberately
  * a low bar rather than an alarm — the point is to put the number in front of a reader
  * once a day, not to decide for them.
+ *
+ * LIFETIME ALONE CANNOT SAY WHO FOUND TODAY'S LEADS, OR WHETHER A FIX WORKED (2026-10-13).
+ * The day after the two fixes above shipped, `28-sitemap` wrote 16 of the cycle's 44
+ * contact points and 16 of its 23 email addresses, and all four of the day's parks trace
+ * to it; `18-rdap` wrote its first points in 55 days. None of that was readable here.
+ * Lifetime totals are dominated by `34-channel-page`'s 15,000 and barely move, and
+ * `days_since_last_point` only answers yes-or-no, so confirming either fix meant hand
+ * SQL — the exact manual step the function was built to end, and the step the 10-12
+ * debrief had to list as a ranked next action. Pass the cycle window and every row also
+ * carries what it produced inside it, so the snapshot names the day's real producers
+ * instead of its all-time ones. Null, not 0, when no window is given: unknown and
+ * measured-as-nothing are different answers.
  */
-export async function methodProduction(quietAfterDays = 14): Promise<MethodProduction[]> {
+export async function methodProduction(
+  quietAfterDays = 14,
+  cycle?: { sinceISO: string; untilISO: string },
+): Promise<MethodProduction[]> {
   const rows = await query<Record<string, string | number | null>>(
     `SELECT cp.source AS source,
             count(*) AS points,
@@ -706,6 +727,29 @@ export async function methodProduction(quietAfterDays = 14): Promise<MethodProdu
       WHERE cp.source IS NOT NULL
       GROUP BY cp.source`,
   );
+  // Counted in the same breath as the lifetime roll-up so the two cannot drift, and
+  // filed by source so a method missing from the window reads as 0 rather than null.
+  const inCycle = new Map<string, { points: number; emails: number; leads: number }>();
+  if (cycle) {
+    const cycleRows = await query<Record<string, string | number | null>>(
+      `SELECT cp.source AS source,
+              count(*) AS points,
+              count(*) FILTER (WHERE cp.kind IN ('business_email', 'personal_email')) AS emails,
+              count(DISTINCT cp.lead_id) AS leads
+         FROM leads.contact_points cp
+        WHERE cp.source IS NOT NULL
+          AND cp.created_at >= $1 AND cp.created_at < $2
+        GROUP BY cp.source`,
+      [cycle.sinceISO, cycle.untilISO],
+    );
+    for (const r of cycleRows) {
+      inCycle.set(String(r.source), {
+        points: Number(r.points ?? 0),
+        emails: Number(r.emails ?? 0),
+        leads: Number(r.leads ?? 0),
+      });
+    }
+  }
   const now = Date.now();
   const out: MethodProduction[] = rows.map((r) => {
     const last = r.last_point ? new Date(String(r.last_point)) : null;
@@ -713,6 +757,7 @@ export async function methodProduction(quietAfterDays = 14): Promise<MethodProdu
       ? Math.floor((now - last.getTime()) / 86_400_000)
       : null;
     const points = Number(r.points ?? 0);
+    const cur = cycle ? (inCycle.get(String(r.source)) ?? { points: 0, emails: 0, leads: 0 }) : null;
     return {
       source: String(r.source),
       points,
@@ -723,6 +768,9 @@ export async function methodProduction(quietAfterDays = 14): Promise<MethodProdu
       // A paid lane is quiet because its month is spent, which is budget, not breakage.
       quiet: points > 0 && days !== null && days >= quietAfterDays
         && !PAID_POINT_SOURCE_PREFIXES.some((p) => String(r.source).startsWith(p)),
+      points_in_cycle: cur ? cur.points : null,
+      email_points_in_cycle: cur ? cur.emails : null,
+      leads_in_cycle: cur ? cur.leads : null,
     };
   });
   out.sort((a, b) => (b.days_since_last_point ?? -1) - (a.days_since_last_point ?? -1));
