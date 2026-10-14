@@ -1,4 +1,5 @@
 import PipelineDb, { type FieldSet } from 'pipeline-db/sdk';
+import { query } from 'pipeline-db';
 
 // Must match leads.vocab_lead_candidates_review_status in Postgres. The two
 // lanes below were live for weeks but missing from this type, so every call site
@@ -413,4 +414,90 @@ export async function countShelf(): Promise<{
     if ((r.get('enrichment_bundle_path') as string | undefined)?.trim()) bundled += 1;
   }
   return { ready_to_write: ready, bundled, already_sent: sent, total: rows.length };
+}
+
+export type BulkStatusWrite = {
+  /** The second every row in the cluster shares, which is what makes it one statement. */
+  at: string;
+  review_status: string | null;
+  leads: number;
+  /** How many had already been emailed when the write landed. */
+  already_emailed: number;
+  with_email: number;
+  /** The leading `[tag]` the writer stamped into `notes`, if it stamped one. */
+  stamp: string | null;
+  /** Reporting label only, never a selector — see the comment above. */
+  left_the_send_queue: boolean;
+};
+
+// Mirrors SIEGE_REVIEW_STATUSES in automator/scripts/siege_tiers.py, which OWNS the
+// definition. Duplicated here on purpose and nowhere else: this list never selects a
+// lead, it only labels a line in a report, so drift mislabels a sentence in a debrief
+// instead of emailing the wrong person. Do not reuse it to pick leads.
+const SEND_QUEUE_STATUSES_FOR_REPORTING = ['approved_hold', 'approved', 'needs_contact'];
+
+/**
+ * Single-statement bulk rewrites of `review_status` inside a window, largest first.
+ *
+ * WHY THIS EXISTS (2026-10-14). The shelf fell 800 in one cycle — 7,604 to 6,804 — and
+ * the only instrument that could see it was `parked.parked_today: -800`. A bare negative
+ * there reads as the send path draining the bank, which is the one explanation the
+ * numbers ruled out: 783 emails went out, and sending does not move a lead out of
+ * `approved_hold` at all (see countShelf above). The real cause was an ICP audit Casey
+ * ran at 16:26 UTC that flipped 881 leads to `rejected` and zeroed their score, 720 of
+ * whom had already been emailed, and it also paused 684 live SmartLead sequences. None of
+ * that is a fault — it is the correct call, with a working undo script — but finding it
+ * took an hour of hand SQL across four repos, a whole-home grep, and reading a rubric out
+ * of a backups folder no repo knows about.
+ *
+ * The cheapest detector for that entire class is the shape of the write itself. Per-lead
+ * work — a push, a verify pass, an Apify batch — spreads across seconds. One UPDATE over
+ * a thousand rows lands on a single second, so a second holding 50+ status rows is a bulk
+ * reclassification by definition, whoever ran it. Grouping by that second and reading the
+ * leading `[tag]` out of `notes` makes the write name itself: the 10-13 audit reports as
+ * `881 leads -> rejected, stamp [NOT ICP 2026-10-13]`.
+ *
+ * Deliberately a report and not an alarm. Bulk reclassification is a normal, healthy
+ * operation and the point is to put it in front of a reader beside the shelf delta it
+ * explains, so nobody spends another cycle blaming the send path for a number it
+ * did not move. One grouped query, no network, no model.
+ *
+ * It cannot prove which status a row came FROM — nothing keeps lead history — so it
+ * reports the destination and the size. That is enough to separate "the shelf was
+ * reclassified" from "the shelf was sent", which is the question that went unanswered.
+ */
+export async function bulkStatusWrites(
+  sinceISO: string,
+  untilISO: string,
+  minLeads = 50,
+): Promise<BulkStatusWrite[]> {
+  const rows = await query<Record<string, string | number | Date | null>>(
+    `SELECT date_trunc('second', lc.updated_at) AS at,
+            lc.review_status                   AS review_status,
+            count(*)                           AS leads,
+            count(*) FILTER (WHERE lc.outreach_status = 'sent_to_smartlead') AS already_emailed,
+            count(*) FILTER (WHERE lc.email_address IS NOT NULL)             AS with_email,
+            mode() WITHIN GROUP (ORDER BY substring(lc.notes from '\\[[^\\]]{1,60}\\]')) AS stamp
+       FROM leads.lead_candidates lc
+      WHERE lc.updated_at >= $1
+        AND lc.updated_at <  $2
+      GROUP BY 1, 2
+     HAVING count(*) >= $3
+      ORDER BY count(*) DESC
+      LIMIT 8`,
+    [sinceISO, untilISO, minLeads],
+  );
+  return rows.map((r) => {
+    const status = r.review_status === null ? null : String(r.review_status);
+    return {
+      at: new Date(String(r.at)).toISOString(),
+      review_status: status,
+      leads: Number(r.leads ?? 0),
+      already_emailed: Number(r.already_emailed ?? 0),
+      with_email: Number(r.with_email ?? 0),
+      stamp: r.stamp === null ? null : String(r.stamp),
+      left_the_send_queue: status === null
+        || !SEND_QUEUE_STATUSES_FOR_REPORTING.includes(status),
+    };
+  });
 }

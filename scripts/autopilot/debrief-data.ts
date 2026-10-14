@@ -12,6 +12,7 @@ import { join } from 'node:path';
 import {
   countByReviewStatus,
   countSentBetween,
+  bulkStatusWrites,
   countShelf,
   getLeadsDiscoveredSince,
   type Lead,
@@ -2198,6 +2199,10 @@ async function main(): Promise<void> {
   const sent = await countSentBetween(sinceISO, untilISO).catch(() => null);
   const shelf = await countShelf().catch(() => null);
 
+  // Why the shelf moved, when it moved in one statement. Same fail-soft rule as the
+  // calls below: a broken query degrades to null, it does not take the debrief down.
+  const bulkWrites = await bulkStatusWrites(sinceISO, untilISO).catch(() => null);
+
   // The recovery lane is the only thing still producing new sendable leads while
   // discovery is paused, and no field here counted its output. Same fail-soft rule
   // as the two above. See collectYieldBetween() for what each number means.
@@ -2435,6 +2440,20 @@ async function main(): Promise<void> {
       // run or it flags nothing that matters.
       measured_minutes_after_cycle_end: Math.round((nowMs - Date.parse(untilISO)) / 60_000),
       counts_post_cycle_arrivals: nowMs - Date.parse(untilISO) > 30 * 60_000,
+      // READ THIS BEFORE EXPLAINING A NEGATIVE parked_today (2026-10-14). Sending does
+      // not move a lead out of approved_hold, so the send path can never be the reason
+      // the shelf shrank, however many emails went out. A bulk reclassification can, and
+      // did: the shelf fell 800 this cycle because an ICP audit flipped 881 leads to
+      // `rejected` in one statement at 16:26Z, 720 of them already emailed, and no
+      // instrument could show it — the diagnosis took hand SQL across four repos and a
+      // rubric found in a backups folder. Every row here is one second that carries 50+
+      // status rows, which per-lead work cannot produce, with the leading `[tag]` the
+      // writer stamped into `notes`. An empty array means nothing was rewritten in bulk,
+      // so a shelf move has to be explained by arrivals and departures one lead at a
+      // time. Null means the query failed, which is not the same as empty. See
+      // bulkStatusWrites() in src/db.ts for why the destination is reported and the
+      // origin is not.
+      bulk_status_writes: bulkWrites,
     },
     // Emails LOADED into a SmartLead campaign this cycle (see countSentBetween). Null
     // means the query failed, not that nothing was sent.
