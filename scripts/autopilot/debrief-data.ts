@@ -143,6 +143,140 @@ export function siegePlanFacts(raw: unknown): SiegePlanFacts {
   };
 }
 
+// --- THE FLEET ITSELF SHRANK AND THREE SNAPSHOTS IN A ROW COULD NOT SAY SO (2026-10-15) ---
+//
+// The block above settled that a small `mailbox_slots` argues for nothing, and said
+// capacity against the follow-up bill is what sizes the fleet. It is, and nothing
+// compared either one to yesterday. Across the three cycles after the record push the
+// send plan read:
+//
+//   10-13   57 live inboxes   855 messages/day allowance   1,495 follow-ups due
+//   10-14   53 live inboxes   795                              0
+//   10-15   43 live inboxes   645                            562
+//
+// A quarter of the fleet and 210 messages a day of allowance gone in three days, and
+// every one of those numbers looked unremarkable on its own morning. The cause is on
+// disk in the email repo: the inbox health gate paused 13 mailboxes in its 2026-10-14
+// run, 0 for warmup day and all 13 for a health score under 90, some as low as 53.5 —
+// its biggest single pull in five weeks, the morning after 782 emails went out in one
+// push. A suspended mailbox needs two weeks of warmup to come back, so this is the
+// expensive kind of capacity loss, not weather.
+//
+// So carry the day-over-day move and the gate's own last run. Stated carefully: the gate
+// also pulled 6 mailboxes after a zero-send weekend, so pauses churn on their own and a
+// correlation is not a proof. What the fields are for is making the question askable on
+// the morning it starts rather than three days later.
+export type FleetFacts = {
+  live_inboxes_prev: number | null;
+  live_inboxes_change: number | null;
+  mailbox_capacity_prev: number | null;
+  mailbox_capacity_change: number | null;
+  /** When the inbox health gate last ran. It is staleness-gated to once per 24h. */
+  gate_last_run: string | null;
+  gate_paused: number | null;
+  gate_resumed: number | null;
+  /** The split that decides whether a pull is deliverability or just a young mailbox. */
+  gate_paused_on_health: number | null;
+  gate_paused_on_warmup: number | null;
+  /** Mailboxes the gate is holding paused right now, all causes, all time. */
+  gate_paused_total: number | null;
+  /** Largest single pull in the gate's retained history, for scale. */
+  gate_biggest_pull: number | null;
+  gate_biggest_pull_at: string | null;
+};
+
+const NO_FLEET: FleetFacts = {
+  live_inboxes_prev: null,
+  live_inboxes_change: null,
+  mailbox_capacity_prev: null,
+  mailbox_capacity_change: null,
+  gate_last_run: null,
+  gate_paused: null,
+  gate_resumed: null,
+  gate_paused_on_health: null,
+  gate_paused_on_warmup: null,
+  gate_paused_total: null,
+  gate_biggest_pull: null,
+  gate_biggest_pull_at: null,
+};
+
+/** Parse the inbox health gate's own state file. Pure, so the selftest can feed it one.
+ *  The gate owns this file's shape in the email repo and may change it, so every field
+ *  is optional on the way in: a rename costs one null, never the block. */
+export function inboxGateFacts(raw: unknown): Pick<
+  FleetFacts,
+  'gate_last_run' | 'gate_paused' | 'gate_resumed' | 'gate_paused_on_health'
+  | 'gate_paused_on_warmup' | 'gate_paused_total' | 'gate_biggest_pull' | 'gate_biggest_pull_at'
+> {
+  const blank = {
+    gate_last_run: null, gate_paused: null, gate_resumed: null,
+    gate_paused_on_health: null, gate_paused_on_warmup: null,
+    gate_paused_total: null, gate_biggest_pull: null, gate_biggest_pull_at: null,
+  };
+  if (!raw || typeof raw !== 'object') return blank;
+  const s = raw as {
+    lastRunAt?: unknown;
+    pausedByGate?: Record<string, { since?: unknown; reasons?: unknown }>;
+    history?: Array<{ at?: unknown; paused?: unknown; resumed?: unknown }>;
+  };
+  const history = Array.isArray(s.history) ? s.history : [];
+  const last = history.length > 0 ? history[history.length - 1] : null;
+  const paused = s.pausedByGate && typeof s.pausedByGate === 'object' ? s.pausedByGate : null;
+  // The reason split is read off the mailboxes the LAST run paused, matched by name in
+  // the registry, because `history` records names and only the registry records why.
+  const lastNames = Array.isArray(last?.paused) ? (last!.paused as unknown[]).filter((n): n is string => typeof n === 'string') : [];
+  let health: number | null = null;
+  let warmup: number | null = null;
+  if (paused && lastNames.length > 0) {
+    health = 0; warmup = 0;
+    for (const name of lastNames) {
+      const reasons = paused[name]?.reasons;
+      const list = Array.isArray(reasons) ? reasons.map(String) : [];
+      // A mailbox can fail both tests; count it under health, which is the expensive one.
+      if (list.some((r) => /health|inbox_rate|landing/i.test(r))) health++;
+      else if (list.some((r) => /warmup/i.test(r))) warmup++;
+    }
+  } else if (paused) {
+    health = 0; warmup = 0;
+  }
+  let biggest: { at: string | null; n: number } | null = null;
+  for (const h of history) {
+    const n = Array.isArray(h?.paused) ? h.paused.length : 0;
+    if (!biggest || n > biggest.n) biggest = { at: typeof h?.at === 'string' ? h.at : null, n };
+  }
+  return {
+    gate_last_run: typeof s.lastRunAt === 'string' ? s.lastRunAt : null,
+    gate_paused: last ? (Array.isArray(last.paused) ? last.paused.length : null) : null,
+    gate_resumed: last ? (Array.isArray(last.resumed) ? last.resumed.length : null) : null,
+    gate_paused_on_health: health,
+    gate_paused_on_warmup: warmup,
+    gate_paused_total: paused ? Object.keys(paused).length : null,
+    gate_biggest_pull: biggest?.n ?? null,
+    gate_biggest_pull_at: biggest?.at ?? null,
+  };
+}
+
+/** Today's plan against yesterday's snapshot, plus the gate's own last run. A missing
+ *  prior snapshot reports nulls: an absent baseline must never read as "no change". */
+export function fleetFacts(
+  plan: SiegePlanFacts,
+  prior: { live_inboxes?: number | null; mailbox_capacity?: number | null } | null,
+  gateState: unknown,
+): FleetFacts {
+  const livePrev = typeof prior?.live_inboxes === 'number' ? prior.live_inboxes : null;
+  const capPrev = typeof prior?.mailbox_capacity === 'number' ? prior.mailbox_capacity : null;
+  return {
+    ...NO_FLEET,
+    live_inboxes_prev: livePrev,
+    live_inboxes_change: livePrev !== null && plan.live_inboxes !== null
+      ? plan.live_inboxes - livePrev : null,
+    mailbox_capacity_prev: capPrev,
+    mailbox_capacity_change: capPrev !== null && plan.mailbox_capacity !== null
+      ? plan.mailbox_capacity - capPrev : null,
+    ...inboxGateFacts(gateState),
+  };
+}
+
 // WAS A SATURDAY INDISTINGUISHABLE FROM A BROKEN MONDAY (2026-10-04).
 //
 // `plan_found: false` is the right answer for both of these days and they are not
@@ -423,7 +557,22 @@ export function sendPlanHealth(
       'the parser never counted, so five sixths of the shortfall had no counter and no ' +
       'reason. Their reasons were in the log all along (an em dash outside the sign-off ' +
       'twice, bare-title format, opener shape, a rank superlative). `reasons` now covers ' +
-      'failed and skipped together, because the question is why a planned email did not go.',
+      'failed and skipped together, because the question is why a planned email did not go. ' +
+      'AND READ send_plan.fleet BEFORE READING ANY OF THE ABOVE AS A SHORTFALL (2026-10-15): ' +
+      'it carries the fleet\'s day-over-day move, which nothing did until then. Over the ' +
+      'three cycles after the record 782-email push the plan read 57 live inboxes and an ' +
+      '855-message allowance, then 53 and 795, then 43 and 645 — a quarter of the fleet and ' +
+      '210 messages a day gone in three days, each number unremarkable on its own morning. ' +
+      'gate_paused/gate_resumed are the inbox health gate\'s own newest run (the gate lives ' +
+      'in youtube-email-outreach-v1 and is read off its state file, never driven from here), ' +
+      'and gate_paused_on_health vs gate_paused_on_warmup is the split that matters: a ' +
+      'warmup-day pause is a young mailbox and will lift itself, while a health pause is ' +
+      'deliverability and costs two weeks of warmup to undo. The 2026-10-14 run pulled 13, ' +
+      'ALL on health, some as low as 53.5, its biggest pull in five weeks and the morning ' +
+      'after that push. Stated carefully, because the gate also pulled 6 after a zero-send ' +
+      'weekend: pauses churn on their own, so a big pull beside a big push is a question ' +
+      'worth asking the same morning and not a proof. live_inboxes_change is null when ' +
+      'yesterday\'s snapshot is missing — unknown, not steady.',
   };
 }
 
@@ -937,6 +1086,36 @@ export function walkRateTrend(
     walk_rate_change_pct: pct,
     throughput_bound: comparableBaseline ? hasRoad && pct <= WALK_RATE_DROP_PCT : null,
   };
+}
+
+/** Last cycle's fleet size, out of the snapshot this script wrote 24h ago. Null on a
+ *  missing or malformed file: an absent baseline must read as unknown, not as no change.
+ *  Both fields have been written since 2026-10-13, so the first usable baseline is the
+ *  2026-10-14 snapshot. */
+export function priorSendPlan(
+  priorDate: string,
+  logsDir: string = LOGS,
+): { live_inboxes: number | null; mailbox_capacity: number | null } | null {
+  const p = join(logsDir, `autopilot-debrief-${priorDate}.json`);
+  if (!existsSync(p)) return null;
+  try {
+    const prior = JSON.parse(readFileSync(p, 'utf8')) as {
+      send_plan?: { live_inboxes?: unknown; mailbox_capacity?: unknown };
+    };
+    const s = prior.send_plan;
+    if (!s || typeof s !== 'object') return null;
+    return { live_inboxes: num(s.live_inboxes), mailbox_capacity: num(s.mailbox_capacity) };
+  } catch { return null; }
+}
+
+/** The inbox health gate's state file, which lives in the email repo because the gate
+ *  does (CLAUDE.md: that lever is owned there, and this repo only counts). */
+function readInboxGateState(): unknown {
+  const f = join('/home/casey/repos/youtube-email-outreach-v1', '.inbox-health-state.json');
+  if (!existsSync(f)) return null;
+  try {
+    return JSON.parse(readFileSync(f, 'utf8'));
+  } catch { return null; }
 }
 
 // Last cycle's `seeds_advanced` per lane, read out of the debrief snapshot this script
@@ -2397,13 +2576,22 @@ async function main(): Promise<void> {
   const sendLog = orchestratorSendLog(sinceISO, untilISO);
   const cycleDay = cyclePacificDay(sinceISO);
   const siegeUnit = siegeUnitFacts(cycleDay);
+  const siegePlan = readSiegePlan(cycleDay);
   const sendPlan = sendPlanHealth(
-    readSiegePlan(cycleDay),
+    siegePlan,
+
     sent?.total ?? null,
     sendLog.sent_sum,
     siegeUnitVerdict(siegeUnit, sinceISO, untilISO),
     siegeUnit,
     readSiegePushOutcome(sinceISO, untilISO),
+  );
+  // The fleet's own day-over-day move, which no snapshot carried until 2026-10-15 —
+  // see FleetFacts. Both reads are filesystem-only and degrade to nulls.
+  const fleet = fleetFacts(
+    siegePlan,
+    priorSendPlan(pacificDate(new Date(sinceMs))),
+    readInboxGateState(),
   );
 
   // Supply-health — surface the persistent term-supply outage the finder can't self-heal.
@@ -2491,7 +2679,7 @@ async function main(): Promise<void> {
     },
     // Why the cycle sent what it sent. sent_today counts emails; this says whether a
     // batch was written and left standing. See the block comment on siegePlanFacts().
-    send_plan: sendPlan,
+    send_plan: { ...sendPlan, fleet },
     // What the Bloodhound recovery lane produced this cycle. Its collect pass is the
     // pipeline's only lead-producing process while discovery is paused, so a debrief
     // that can't see its yield can't tell a picked-over book from a broken lane.

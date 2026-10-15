@@ -1,4 +1,4 @@
-import { apifyBatchFacts, apifyLedgerLine, normalizePushReason, offerFromBatchId, siegePushOutcome, classifyKeyProbe, cyclePacificDay, enrichmentChainFacts, isSendingDay, projectRecoveryBudget, MAX_MISSING_DEBRIEFS, missingDebriefs, pushRunVerdict, unitStartedAt, sendPlanHealth, siegePlanFacts, summarizeSendLines, isVerifiedOrBeyond, laneYield, priorAdvanceSource, priorSeedsAdvanced, priorSeedsWalked, reconcileAdvanced, sessionSeedsAdvanced, sessionStartMs, walkRateTrend } from './debrief-data.ts';
+import { fleetFacts, inboxGateFacts, apifyBatchFacts, apifyLedgerLine, normalizePushReason, offerFromBatchId, siegePushOutcome, classifyKeyProbe, cyclePacificDay, enrichmentChainFacts, isSendingDay, projectRecoveryBudget, MAX_MISSING_DEBRIEFS, missingDebriefs, pushRunVerdict, unitStartedAt, sendPlanHealth, siegePlanFacts, summarizeSendLines, isVerifiedOrBeyond, laneYield, priorAdvanceSource, priorSeedsAdvanced, priorSeedsWalked, reconcileAdvanced, sessionSeedsAdvanced, sessionStartMs, walkRateTrend } from './debrief-data.ts';
 let fail = 0;
 const ok = (name: string, got: unknown, want: unknown) => {
   const pass = JSON.stringify(got) === JSON.stringify(want);
@@ -594,6 +594,58 @@ ok('a fallback stamp inside the window carries the verdict the reload hid',
   pushRunVerdict('success', unitStartedAt('', 'Thu 2026-10-08 10:15:31 UTC'),
     '2026-10-08T07:00:00.000Z', '2026-10-09T07:00:00.000Z'),
   'success');
+
+
+// --- send_plan.fleet: the fleet's own day-over-day move (2026-10-15) ---------------
+// The real numbers from the three cycles after the record push.
+ok('a shrinking fleet is reported as a fall, not as three fine mornings',
+  (() => {
+    const f = fleetFacts(
+      { ...siegePlanFacts({ summary: { inboxes: [{ live: true, message_per_day: 645, followups_due: 0, free_before_fill: 67 }] } }) },
+      { live_inboxes: 53, mailbox_capacity: 795 },
+      null,
+    );
+    return [f.live_inboxes_change, f.mailbox_capacity_change, f.live_inboxes_prev];
+  })(),
+  [-52, -150, 53]);
+ok('a missing prior snapshot reports unknown, never "no change"',
+  (() => {
+    const f = fleetFacts(siegePlanFacts({ summary: { inboxes: [{ live: true, message_per_day: 15 }] } }), null, null);
+    return [f.live_inboxes_change, f.mailbox_capacity_change, f.live_inboxes_prev];
+  })(),
+  [null, null, null]);
+
+// inboxGateFacts — the split that decides whether a pull costs two weeks of warmup.
+const GATE_STATE = {
+  lastRunAt: '2026-10-14T09:45:53.239Z',
+  pausedByGate: {
+    'a@x.com': { since: '2026-10-14T09:45:53.239Z', reasons: ['health 53.5<90'] },
+    'b@x.com': { since: '2026-10-14T09:45:53.239Z', reasons: ['inbox_rate 81<90'] },
+    'c@x.com': { since: '2026-10-14T09:45:53.239Z', reasons: ['warmup day 8<14'] },
+    'd@x.com': { since: '2026-07-22T18:24:35.406Z', reasons: ['health 60<90', 'warmup day 1<14'] },
+  },
+  history: [
+    { at: '2026-10-13T09:45:32.967Z', paused: ['e@x.com', 'f@x.com'], resumed: [] },
+    { at: '2026-10-14T09:45:53.239Z', paused: ['a@x.com', 'b@x.com', 'c@x.com'], resumed: ['g@x.com'] },
+  ],
+};
+ok('the newest run is counted, not the whole history',
+  (() => { const g = inboxGateFacts(GATE_STATE); return [g.gate_paused, g.gate_resumed, g.gate_last_run]; })(),
+  [3, 1, '2026-10-14T09:45:53.239Z']);
+ok('a landing-rate pause counts as health, not as a young mailbox',
+  (() => { const g = inboxGateFacts(GATE_STATE); return [g.gate_paused_on_health, g.gate_paused_on_warmup]; })(),
+  [2, 1]);
+ok('the standing paused count is every cause, all time',
+  inboxGateFacts(GATE_STATE).gate_paused_total, 4);
+ok('the biggest pull is named for scale',
+  (() => { const g = inboxGateFacts(GATE_STATE); return [g.gate_biggest_pull, g.gate_biggest_pull_at]; })(),
+  [3, '2026-10-14T09:45:53.239Z']);
+ok('a missing or renamed state file costs nulls, not the block',
+  (() => { const g = inboxGateFacts(null); return [g.gate_paused, g.gate_paused_on_health, g.gate_paused_total]; })(),
+  [null, null, null]);
+ok('a state file with no history yet reports no run rather than zero pauses',
+  (() => { const g = inboxGateFacts({ lastRunAt: 'x', pausedByGate: {} }); return [g.gate_paused, g.gate_paused_total]; })(),
+  [null, 0]);
 
 console.log(fail === 0 ? '\nALL PASS' : `\n${fail} FAILED`);
 process.exit(fail === 0 ? 0 : 1);
