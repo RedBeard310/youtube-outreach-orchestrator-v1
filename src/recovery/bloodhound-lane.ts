@@ -1545,6 +1545,7 @@ export function collectPasses(logText: string, minSample = 30): CollectPass[] {
       methodErrors: null, topErrorShape: null, topErrorCount: null, deadMethods: null,
       topErrorCause: null, topErrorCauseCount: null, errorCauseShapes: null,
       topErrorCausePct: null,
+      causeList: null, topFaultCause: null, topFaultCauseCount: null, topFaultCausePct: null,
     };
     out.push(pass);
     current = pass;

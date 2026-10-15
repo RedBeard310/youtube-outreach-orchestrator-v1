@@ -16,6 +16,7 @@ import {
   collectRewalk,
   collectRewalkCause,
   collectPasses,
+  parseCauseEntries,
   collectYield,
   collectPassAttribution,
   MAX_CONSECUTIVE_REWINDS,
@@ -908,4 +909,67 @@ test('collectRewalkCause: repetition before the first lap closes is unexplained,
 test('collectCursorKey: a lane holding no cursor keys as null', () => {
   assert.equal(collectCursorKey({}), null);
   assert.equal(collectCursorKey({ collectCursor: cursorAt('recX') }), '0:2026-07-15T17:00:14.391Z:recX');
+});
+
+// --- The top cause can be a deliberate content outcome (2026-10-15) --------------
+//
+// The real 2026-10-15 03:01Z pass. `34-channel-page: page rendered with no outbound
+// links` held 60% of the errors, which the snapshot's own guidance reads as "one fault
+// holding most of a pass, chase it" — and it is not a fault at all: that method tests
+// for the rendered channel markers first and emits a different message when they are
+// missing, so this one means the creator genuinely has no links. The real fault was #2,
+// `17-podcast: iTunes N` (Apple refusing a rate-limited burst), and reading it took a
+// hand grep of the collect log.
+const CAUSE_LOG = [
+  'Collected 0 contact points from 0/102 leads.',
+  '[bloodhound] Methods found 76 point(s) on 41/102 leads; 76 were already on file.',
+  '[bloodhound] Method errors: 85 across 8 shape(s) — 51x 34-channel-page: page rendered with no outbound links | 28x 17-podcast: iTunes N; and 2 rarer shape(s)',
+  '[bloodhound] Method error causes: 85 across 6 cause(s), top 60% — 51x 34-channel-page: page rendered with no outbound links | 28x 17-podcast: iTunes N | 3x 28-sitemap: This operation was aborted | 1x 01-mailto: This operation was aborted; and 2 rarer cause(s)',
+].join('\n');
+
+test('collectPasses: the whole named cause list is kept, not just the top row', () => {
+  const p = collectPasses(CAUSE_LOG)[0]!;
+  assert.equal(p.causeList?.length, 4);
+  assert.deepEqual(p.causeList?.[1], { count: 28, cause: '17-podcast: iTunes N' });
+  // The existing top-cause fields must not change meaning.
+  assert.equal(p.topErrorCause, '34-channel-page: page rendered with no outbound links');
+  assert.equal(p.topErrorCauseCount, 51);
+  assert.equal(p.topErrorCausePct, 60);
+});
+
+test('collectPasses: the top FAULT cause skips a deliberate content outcome', () => {
+  const p = collectPasses(CAUSE_LOG)[0]!;
+  assert.equal(p.topFaultCause, '17-podcast: iTunes N');
+  assert.equal(p.topFaultCauseCount, 28);
+  // Share of the pass's errors, so it is comparable with topErrorCausePct.
+  assert.equal(p.topFaultCausePct, 33);
+});
+
+test('collectPasses: a pass whose only causes are benign reports no fault', () => {
+  const log = [
+    'Collected 0 contact points from 0/150 leads.',
+    '[bloodhound] Method error causes: 68 across 1 cause(s), top 100% — 68x 34-channel-page: page rendered with no outbound links',
+  ].join('\n');
+  const p = collectPasses(log)[0]!;
+  assert.equal(p.topErrorCause, '34-channel-page: page rendered with no outbound links');
+  assert.equal(p.topFaultCause, null);
+  assert.equal(p.topFaultCausePct, null);
+});
+
+test('collectPasses: a pass with no cause line leaves every cause field null, not zero', () => {
+  const p = collectPasses('Collected 4 contact points from 3/150 leads.')[0]!;
+  assert.equal(p.causeList, null);
+  assert.equal(p.topFaultCause, null);
+  assert.equal(p.topFaultCauseCount, null);
+  assert.equal(p.topErrorCause, null);
+});
+
+test('parseCauseEntries: the rarer-cause tail is not mistaken for a cause', () => {
+  // The `; and N rarer cause(s)` tail is cut by the regex, so only named rows arrive.
+  assert.deepEqual(parseCauseEntries('5x a: b | 2x c'), [
+    { count: 5, cause: 'a: b' },
+    { count: 2, cause: 'c' },
+  ]);
+  assert.deepEqual(parseCauseEntries(''), []);
+  assert.deepEqual(parseCauseEntries('and 2 rarer cause(s)'), []);
 });

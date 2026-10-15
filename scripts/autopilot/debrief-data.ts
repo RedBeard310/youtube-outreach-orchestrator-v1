@@ -2298,6 +2298,27 @@ async function main(): Promise<void> {
         top_method_cause_count: passes.length > 0 ? passes[passes.length - 1]!.topErrorCauseCount : null,
         top_method_cause_pct: passes.length > 0 ? passes[passes.length - 1]!.topErrorCausePct : null,
         method_causes: passes.length > 0 ? passes[passes.length - 1]!.errorCauseShapes : null,
+        // AND THE TOP CAUSE CAN BE A CONTENT OUTCOME, WHICH IS NOT A FAULT (2026-10-15).
+        // The guidance above says a cause holding most of a pass is one fault to chase.
+        // That read failed on its third day: `34-channel-page: page rendered with no
+        // outbound links` held 60% of the 03:01Z pass, and that message is the method's
+        // own way of saying this creator has no links — it tests for the rendered channel
+        // markers first and says something else when they are missing. The real fault was
+        // the SECOND row, `17-podcast: iTunes N`, which had climbed 3 -> 12 -> 69 -> 56
+        // across the cycle's four passes (Apple meters its Search API per IP and the pass
+        // calls it 8-wide, costing 165 of 552 leads), and finding it took a hand grep of
+        // the collect log while the snapshot pointed at the benign row.
+        //
+        // So: method_cause_list is every cause the collect CLI named, largest first, and
+        // top_method_fault_cause is the largest one that is not a known content outcome.
+        // READ THE FAULT CAUSE FIRST and treat top_method_cause as context. A null fault
+        // cause with a large method_errors means the whole pass was content outcomes,
+        // which is a picked-over book and not a fault. Both null before the cause line
+        // existed, which is unknowable and NOT zero.
+        method_cause_list: passes.length > 0 ? passes[passes.length - 1]!.causeList : null,
+        top_method_fault_cause: passes.length > 0 ? passes[passes.length - 1]!.topFaultCause : null,
+        top_method_fault_cause_count: passes.length > 0 ? passes[passes.length - 1]!.topFaultCauseCount : null,
+        top_method_fault_cause_pct: passes.length > 0 ? passes[passes.length - 1]!.topFaultCausePct : null,
         methods_dead: passes.length > 0 ? passes[passes.length - 1]!.deadMethods : null,
       };
     } catch {
@@ -2597,6 +2618,24 @@ async function main(): Promise<void> {
         'carrying every one of the day\'s 4 parks, and 18-rdap producing for the first time ' +
         'in 55 days. points_in_cycle/email_points_in_cycle/leads_in_cycle are null, not 0, ' +
         'on a snapshot written without a window: unknown and measured-as-nothing differ. ' +
+        'AND READ top_method_fault_cause BEFORE CHASING top_method_cause (2026-10-15): the ' +
+        'largest cause can be a deliberate content outcome. That day it was ' +
+        '"34-channel-page: page rendered with no outbound links" at 60% of the pass, which ' +
+        'is that method saying the creator genuinely has no links (it checks the rendered ' +
+        'channel markers first and emits a different message when the page did not render), ' +
+        'so the 10-12 rule above pointed at a non-fault for three days. The real fault was ' +
+        'the second row, "17-podcast: iTunes N", which had climbed 3 -> 12 -> 69 -> 56 ' +
+        'across that cycle\'s four passes: Apple meters its Search API per IP, the collect ' +
+        'pass calls it 8-wide, and 165 of 552 leads never got the method at all. Reading it ' +
+        'took a hand grep of the collect log. method_cause_list is now every cause the ' +
+        'collect CLI named, largest first, and top_method_fault_cause is the largest one ' +
+        'that is not a known content outcome — READ THAT FIRST. A null fault cause beside a ' +
+        'large method_errors means the whole pass was content outcomes, which is a ' +
+        'picked-over book and not a fault. Both null before the cause line existed, which ' +
+        'is unknowable and NOT zero. The same cycle fixed the reason the status was ' +
+        'unreadable: both error condensers collapse digits to N, so every bare HTTP status ' +
+        'in the lane now carries a word beside it (httpReason() in the email repo) and a ' +
+        'future "iTunes N" reads "iTunes N rate-limited". ' +
         'A climbing collect_book_stranded is the real fault ' +
         'signal (a selector gap has reopened). Emails here are unverified: the verify pass ' +
         'decides which ones flip to approved_hold.',
