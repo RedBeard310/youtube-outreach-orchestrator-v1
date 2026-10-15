@@ -61,8 +61,8 @@ The orchestrator owns almost no business logic. Each repo/skill already runs end
   ┌──────────────────────────────┐       ┌──────────────────────────────┐
   │ Compose email (Opus 4.7)     │       │ [future: d100 outreach       │
   │ A/B 50/50 between:           │       │  agent. Out of scope for v1  │
-  │   - 5-ideas-email skill      │       │  of this orchestrator.]      │
-  │   - nick-saraev-cold-email   │       │                              │
+  │   - cold-email-5-ideas skill      │       │  of this orchestrator.]      │
+  │   - cold-email-nick-saraev   │       │                              │
   │     skill                    │       │ Currently terminal at        │
   └──────────────────────────────┘       │ enrichment complete.         │
                 │                        └──────────────────────────────┘
@@ -90,8 +90,8 @@ The orchestrator owns almost no business logic. Each repo/skill already runs end
 | `youtube-email-outreach-v1` | Agent (repo) | The current repo. Find email → verify → enrich (calls Quick research) → compose → push — **but the tick stops after enrich (parks at `ready_data_scraped`); compose + push are the decoupled on-demand `npm run send`.** Handles its own state machine via `outreach_status`. Already supports `--lead-id`, `--variant`, `--concurrency` flags. | Outreach status fields + email vars |
 | `quick-youtube-channel-research-v1` | Agent (repo, locked) | Quick enrichment. Called by email-outreach-v1 today; will continue to be called the same way. Writes to scratch Airtable base, exports local markdown bundle. | Scratch Airtable base (cleaned by `airtable-cleanup.ts`) |
 | **Deep-research agent (TBN)** | Agent (future repo) | For `d100` leads only. Likely a rename/fork of `quick-youtube-channel-research-v1` with deeper extraction passes. Writes to a separate, permanent Airtable base. Casey will name this. | Dedicated permanent Airtable base |
-| `5-ideas-email` | Skill (`~/.claude/skills/5-ideas-email/`) | Email writer variant A. Read by `youtube-email-outreach-v1` at compose time. | — |
-| `nick-saraev-cold-email` | Skill (`~/.claude/skills/nick-saraev-cold-email/`) | Email writer variant B. A/B split with variant A via SHA-256 hash of lead ID. | — |
+| `cold-email-5-ideas` | Skill (`~/.claude/skills/cold-email-5-ideas/`) | Email writer variant A. Read by `youtube-email-outreach-v1` at compose time. | — |
+| `cold-email-nick-saraev` | Skill (`~/.claude/skills/cold-email-nick-saraev/`) | Email writer variant B. A/B split with variant A via SHA-256 hash of lead ID. | — |
 
 The orchestrator does **not** call the skills directly. It only calls `youtube-email-outreach-v1`, which already knows how to route compose to the right skill via the existing variant system.
 

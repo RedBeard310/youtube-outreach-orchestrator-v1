@@ -28,8 +28,8 @@ No business logic, no retries inside a tick, no state of its own beyond a tick l
 | `youtube-email-outreach-v1` | Find email → verify → enrich (quick) → compose → push to SmartLead | Orchestrator | `npm run outreach -- --lead-ids ... [--stop-after verify]` |
 | `quick-youtube-channel-research-v1` | 9-stage quick enrichment, writes to shared scratch base | email-outreach (transitively) | Internal call |
 | `youtube-deep-research-v1` | 12-stage deep research, creates a new Airtable base per prospect | Orchestrator (D100 only) | `npx tsx scripts/setup-airtable.ts` then `npx tsx scripts/run-channel.ts` |
-| `5-ideas-email` skill | Compose variant A | email-outreach at compose time | Claude skill |
-| `nick-saraev-cold-email` skill | Compose variant B | email-outreach at compose time | Claude skill |
+| `cold-email-5-ideas` skill | Compose variant A | email-outreach at compose time | Claude skill |
+| `cold-email-nick-saraev` skill | Compose variant B | email-outreach at compose time | Claude skill |
 
 A/B between the two compose skills is decided by SHA-256 hash of lead ID — deterministic, persisted on the row.
 
