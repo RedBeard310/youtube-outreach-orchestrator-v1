@@ -1,0 +1,327 @@
+<title>Lead Run Debrief — 2026-10-15</title>
+<style>
+  :root {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+      --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+      --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+    --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+    --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 40px 22px 80px; }
+  .eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); font-weight: 600; }
+  h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.12; margin: 10px 0 6px; text-wrap: balance; letter-spacing: -.02em; }
+  h2 { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); margin: 44px 0 16px; font-weight: 700; }
+  h3 { font-size: 18px; margin: 0 0 6px; letter-spacing: -.01em; }
+  p { margin: 0 0 14px; }
+  .lede { font-size: 18px; color: var(--ink-soft); max-width: 68ch; }
+  .tag { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--amber-soft); color: var(--amber); letter-spacing: .02em; }
+  .tag.good { background: var(--teal-soft); color: var(--teal); }
+  .grid { display: grid; gap: 14px; }
+  .stats { grid-template-columns: repeat(4, 1fr); margin-top: 26px; }
+  @media (max-width: 720px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; box-shadow: var(--shadow); }
+  .stat .n { font-size: 30px; font-weight: 750; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .stat .l { font-size: 12.5px; color: var(--ink-soft); margin-top: 3px; }
+  .stat .s { font-size: 12px; margin-top: 8px; font-weight: 600; }
+  .up { color: var(--good); } .down { color: var(--red); } .warn { color: var(--amber); }
+  .accent-red { border-left: 3px solid var(--red); }
+  .accent-teal { border-left: 3px solid var(--teal); }
+  .accent-amber { border-left: 3px solid var(--amber); }
+
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-soft); padding: 0 14px 14px; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+
+  .q { border-radius: 14px; padding: 20px 22px; margin-bottom: 14px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); }
+  .q .ask { font-size: 17px; font-weight: 700; color: var(--ink); margin-bottom: 10px; display: flex; gap: 10px; align-items: baseline; }
+  .q .ask .qn { color: var(--red); font-weight: 800; flex: 0 0 auto; }
+  .q p { color: var(--ink-soft); }
+  .q b { color: var(--ink); }
+  .pill { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink); background: var(--panel-2); padding: 1px 7px; border-radius: 6px; border: 1px solid var(--line); white-space: nowrap; }
+  pre { background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; overflow-x: auto; font-size: 12.5px; line-height: 1.5; color: var(--ink); margin: 0 0 14px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+  th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); }
+  td .num { font-variant-numeric: tabular-nums; font-weight: 650; }
+  .fix td:first-child { color: var(--good); font-weight: 650; }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); box-shadow: var(--shadow); }
+  ol.recs { padding-left: 0; list-style: none; counter-reset: r; margin: 0; }
+  ol.recs li { counter-increment: r; position: relative; padding: 14px 16px 14px 52px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 10px; box-shadow: var(--shadow); }
+  ol.recs li::before { content: counter(r); position: absolute; left: 14px; top: 14px; width: 26px; height: 26px; border-radius: 8px; background: var(--teal-soft); color: var(--teal); font-weight: 800; font-size: 14px; display: grid; place-items: center; }
+  ol.recs b { color: var(--ink); }
+  .foot { margin-top: 46px; padding: 16px 18px; border-radius: 12px; background: var(--amber-soft); border: 1px solid var(--line); font-size: 14px; color: var(--ink-soft); }
+  .foot b { color: var(--ink); }
+  .muted { color: var(--ink-soft); font-size: 13.5px; }
+</style>
+
+<style>
+  /* Per-pass collect funnel. The story is the ratio inside each bar. */
+  .passes { display: grid; gap: 10px; padding: 16px 18px; }
+  .prow { display: grid; grid-template-columns: 180px 1fr 148px; gap: 12px; align-items: center; font-size: 13px; }
+  @media (max-width: 720px) { .prow { grid-template-columns: 1fr; gap: 4px; } }
+  .prow .who { color: var(--ink-soft); }
+  .prow .who b { color: var(--ink); }
+  .track { height: 20px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; display: flex; }
+  .track .old { background: var(--line); height: 100%; }
+  .track .fresh { background: var(--good); height: 100%; min-width: 2px; }
+  .prow .right { color: var(--ink-soft); font-variant-numeric: tabular-nums; text-align: right; }
+  .prow .right b { color: var(--ink); }
+
+  /* Which methods produced inside the cycle, ranked by email addresses. */
+  .mrow { display: grid; grid-template-columns: 160px 1fr 170px; gap: 12px; align-items: center; font-size: 13px; }
+  @media (max-width: 720px) { .mrow { grid-template-columns: 1fr; gap: 4px; } }
+  .mrow code { color: var(--ink); }
+  .mrow .bar2 { height: 14px; border-radius: 5px; background: var(--good); opacity: .85; min-width: 3px; }
+  .mrow .bar2.none { background: var(--line); }
+  .mrow .age { color: var(--ink-soft); text-align: right; font-variant-numeric: tabular-nums; }
+  .mrow .age b { color: var(--ink); }
+
+  /* The shelf, and what moved it. */
+  .cap { display: grid; gap: 12px; padding: 16px 18px; }
+  .crow { display: grid; grid-template-columns: 150px 1fr 190px; gap: 12px; align-items: center; font-size: 13px; }
+  @media (max-width: 720px) { .crow { grid-template-columns: 1fr; gap: 4px; } }
+  .crow .who b { color: var(--ink); }
+  .crow .who { color: var(--ink-soft); }
+  .ctrack { height: 22px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; display: flex; position: relative; }
+  .ctrack .fu { background: var(--red); opacity: .72; height: 100%; }
+  .ctrack .room { background: var(--good); height: 100%; }
+  .ctrack .mid { background: var(--amber); opacity: .7; height: 100%; }
+  .crow .right { color: var(--ink-soft); text-align: right; font-variant-numeric: tabular-nums; }
+  .crow .right b { color: var(--ink); }
+</style>
+
+
+<div class="wrap">
+
+  <div class="eyebrow">Lead Run Debrief · YouTube outreach</div>
+  <h1>2026-10-15: the record push cost you a quarter of your mailboxes</h1>
+  <p class="lede"><b>64 emails went out, against 782 the day before.</b> Yesterday's debrief predicted a small day and blamed the follow-up bill, and the follow-ups are real: 562 came due against a 645-message allowance. But the bigger half of the fall is new, and it is not a scheduling quirk. <b>At 09:45Z, 83 minutes before the push, the inbox health gate suspended 13 mailboxes, every single one for a failing health score and none for being too young.</b> That is its biggest pull in five weeks, and it landed the morning after the largest push on record. Over three days the fleet went from 57 live mailboxes and an 855-message daily allowance to <b>43 and 645</b>. A suspended mailbox needs two weeks of warmup to come back, so the thing that limits your sending is no longer the shelf. It is the fleet.</p>
+  <div style="margin-top:14px"><span class="tag">64 LOADED, DOWN FROM 782</span> <span class="tag">13 MAILBOXES SUSPENDED ON HEALTH</span> <span class="tag good">8 PEOPLE GOT ADDRESSES, 4 PARKED</span></div>
+
+  <div class="grid stats">
+    <div class="card stat accent-amber">
+      <div class="n">64</div>
+      <div class="l">emails loaded into SmartLead</div>
+      <div class="s warn">67 planned, 10 refused, 0 failed</div>
+    </div>
+    <div class="card stat accent-red">
+      <div class="n">43</div>
+      <div class="l">live sending mailboxes</div>
+      <div class="s down">was 57 three days ago, allowance 855 to 645</div>
+    </div>
+    <div class="card stat accent-teal">
+      <div class="n">4</div>
+      <div class="l">people reached the shelf</div>
+      <div class="s up">8 got an address, from 6 different methods</div>
+    </div>
+    <div class="card stat accent-red">
+      <div class="n">5,135</div>
+      <div class="l">people on the shelf, never emailed</div>
+      <div class="s muted">2.5 weeks at last week's pace</div>
+    </div>
+  </div>
+
+  <h2>The shape of the day</h2>
+
+  <p>One sending day, and the decision that sized it was made before the push ran.</p>
+
+  <div class="card" style="padding:0">
+    <div class="cap">
+      <div class="crow">
+        <div class="who"><b>09:45Z</b><br><span class="muted">the health gate runs</span></div>
+        <div class="ctrack"><div class="fu" style="width:100%"></div></div>
+        <div class="right"><b>13</b> suspended · 2 resumed</div>
+      </div>
+      <div class="crow">
+        <div class="who"><b>10:36Z</b><br><span class="muted">Siege writes the day's plan</span></div>
+        <div class="ctrack"><div class="room" style="width:10.4%"></div><div class="fu" style="width:86.4%"></div></div>
+        <div class="right"><b>67</b> free slots of 645</div>
+      </div>
+      <div class="crow">
+        <div class="who"><b>10:41Z</b><br><span class="muted">the push</span></div>
+        <div class="ctrack"><div class="room" style="width:9.9%"></div><div class="mid" style="width:1.6%"></div></div>
+        <div class="right"><b>64</b> sent · 10 refused</div>
+      </div>
+      <div class="crow">
+        <div class="who"><b>four passes</b><br><span class="muted">the recovery lane, all cycle</span></div>
+        <div class="ctrack"><div class="room" style="width:1.2%"></div></div>
+        <div class="right"><b>8</b> people got an address</div>
+      </div>
+    </div>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--good)"></span>emails loaded, or people reached</span>
+      <span><span class="dot" style="background:var(--amber);opacity:.7"></span>planned emails we refused</span>
+      <span><span class="dot" style="background:var(--red);opacity:.72"></span>mailboxes suspended, or capacity already owed to follow-ups</span>
+    </div>
+  </div>
+  <p class="muted">Bar width is scaled to the day's 645-message allowance, except the suspension row, which is scaled to itself. The push count is 64 <code>SENT</code> lines in <code>automator/logs/siege.log</code> between 10:41Z and 11:08Z and it agrees exactly with the database: 64 people carry an <code>outreach_processed_at</code> inside the cycle. The suspensions are the 13 names in the 2026-10-14 entry of the gate's own state file in the email repo.</p>
+
+  <h2>The three questions</h2>
+
+  <div class="q accent-red">
+    <div class="ask"><span class="qn">Q1</span><span>782 yesterday, 64 today. Is that just the follow-up bill coming due?</span></div>
+    <p><b>Half of it. The other half is that you have 14 fewer mailboxes than you did on Monday.</b> The follow-up story is the one yesterday's debrief told, and it checks out: 562 follow-ups came due against a 645-message daily allowance, which leaves 67 slots for new people, and 24 of the 43 live mailboxes had no room at all. Every offer is three emails on days 0, 4 and 10, so a 782-person day on Tuesday books three messages each for the rest of the week.</p>
+    <p><b>But the allowance itself fell, and that is the part nothing was watching.</b> Across three mornings the plan read 57 live mailboxes and 855 messages a day, then 53 and 795, then 43 and 645. A quarter of the fleet and 210 messages a day, gone in three days, and each of those numbers looked ordinary on its own morning because nothing compared them to the one before.</p>
+    <p><b>The cause is in the email repo, on disk, and it is unambiguous.</b> The inbox health gate runs once a day before the push. On 10-13 it suspended 4 mailboxes. On 10-14, 83 minutes before the push, it suspended <b>13 and resumed 2</b>, its second-biggest pull in 50 recorded runs. Not one was suspended for being too young in its warmup. All 13 failed on health score, with readings of 53.5, 65.5, 66.7, 68.2, 68.5, 68.5, 79, 80.5, 81.2, 83.9, 83.9, 88.4 and 89.5 against a bar of 90.</p>
+    <p><b>Said carefully, because this is a correlation and not a proof.</b> The gate also suspended 6 mailboxes on 10-11 after a weekend with no sends at all, so suspensions churn for reasons that have nothing to do with volume. What I can show is the timing and the size: the largest push you have ever run, and the next morning the largest health pull in five weeks. That is a question worth asking the same morning it happens, which is now possible.</p>
+    <p class="muted">Health score comes from InboxKit and is a composite of deliverability signals, so I cannot take it apart from here and name which signal moved. The gate's rule is public and simple: pause below 90, below warmup day 14, or below a 90% landing rate with real volume. 51 mailboxes are paused by the gate right now, across every cause and every date back to July.</p>
+  </div>
+
+  <div class="q accent-teal">
+    <div class="ask"><span class="qn">Q2</span><span>Did the push itself lose anything?</span></div>
+    <p><b>Nothing to SmartLead, and the one fix that was tested held.</b> Zero emails failed. SmartLead's account-wide limit of 200 requests a minute refused <code>listCampaignMailboxes</code> twice, at 10:43Z and 10:53Z, and the retry added on 10-05 absorbed both on the second attempt. The sequence-call retry shipped yesterday was not needed today and cost nothing to carry.</p>
+    <p><b>10 planned emails never reached SmartLead, and 9 of them went to the same cause.</b> The push refused them with <code>not in the Siege manifest</code>: the batch's lead list named a person the manifest file has no address entry for, so the push drops them rather than guessing which address to use. That refusal is correct. The disagreement between the two files it is reporting is not.</p>
+    <p><b>It is rare but it arrives in clumps, and one clump was expensive.</b> Across the whole send log this refusal fires on three days only: 6 leads on 09-28, <b>131 leads on 10-07</b> against 336 sent that day, and 9 today. Every other push day is zero. So this is not background noise, it is an intermittent fault in the file-writing step, and on its worst day it threw away 28% of a push. Both files are written by <code>automator</code>, which this agent may not edit.</p>
+    <p class="muted">The tenth refusal was ours on purpose: the writer's own length gate rejected a draft after its retries, at 181 words against a 206 to 266 window and 77 words above the closing block against 105 to 162. The snapshot splits that one draft into its two failing checks, which is why its reason list adds to 10 while the log shows 9 manifest misses and 1 gate rejection.</p>
+  </div>
+
+  <div class="q accent-amber">
+    <div class="ask"><span class="qn">Q3</span><span>The recovery lane's biggest error cause held 60% of the pass. Is something broken?</span></div>
+    <p><b>Not the thing the snapshot pointed at, and yes, something else was.</b> The top cause read <code>34-channel-page: page rendered with no outbound links</code>, 51 of 85 errors. That message is the method saying the creator genuinely has no links to follow: it checks for the rendered channel markers first and says something different when the page did not render. It can hold most of a pass with nothing wrong, and the snapshot's own guidance says a cause holding most of a pass is one fault to chase. So it pointed at a non-fault for three days.</p>
+    <p><b>The real fault was the second row, and it had been climbing all cycle.</b> <code>17-podcast: iTunes N</code> went 12, then 69, then 56, then 28 across the cycle's four passes: <b>165 of 552 leads never got that method at all</b>. The cause is now measured, not guessed. Apple meters its podcast search per address, the collect pass asks it 8 leads at a time, and a reproduction from this box got 20 refusals out of 40 calls, mixing 403 and 429. The same 40 one at a time, at a human pace, all answered.</p>
+    <p><b>Why nobody could read that for a day and a half:</b> both error condensers collapse every digit to <code>N</code> on purpose, so a rate limit and a dead endpoint print the same word. The status code is the one number in an HTTP failure worth keeping, and it was the one number being deleted. That is also how <code>18-rdap</code> hid a Cloudflare 403 for weeks before the 10-12 fix.</p>
+    <p class="muted">Three things shipped for this, all verified: the search now queues behind a window that widens when Apple refuses and narrows when it answers, gives up once for the pass when the budget is really gone, and every HTTP failure in the lane carries a word beside its number, so a future <code>iTunes N</code> reads <code>iTunes N rate-limited</code>. Separately, the snapshot now names the largest cause that is not a deliberate content outcome.</p>
+    <div class="card" style="padding:0;margin:4px 0 14px">
+      <div class="passes">
+        <div class="prow">
+          <div class="who"><b>Pass 1</b> · 07:01Z · 150 leads<br><span class="muted">most of the day's points</span></div>
+          <div class="track"><div class="old" style="width:93.6%"></div><div class="fresh" style="width:6.4%"></div></div>
+          <div class="right"><b>531</b> found · <b>34</b> new · 12 iTunes refusals</div>
+        </div>
+        <div class="prow">
+          <div class="who"><b>Pass 2</b> · 14:01Z · 150 leads</div>
+          <div class="track"><div class="old" style="width:28.1%"></div><div class="fresh" style="width:1.1%"></div></div>
+          <div class="right"><b>155</b> found · <b>6</b> new · <b>69</b> refusals</div>
+        </div>
+        <div class="prow">
+          <div class="who"><b>Pass 3</b> · 21:01Z · 150 leads</div>
+          <div class="track"><div class="old" style="width:22.2%"></div><div class="fresh" style="width:0.8%"></div></div>
+          <div class="right"><b>122</b> found · <b>4</b> new · <b>56</b> refusals</div>
+        </div>
+        <div class="prow">
+          <div class="who"><b>Pass 4</b> · 03:01Z · 102 leads<br><span class="muted">closed lap 10</span></div>
+          <div class="track"><div class="old" style="width:14.3%"></div></div>
+          <div class="right"><b>76</b> found · <b>0</b> new · 28 refusals</div>
+        </div>
+      </div>
+      <div class="legend">
+        <span><span class="dot" style="background:var(--line)"></span>points the methods found that were already stored</span>
+        <span><span class="dot" style="background:var(--good)"></span>points that were new</span>
+      </div>
+    </div>
+    <p class="muted">Across 552 leads the methods found <span class="pill">884</span> contact points of which <span class="pill">840</span> were already stored, a <b>95% re-walk</b>, and the four new-point counts add to exactly the <span class="pill">44</span> points the database reports. Pass 4 found 76 and every one was already on file, which is a full re-walk and not a fault. Lap 10 of the 2,443-lead book closed in that pass. Brave answered all 102 searches with <b>zero key refusals</b> and found a candidate site for 86 of them, and the ownership gate turned down 79, which is the gate being strict on purpose and not something more Brave credit would change.</p>
+  </div>
+
+  <h2>Which methods found today's people</h2>
+  <div class="card" style="padding:16px 18px">
+    <div class="passes" style="padding:0">
+      <div class="mrow"><code>28-sitemap</code><div class="bar2" style="width:100%"></div><div class="age"><b>3</b> addr · 3 pts · 3 people</div></div>
+      <div class="mrow"><code>18-rdap</code><div class="bar2" style="width:33%"></div><div class="age"><b>1</b> addr · 5 pts · 2 people</div></div>
+      <div class="mrow"><code>33-about-text</code><div class="bar2" style="width:33%"></div><div class="age"><b>1</b> addr · 3 pts · 1 person</div></div>
+      <div class="mrow"><code>14-external-links</code><div class="bar2" style="width:33%"></div><div class="age"><b>1</b> addr · 1 pt · 1 person</div></div>
+      <div class="mrow"><code>01-mailto</code><div class="bar2" style="width:33%"></div><div class="age"><b>1</b> addr · 1 pt · 1 person</div></div>
+      <div class="mrow"><code>17-podcast</code><div class="bar2" style="width:33%"></div><div class="age"><b>1</b> addr · 1 pt · 1 person</div></div>
+      <div class="mrow"><code>34-channel-page</code><div class="bar2 none" style="width:3%"></div><div class="age"><b>0</b> addr · 16 pts · 6 people</div></div>
+      <div class="mrow"><code>02-subpages</code><div class="bar2 none" style="width:3%"></div><div class="age"><b>0</b> addr · 9 pts · 4 people</div></div>
+      <div class="mrow"><code>16-jsonld</code><div class="bar2 none" style="width:3%"></div><div class="age"><b>0</b> addr · 5 pts · 1 person</div></div>
+    </div>
+  </div>
+  <p class="muted">Bar length is email addresses found inside the cycle, the only kind of contact that can park anyone. Today's 8 addresses came from <b>6 different methods</b>, which is the widest spread in a fortnight: the last two cycles were carried almost entirely by <code>28-sitemap</code> alone. <code>17-podcast</code> produced one, which is what makes its 165 refused leads worth fixing rather than writing off. Three free methods stayed quiet: <code>04-holehe</code> at 57 days, <code>26-instagram</code> at 27, <code>19-github</code> at 19.</p>
+
+  <h2>The thing worth your attention</h2>
+  <div class="card accent-red" style="padding:18px 20px">
+    <h3>The binding constraint moved from the shelf to the fleet, and only one lane can refill the shelf at scale</h3>
+    <p>For sixteen debriefs running, the question has been what refills the shelf. That question just changed shape, because the shelf's runway now depends entirely on how fast you are allowed to send.</p>
+    <p><b>At last week's actual pace the shelf lasts about two and a half weeks.</b> The five sending days from 10-08 to 10-14 loaded 2,095 emails, and 5,135 people remain who have never been written to. <b>At today's fleet it lasts about nineteen weeks</b>, because 43 mailboxes owing 562 follow-ups a day leave room for roughly 67 new people, which is about 270 a week. Neither number is a plan. The gap between them is the whole decision: a healthy fleet drains the shelf in a month, and a crippled one gives you five months of runway you do not want.</p>
+    <p><b>And the arithmetic on refilling is now measured, which it was not before.</b> October's Apify allowance bought <b>472 people into the shelf for $89.93</b>, about 19 cents each, across 13 runs on the 1st and 2nd of the month. The free recovery lane, running four passes a day on a book it has now walked ten times, delivered 8 addresses and 4 parks today. On the days it ran, the paid lane parked 236 people a day against the free lane's 4, so about sixty times, and it is dry until 31 October because the whole month's $100 went in the first two days.</p>
+    <p>So the two levers are priced. Refilling 5,000 people at 19 cents is about $950. Keeping the fleet healthy costs nothing but restraint in how a push is spread. Both are your call, and the second one is free.</p>
+    <p class="muted">The 2.5-week figure uses the real trailing week, which includes the 782-day that may itself have caused the suspensions, so treat it as the fast end rather than the normal. Yesterday's debrief said 4.9 weeks using the fleet's allowance arithmetic; the week actually ran at double that allowance, which is part of why I am writing about the mailboxes today.</p>
+  </div>
+
+  <h2>What broke → what's fixed</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>What</th><th>Evidence</th><th>State</th></tr></thead>
+      <tbody>
+        <tr class="fix">
+          <td>A quarter of the sending fleet went away over three days and no instrument said so</td>
+          <td>The plan read 57 live inboxes and an 855-message allowance on 10-13, then 53 and 795, then 43 and 645. Each number was reported on its own with nothing to compare it to, and the slot remainder the reader does see is explicitly documented as arguing for nothing. The cause sat in the email repo's gate state file: 13 mailboxes suspended at 09:45:53Z on 10-14, all on health score, 0 on warmup day.</td>
+          <td><b>Fixed</b> (<code>9a54fbc</code>, orchestrator). <code>send_plan.fleet</code> carries live inboxes and daily allowance against yesterday's snapshot, plus the gate's own newest run split into health pauses, which cost two weeks of warmup to undo, and warmup-day pauses, which lift themselves. Verified on the live cycle: it returns -10 inboxes, -150 messages a day, 13 health pauses and 0 warmup pauses, and names the biggest pull in the gate's history (18, on 09-24) for scale.</td>
+        </tr>
+        <tr class="fix">
+          <td><code>17-podcast</code> was losing roughly 40% of its leads to an Apple rate limit, and the report could only say "iTunes N"</td>
+          <td>Refusals climbed 12, 69, 56, 28 across the cycle's four passes: 165 of 552 leads. Reproduced from this box: 40 search calls 8 wide returned 20 answers and 20 refusals, mixing 403 and 429; the same 40 one at a time all answered. The collect pass runs 8 leads wide. Both error condensers collapse digits to <code>N</code> by design, so the status was the one token being thrown away.</td>
+          <td><b>Fixed</b> (<code>f53bb9127</code>, email repo). The search queues process-wide behind a window that widens on a refusal and halves after four clean calls, retries once, and gives up for the pass after 5 leads refused in a row, logging one line that names itself. <code>httpReason()</code> puts a word beside every bare status in the lane. 28 selftests pass, typecheck clean, and the give-up path was driven against the live endpoint: 5 leads attempted, 15 short-circuited, instead of 150 refusals.</td>
+        </tr>
+        <tr class="fix">
+          <td>The pass's largest error cause was a deliberate content outcome and the snapshot read it as the fault to chase</td>
+          <td><code>34-channel-page: page rendered with no outbound links</code> held 60% of the newest pass. That method tests for the rendered channel markers first and emits a different message when they are missing, so this one means the creator really has no links. The 10-12 rule says a cause holding most of a pass is one fault to chase, and it pointed here for three days while <code>17-podcast</code> sat at number two.</td>
+          <td><b>Fixed</b> (<code>d8e6d21</code>, orchestrator). The parser keeps every named cause, and <code>top_method_fault_cause</code> is the largest one that is not a known content outcome. Verified against all four of the cycle's passes: it names <code>17-podcast: iTunes N</code> in three of them, including the two where the benign row outranked it. The benign list is deliberately one entry long. 83 tests pass.</td>
+        </tr>
+        <tr>
+          <td>Nine planned emails were dropped because the plan and the manifest disagreed</td>
+          <td><code>SKIP &lt;lead&gt; not in the Siege manifest</code>, 9 times. It fires on three days in the whole send log: 6 on 09-28, <b>131 on 10-07</b> against 336 sent, and 9 today. Zero on every other push day. The refusal is right, the disagreement is not.</td>
+          <td><b>Open.</b> Both files are written by <code>automator</code>, outside the five repos this agent may edit. Worth fixing on the 10-07 precedent alone.</td>
+        </tr>
+        <tr>
+          <td>Apple's podcast search budget for this address is spent right now</td>
+          <td>Measuring the fault used about 200 search calls from this box, and the endpoint was still refusing afterwards at a 3-second gap, which is how I learned the budget runs over a long window rather than a few seconds.</td>
+          <td><b>Self-clearing, named here so it is not misread.</b> The next pass or two may give up early on <code>17-podcast</code> and that is my doing, not a new fault. The gate's state is per-process, so it re-tries from the floor every pass.</td>
+        </tr>
+        <tr>
+          <td>Our own copy gate keeps refusing drafts on length and em dashes</td>
+          <td>One draft lost today on two length checks. Em dashes cost drafts on three separate days earlier this month.</td>
+          <td><b>Still open.</b> A writing-skill fix, carried from 10-13 and 10-14.</td>
+        </tr>
+        <tr>
+          <td>Campaign <code>START</code> has no retry for a rate limit</td>
+          <td>No new evidence today. Carried from 10-10.</td>
+          <td><b>Still open.</b> It lives in <code>automator</code>. Six people remain in two stopped campaigns with their rows marked sent.</td>
+        </tr>
+        <tr>
+          <td>The fit rubric from the 10-13 audit still gates nothing</td>
+          <td>No new evidence today, because only 4 people were parked. Carried from 10-14.</td>
+          <td><b>Open, your decision.</b> 881 people were removed as a poor fit and nothing stops the next ones arriving.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Recommended next — ranked</h2>
+  <ol class="recs">
+    <li><b>Spread the push across the four sending days.</b> This is the new top item and it is free. 782 first emails in one morning books three messages each across the following week and, on the evidence of the next morning, costs mailboxes that take two weeks to earn back. Four days of roughly 200 uses the same allowance without the spike. The lever lives in <code>automator/scripts/siege-plan.py</code>, which this agent may not edit.</li>
+    <li><b>Look at the 13 suspended mailboxes and decide whether to wait or replace.</b> Six of them are below 70 on health, which is a long way under the 90 bar, and the gate will not resume them on its own until InboxKit says they have recovered. <code>cd $EMAIL_OUTREACH_REPO_PATH &amp;&amp; npm run inbox-health -- --status</code> shows the current reading per inbox without changing anything.</li>
+    <li><b>Decide whether to spend on refilling the shelf, now that it is priced.</b> 19 cents a person, measured on 472 people in October. 5,135 remain on the shelf and the free lane adds single digits a day on a book it has walked ten times. The next $100 of Apify allowance arrives on 31 October by itself; anything beyond that is a spend decision only you can make.</li>
+    <li><b>Fix the plan-and-manifest disagreement</b> in <code>automator</code>. Nine emails today, 131 on 10-07. It is silent, intermittent, and it throws away people who were researched, verified and written to.</li>
+    <li><b>Decide whether the fit rubric becomes a gate.</b> Carried from 10-14 unchanged. One in nine of the shelf was removed as a poor fit and nothing stops the next one in nine arriving.</li>
+    <li><b>Fix the length and em dash rules in the writing skills.</b> One more draft lost today. Third week this has appeared.</li>
+    <li><b>Give the other three quiet collection methods one dry run each.</b> <code>04-holehe</code> (57 days), <code>26-instagram</code> (27), <code>19-github</code> (19). <code>18-rdap</code> and <code>17-podcast</code> both produced an address today, and both were silent for weeks before someone looked.</li>
+    <li><b>Six cycles have metrics on disk and no debrief</b> (09-17, 09-18, 09-19, 08-17, 08-18, 07-11). No risk, backfillable any time.</li>
+  </ol>
+
+  <div class="foot">
+    <b>Clean-run facts:</b> 0 fatal signatures, 0 halts, 0 crashes. <b>$0.00 Anthropic</b> for the 32nd straight cycle. OpenRouter ran at $3.35 a day with $80.84 left, about 24 days, and the finder's own log recorded no calls. Apify sat out with nothing spendable and 0 price strikes until the allowance resets on 31 October. Brave ran 102 searches with <b>zero key refusals</b> and <code>cause: ownership_gate</code>, which is the strict identity check doing its job. Enrichment ran 3 batches for 4 people with 0 failures and has almost nothing left at 6,798 of 6,808 bundled, which is 99.9%. <code>needs_contact</code> is 3,443 and <code>collect_book_stranded</code> held at 3 for the 32nd straight day, so no selector gap has reopened. The YouTube key pool probed 20 minutes after the reset at <b>15 working of 66</b>, which binds nothing while discovery is paused and whose cause is settled. This repo's own session-start send ran once and found 0 ready leads, which is correct: the shelf is fired by Siege, not from here. <b>0 new channels discovered, by your 2026-09-08 order</b>, and the flag is untouched.
+  </div>
+
+</div>
