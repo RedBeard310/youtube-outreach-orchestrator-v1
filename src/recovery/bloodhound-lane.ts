@@ -1422,9 +1422,50 @@ export type CollectPass = {
   topErrorCauseCount: number | null;
   errorCauseShapes: number | null;
   topErrorCausePct: number | null;
+  /** EVERY cause the collect CLI named on that line, largest first, not just the top one
+   *  (2026-10-15). The top cause alone answers the wrong question when the largest cause
+   *  is a deliberate content outcome: on 2026-10-15 it read
+   *  `34-channel-page: page rendered with no outbound links` at 60% of the pass, which is
+   *  that method's own way of saying this creator has no links (it checks the rendered
+   *  markers first and says something else when the page did not render). The real fault
+   *  sat at #2 — `17-podcast: iTunes N`, which had climbed 3 -> 12 -> 69 -> 56 across the
+   *  cycle's four passes and cost 165 of 552 leads — and reading it took a hand grep of
+   *  the collect log. Six causes are named on the line; a longer tail is summarised there
+   *  and does not reach this list. */
+  causeList: { cause: string; count: number }[] | null;
+  /** The largest cause that is NOT a known per-lead content outcome, i.e. the largest
+   *  thing that might actually be broken. Falls back to null when every named cause is
+   *  benign. See BENIGN_CAUSES below for the (deliberately tiny) list and why. */
+  topFaultCause: string | null;
+  topFaultCauseCount: number | null;
+  topFaultCausePct: number | null;
   /** Method ids the collect CLI's breaker took out of the pass. */
   deadMethods: string[] | null;
 };
+
+/** Causes a method emits ON PURPOSE to describe what it read, not to report a failure.
+ *  They are counted as errors because the method found nothing, and they can hold most
+ *  of a pass without anything being wrong, which is exactly how one hid a real fault for
+ *  a day and a half. Keep this list SHORT and only for messages whose own code proves
+ *  the dependency answered: `34-channel-page` tests for the rendered channel markers and
+ *  emits a different message when they are missing, so this one means the page really is
+ *  bare. A message that merely looks harmless does not belong here. */
+const BENIGN_CAUSES = ["page rendered with no outbound links"];
+
+function isBenignCause(cause: string): boolean {
+  return BENIGN_CAUSES.some((b) => cause.includes(b));
+}
+
+/** Split the named part of a cause/shape line into its `Nx cause` entries. */
+export function parseCauseEntries(namedPart: string): { cause: string; count: number }[] {
+  const out: { cause: string; count: number }[] = [];
+  for (const chunk of namedPart.split('|')) {
+    const m = /^\s*(\d+)x\s+(.+?)\s*$/.exec(chunk);
+    if (!m) continue;
+    out.push({ count: Number(m[1]), cause: m[2]! });
+  }
+  return out;
+}
 
 /** Every COMPLETED pass in a collect log, oldest first. A pass still running has
  *  written no summary line yet and is deliberately not counted. */
@@ -1435,6 +1476,10 @@ export function collectPasses(logText: string, minSample = 30): CollectPass[] {
   const ERRORS = /^\[bloodhound\] Method errors: (\d+) across (\d+) shape\(s\) — (\d+)x ([^|;]+)/;
   // Printed immediately after the shape line (youtube-email-outreach-v1, 2026-10-12).
   const CAUSES = /^\[bloodhound\] Method error causes: (\d+) across (\d+) cause\(s\), top (\d+)% — (\d+)x ([^|;]+)/;
+  // The same line, keeping every named entry. `;` is a safe terminator because
+  // condenseCause() strips `;` out of a cause, so the only one on the line is the
+  // collect CLI's own "; and N rarer cause(s)" tail.
+  const CAUSES_ALL = /^\[bloodhound\] Method error causes: \d+ across \d+ cause\(s\), top \d+% — ([^;]+)/;
   const DEAD = /^\[bloodhound\] Breaker tripped on \d+ method\(s\): (.+)$/;
   const out: CollectPass[] = [];
   // The newest summary line ACCEPTED into `out`, or null. A short tail-of-lap batch is
@@ -1469,6 +1514,15 @@ export function collectPasses(logText: string, minSample = 30): CollectPass[] {
         current.topErrorCausePct = Number(c[3]);
         current.topErrorCauseCount = Number(c[4]);
         current.topErrorCause = c[5]!.trim();
+        const total = Number(c[1]);
+        const all = parseCauseEntries(CAUSES_ALL.exec(line)?.[1] ?? '');
+        current.causeList = all.length > 0 ? all : null;
+        const fault = all.find((e) => !isBenignCause(e.cause)) ?? null;
+        current.topFaultCause = fault?.cause ?? null;
+        current.topFaultCauseCount = fault?.count ?? null;
+        current.topFaultCausePct = fault && total > 0
+          ? Math.round((fault.count / total) * 100)
+          : null;
       }
       continue;
     }
