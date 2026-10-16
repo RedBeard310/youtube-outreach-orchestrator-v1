@@ -123,7 +123,17 @@ actually sizes the fleet from here: 22, 18, 18, 22 and `2026-10-16T07:05:14Z` to
 filesystem-only, no `automator` import, every field optional on the way in, so a rename
 in that repo costs one null rather than the block.
 
-All three are covered by 11 new selftests (adoption with no reasons left, the band ledger
+**4. The gate now writes the reason next to the pause** (email repo,
+`src/smartlead/inbox-health.ts`, `4fe6e8921`). Fixes 2 and 3 read two files and join them
+by address, which works but leaves the answer dependent on a registry another program is
+allowed to empty. Each history entry now carries its own `pausedReasons` map, so a run
+records why as well as who and no reader has to join anything. Additive and keyed by
+address, because `automator`'s band gate and `automations_ingest.py` both read these files
+and must keep seeing the same shapes. The orchestrator prefers this record when it is
+present, falls back to the registry, then to the band ledger. `tsc` clean in both repos,
+module loads.
+
+All four are covered by 12 new selftests (adoption with no reasons left, the band ledger
 supplying them, the split always reconciling, a plan written after the push, two morning
 snapshots a day apart, a missing stamp, no push in the cycle). Full selftest suite passes
 and the whole gatherer re-ran clean end to end.

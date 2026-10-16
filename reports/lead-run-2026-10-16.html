@@ -204,7 +204,7 @@
     <p><b>Because the reasons moved house and the instrument was still looking in the old one.</b> The old gate suspended 4 mailboxes at 09:46Z and resumed 4. The split that matters, deliverability against a mailbox simply being too young, read <b>0 on health and 0 on warmup</b>. A gate cannot pause a mailbox for neither reason.</p>
     <p><b>All four were health pauses.</b> One read 73.4 against a bar of 90. The new band gate takes health-only suspensions out of the old gate's ledger and deletes them there, on purpose, because the old gate would otherwise resume them on its next run. It does that about thirteen hours after the pause, so a debrief reading in the morning finds the names in the history and no reasons anywhere.</p>
     <p><b>It had been failing quietly for weeks and it rewrites the past.</b> Nothing has been added to that ledger since 2026-09-08, while the history records suspensions on six of the last eight days. Yesterday's debrief read 13 of 13 on health and was right at the time. Re-read this morning, the same run reports 0 and 0. An instrument that changes its answer about a past day without saying so is worse than one that admits it does not know.</p>
-    <p class="muted">Fixed today: reasons are now read from both ledgers, newest owner first, and any suspension whose reason is in neither is counted as <code>gate_paused_unexplained</code>, so health plus warmup plus unexplained always adds up to the pull. On this cycle's live data it reports 2 on health and 2 unexplained, which is the honest answer: two of the four mailboxes have since been released by the new gate and their reasons are gone from both files.</p>
+    <p class="muted">Fixed today in two places. The reader now takes reasons from both ledgers, newest owner first, and counts any suspension whose reason is in neither as <code>gate_paused_unexplained</code>, so health plus warmup plus unexplained always adds up to the pull. On this cycle's live data that is 2 on health and 2 unexplained, which is the honest answer: the new gate has since released those two and their reasons are gone from both files. And the gate itself now writes the reason next to the pause, in the same history entry, so from tomorrow no reader has to join two files that another program is allowed to empty.</p>
   </div>
 
   <h2>Which methods found today's people</h2>
@@ -249,6 +249,11 @@
         <td>No instrument named the thing that now sizes the fleet</td>
         <td>The band gate bands all 58 mailboxes hourly and that, not the old gate's daily pull, is what decides how many can send</td>
         <td>Fixed: <code>band_stop</code>, <code>band_watch</code>, <code>band_normal</code>, <code>band_gate_owned</code> and its run stamp are in the snapshot. 22, 18, 18 and 22 today</td>
+      </tr>
+      <tr class="fix">
+        <td>The reason a mailbox was suspended depends on a file another program is allowed to empty</td>
+        <td>The gate recorded which mailboxes it paused in one place and why in another, and the new gate deletes the second one as it takes ownership. The join was the weak link, not either file</td>
+        <td>Fixed in the email repo: each history entry now carries its own <code>pausedReasons</code> map, additive so the band gate and the ingest script keep reading the same shapes</td>
       </tr>
       <tr>
         <td>The morning plan is unrecoverable after a re-plan</td>
