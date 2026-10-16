@@ -309,7 +309,12 @@ export function inboxGateFacts(raw: unknown, adopted: Record<string, string[]> =
   const s = raw as {
     lastRunAt?: unknown;
     pausedByGate?: Record<string, { since?: unknown; reasons?: unknown }>;
-    history?: Array<{ at?: unknown; paused?: unknown; resumed?: unknown }>;
+    history?: Array<{
+      at?: unknown;
+      paused?: unknown;
+      resumed?: unknown;
+      pausedReasons?: Record<string, unknown>;
+    }>;
   };
   const history = Array.isArray(s.history) ? s.history : [];
   const last = history.length > 0 ? history[history.length - 1] : null;
@@ -323,12 +328,16 @@ export function inboxGateFacts(raw: unknown, adopted: Record<string, string[]> =
   if (paused && lastNames.length > 0) {
     health = 0; warmup = 0; unexplained = 0;
     for (const name of lastNames) {
-      // The old registry first, then the band gate's ledger, which adopts health-only
-      // pauses out of the registry hours later and is the only place they survive.
+      // The run's own record first (written by the gate since 2026-10-16 and immune to
+      // adoption), then the registry, then the band gate's ledger, which adopts
+      // health-only pauses out of that registry hours later.
+      const inRun = last?.pausedReasons?.[name];
       const own = paused[name]?.reasons;
-      const list = Array.isArray(own) && own.length > 0
-        ? own.map(String)
-        : (adopted[name] ?? []).map(String);
+      const list = Array.isArray(inRun) && inRun.length > 0
+        ? inRun.map(String)
+        : Array.isArray(own) && own.length > 0
+          ? own.map(String)
+          : (adopted[name] ?? []).map(String);
       // A mailbox can fail both tests; count it under health, which is the expensive one.
       if (list.some((r) => /health|inbox_rate|landing|spam|score/i.test(r))) health++;
       else if (list.some((r) => /warmup/i.test(r))) warmup++;

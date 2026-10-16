@@ -666,6 +666,20 @@ ok('the band gate\'s ledger supplies the reasons the old registry gave away',
     return [g.gate_paused_on_health, g.gate_paused_on_warmup, g.gate_paused_unexplained];
   })(),
   [1, 1, 0]);
+ok('a run that recorded its own reasons needs neither ledger (the 10-16 email-repo fix)',
+  (() => {
+    const g = inboxGateFacts({
+      ...ADOPTED_STATE,
+      history: [{
+        at: '2026-10-15T09:46:38.753Z',
+        paused: ['p@x.com', 'q@x.com'],
+        resumed: [],
+        pausedReasons: { 'p@x.com': ['health 73.4<90'], 'q@x.com': ['warmup day 9<14'] },
+      }],
+    });
+    return [g.gate_paused_on_health, g.gate_paused_on_warmup, g.gate_paused_unexplained];
+  })(),
+  [1, 1, 0]);
 ok('the split always adds up to the pull',
   (() => {
     const g = inboxGateFacts(ADOPTED_STATE, { 'p@x.com': ['2 of 31 warmup emails in spam in 3 days'] });
