@@ -65,6 +65,11 @@ export type SiegePlanFacts = {
   followups_due: number | null;
   /** Live mailboxes with no room left at all for a new person. */
   inboxes_full: number | null;
+  /** When Siege wrote the plan file we just read. NOT the start of the day: the file is
+   *  overwritten in place, so a re-plan late at night replaces the morning's fleet
+   *  snapshot and every number above describes the fleet AT THIS STAMP. See the
+   *  block comment on fleetFacts(). */
+  plan_generated_at: string | null;
 };
 
 const NO_PLAN: SiegePlanFacts = {
@@ -79,6 +84,7 @@ const NO_PLAN: SiegePlanFacts = {
   mailbox_capacity: null,
   followups_due: null,
   inboxes_full: null,
+  plan_generated_at: null,
 };
 
 const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
@@ -140,6 +146,7 @@ export function siegePlanFacts(raw: unknown): SiegePlanFacts {
     inboxes_full: live === null
       ? null
       : live.filter((i) => (num(i.free_before_fill) ?? 0) === 0).length,
+    plan_generated_at: typeof s.generated_at === 'string' ? s.generated_at : null,
   };
 }
 
@@ -166,11 +173,71 @@ export function siegePlanFacts(raw: unknown): SiegePlanFacts {
 // also pulled 6 mailboxes after a zero-send weekend, so pauses churn on their own and a
 // correlation is not a proof. What the fields are for is making the question askable on
 // the morning it starts rather than three days later.
+// --- AND THE DELTA COMPARED TWO SNAPSHOTS TAKEN 12 HOURS APART (2026-10-16) ---
+//
+// The block above shipped the day-over-day move and it read -22 live inboxes / -330
+// messages on its second day. The fleet did shrink. The size of that one-day step did
+// not happen in one day, and the snapshot could not say so:
+//
+//   • `state/siege/<day>/plan.json` is OVERWRITTEN in place. The 10-14 file was written
+//     at 10:36Z, before that day's push. The 10-15 file was written at 23:00Z, twelve
+//     hours AFTER its push ran at 11:28Z — so the two numbers being subtracted describe
+//     the fleet at two different times of day, and the newer one describes a fleet that
+//     sent nothing at all.
+//   • A second, stricter gate went live INSIDE this cycle: `automator/scripts/inbox-health.py`
+//     ran for the first time at 22:57Z, suspended its first band of mailboxes, and the
+//     23:00Z re-plan is a photograph of that. The push three minutes earlier flew with
+//     the morning's fleet.
+//   • The giveaway was already in the snapshot and unread: `planned` (100, counted off
+//     the re-plan's assignments) was SMALLER than `sent_in_cycle` (160). A plan cannot
+//     send more than it holds. That inequality is the file saying "I am not the plan
+//     that was pushed".
+//
+// So carry the stamp, the gap between the two stamps, and whether the newest plan was
+// written after the push it is being read as the fleet for. A delta across a 12-hour gap
+// is not wrong, it is a different measurement, and it must not read as one day's loss.
+//
+// --- AND THE PAUSE-REASON SPLIT SILENTLY READ "NEITHER" (2026-10-16) ---
+//
+// Same cycle, same block: `gate_paused: 4` beside `gate_paused_on_health: 0` and
+// `gate_paused_on_warmup: 0`. Four mailboxes paused for no reason at all, which is not a
+// thing the gate can do. All four were health pauses, as low as 73.4.
+//
+// The split is read off the old gate's `pausedByGate` registry, matched by name. The new
+// band gate ADOPTS health-only pauses out of that registry into its own ledger
+// (`adopt()` in automator/scripts/inbox_health.py) and deletes them, because with the old
+// gate's health rule retired it would otherwise resume them. So the reasons move house
+// about thirteen hours after the pause, and a debrief reading afterwards finds the names
+// in `history` and nothing in the registry. Nothing had been added to that registry
+// since 2026-09-08 while the history recorded pauses on six of the last eight days.
+//
+// It degrades backwards, too: the 10-15 debrief read 13 of 13 on health and was right at
+// the time; the same run now reads 0 and 0. An instrument that quietly changes its answer
+// about a past day is worse than one that says it does not know.
+//
+// Two fixes. Read the new gate's ledger for the reasons as well as the old registry,
+// newest owner first. And never let the split claim "neither": any paused mailbox whose
+// reason could not be found anywhere is counted in `gate_paused_unexplained`, so
+// health + warmup + unexplained always adds up to `gate_paused`.
 export type FleetFacts = {
   live_inboxes_prev: number | null;
   live_inboxes_change: number | null;
   mailbox_capacity_prev: number | null;
   mailbox_capacity_change: number | null;
+  /** When Siege wrote the plan this cycle's fleet numbers came from, and the one
+   *  yesterday's came from. Both needed, because the delta is only a day's move if the
+   *  two were taken about a day apart. */
+  plan_generated_at: string | null;
+  plan_generated_at_prev: string | null;
+  /** Hours between the two snapshots. ~24 is a day-over-day move; 12 or 36 is not. */
+  snapshot_gap_hours: number | null;
+  /** True when the plan on disk was written AFTER the push that sent in this cycle, so
+   *  it describes a fleet that sent nothing. null when either stamp is missing. */
+  replanned_after_push: boolean | null;
+  /** The one field to read before quoting a change: false means the two snapshots are
+   *  not a day apart or the newer one post-dates the push, so the delta is real
+   *  arithmetic on two different measurements. null means a stamp was missing. */
+  delta_comparable: boolean | null;
   /** When the inbox health gate last ran. It is staleness-gated to once per 24h. */
   gate_last_run: string | null;
   gate_paused: number | null;
@@ -178,11 +245,23 @@ export type FleetFacts = {
   /** The split that decides whether a pull is deliverability or just a young mailbox. */
   gate_paused_on_health: number | null;
   gate_paused_on_warmup: number | null;
+  /** Paused mailboxes whose reason is in neither ledger. Keeps the split honest:
+   *  health + warmup + unexplained === gate_paused, always. */
+  gate_paused_unexplained: number | null;
   /** Mailboxes the gate is holding paused right now, all causes, all time. */
   gate_paused_total: number | null;
   /** Largest single pull in the gate's retained history, for scale. */
   gate_biggest_pull: number | null;
   gate_biggest_pull_at: string | null;
+  /** The band gate in automator, which took over health pauses on 2026-10-15T22:57Z and
+   *  is now the thing that decides how many mailboxes can send. Its bands say the fleet's
+   *  size in one number each: `stop` is suspended, `watch` is on its way there. */
+  band_gate_run_at: string | null;
+  band_normal: number | null;
+  band_watch: number | null;
+  band_stop: number | null;
+  /** Mailboxes the band gate holds suspended in its own name. */
+  band_gate_owned: number | null;
 };
 
 const NO_FLEET: FleetFacts = {
@@ -190,27 +269,40 @@ const NO_FLEET: FleetFacts = {
   live_inboxes_change: null,
   mailbox_capacity_prev: null,
   mailbox_capacity_change: null,
+  plan_generated_at: null,
+  plan_generated_at_prev: null,
+  snapshot_gap_hours: null,
+  replanned_after_push: null,
+  delta_comparable: null,
   gate_last_run: null,
   gate_paused: null,
   gate_resumed: null,
   gate_paused_on_health: null,
   gate_paused_on_warmup: null,
+  gate_paused_unexplained: null,
   gate_paused_total: null,
   gate_biggest_pull: null,
   gate_biggest_pull_at: null,
+  band_gate_run_at: null,
+  band_normal: null,
+  band_watch: null,
+  band_stop: null,
+  band_gate_owned: null,
 };
 
 /** Parse the inbox health gate's own state file. Pure, so the selftest can feed it one.
  *  The gate owns this file's shape in the email repo and may change it, so every field
  *  is optional on the way in: a rename costs one null, never the block. */
-export function inboxGateFacts(raw: unknown): Pick<
+export function inboxGateFacts(raw: unknown, adopted: Record<string, string[]> = {}): Pick<
   FleetFacts,
   'gate_last_run' | 'gate_paused' | 'gate_resumed' | 'gate_paused_on_health'
-  | 'gate_paused_on_warmup' | 'gate_paused_total' | 'gate_biggest_pull' | 'gate_biggest_pull_at'
+  | 'gate_paused_on_warmup' | 'gate_paused_unexplained' | 'gate_paused_total'
+  | 'gate_biggest_pull' | 'gate_biggest_pull_at'
 > {
   const blank = {
     gate_last_run: null, gate_paused: null, gate_resumed: null,
     gate_paused_on_health: null, gate_paused_on_warmup: null,
+    gate_paused_unexplained: null,
     gate_paused_total: null, gate_biggest_pull: null, gate_biggest_pull_at: null,
   };
   if (!raw || typeof raw !== 'object') return blank;
@@ -227,17 +319,23 @@ export function inboxGateFacts(raw: unknown): Pick<
   const lastNames = Array.isArray(last?.paused) ? (last!.paused as unknown[]).filter((n): n is string => typeof n === 'string') : [];
   let health: number | null = null;
   let warmup: number | null = null;
+  let unexplained: number | null = null;
   if (paused && lastNames.length > 0) {
-    health = 0; warmup = 0;
+    health = 0; warmup = 0; unexplained = 0;
     for (const name of lastNames) {
-      const reasons = paused[name]?.reasons;
-      const list = Array.isArray(reasons) ? reasons.map(String) : [];
+      // The old registry first, then the band gate's ledger, which adopts health-only
+      // pauses out of the registry hours later and is the only place they survive.
+      const own = paused[name]?.reasons;
+      const list = Array.isArray(own) && own.length > 0
+        ? own.map(String)
+        : (adopted[name] ?? []).map(String);
       // A mailbox can fail both tests; count it under health, which is the expensive one.
-      if (list.some((r) => /health|inbox_rate|landing/i.test(r))) health++;
+      if (list.some((r) => /health|inbox_rate|landing|spam|score/i.test(r))) health++;
       else if (list.some((r) => /warmup/i.test(r))) warmup++;
+      else unexplained++;
     }
   } else if (paused) {
-    health = 0; warmup = 0;
+    health = 0; warmup = 0; unexplained = 0;
   }
   let biggest: { at: string | null; n: number } | null = null;
   for (const h of history) {
@@ -250,21 +348,95 @@ export function inboxGateFacts(raw: unknown): Pick<
     gate_resumed: last ? (Array.isArray(last.resumed) ? last.resumed.length : null) : null,
     gate_paused_on_health: health,
     gate_paused_on_warmup: warmup,
+    gate_paused_unexplained: unexplained,
     gate_paused_total: paused ? Object.keys(paused).length : null,
     gate_biggest_pull: biggest?.n ?? null,
     gate_biggest_pull_at: biggest?.at ?? null,
   };
 }
 
-/** Today's plan against yesterday's snapshot, plus the gate's own last run. A missing
- *  prior snapshot reports nulls: an absent baseline must never read as "no change". */
+/** The band gate's own state file (automator/state/inbox-health.json). Pure, so the
+ *  selftest can feed it one. It is another repo's file and another repo's shape, so every
+ *  field is optional on the way in: a rename costs one null, never the block.
+ *
+ *  `owned` doubles as the reason book for pauses this gate adopted off the old gate. */
+export function bandGateFacts(raw: unknown): {
+  band_gate_run_at: string | null;
+  band_normal: number | null;
+  band_watch: number | null;
+  band_stop: number | null;
+  band_gate_owned: number | null;
+  reasons: Record<string, string[]>;
+} {
+  const blank = {
+    band_gate_run_at: null, band_normal: null, band_watch: null,
+    band_stop: null, band_gate_owned: null, reasons: {},
+  };
+  if (!raw || typeof raw !== 'object') return blank;
+  const s = raw as {
+    generated_at?: unknown;
+    runs?: unknown;
+    owned?: Record<string, { reasons?: unknown }>;
+  };
+  const runs = Array.isArray(s.runs) ? s.runs : [];
+  const last = runs.length > 0 ? runs[runs.length - 1] as { at?: unknown; counts?: Record<string, unknown> } : null;
+  const counts = last?.counts && typeof last.counts === 'object' ? last.counts : {};
+  const owned = s.owned && typeof s.owned === 'object' ? s.owned : null;
+  const reasons: Record<string, string[]> = {};
+  if (owned) {
+    for (const [email, rec] of Object.entries(owned)) {
+      const list = Array.isArray(rec?.reasons) ? rec.reasons.map(String) : [];
+      if (list.length > 0) reasons[email] = list;
+    }
+  }
+  return {
+    band_gate_run_at: typeof last?.at === 'string'
+      ? last.at
+      : (typeof s.generated_at === 'string' ? s.generated_at : null),
+    band_normal: num(counts.normal),
+    band_watch: num(counts.watch),
+    band_stop: num(counts.stop),
+    band_gate_owned: owned ? Object.keys(owned).length : null,
+    reasons,
+  };
+}
+
+/** Hours between two ISO stamps, one decimal. Null if either is missing or unparseable. */
+function hoursBetween(aISO: string | null, bISO: string | null): number | null {
+  if (!aISO || !bISO) return null;
+  const a = Date.parse(aISO);
+  const b = Date.parse(bISO);
+  if (!Number.isFinite(a) || !Number.isFinite(b)) return null;
+  return Number(((a - b) / 3_600_000).toFixed(1));
+}
+
+/** Today's plan against yesterday's snapshot, plus both gates' own last runs. A missing
+ *  prior snapshot reports nulls: an absent baseline must never read as "no change".
+ *
+ *  `pushStartedAt` is when the push that sent in this cycle began (the Siege unit's own
+ *  start stamp). It is what makes `replanned_after_push` answerable — see the block
+ *  comment on FleetFacts. */
 export function fleetFacts(
   plan: SiegePlanFacts,
-  prior: { live_inboxes?: number | null; mailbox_capacity?: number | null } | null,
+  prior: {
+    live_inboxes?: number | null;
+    mailbox_capacity?: number | null;
+    plan_generated_at?: string | null;
+  } | null,
   gateState: unknown,
+  bandState: unknown = null,
+  pushStartedAt: string | null = null,
 ): FleetFacts {
   const livePrev = typeof prior?.live_inboxes === 'number' ? prior.live_inboxes : null;
   const capPrev = typeof prior?.mailbox_capacity === 'number' ? prior.mailbox_capacity : null;
+  const stampPrev = typeof prior?.plan_generated_at === 'string' ? prior.plan_generated_at : null;
+  const gap = hoursBetween(plan.plan_generated_at, stampPrev);
+  // A push stamp we could not read must not turn into a claim that the plan is the one
+  // that flew: unknown stays unknown.
+  const pushMs = pushStartedAt ? Date.parse(pushStartedAt) : NaN;
+  const planMs = plan.plan_generated_at ? Date.parse(plan.plan_generated_at) : NaN;
+  const afterPush = Number.isFinite(pushMs) && Number.isFinite(planMs) ? planMs > pushMs : null;
+  const band = bandGateFacts(bandState);
   return {
     ...NO_FLEET,
     live_inboxes_prev: livePrev,
@@ -273,7 +445,21 @@ export function fleetFacts(
     mailbox_capacity_prev: capPrev,
     mailbox_capacity_change: capPrev !== null && plan.mailbox_capacity !== null
       ? plan.mailbox_capacity - capPrev : null,
-    ...inboxGateFacts(gateState),
+    plan_generated_at: plan.plan_generated_at,
+    plan_generated_at_prev: stampPrev,
+    snapshot_gap_hours: gap,
+    replanned_after_push: afterPush,
+    // 12 to 36 hours apart is a day-over-day move read at a comparable hour. Outside
+    // that, or taken after the push, it is arithmetic across two different measurements.
+    delta_comparable: gap === null
+      ? null
+      : (gap >= 12 && gap <= 36 && afterPush !== true),
+    ...inboxGateFacts(gateState, band.reasons),
+    band_gate_run_at: band.band_gate_run_at,
+    band_normal: band.band_normal,
+    band_watch: band.band_watch,
+    band_stop: band.band_stop,
+    band_gate_owned: band.band_gate_owned,
   };
 }
 
@@ -572,7 +758,27 @@ export function sendPlanHealth(
       'after that push. Stated carefully, because the gate also pulled 6 after a zero-send ' +
       'weekend: pauses churn on their own, so a big pull beside a big push is a question ' +
       'worth asking the same morning and not a proof. live_inboxes_change is null when ' +
-      'yesterday\'s snapshot is missing — unknown, not steady.',
+      'yesterday\'s snapshot is missing — unknown, not steady. READ fleet.delta_comparable ' +
+      'BEFORE QUOTING EITHER CHANGE (2026-10-16): plan.json is overwritten in place, so the ' +
+      'two numbers being subtracted are whatever hour each file was last written. The 10-14 ' +
+      'plan was written at 10:36Z before its push; the 10-15 plan was written at 23:00Z, ' +
+      'twelve hours AFTER its push ran at 11:28Z and three minutes after a new, stricter ' +
+      'gate suspended its first band of mailboxes — so -22 inboxes and -330 messages in ' +
+      '"one day" spans two different hours of two different days, and the newer snapshot ' +
+      'describes a fleet that sent nothing. plan_generated_at / plan_generated_at_prev / ' +
+      'snapshot_gap_hours are the arithmetic; replanned_after_push:true says the plan on ' +
+      'disk is not the plan that flew. The giveaway was in the snapshot all along and ' +
+      'unread: planned (100, counted off the re-plan) was smaller than sent_in_cycle (160), ' +
+      'and a plan cannot send more than it holds. AND band_* IS NOW THE FLEET: ' +
+      'automator/scripts/inbox-health.py took over health pauses at 2026-10-15T22:57Z and ' +
+      'bands every mailbox normal / watch / stop, so band_stop is how many cannot send and ' +
+      'band_watch is how many are on their way there. The old gate\'s ledger is no longer ' +
+      'the whole picture: it ADOPTS health-only pauses out of pausedByGate and deletes ' +
+      'them, which is why gate_paused read 4 beside 0 on health and 0 on warmup for a run ' +
+      'whose four pauses were all health, as low as 73.4. Reasons are now read from both ' +
+      'ledgers, and gate_paused_unexplained carries any pause whose reason is in neither, ' +
+      'so health + warmup + unexplained always equals gate_paused and the split can never ' +
+      'silently answer "neither" again.',
   };
 }
 
@@ -1095,16 +1301,26 @@ export function walkRateTrend(
 export function priorSendPlan(
   priorDate: string,
   logsDir: string = LOGS,
-): { live_inboxes: number | null; mailbox_capacity: number | null } | null {
+): {
+  live_inboxes: number | null;
+  mailbox_capacity: number | null;
+  plan_generated_at: string | null;
+} | null {
   const p = join(logsDir, `autopilot-debrief-${priorDate}.json`);
   if (!existsSync(p)) return null;
   try {
     const prior = JSON.parse(readFileSync(p, 'utf8')) as {
-      send_plan?: { live_inboxes?: unknown; mailbox_capacity?: unknown };
+      send_plan?: { live_inboxes?: unknown; mailbox_capacity?: unknown; plan_generated_at?: unknown };
     };
     const s = prior.send_plan;
     if (!s || typeof s !== 'object') return null;
-    return { live_inboxes: num(s.live_inboxes), mailbox_capacity: num(s.mailbox_capacity) };
+    return {
+      live_inboxes: num(s.live_inboxes),
+      mailbox_capacity: num(s.mailbox_capacity),
+      // Written since 2026-10-16. Older snapshots report null, which makes the gap
+      // unknown rather than assumed comparable.
+      plan_generated_at: typeof s.plan_generated_at === 'string' ? s.plan_generated_at : null,
+    };
   } catch { return null; }
 }
 
@@ -1112,6 +1328,16 @@ export function priorSendPlan(
  *  does (CLAUDE.md: that lever is owned there, and this repo only counts). */
 function readInboxGateState(): unknown {
   const f = join('/home/casey/repos/youtube-email-outreach-v1', '.inbox-health-state.json');
+  if (!existsSync(f)) return null;
+  try {
+    return JSON.parse(readFileSync(f, 'utf8'));
+  } catch { return null; }
+}
+
+/** The band gate's state file, in automator, for the same reason: it owns the lever and
+ *  since 2026-10-15 it owns the health pauses too. Filesystem only, no automator import. */
+function readBandGateState(): unknown {
+  const f = join(AUTOMATOR_REPO, 'state', 'inbox-health.json');
   if (!existsSync(f)) return null;
   try {
     return JSON.parse(readFileSync(f, 'utf8'));
@@ -2592,6 +2818,11 @@ async function main(): Promise<void> {
     siegePlan,
     priorSendPlan(pacificDate(new Date(sinceMs))),
     readInboxGateState(),
+    readBandGateState(),
+    // Only a push that ran INSIDE this cycle can be the push the plan post-dates.
+    // `push_unit_result` is null unless that is true (see siegeUnitVerdict), so this is
+    // null on a weekend rather than a stale weekday stamp.
+    sendPlan.push_unit_result !== null ? sendPlan.unit_last_started : null,
   );
 
   // Supply-health — surface the persistent term-supply outage the finder can't self-heal.

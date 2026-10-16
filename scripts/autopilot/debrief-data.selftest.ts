@@ -1,4 +1,4 @@
-import { fleetFacts, inboxGateFacts, apifyBatchFacts, apifyLedgerLine, normalizePushReason, offerFromBatchId, siegePushOutcome, classifyKeyProbe, cyclePacificDay, enrichmentChainFacts, isSendingDay, projectRecoveryBudget, MAX_MISSING_DEBRIEFS, missingDebriefs, pushRunVerdict, unitStartedAt, sendPlanHealth, siegePlanFacts, summarizeSendLines, isVerifiedOrBeyond, laneYield, priorAdvanceSource, priorSeedsAdvanced, priorSeedsWalked, reconcileAdvanced, sessionSeedsAdvanced, sessionStartMs, walkRateTrend } from './debrief-data.ts';
+import { bandGateFacts, fleetFacts, inboxGateFacts, apifyBatchFacts, apifyLedgerLine, normalizePushReason, offerFromBatchId, siegePushOutcome, classifyKeyProbe, cyclePacificDay, enrichmentChainFacts, isSendingDay, projectRecoveryBudget, MAX_MISSING_DEBRIEFS, missingDebriefs, pushRunVerdict, unitStartedAt, sendPlanHealth, siegePlanFacts, summarizeSendLines, isVerifiedOrBeyond, laneYield, priorAdvanceSource, priorSeedsAdvanced, priorSeedsWalked, reconcileAdvanced, sessionSeedsAdvanced, sessionStartMs, walkRateTrend } from './debrief-data.ts';
 let fail = 0;
 const ok = (name: string, got: unknown, want: unknown) => {
   const pass = JSON.stringify(got) === JSON.stringify(want);
@@ -232,7 +232,7 @@ ok('plan facts read off the real shape',
   siegePlanFacts(PLAN_29),
   { plan_found: true, plan_day: '2026-09-29', email_paused: false, day_cap: 150,
     planned: 150, mailbox_slots: 16, live_inboxes: 2, offers_blocked: 2,
-    mailbox_capacity: 30, followups_due: 14, inboxes_full: 0 });
+    mailbox_capacity: 30, followups_due: 14, inboxes_full: 0, plan_generated_at: null });
 ok('blocked offers count as an array too',
   siegePlanFacts({ summary: { offer_problems: [{ offer: 'a' }] } }).offers_blocked, 1);
 ok('a dead inbox contributes no slots',
@@ -241,7 +241,7 @@ ok('a dead inbox owes no follow-ups we can act on either',
   siegePlanFacts({ summary: { inboxes: [{ live: false, message_per_day: 15, followups_due: 40 }] } }),
   { plan_found: true, plan_day: null, email_paused: null, day_cap: null, planned: null,
     mailbox_slots: 0, live_inboxes: 0, offers_blocked: null,
-    mailbox_capacity: 0, followups_due: 0, inboxes_full: 0 });
+    mailbox_capacity: 0, followups_due: 0, inboxes_full: 0, plan_generated_at: null });
 // THE 2026-10-12 SHAPE: the healthiest fleet of the week and the worst new-person
 // volume of the week, because follow-ups outran the whole allowance. The slot count
 // alone reads identically to a suspension wave, which is why the three fields exist.
@@ -259,12 +259,12 @@ ok('follow-ups eating the fleet is readable, not just the small slot count',
   }),
   { plan_found: true, plan_day: '2026-10-12', email_paused: null, day_cap: 870,
     planned: 13, mailbox_slots: 13, live_inboxes: 3, offers_blocked: null,
-    mailbox_capacity: 45, followups_due: 55, inboxes_full: 2 });
+    mailbox_capacity: 45, followups_due: 55, inboxes_full: 2, plan_generated_at: null });
 ok('a renamed key costs one null, not the block',
   siegePlanFacts({ summary: { day_cap: 'oops' }, assignments: [1] }),
   { plan_found: true, plan_day: null, email_paused: null, day_cap: null,
     planned: 1, mailbox_slots: null, live_inboxes: null, offers_blocked: null,
-    mailbox_capacity: null, followups_due: null, inboxes_full: null });
+    mailbox_capacity: null, followups_due: null, inboxes_full: null, plan_generated_at: null });
 ok('garbage is no plan', siegePlanFacts('nope').plan_found, false);
 ok('null is no plan', siegePlanFacts(null).plan_found, false);
 
@@ -646,6 +646,92 @@ ok('a missing or renamed state file costs nulls, not the block',
 ok('a state file with no history yet reports no run rather than zero pauses',
   (() => { const g = inboxGateFacts({ lastRunAt: 'x', pausedByGate: {} }); return [g.gate_paused, g.gate_paused_total]; })(),
   [null, 0]);
+
+// The 2026-10-16 shape: the band gate adopted the health pauses out of the old registry,
+// so the old registry knows nothing about the mailboxes its own history says it paused.
+const ADOPTED_STATE = {
+  lastRunAt: '2026-10-15T09:46:38.753Z',
+  pausedByGate: { 'old@x.com': { since: '2026-07-22T18:24:35.406Z', reasons: ['health 85<90'] } },
+  history: [{ at: '2026-10-15T09:46:38.753Z', paused: ['p@x.com', 'q@x.com'], resumed: ['r@x.com'] }],
+};
+ok('four pauses with no reasons left in the old registry read as unexplained, not as neither',
+  (() => {
+    const g = inboxGateFacts(ADOPTED_STATE);
+    return [g.gate_paused, g.gate_paused_on_health, g.gate_paused_on_warmup, g.gate_paused_unexplained];
+  })(),
+  [2, 0, 0, 2]);
+ok('the band gate\'s ledger supplies the reasons the old registry gave away',
+  (() => {
+    const g = inboxGateFacts(ADOPTED_STATE, { 'p@x.com': ['health 73.4<90'], 'q@x.com': ['warmup day 9<14'] });
+    return [g.gate_paused_on_health, g.gate_paused_on_warmup, g.gate_paused_unexplained];
+  })(),
+  [1, 1, 0]);
+ok('the split always adds up to the pull',
+  (() => {
+    const g = inboxGateFacts(ADOPTED_STATE, { 'p@x.com': ['2 of 31 warmup emails in spam in 3 days'] });
+    return (g.gate_paused_on_health! + g.gate_paused_on_warmup! + g.gate_paused_unexplained!) === g.gate_paused;
+  })(),
+  true);
+
+// bandGateFacts — the gate that owns the fleet since 2026-10-15T22:57Z.
+const BAND_STATE = {
+  generated_at: '2026-10-16T07:05:14Z',
+  owned: { 'p@x.com': { reasons: ['health 73.4<90'] }, 'q@x.com': { reasons: [] } },
+  runs: [
+    { at: '2026-10-15T22:57:06Z', counts: { normal: 21, watch: 20, stop: 17 } },
+    { at: '2026-10-16T07:05:14Z', counts: { normal: 18, watch: 18, stop: 22 } },
+  ],
+};
+ok('the newest band run is the fleet, and owned is counted whole',
+  (() => {
+    const b = bandGateFacts(BAND_STATE);
+    return [b.band_gate_run_at, b.band_normal, b.band_watch, b.band_stop, b.band_gate_owned];
+  })(),
+  ['2026-10-16T07:05:14Z', 18, 18, 22, 2]);
+ok('a missing band state costs nulls, not the block',
+  (() => { const b = bandGateFacts(null); return [b.band_stop, b.band_gate_owned, b.reasons]; })(),
+  [null, null, {}]);
+
+// The 2026-10-16 fault itself: a delta across a 12-hour gap, on a plan written after the
+// push. The numbers are real.
+const REPLAN = siegePlanFacts({
+  summary: {
+    day: '2026-10-15',
+    generated_at: '2026-10-15T23:00:43Z',
+    inboxes: Array.from({ length: 21 }, () => ({ live: true, message_per_day: 15, followups_due: 0, free_before_fill: 5 })),
+  },
+  assignments: new Array(100).fill(0),
+});
+ok('a plan written after the push is named as such, and its delta is not comparable',
+  (() => {
+    const f = fleetFacts(
+      REPLAN,
+      { live_inboxes: 43, mailbox_capacity: 645, plan_generated_at: '2026-10-14T10:36:16Z' },
+      null, null, '2026-10-15T11:28:18Z',
+    );
+    return [f.live_inboxes_change, f.snapshot_gap_hours, f.replanned_after_push, f.delta_comparable];
+  })(),
+  [-22, 36.4, true, false]);
+ok('two morning snapshots a day apart ARE comparable',
+  (() => {
+    const f = fleetFacts(
+      siegePlanFacts({ summary: { generated_at: '2026-10-14T10:36:16Z', inboxes: [{ live: true, message_per_day: 15 }] } }),
+      { live_inboxes: 43, mailbox_capacity: 645, plan_generated_at: '2026-10-13T10:20:00Z' },
+      null, null, '2026-10-14T11:28:18Z',
+    );
+    return [f.snapshot_gap_hours, f.replanned_after_push, f.delta_comparable];
+  })(),
+  [24.3, false, true]);
+ok('an older snapshot with no stamp makes comparability unknown, not true',
+  (() => {
+    const f = fleetFacts(REPLAN, { live_inboxes: 43, mailbox_capacity: 645 }, null, null, '2026-10-15T11:28:18Z');
+    return [f.snapshot_gap_hours, f.delta_comparable, f.plan_generated_at];
+  })(),
+  [null, null, '2026-10-15T23:00:43Z']);
+ok('no push in the cycle leaves replanned_after_push unknown',
+  fleetFacts(REPLAN, { live_inboxes: 43, mailbox_capacity: 645, plan_generated_at: '2026-10-14T10:36:16Z' }, null, null, null)
+    .replanned_after_push,
+  null);
 
 console.log(fail === 0 ? '\nALL PASS' : `\n${fail} FAILED`);
 process.exit(fail === 0 ? 0 : 1);
