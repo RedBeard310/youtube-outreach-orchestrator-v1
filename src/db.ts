@@ -376,6 +376,109 @@ export async function countSentBetween(
   return { total: records.length, by_review_status: by };
 }
 
+export type FirstTouchCounts = {
+  /** People with at least one new-offer send inside the window. */
+  people: number;
+  /** Of those, how many had never been emailed before that send. */
+  first_touch: number;
+  /** Of those, how many we had already written to at least once. */
+  repeat: number;
+  /** first_touch as a whole-number percentage of people, null when nobody was emailed. */
+  first_touch_pct: number | null;
+  /** First touches who were sitting on the shelf (`review_status = approved_hold`). */
+  shelf_first_touch: number;
+  /** The same two counts over the seven days before the window, as the baseline. */
+  people_prev_7d: number;
+  first_touch_prev_7d: number;
+  first_touch_pct_prev_7d: number | null;
+};
+
+/**
+ * How many of the cycle's emails reached somebody we had never written to.
+ *
+ * WHY THIS EXISTS (2026-10-17). `sent_today` counts emails and `shelf.ready_to_write`
+ * counts the inventory, and for two cycles the two numbers sat side by side telling a
+ * story neither could state: 160 emails went out on 10-15 and 82 on 10-16, both pushes
+ * lossless, and the shelf did not move one person — `ready_to_write` read exactly 5,138
+ * and `already_sent` exactly 1,663 on three consecutive mornings. Every one of those 242
+ * emails was a repeat offer to somebody already in `already_sent`. Finding that out took
+ * hand SQL over `leads.outreach_sends`, and the only reason anybody went looking was that
+ * all four shelf figures happened to be byte-identical two days running. A one-person
+ * change would have hidden it completely.
+ *
+ * The cause is upstream in `automator` and is not a fault: `siege.fill_slots` hands slots
+ * out by `priority_key`, which is tier, then score, then subscribers, and carries nothing
+ * about whether a person has heard from us. The Whale tier's never-emailed supply ran out
+ * on the 776-person push of 10-13, so since then its re-offer queue has taken every slot
+ * while 949 ready Strong-7 and Other-7+ people waited (see `waiting_for_a_slot` in the
+ * plan facts). Repeat offers are deliberate — Casey reopened that stream on 2026-10-07 —
+ * so this is a report, never an alarm. The point is that "we sent 82 and lost none" and
+ * "we reached one new person" are different days, and until now they printed the same.
+ *
+ * Counts PEOPLE, not rows: one person can be loaded into more than one campaign. Reads
+ * `leads.outreach_sends`, which holds one row per new offer started (every row in the
+ * 10-16 cycle had `is_followup = false`; SmartLead sends the day-4 and day-10 messages on
+ * its own and they are not logged here), so this measures first touches and not replies
+ * to our own sequence. "Before" means before that person's own first send in the window,
+ * not before the window, so a person first emailed mid-cycle counts once and correctly.
+ *
+ * One statement, no model, no network beyond the pool. Fail-soft at the call site.
+ */
+export async function countFirstTouchBetween(
+  sinceISO: string,
+  untilISO: string,
+): Promise<FirstTouchCounts> {
+  const prevStartISO = new Date(new Date(sinceISO).getTime() - 7 * 24 * 3600 * 1000).toISOString();
+  const rows = await query<Record<string, string | number | null>>(
+    `WITH touched AS (
+       SELECT s.lead_id,
+              min(s.sent_at) FILTER (WHERE s.sent_at >= $1 AND s.sent_at < $2) AS cyc_first,
+              min(s.sent_at) FILTER (WHERE s.sent_at >= $3 AND s.sent_at < $1) AS prev_first
+         FROM leads.outreach_sends s
+        WHERE s.sent_at >= $3 AND s.sent_at < $2
+        GROUP BY 1
+     ),
+     scored AS (
+       SELECT t.lead_id,
+              t.cyc_first,
+              t.prev_first,
+              lc.review_status,
+              EXISTS (SELECT 1 FROM leads.outreach_sends p
+                       WHERE p.lead_id = t.lead_id AND p.sent_at < t.cyc_first)  AS cyc_repeat,
+              EXISTS (SELECT 1 FROM leads.outreach_sends p
+                       WHERE p.lead_id = t.lead_id AND p.sent_at < t.prev_first) AS prev_repeat
+         FROM touched t
+         LEFT JOIN leads.lead_candidates lc ON lc.id = t.lead_id
+     )
+     SELECT count(*) FILTER (WHERE cyc_first IS NOT NULL)                       AS people,
+            count(*) FILTER (WHERE cyc_first IS NOT NULL AND NOT cyc_repeat)    AS first_touch,
+            count(*) FILTER (WHERE cyc_first IS NOT NULL AND cyc_repeat)        AS repeat_touch,
+            count(*) FILTER (WHERE cyc_first IS NOT NULL AND NOT cyc_repeat
+                               AND review_status = 'approved_hold')             AS shelf_first_touch,
+            count(*) FILTER (WHERE prev_first IS NOT NULL)                      AS people_prev,
+            count(*) FILTER (WHERE prev_first IS NOT NULL AND NOT prev_repeat)  AS first_touch_prev
+       FROM scored`,
+    [sinceISO, untilISO, prevStartISO],
+  );
+  const r = rows[0] ?? {};
+  const n = (v: unknown) => Number(v ?? 0);
+  const pct = (part: number, whole: number) => (whole > 0 ? Math.round((1000 * part) / whole) / 10 : null);
+  const people = n(r.people);
+  const firstTouch = n(r.first_touch);
+  const peoplePrev = n(r.people_prev);
+  const firstTouchPrev = n(r.first_touch_prev);
+  return {
+    people,
+    first_touch: firstTouch,
+    repeat: n(r.repeat_touch),
+    first_touch_pct: pct(firstTouch, people),
+    shelf_first_touch: n(r.shelf_first_touch),
+    people_prev_7d: peoplePrev,
+    first_touch_prev_7d: firstTouchPrev,
+    first_touch_pct_prev_7d: pct(firstTouchPrev, peoplePrev),
+  };
+}
+
 // The shelf: parked leads that are researched, bundled and one command from a written
 // email. This has been the largest thing in the pipeline since 2026-09-16 and it was
 // only ever counted by hand. `bundled` is the honest measure of whether enrichment has

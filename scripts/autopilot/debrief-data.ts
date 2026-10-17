@@ -12,6 +12,7 @@ import { join } from 'node:path';
 import {
   countByReviewStatus,
   countSentBetween,
+  countFirstTouchBetween,
   bulkStatusWrites,
   countShelf,
   getLeadsDiscoveredSince,
@@ -65,6 +66,13 @@ export type SiegePlanFacts = {
   followups_due: number | null;
   /** Live mailboxes with no room left at all for a new person. */
   inboxes_full: number | null;
+  /** Ready people who got no slot today, summed over Siege's tiers. This is the queue
+   *  behind `sent_today.first_touch`: slots are handed out by tier, so a tier with a
+   *  full re-offer queue takes them all and never-emailed people below it wait. */
+  waiting_for_a_slot: number | null;
+  /** The same, per tier, so "the Whale queue ate the day" is readable rather than
+   *  inferred. Keys are automator's tier names; null if the plan stops carrying them. */
+  waiting_by_tier: Record<string, number> | null;
   /** When Siege wrote the plan file we just read. NOT the start of the day: the file is
    *  overwritten in place, so a re-plan late at night replaces the morning's fleet
    *  snapshot and every number above describes the fleet AT THIS STAMP. See the
@@ -84,6 +92,8 @@ const NO_PLAN: SiegePlanFacts = {
   mailbox_capacity: null,
   followups_due: null,
   inboxes_full: null,
+  waiting_for_a_slot: null,
+  waiting_by_tier: null,
   plan_generated_at: null,
 };
 
@@ -146,6 +156,29 @@ export function siegePlanFacts(raw: unknown): SiegePlanFacts {
     inboxes_full: live === null
       ? null
       : live.filter((i) => (num(i.free_before_fill) ?? 0) === 0).length,
+    // WHO WAS READY AND GOT NOTHING (2026-10-17). Siege's `fill_slots` sorts by
+    // `priority_key` — tier, then score, then subscribers — and nothing in that key
+    // asks whether a person has already heard from us. The Whale tier's never-emailed
+    // supply ran out on the 776-person push of 10-13, so on 10-16 all 82 slots went to
+    // Whale re-offers while 141 Strong-7 and 808 Other-7+ people sat ready, with
+    // research bundles, and waited. That is the mechanism behind a 1% first-touch day,
+    // it is already in the plan file, and reading it took opening that file by hand.
+    waiting_for_a_slot: (() => {
+      const w = s.waiting_for_a_slot;
+      if (!w || typeof w !== 'object' || Array.isArray(w)) return null;
+      return Object.values(w as Record<string, unknown>)
+        .reduce((t: number, v) => t + (num(v) ?? 0), 0);
+    })(),
+    waiting_by_tier: (() => {
+      const w = s.waiting_for_a_slot;
+      if (!w || typeof w !== 'object' || Array.isArray(w)) return null;
+      const out: Record<string, number> = {};
+      for (const [k, v] of Object.entries(w as Record<string, unknown>)) {
+        const n = num(v);
+        if (n !== null) out[k] = n;
+      }
+      return Object.keys(out).length > 0 ? out : null;
+    })(),
     plan_generated_at: typeof s.generated_at === 'string' ? s.generated_at : null,
   };
 }
@@ -2613,6 +2646,11 @@ async function main(): Promise<void> {
   const sent = await countSentBetween(sinceISO, untilISO).catch(() => null);
   const shelf = await countShelf().catch(() => null);
 
+  // How many of those emails reached somebody new. Same fail-soft rule. See
+  // countFirstTouchBetween() for the two cycles that printed a lossless push beside a
+  // shelf that had not moved one person, and said nothing.
+  const firstTouch = await countFirstTouchBetween(sinceISO, untilISO).catch(() => null);
+
   // Why the shelf moved, when it moved in one statement. Same fail-soft rule as the
   // calls below: a broken query degrades to null, it does not take the debrief down.
   const bulkWrites = await bulkStatusWrites(sinceISO, untilISO).catch(() => null);
@@ -2910,12 +2948,31 @@ async function main(): Promise<void> {
       total: sent?.total ?? null,
       by_review_status: sent?.by_review_status ?? null,
       orchestrator_log: sendLog,
+      // WHETHER ANY OF THOSE EMAILS REACHED SOMEBODY NEW (2026-10-17). A lossless push
+      // and a day that touched nobody new printed identically for two cycles running:
+      // 160 emails then 82, nothing failed, nothing refused, and the shelf did not move
+      // one person. See countFirstTouchBetween() in src/db.ts. Null means the query
+      // failed, which is not the same as nobody new.
+      first_touch: firstTouch,
       note:
         'Loaded into a SmartLead campaign, counted from leads.outreach_processed_at. ' +
         'SmartLead sends on its own schedule (Mon-Thu 09:00-15:00 ET), so this is not ' +
         'delivered volume — for that run youtube-email-outreach-v1/scripts/sl-sent-per-day.ts. ' +
         'orchestrator_log covers only sends this repo launched; a batch driven by hand from ' +
-        'the email repo shows up in total and not there, and the difference is the point.',
+        'the email repo shows up in total and not there, and the difference is the point. ' +
+        'READ first_touch BEFORE CALLING A LOSSLESS PUSH A GOOD DAY (2026-10-17): total ' +
+        'counts emails and cannot say whether any of them reached a person who had never ' +
+        'heard from us. On 2026-10-15 and 10-16, 242 emails went out, both pushes lost ' +
+        'nothing, and between them they reached ONE new person — every other email was a ' +
+        'repeat offer, and the shelf printed exactly 5,138 ready and 1,663 already-sent on ' +
+        'three consecutive mornings. first_touch_pct against first_touch_pct_prev_7d is the ' +
+        'reading: 1.3% this cycle against 68.7% over the prior week. It is not a fault — ' +
+        'repeat offers are deliberate since 2026-10-07 — but it is a different day from the ' +
+        'one total describes, and the pair of them is what says which. Read it beside ' +
+        'send_plan.waiting_for_a_slot: Siege fills slots by tier and the Whale tier ran out ' +
+        'of never-emailed people on the 10-13 push, so its re-offer queue takes every slot ' +
+        'while ready lower-tier people wait. shelf_first_touch is how many first touches ' +
+        'came off approved_hold, which is the only number that drains the shelf.',
     },
     // Why the cycle sent what it sent. sent_today counts emails; this says whether a
     // batch was written and left standing. See the block comment on siegePlanFacts().

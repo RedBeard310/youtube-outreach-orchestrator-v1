@@ -232,7 +232,8 @@ ok('plan facts read off the real shape',
   siegePlanFacts(PLAN_29),
   { plan_found: true, plan_day: '2026-09-29', email_paused: false, day_cap: 150,
     planned: 150, mailbox_slots: 16, live_inboxes: 2, offers_blocked: 2,
-    mailbox_capacity: 30, followups_due: 14, inboxes_full: 0, plan_generated_at: null });
+    mailbox_capacity: 30, followups_due: 14, inboxes_full: 0,
+    waiting_for_a_slot: null, waiting_by_tier: null, plan_generated_at: null });
 ok('blocked offers count as an array too',
   siegePlanFacts({ summary: { offer_problems: [{ offer: 'a' }] } }).offers_blocked, 1);
 ok('a dead inbox contributes no slots',
@@ -241,7 +242,8 @@ ok('a dead inbox owes no follow-ups we can act on either',
   siegePlanFacts({ summary: { inboxes: [{ live: false, message_per_day: 15, followups_due: 40 }] } }),
   { plan_found: true, plan_day: null, email_paused: null, day_cap: null, planned: null,
     mailbox_slots: 0, live_inboxes: 0, offers_blocked: null,
-    mailbox_capacity: 0, followups_due: 0, inboxes_full: 0, plan_generated_at: null });
+    mailbox_capacity: 0, followups_due: 0, inboxes_full: 0,
+    waiting_for_a_slot: null, waiting_by_tier: null, plan_generated_at: null });
 // THE 2026-10-12 SHAPE: the healthiest fleet of the week and the worst new-person
 // volume of the week, because follow-ups outran the whole allowance. The slot count
 // alone reads identically to a suspension wave, which is why the three fields exist.
@@ -259,12 +261,40 @@ ok('follow-ups eating the fleet is readable, not just the small slot count',
   }),
   { plan_found: true, plan_day: '2026-10-12', email_paused: null, day_cap: 870,
     planned: 13, mailbox_slots: 13, live_inboxes: 3, offers_blocked: null,
-    mailbox_capacity: 45, followups_due: 55, inboxes_full: 2, plan_generated_at: null });
+    mailbox_capacity: 45, followups_due: 55, inboxes_full: 2,
+    waiting_for_a_slot: null, waiting_by_tier: null, plan_generated_at: null });
 ok('a renamed key costs one null, not the block',
   siegePlanFacts({ summary: { day_cap: 'oops' }, assignments: [1] }),
   { plan_found: true, plan_day: null, email_paused: null, day_cap: null,
     planned: 1, mailbox_slots: null, live_inboxes: null, offers_blocked: null,
-    mailbox_capacity: null, followups_due: null, inboxes_full: null, plan_generated_at: null });
+    mailbox_capacity: null, followups_due: null, inboxes_full: null,
+    waiting_for_a_slot: null, waiting_by_tier: null, plan_generated_at: null });
+// THE 2026-10-16 SHAPE: every slot went to the tier that had already heard from us,
+// and 949 ready people below it waited. The plan carried that all along.
+ok('the queue behind a 1% first-touch day is summed and kept per tier',
+  (() => {
+    const f = siegePlanFacts({
+      summary: {
+        day: '2026-10-16',
+        new_offers_starting: { whale: 82, strong7: 0, other7: 0 },
+        waiting_for_a_slot: { whale: 63, strong7: 141, other7: 808 },
+      },
+    });
+    return [f.waiting_for_a_slot, f.waiting_by_tier];
+  })(),
+  [1012, { whale: 63, strong7: 141, other7: 808 }]);
+ok('a renamed or non-numeric waiting tier costs that tier, not the sum',
+  (() => {
+    const f = siegePlanFacts({ summary: { waiting_for_a_slot: { whale: 5, strong7: 'oops' } } });
+    return [f.waiting_for_a_slot, f.waiting_by_tier];
+  })(),
+  [5, { whale: 5 }]);
+ok('a plan with no waiting block costs nulls, not the plan',
+  (() => {
+    const f = siegePlanFacts({ summary: { day: '2026-09-29' } });
+    return [f.waiting_for_a_slot, f.waiting_by_tier, f.plan_found];
+  })(),
+  [null, null, true]);
 ok('garbage is no plan', siegePlanFacts('nope').plan_found, false);
 ok('null is no plan', siegePlanFacts(null).plan_found, false);
 
