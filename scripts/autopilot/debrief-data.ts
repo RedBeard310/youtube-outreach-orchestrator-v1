@@ -295,6 +295,29 @@ export type FleetFacts = {
   band_stop: number | null;
   /** Mailboxes the band gate holds suspended in its own name. */
   band_gate_owned: number | null;
+  /** The band gate's OWN day-over-day move, read from its own retained run history
+   *  (2026-10-18). Needed because on a non-sending day there is no plan, so `band_normal`
+   *  is the only live fleet number — and the only prior number beside it was
+   *  `live_inboxes_prev`, which is Siege's plan-time count from a different instrument on a
+   *  different day. Subtracting those two is the 2026-10-16 fault in a new place. These
+   *  fields come from one instrument, so the subtraction is sound by construction. */
+  band_prev_at: string | null;
+  band_normal_prev: number | null;
+  band_watch_prev: number | null;
+  band_stop_prev: number | null;
+  band_normal_change: number | null;
+  band_stop_change: number | null;
+  /** Hours between the two band readings, and whether that makes them a day's move. */
+  band_gap_hours: number | null;
+  band_delta_comparable: boolean | null;
+  /** Mailboxes the gate actually moved inside the cycle window, by direction. This is the
+   *  morning question ("did the fleet move, and which way") answered without a hand grep
+   *  of the gate log. null when no window was supplied: unknown, not zero. */
+  band_moved_to_normal: number | null;
+  band_moved_to_watch: number | null;
+  band_moved_to_stop: number | null;
+  /** Who came back, capped. A batch returning in one hour is worth seeing by name. */
+  band_returned: string[];
 };
 
 const NO_FLEET: FleetFacts = {
@@ -321,6 +344,18 @@ const NO_FLEET: FleetFacts = {
   band_watch: null,
   band_stop: null,
   band_gate_owned: null,
+  band_prev_at: null,
+  band_normal_prev: null,
+  band_watch_prev: null,
+  band_stop_prev: null,
+  band_normal_change: null,
+  band_stop_change: null,
+  band_gap_hours: null,
+  band_delta_comparable: null,
+  band_moved_to_normal: null,
+  band_moved_to_watch: null,
+  band_moved_to_stop: null,
+  band_returned: [],
 };
 
 /** Parse the inbox health gate's own state file. Pure, so the selftest can feed it one.
@@ -402,26 +437,39 @@ export function inboxGateFacts(raw: unknown, adopted: Record<string, string[]> =
  *  field is optional on the way in: a rename costs one null, never the block.
  *
  *  `owned` doubles as the reason book for pauses this gate adopted off the old gate. */
-export function bandGateFacts(raw: unknown): {
-  band_gate_run_at: string | null;
-  band_normal: number | null;
-  band_watch: number | null;
-  band_stop: number | null;
-  band_gate_owned: number | null;
-  reasons: Record<string, string[]>;
-} {
+export function bandGateFacts(
+  raw: unknown,
+  window: { sinceISO: string; untilISO: string } | null = null,
+): Omit<Pick<FleetFacts,
+  | 'band_gate_run_at' | 'band_normal' | 'band_watch' | 'band_stop' | 'band_gate_owned'
+  | 'band_prev_at' | 'band_normal_prev' | 'band_watch_prev' | 'band_stop_prev'
+  | 'band_normal_change' | 'band_stop_change' | 'band_gap_hours' | 'band_delta_comparable'
+  | 'band_moved_to_normal' | 'band_moved_to_watch' | 'band_moved_to_stop' | 'band_returned'
+>, never> & { reasons: Record<string, string[]> } {
   const blank = {
     band_gate_run_at: null, band_normal: null, band_watch: null,
     band_stop: null, band_gate_owned: null, reasons: {},
+    band_prev_at: null, band_normal_prev: null, band_watch_prev: null, band_stop_prev: null,
+    band_normal_change: null, band_stop_change: null,
+    band_gap_hours: null, band_delta_comparable: null,
+    band_moved_to_normal: null, band_moved_to_watch: null, band_moved_to_stop: null,
+    band_returned: [],
   };
   if (!raw || typeof raw !== 'object') return blank;
+  type Run = {
+    at?: unknown;
+    counts?: Record<string, unknown>;
+    to_normal?: unknown;
+    to_watch?: unknown;
+    to_stop?: unknown;
+  };
   const s = raw as {
     generated_at?: unknown;
     runs?: unknown;
     owned?: Record<string, { reasons?: unknown }>;
   };
-  const runs = Array.isArray(s.runs) ? s.runs : [];
-  const last = runs.length > 0 ? runs[runs.length - 1] as { at?: unknown; counts?: Record<string, unknown> } : null;
+  const runs = (Array.isArray(s.runs) ? s.runs : []) as Run[];
+  const last = runs.length > 0 ? runs[runs.length - 1] : null;
   const counts = last?.counts && typeof last.counts === 'object' ? last.counts : {};
   const owned = s.owned && typeof s.owned === 'object' ? s.owned : null;
   const reasons: Record<string, string[]> = {};
@@ -431,15 +479,79 @@ export function bandGateFacts(raw: unknown): {
       if (list.length > 0) reasons[email] = list;
     }
   }
+  const runAt = typeof last?.at === 'string'
+    ? last.at
+    : (typeof s.generated_at === 'string' ? s.generated_at : null);
+  const normal = num(counts.normal);
+  const watch = num(counts.watch);
+  const stop = num(counts.stop);
+
+  // The prior reading: the gate runs hourly and keeps dozens of runs, so pick the one
+  // closest to 24h before the newest rather than "the one before it", which would be an
+  // hour-over-hour move dressed up as a day's. Only runs 12 to 36 hours back qualify —
+  // the same window `delta_comparable` uses, so the two blocks cannot disagree.
+  const lastMs = runAt ? Date.parse(runAt) : NaN;
+  let prev: Run | null = null;
+  let prevGap: number | null = null;
+  if (Number.isFinite(lastMs)) {
+    for (const r of runs) {
+      if (typeof r?.at !== 'string') continue;
+      const ms = Date.parse(r.at);
+      if (!Number.isFinite(ms) || ms >= lastMs) continue;
+      const gap = (lastMs - ms) / 3_600_000;
+      if (gap < 12 || gap > 36) continue;
+      if (prevGap === null || Math.abs(gap - 24) < Math.abs(prevGap - 24)) {
+        prev = r; prevGap = gap;
+      }
+    }
+  }
+  const pc = prev?.counts && typeof prev.counts === 'object' ? prev.counts : {};
+  const normalPrev = prev ? num(pc.normal) : null;
+  const watchPrev = prev ? num(pc.watch) : null;
+  const stopPrev = prev ? num(pc.stop) : null;
+
+  // Moves inside the cycle window, by direction. A window is required: without one,
+  // "0 moved" and "nobody asked" would print the same number.
+  let toNormal: number | null = null;
+  let toWatch: number | null = null;
+  let toStop: number | null = null;
+  const returned: string[] = [];
+  if (window) {
+    const a = Date.parse(window.sinceISO);
+    const b = Date.parse(window.untilISO);
+    if (Number.isFinite(a) && Number.isFinite(b)) {
+      toNormal = 0; toWatch = 0; toStop = 0;
+      for (const r of runs) {
+        if (typeof r?.at !== 'string') continue;
+        const ms = Date.parse(r.at);
+        if (!Number.isFinite(ms) || ms < a || ms >= b) continue;
+        const n = Array.isArray(r.to_normal) ? r.to_normal.map(String) : [];
+        toNormal += n.length;
+        toWatch += Array.isArray(r.to_watch) ? r.to_watch.length : 0;
+        toStop += Array.isArray(r.to_stop) ? r.to_stop.length : 0;
+        for (const e of n) if (returned.length < 12) returned.push(e);
+      }
+    }
+  }
+
   return {
-    band_gate_run_at: typeof last?.at === 'string'
-      ? last.at
-      : (typeof s.generated_at === 'string' ? s.generated_at : null),
-    band_normal: num(counts.normal),
-    band_watch: num(counts.watch),
-    band_stop: num(counts.stop),
+    band_gate_run_at: runAt,
+    band_normal: normal,
+    band_watch: watch,
+    band_stop: stop,
     band_gate_owned: owned ? Object.keys(owned).length : null,
-    reasons,
+    band_prev_at: typeof prev?.at === 'string' ? prev.at : null,
+    band_normal_prev: normalPrev,
+    band_watch_prev: watchPrev,
+    band_stop_prev: stopPrev,
+    band_normal_change: normal !== null && normalPrev !== null ? normal - normalPrev : null,
+    band_stop_change: stop !== null && stopPrev !== null ? stop - stopPrev : null,
+    band_gap_hours: prevGap === null ? null : Number(prevGap.toFixed(1)),
+    band_delta_comparable: Number.isFinite(lastMs) && runs.length > 0 ? prev !== null : null,
+    band_moved_to_normal: toNormal,
+    band_moved_to_watch: toWatch,
+    band_moved_to_stop: toStop,
+    band_returned: returned,
   };
 }
 
@@ -468,6 +580,7 @@ export function fleetFacts(
   gateState: unknown,
   bandState: unknown = null,
   pushStartedAt: string | null = null,
+  bandWindow: { sinceISO: string; untilISO: string } | null = null,
 ): FleetFacts {
   const livePrev = typeof prior?.live_inboxes === 'number' ? prior.live_inboxes : null;
   const capPrev = typeof prior?.mailbox_capacity === 'number' ? prior.mailbox_capacity : null;
@@ -478,7 +591,7 @@ export function fleetFacts(
   const pushMs = pushStartedAt ? Date.parse(pushStartedAt) : NaN;
   const planMs = plan.plan_generated_at ? Date.parse(plan.plan_generated_at) : NaN;
   const afterPush = Number.isFinite(pushMs) && Number.isFinite(planMs) ? planMs > pushMs : null;
-  const band = bandGateFacts(bandState);
+  const band = bandGateFacts(bandState, bandWindow);
   return {
     ...NO_FLEET,
     live_inboxes_prev: livePrev,
@@ -502,6 +615,18 @@ export function fleetFacts(
     band_watch: band.band_watch,
     band_stop: band.band_stop,
     band_gate_owned: band.band_gate_owned,
+    band_prev_at: band.band_prev_at,
+    band_normal_prev: band.band_normal_prev,
+    band_watch_prev: band.band_watch_prev,
+    band_stop_prev: band.band_stop_prev,
+    band_normal_change: band.band_normal_change,
+    band_stop_change: band.band_stop_change,
+    band_gap_hours: band.band_gap_hours,
+    band_delta_comparable: band.band_delta_comparable,
+    band_moved_to_normal: band.band_moved_to_normal,
+    band_moved_to_watch: band.band_moved_to_watch,
+    band_moved_to_stop: band.band_moved_to_stop,
+    band_returned: band.band_returned,
   };
 }
 
@@ -820,7 +945,25 @@ export function sendPlanHealth(
       'whose four pauses were all health, as low as 73.4. Reasons are now read from both ' +
       'ledgers, and gate_paused_unexplained carries any pause whose reason is in neither, ' +
       'so health + warmup + unexplained always equals gate_paused and the split can never ' +
-      'silently answer "neither" again.',
+      'silently answer "neither" again. ' +
+      'AND READ band_normal_prev, NEVER live_inboxes_prev, WHEN QUOTING A BAND MOVE ' +
+      '(2026-10-18): those two are different instruments read at different hours, and on a ' +
+      'non-sending day there is no plan at all, so band_normal is the only live fleet ' +
+      'number and the only prior number sitting beside it was Siege\'s plan-time count from ' +
+      'the last weekday. That morning they read 28 and 18, and subtracting them says "+10 ' +
+      'inboxes" about two things that were never measured together — the 2026-10-16 fault ' +
+      'in a new place. band_* _prev now comes from the band gate\'s own retained run ' +
+      'history, picking the run closest to 24h back inside the same 12-to-36-hour window ' +
+      'delta_comparable uses, so the subtraction is one instrument against itself; ' +
+      'band_delta_comparable is false when no run qualifies. band_moved_to_normal / ' +
+      '_to_watch / _to_stop are what the gate actually moved inside the cycle, which took a ' +
+      'hand grep of the gate log until now: on 2026-10-18 TEN mailboxes returned to normal ' +
+      'in one hour at 23:05Z, all ten clean at 96.7 the whole time and held on ' +
+      'follow-ups-only purely because the 48-hour recovery clock in ' +
+      'automator/config/inbox-health.json recover.hours could not credit any clean time ' +
+      'before the gate\'s own first run, so the first cohort aged out together. They are ' +
+      'null, not 0, on a snapshot written without a window: unknown and measured-as-nothing ' +
+      'differ. band_returned names them, capped at 12.',
   };
 }
 
@@ -2870,6 +3013,8 @@ async function main(): Promise<void> {
     // `push_unit_result` is null unless that is true (see siegeUnitVerdict), so this is
     // null on a weekend rather than a stale weekday stamp.
     sendPlan.push_unit_result !== null ? sendPlan.unit_last_started : null,
+    // The band gate's own moves inside this cycle. Same window as everything else.
+    { sinceISO, untilISO },
   );
 
   // Supply-health — surface the persistent term-supply outage the finder can't self-heal.

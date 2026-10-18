@@ -736,6 +736,51 @@ ok('a missing band state costs nulls, not the block',
   (() => { const b = bandGateFacts(null); return [b.band_stop, b.band_gate_owned, b.reasons]; })(),
   [null, null, {}]);
 
+// The 2026-10-18 fault: on a non-sending day band_normal (28) sat beside live_inboxes_prev
+// (18, Siege's plan-time count from Friday) and subtracting them read as +10. The prior
+// band reading has to come from the band gate's own history. Shape and numbers are real:
+// ten mailboxes returned to normal in the 23:05Z run and one more at 00:05Z.
+const BAND_HISTORY = {
+  generated_at: '2026-10-18T07:05:07Z',
+  owned: {},
+  runs: [
+    // An hour-over-hour neighbour must NOT be chosen as the day's baseline.
+    { at: '2026-10-16T22:05:59Z', counts: { normal: 18, watch: 14, stop: 26 }, to_normal: [], to_watch: [], to_stop: [] },
+    { at: '2026-10-17T06:05:35Z', counts: { normal: 18, watch: 14, stop: 26 }, to_normal: [], to_watch: [], to_stop: [] },
+    { at: '2026-10-17T07:05:44Z', counts: { normal: 18, watch: 14, stop: 26 }, to_normal: [], to_watch: [], to_stop: [] },
+    { at: '2026-10-17T23:05:19Z', counts: { normal: 27, watch: 5, stop: 26 }, to_normal: ['a@x.com', 'b@x.com'], to_watch: [], to_stop: [] },
+    { at: '2026-10-18T00:05:12Z', counts: { normal: 28, watch: 4, stop: 26 }, to_normal: ['c@x.com'], to_watch: [], to_stop: ['d@x.com'] },
+    { at: '2026-10-18T07:05:07Z', counts: { normal: 28, watch: 4, stop: 26 }, to_normal: [], to_watch: [], to_stop: [] },
+  ],
+};
+ok('the band baseline is the gate\'s own run nearest 24h back, not the one before it',
+  (() => {
+    const b = bandGateFacts(BAND_HISTORY);
+    return [b.band_prev_at, b.band_normal_prev, b.band_normal_change, b.band_gap_hours, b.band_delta_comparable];
+  })(),
+  ['2026-10-17T07:05:44Z', 18, 10, 24.0, true]);
+ok('band moves are counted by direction inside the cycle window, and the returners named',
+  (() => {
+    const b = bandGateFacts(BAND_HISTORY, { sinceISO: '2026-10-17T07:00:00.000Z', untilISO: '2026-10-18T07:00:00.000Z' });
+    return [b.band_moved_to_normal, b.band_moved_to_stop, b.band_moved_to_watch, b.band_returned];
+  })(),
+  [3, 1, 0, ['a@x.com', 'b@x.com', 'c@x.com']]);
+ok('no window means the moves are unknown, not zero',
+  (() => {
+    const b = bandGateFacts(BAND_HISTORY);
+    return [b.band_moved_to_normal, b.band_moved_to_stop, b.band_returned];
+  })(),
+  [null, null, []]);
+ok('a history with no run 12-36h back reports the baseline as not comparable',
+  (() => {
+    const b = bandGateFacts({ runs: [
+      { at: '2026-10-18T06:05:13Z', counts: { normal: 28, watch: 4, stop: 26 } },
+      { at: '2026-10-18T07:05:07Z', counts: { normal: 28, watch: 4, stop: 26 } },
+    ] });
+    return [b.band_normal_prev, b.band_normal_change, b.band_gap_hours, b.band_delta_comparable];
+  })(),
+  [null, null, null, false]);
+
 // The 2026-10-16 fault itself: a delta across a 12-hour gap, on a plan written after the
 // push. The numbers are real.
 const REPLAN = siegePlanFacts({
