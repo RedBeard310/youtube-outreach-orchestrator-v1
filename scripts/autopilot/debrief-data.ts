@@ -14,8 +14,12 @@ import {
   countSentBetween,
   countFirstTouchBetween,
   bulkStatusWrites,
+  bulkStatusWriteRollup,
+  reviewStatusPopulation,
   countShelf,
   getLeadsDiscoveredSince,
+  type BulkRewriteRoll,
+  type BulkStatusWrite,
   type Lead,
 } from '../../src/db.ts';
 import { discoveryReportKey } from '../../src/discovery-method.ts';
@@ -1509,6 +1513,114 @@ export function priorSendPlan(
   } catch { return null; }
 }
 
+/** Last cycle's population per `review_status`, out of the snapshot this script wrote 24h
+ *  ago. Null on a missing or malformed file, and null for a status that file never listed:
+ *  an absent baseline must read as unknown, never as no change. Written since 2026-10-19,
+ *  so the first usable baseline is the 2026-10-20 snapshot. */
+export function priorReviewStatusPopulation(
+  priorDate: string,
+  logsDir: string = LOGS,
+): Record<string, number> | null {
+  const p = join(logsDir, `autopilot-debrief-${priorDate}.json`);
+  if (!existsSync(p)) return null;
+  try {
+    const prior = JSON.parse(readFileSync(p, 'utf8')) as {
+      parked?: { review_status_population?: unknown };
+    };
+    const pop = prior.parked?.review_status_population;
+    if (!pop || typeof pop !== 'object' || Array.isArray(pop)) return null;
+    const out: Record<string, number> = {};
+    for (const [k, v] of Object.entries(pop as Record<string, unknown>)) {
+      const n = num(v);
+      if (n !== null) out[k] = n;
+    }
+    return Object.keys(out).length === 0 ? null : out;
+  } catch { return null; }
+}
+
+export type BulkRewriteShape = BulkRewriteRoll & {
+  /** How many of this status's clusters the capped list above actually printed. */
+  clusters_reported: number;
+  /** True when the printed list is a sample of this status's clusters, not all of them. */
+  truncated: boolean;
+  /** Rows the capped list printed, so the understatement is arithmetic and not a claim. */
+  rows_reported: number;
+  population_now: number | null;
+  population_prev: number | null;
+  population_change: number | null;
+  /** `one_statement` | `few_statements` | `batched_sweep`. Null when nothing clustered. */
+  shape: string | null;
+  /** `migration` (the population grew by about what was written), `restamp` (it did not),
+   *  `mixed`, or `unknown` when there is no prior population to subtract. */
+  moved: string;
+};
+
+/**
+ * WHAT A BULK REWRITE ACTUALLY DID, BESIDE THE CLUSTERS THAT REPORT IT (2026-10-19).
+ *
+ * `bulk_status_writes` prints the eight largest one-second clusters in the window. That is
+ * the right instrument for one UPDATE and it understates a writer that pages. This cycle
+ * the weekly subscriber-floor sweep rewrote 38,492 rows into `below_threshold` across 155
+ * clusters in 154 seconds, and the snapshot printed the eight biggest — 2,578 leads, with
+ * `left_the_send_queue: true` and 128 of them carrying an email address. Nothing on the
+ * line said it was a sample, so the only available reading was a 2,578-lead demotion. The
+ * sweep demoted nobody: every one of those leads was already `below_threshold` and the
+ * sweep re-stamped it on the way past.
+ *
+ * Two fields separate the cases, and neither needs to know who the writer was:
+ *
+ *   - `shape`, off the cluster count. One statement lands on one second. A paged re-walk
+ *     of a 66,488-row book cannot. 155 clusters is a sweep; the 10-13 ICP audit was 1.
+ *   - `moved`, off this status's own population against yesterday's snapshot. 38,492 rows
+ *     written with the population flat is a re-stamp. The 10-13 audit wrote 881 into
+ *     `rejected` and that population grew by 881. Same instrument against itself, 24h
+ *     apart, which is the 2026-10-18 `band_normal_prev` lesson applied here.
+ *
+ * `moved` is `unknown` with no prior population, which is the honest answer on the first
+ * run and after any skipped cycle. Unknown and measured-as-nothing differ.
+ */
+export function bulkRewriteShape(
+  rollup: BulkRewriteRoll[] | null,
+  clusters: BulkStatusWrite[] | null,
+  populationNow: Record<string, number> | null,
+  populationPrev: Record<string, number> | null,
+): BulkRewriteShape[] | null {
+  if (rollup === null) return null;
+  const key = (s: string | null) => (s === null ? '(null)' : s);
+  return rollup.map((roll) => {
+    const k = key(roll.review_status);
+    const mine = (clusters ?? []).filter((c) => key(c.review_status) === k);
+    const now = populationNow === null ? null : populationNow[k] ?? 0;
+    const prev = populationPrev === null ? null : populationPrev[k] ?? null;
+    const change = now === null || prev === null ? null : now - prev;
+    // Bands, not a ratio, so a tiny rewrite cannot divide its way to a verdict.
+    const moved = change === null
+      ? 'unknown'
+      : change >= roll.rows_in_window * 0.5
+        ? 'migration'
+        : change <= roll.rows_in_window * 0.1
+          ? 'restamp'
+          : 'mixed';
+    return {
+      ...roll,
+      clusters_reported: mine.length,
+      truncated: mine.length < roll.clusters,
+      rows_reported: mine.reduce((a, c) => a + c.leads, 0),
+      population_now: now,
+      population_prev: prev,
+      population_change: change,
+      shape: roll.clusters === 0
+        ? null
+        : roll.clusters <= 2
+          ? 'one_statement'
+          : roll.clusters < 10
+            ? 'few_statements'
+            : 'batched_sweep',
+      moved,
+    };
+  });
+}
+
 /** The inbox health gate's state file, which lives in the email repo because the gate
  *  does (CLAUDE.md: that lever is owned there, and this repo only counts). */
 function readInboxGateState(): unknown {
@@ -2797,6 +2909,11 @@ async function main(): Promise<void> {
   // Why the shelf moved, when it moved in one statement. Same fail-soft rule as the
   // calls below: a broken query degrades to null, it does not take the debrief down.
   const bulkWrites = await bulkStatusWrites(sinceISO, untilISO).catch(() => null);
+  // ...and whether that capped list is the whole write, and whether it moved anybody.
+  // See bulkRewriteShape() for the 38,492-row sweep this snapshot reported as 2,578.
+  // Same fail-soft rule: both degrade to null rather than taking the debrief down.
+  const bulkRollup = await bulkStatusWriteRollup(sinceISO, untilISO).catch(() => null);
+  const statusPopulation = await reviewStatusPopulation().catch(() => null);
 
   // The recovery lane is the only thing still producing new sendable leads while
   // discovery is paused, and no field here counted its output. Same fail-soft rule
@@ -3049,6 +3166,15 @@ async function main(): Promise<void> {
   // projection off the same account figures, and both must report one reading.
   const openrouter = await openRouterHealth(sinceISO, untilISO);
 
+  // Whether this cycle's bulk rewrites were a sample, a sweep, or a real migration.
+  // Pure arithmetic over the three reads above plus yesterday's snapshot.
+  const bulkRewrite = bulkRewriteShape(
+    bulkRollup,
+    bulkWrites,
+    statusPopulation,
+    priorReviewStatusPopulation(pacificDate(new Date(sinceMs))),
+  );
+
   const snapshot = {
     date,
     cycle_start_iso: sinceISO,
@@ -3085,7 +3211,23 @@ async function main(): Promise<void> {
       // time. Null means the query failed, which is not the same as empty. See
       // bulkStatusWrites() in src/db.ts for why the destination is reported and the
       // origin is not.
+      //
+      // READ bulk_rewrite BEFORE QUOTING ANY NUMBER OUT OF THIS LIST (2026-10-19). The
+      // list is capped at the eight largest seconds, which is the whole write when one
+      // UPDATE did it and a sample when a paged writer did. This cycle the weekly
+      // subscriber-floor sweep rewrote 38,492 rows into `below_threshold` across 155
+      // clusters in 154 seconds and the list printed 2,578 of them — 6.7% — with
+      // `left_the_send_queue: true` and 128 carrying an email, which is exactly the shape
+      // of a 2,578-lead demotion and was not one. Every one of those leads was already
+      // `below_threshold`.
       bulk_status_writes: bulkWrites,
+      // rows_in_window is the real size; truncated says the list above is a sample;
+      // shape separates one statement from a paged sweep by cluster count; moved answers
+      // whether the destination population actually grew. See bulkRewriteShape().
+      bulk_rewrite: bulkRewrite,
+      // The baseline `moved` needs tomorrow. One GROUP BY, no filter. Null means the
+      // query failed, which is not the same as an empty table.
+      review_status_population: statusPopulation,
     },
     // Emails LOADED into a SmartLead campaign this cycle (see countSentBetween). Null
     // means the query failed, not that nothing was sent.

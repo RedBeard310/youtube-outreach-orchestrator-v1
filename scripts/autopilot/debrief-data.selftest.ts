@@ -1,4 +1,4 @@
-import { bandGateFacts, fleetFacts, inboxGateFacts, apifyBatchFacts, apifyLedgerLine, normalizePushReason, offerFromBatchId, siegePushOutcome, classifyKeyProbe, cyclePacificDay, enrichmentChainFacts, isSendingDay, projectRecoveryBudget, MAX_MISSING_DEBRIEFS, missingDebriefs, pushRunVerdict, unitStartedAt, sendPlanHealth, siegePlanFacts, summarizeSendLines, isVerifiedOrBeyond, laneYield, priorAdvanceSource, priorSeedsAdvanced, priorSeedsWalked, reconcileAdvanced, sessionSeedsAdvanced, sessionStartMs, walkRateTrend } from './debrief-data.ts';
+import { bulkRewriteShape, bandGateFacts, fleetFacts, inboxGateFacts, apifyBatchFacts, apifyLedgerLine, normalizePushReason, offerFromBatchId, siegePushOutcome, classifyKeyProbe, cyclePacificDay, enrichmentChainFacts, isSendingDay, projectRecoveryBudget, MAX_MISSING_DEBRIEFS, missingDebriefs, pushRunVerdict, unitStartedAt, sendPlanHealth, siegePlanFacts, summarizeSendLines, isVerifiedOrBeyond, laneYield, priorAdvanceSource, priorSeedsAdvanced, priorSeedsWalked, reconcileAdvanced, sessionSeedsAdvanced, sessionStartMs, walkRateTrend } from './debrief-data.ts';
 let fail = 0;
 const ok = (name: string, got: unknown, want: unknown) => {
   const pass = JSON.stringify(got) === JSON.stringify(want);
@@ -821,6 +821,64 @@ ok('no push in the cycle leaves replanned_after_push unknown',
   fleetFacts(REPLAN, { live_inboxes: 43, mailbox_capacity: 645, plan_generated_at: '2026-10-14T10:36:16Z' }, null, null, null)
     .replanned_after_push,
   null);
+
+
+// bulkRewriteShape — the 2026-10-19 sweep that reported 6.7% of itself as a demotion
+const SWEEP_ROLL = [{
+  review_status: 'below_threshold', rows_in_window: 38492, clusters: 155,
+  rows_in_clusters: 38466, first_at: '2026-10-19T06:41:02Z',
+  last_at: '2026-10-19T06:43:36Z', span_seconds: 154,
+}];
+const SWEEP_CLUSTERS = [340, 334, 332, 319, 316, 315, 312, 310].map((leads, i) => ({
+  at: `2026-10-19T06:42:0${i}Z`, review_status: 'below_threshold', leads,
+  already_emailed: 0, with_email: 15, stamp: null, left_the_send_queue: true,
+}));
+ok('155 clusters is a paged sweep, and the printed list is a sample',
+  (() => {
+    const f = bulkRewriteShape(SWEEP_ROLL, SWEEP_CLUSTERS, { below_threshold: 130102 }, null)![0];
+    return [f.shape, f.truncated, f.clusters_reported, f.rows_reported, f.rows_in_window];
+  })(),
+  ['batched_sweep', true, 8, 2578, 38492]);
+ok('no prior population leaves `moved` unknown, never restamp',
+  bulkRewriteShape(SWEEP_ROLL, SWEEP_CLUSTERS, { below_threshold: 130102 }, null)![0].moved,
+  'unknown');
+ok('a flat population beside 38k writes is a re-stamp',
+  (() => {
+    const f = bulkRewriteShape(SWEEP_ROLL, SWEEP_CLUSTERS,
+      { below_threshold: 130102 }, { below_threshold: 130100 })![0];
+    return [f.population_change, f.moved];
+  })(),
+  [2, 'restamp']);
+// The 2026-10-13 ICP audit: one statement, and the destination grew by what it wrote
+const AUDIT_ROLL = [{
+  review_status: 'rejected', rows_in_window: 881, clusters: 1, rows_in_clusters: 881,
+  first_at: '2026-10-13T16:26:11Z', last_at: '2026-10-13T16:26:11Z', span_seconds: 0,
+}];
+const AUDIT_CLUSTERS = [{
+  at: '2026-10-13T16:26:11Z', review_status: 'rejected', leads: 881,
+  already_emailed: 720, with_email: 881, stamp: '[NOT ICP 2026-10-13]',
+  left_the_send_queue: true,
+}];
+ok('one UPDATE whose destination grew by 881 is a real migration',
+  (() => {
+    const f = bulkRewriteShape(AUDIT_ROLL, AUDIT_CLUSTERS, { rejected: 1063 }, { rejected: 182 })![0];
+    return [f.shape, f.truncated, f.population_change, f.moved];
+  })(),
+  ['one_statement', false, 881, 'migration']);
+ok('a half-and-half rewrite is mixed, not forced into one verdict',
+  bulkRewriteShape(AUDIT_ROLL, AUDIT_CLUSTERS, { rejected: 1063 }, { rejected: 800 })![0].moved,
+  'mixed');
+ok('a failed rollup query is null, not an empty day',
+  bulkRewriteShape(null, SWEEP_CLUSTERS, { below_threshold: 1 }, null), null);
+ok('a status the prior snapshot never listed is unknown, not zero',
+  (() => {
+    const f = bulkRewriteShape(AUDIT_ROLL, AUDIT_CLUSTERS, { rejected: 1063 }, { approved: 5 })![0];
+    return [f.population_prev, f.population_change, f.moved];
+  })(),
+  [null, null, 'unknown']);
+ok('3 to 9 clusters is a handful of statements, not a sweep',
+  bulkRewriteShape([{ ...SWEEP_ROLL[0], clusters: 4 }], SWEEP_CLUSTERS, null, null)![0].shape,
+  'few_statements');
 
 console.log(fail === 0 ? '\nALL PASS' : `\n${fail} FAILED`);
 process.exit(fail === 0 ? 0 : 1);

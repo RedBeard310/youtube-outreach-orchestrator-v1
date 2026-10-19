@@ -604,3 +604,103 @@ export async function bulkStatusWrites(
     };
   });
 }
+
+export type BulkRewriteRoll = {
+  review_status: string | null;
+  /** EVERY row this window rewrote into this status, not just the reported clusters. */
+  rows_in_window: number;
+  /** How many 50+ seconds the window held. 1 is one UPDATE; 155 is a paged sweep. */
+  clusters: number;
+  /** Rows inside those clusters, so `rows_in_window` minus this is the per-lead tail. */
+  rows_in_clusters: number;
+  first_at: string | null;
+  last_at: string | null;
+  /** Seconds from the first cluster to the last. 0 when there is only one. */
+  span_seconds: number | null;
+};
+
+/**
+ * The same window as bulkStatusWrites(), rolled up per destination status with NO cap.
+ *
+ * WHY (2026-10-19). bulkStatusWrites() groups by the second and keeps the eight biggest,
+ * which is right for the shape it was built for — one UPDATE lands on one second — and
+ * wrong for a writer that pages. The weekly subscriber-floor sweep
+ * (`youtube-lead-finder-v1/scripts/graduate-grown-channels.ts`, Mondays) re-checks all
+ * 66,488 parked channels in batches of 50 and re-stamps every one that is still below the
+ * floor. This cycle that was 38,492 rows across 155 clusters in 154 seconds, and the
+ * snapshot reported the eight biggest: 2,578 leads, 6.7% of the truth, with nothing on the
+ * line saying it had been cut. A reader got "2,578 leads left the send queue, 128 of them
+ * with an email" for a sweep that moved almost nobody.
+ *
+ * So report the roll-up beside the clusters. `clusters` is the tell that separates the two
+ * writers without needing to know either of them: one statement cannot spread over 155
+ * seconds, and a paged re-walk of the whole book cannot land on one.
+ *
+ * Still no origin — nothing keeps lead history. What answers "did anybody actually move"
+ * is `population_change` in bulkRewriteShape(), which reads this status's own population
+ * against yesterday's snapshot.
+ */
+export async function bulkStatusWriteRollup(
+  sinceISO: string,
+  untilISO: string,
+  minLeads = 50,
+): Promise<BulkRewriteRoll[]> {
+  const rows = await query<Record<string, string | number | Date | null>>(
+    `WITH touched AS (
+       SELECT date_trunc('second', lc.updated_at) AS at,
+              lc.review_status                   AS review_status,
+              count(*)                           AS leads
+         FROM leads.lead_candidates lc
+        WHERE lc.updated_at >= $1
+          AND lc.updated_at <  $2
+        GROUP BY 1, 2)
+     SELECT review_status,
+            sum(leads)                                     AS rows_in_window,
+            count(*) FILTER (WHERE leads >= $3)             AS clusters,
+            coalesce(sum(leads) FILTER (WHERE leads >= $3), 0) AS rows_in_clusters,
+            min(at)  FILTER (WHERE leads >= $3)             AS first_at,
+            max(at)  FILTER (WHERE leads >= $3)             AS last_at
+       FROM touched
+      GROUP BY 1
+     HAVING count(*) FILTER (WHERE leads >= $3) > 0
+      ORDER BY sum(leads) DESC`,
+    [sinceISO, untilISO, minLeads],
+  );
+  return rows.map((r) => {
+    const first = r.first_at === null ? null : new Date(String(r.first_at)).toISOString();
+    const last = r.last_at === null ? null : new Date(String(r.last_at)).toISOString();
+    return {
+      review_status: r.review_status === null ? null : String(r.review_status),
+      rows_in_window: Number(r.rows_in_window ?? 0),
+      clusters: Number(r.clusters ?? 0),
+      rows_in_clusters: Number(r.rows_in_clusters ?? 0),
+      first_at: first,
+      last_at: last,
+      span_seconds: first === null || last === null
+        ? null
+        : Math.round((Date.parse(last) - Date.parse(first)) / 1000),
+    };
+  });
+}
+
+/**
+ * Live population of every `review_status`, so tomorrow's debrief can ask whether a bulk
+ * rewrite actually moved anybody. One GROUP BY over the lead table, no filter.
+ *
+ * This is the baseline half of the 2026-10-19 fix. A rewrite of 38,492 rows into
+ * `below_threshold` whose population did not grow is a re-stamp of leads that were already
+ * there; the 2026-10-13 ICP audit wrote 881 into `rejected` and that population grew by
+ * 881. The sizes are indistinguishable from the write alone and obvious from the pair.
+ */
+export async function reviewStatusPopulation(): Promise<Record<string, number>> {
+  const rows = await query<Record<string, string | number | null>>(
+    `SELECT coalesce(review_status, '(null)') AS review_status, count(*) AS leads
+       FROM leads.lead_candidates
+      GROUP BY 1
+      ORDER BY 2 DESC`,
+    [],
+  );
+  const out: Record<string, number> = {};
+  for (const r of rows) out[String(r.review_status)] = Number(r.leads ?? 0);
+  return out;
+}
