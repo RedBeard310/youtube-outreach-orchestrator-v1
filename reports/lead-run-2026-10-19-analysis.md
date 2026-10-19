@@ -148,7 +148,7 @@ This is the 2026-10-18 `band_normal_prev` lesson in a new place. That fault was 
 two different instruments read at two different hours; this one is reporting a sample as if
 it were the whole, and both were only findable by hand.
 
-Verified against live data: `rows_in_window: 38485`, `clusters: 155`, `span_seconds: 154`,
+Verified against live data: `rows_in_window: 38472`, `clusters: 155`, `span_seconds: 154`,
 `truncated: true`, `clusters_reported: 8`, `rows_reported: 2578`, `shape: batched_sweep`,
 `moved: unknown`. Eight regression cases added to `debrief-data.selftest.ts` (the sweep is a
 sample and reads as one; no baseline leaves `moved` unknown and never `restamp`; a flat
@@ -162,6 +162,33 @@ so a future cycle cannot re-derive this by hand.
 (`if (fresh !== row.subscriber_count)`), so the 38,485 rows it touched are channels whose
 subscriber count genuinely changed in a week. The write is real and useful. It just is not a
 status change, and the instrument that read it could not say so.
+
+**On the two row counts.** 38,485 is what the sweep wrote, measured at 06:43Z when pass 1
+finished. The snapshot's `rows_in_window` reads lower and keeps falling (38,472 at 07:40Z)
+because pass 2 is still re-scoring the 149 graduates and each promotion takes a row out of
+`below_threshold`. Both are right about different things, and the share the snapshot printed
+is 6.7% either way.
+
+### A second fix, found while verifying the first (`7fa3852`)
+
+`main()` in `debrief-data.ts` fired on import, and `debrief-data.selftest.ts` imports that
+module. So **every selftest run started a second full gatherer pass** (dozens of Postgres
+queries, a 66-key YouTube probe, a systemd sweep), and whether it reached the
+`writeFileSync` that overwrites `logs/autopilot-debrief-<date>.json` came down to whether
+the selftest's `process.exit` won the race. It usually did, which is why this ran unnoticed.
+It lost today: importing the module to exercise one pure function rewrote the day's snapshot
+**41 minutes past the cycle boundary**.
+
+`main()` now runs only when this file is the entry point, matched on the entry file's name,
+which needs no ESM/CJS branch because tsx compiles this to CJS. The one real caller passes
+the path (`npx tsx .../debrief-data.ts` in `debrief.sh`). Verified both ways: the selftest
+no longer touches the database or the snapshot, and the real invocation still writes it.
+
+The only reason today's overwrite cost nothing is the instrument added on 2026-10-01 for
+exactly this: `measured_minutes_after_cycle_end: 41` and
+`counts_post_cycle_arrivals: true` say when the reading was taken, and every figure quoted
+in this debrief was checked against both the 07:20Z and the 07:40Z snapshot. Only
+`rows_in_window` moved.
 
 ## Still open, outside this agent's repos
 
