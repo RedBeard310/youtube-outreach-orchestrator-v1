@@ -1,0 +1,310 @@
+<!doctype html><meta charset="utf-8">
+<title>Lead Run Debrief — 2026-10-19</title>
+<style>
+  :root {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+      --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+      --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+    --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+    --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 40px 22px 80px; }
+  .eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); font-weight: 600; }
+  h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.12; margin: 10px 0 6px; text-wrap: balance; letter-spacing: -.02em; }
+  h2 { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); margin: 44px 0 16px; font-weight: 700; }
+  h3 { font-size: 18px; margin: 0 0 6px; letter-spacing: -.01em; }
+  p { margin: 0 0 14px; }
+  .lede { font-size: 18px; color: var(--ink-soft); max-width: 68ch; }
+  .tag { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--amber-soft); color: var(--amber); letter-spacing: .02em; }
+  .tag.good { background: var(--teal-soft); color: var(--teal); }
+  .grid { display: grid; gap: 14px; }
+  .stats { grid-template-columns: repeat(4, 1fr); margin-top: 26px; }
+  @media (max-width: 720px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; box-shadow: var(--shadow); }
+  .stat .n { font-size: 30px; font-weight: 750; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .stat .l { font-size: 12.5px; color: var(--ink-soft); margin-top: 3px; }
+  .stat .s { font-size: 12px; margin-top: 8px; font-weight: 600; }
+  .up { color: var(--good); } .down { color: var(--red); } .warn { color: var(--amber); }
+  .accent-red { border-left: 3px solid var(--red); }
+  .accent-teal { border-left: 3px solid var(--teal); }
+  .accent-amber { border-left: 3px solid var(--amber); }
+
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-soft); padding: 0 14px 14px; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+
+  .q { border-radius: 14px; padding: 20px 22px; margin-bottom: 14px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); }
+  .q .ask { font-size: 17px; font-weight: 700; color: var(--ink); margin-bottom: 10px; display: flex; gap: 10px; align-items: baseline; }
+  .q .ask .qn { color: var(--red); font-weight: 800; flex: 0 0 auto; }
+  .q p { color: var(--ink-soft); }
+  .q b { color: var(--ink); }
+  .pill { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink); background: var(--panel-2); padding: 1px 7px; border-radius: 6px; border: 1px solid var(--line); white-space: nowrap; }
+  pre { background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; overflow-x: auto; font-size: 12.5px; line-height: 1.5; color: var(--ink); margin: 0 0 14px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+  th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); }
+  td .num { font-variant-numeric: tabular-nums; font-weight: 650; }
+  .fix td:first-child { color: var(--good); font-weight: 650; }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); box-shadow: var(--shadow); }
+  ol.recs { padding-left: 0; list-style: none; counter-reset: r; margin: 0; }
+  ol.recs li { counter-increment: r; position: relative; padding: 14px 16px 14px 52px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 10px; box-shadow: var(--shadow); }
+  ol.recs li::before { content: counter(r); position: absolute; left: 14px; top: 14px; width: 26px; height: 26px; border-radius: 8px; background: var(--teal-soft); color: var(--teal); font-weight: 800; font-size: 14px; display: grid; place-items: center; }
+  ol.recs b { color: var(--ink); }
+  .foot { margin-top: 46px; padding: 16px 18px; border-radius: 12px; background: var(--amber-soft); border: 1px solid var(--line); font-size: 14px; color: var(--ink-soft); }
+  .foot b { color: var(--ink); }
+  .muted { color: var(--ink-soft); font-size: 13.5px; }
+
+  /* The day's events, scaled so the ratio inside each bar is the story. */
+  .cap { display: grid; gap: 12px; padding: 16px 18px; }
+  .crow { display: grid; grid-template-columns: 160px 1fr 190px; gap: 12px; align-items: center; font-size: 13px; }
+  @media (max-width: 720px) { .crow { grid-template-columns: 1fr; gap: 4px; } }
+  .crow .who b { color: var(--ink); }
+  .crow .who { color: var(--ink-soft); }
+  .ctrack { height: 22px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; display: flex; position: relative; }
+  .ctrack .fu { background: var(--red); opacity: .72; height: 100%; }
+  .ctrack .room { background: var(--good); height: 100%; min-width: 2px; }
+  .ctrack .mid { background: var(--amber); opacity: .7; height: 100%; }
+  .crow .right { color: var(--ink-soft); text-align: right; font-variant-numeric: tabular-nums; }
+  .crow .right b { color: var(--ink); }
+
+  /* The two numbers for one write: what the snapshot printed, and what happened. */
+  .frow { display: grid; grid-template-columns: 170px 1fr 150px; gap: 12px; align-items: center; font-size: 13px; }
+  @media (max-width: 720px) { .frow { grid-template-columns: 1fr; gap: 4px; } }
+  .frow .who b { color: var(--ink); }
+  .frow .who { color: var(--ink-soft); }
+  .ftrack { height: 22px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; display: flex; }
+  .ftrack .ok { background: var(--good); height: 100%; }
+  .ftrack .wt { background: var(--amber); opacity: .8; height: 100%; }
+  .ftrack .st { background: var(--red); opacity: .78; height: 100%; }
+  .frow .right { color: var(--ink-soft); text-align: right; font-variant-numeric: tabular-nums; }
+  .frow .right b { color: var(--ink); }
+  .dgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px; }
+  .dchip { font-size: 12.5px; padding: 7px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel-2); display: flex; justify-content: space-between; gap: 8px; }
+  .dchip.bad { background: var(--red-soft); }
+  .dchip.good { background: var(--teal-soft); }
+  .dchip code { font-size: 12px; }
+  .dchip span { font-variant-numeric: tabular-nums; color: var(--ink-soft); white-space: nowrap; }
+</style>
+
+<div class="wrap">
+
+  <div class="eyebrow">Lead Run Debrief · YouTube outreach</div>
+  <h1>2026-10-19: 149 channels grew past the floor, and the snapshot called it a 2,578-lead demotion</h1>
+  <p class="lede"><b>Nothing went out. Sunday is not a sending day.</b> The cycle's last 19 minutes held its one real event: the weekly subscriber-floor sweep re-read the subscriber count on all 66,488 parked channels and found <b>149 that have grown past 3,000 subscribers</b>. While discovery is paused, that lane is the only thing in the pipeline still producing people nobody has ever written to. On its way past it refreshed <b>38,485 rows</b>, and the snapshot reported the eight busiest seconds of that: <b>2,578 leads moved to <code>below_threshold</code>, 128 of them carrying an email address, <code>left_the_send_queue: true</code></b>. Which is precisely the shape of the 2026-10-13 audit that really did demote 881 people. This one demoted nobody. Every one of those leads was already <code>below_threshold</code> and the only column that changed was the subscriber count. <b>The fix shipped this cycle.</b> Separately, the fleet had its best morning in five weeks: <b>34 mailboxes clear, the watch band empty</b>, and every mailbox carrying Casey's own name is now in the clear half.</p>
+  <div style="margin-top:14px"><span class="tag good">149 CHANNELS CROSSED THE FLOOR</span> <span class="tag good">34 CLEAR, 0 ON WATCH</span> <span class="tag">0 EMAILS, NOT A SENDING DAY</span></div>
+
+  <div class="grid stats">
+    <div class="card stat accent-teal">
+      <div class="n">149</div>
+      <div class="l">channels grew past 3,000 subscribers</div>
+      <div class="s up">66,002 still below, 337 gone from YouTube</div>
+    </div>
+    <div class="card stat accent-red">
+      <div class="n">6.7%</div>
+      <div class="l">of the sweep's write the snapshot printed</div>
+      <div class="s down">2,578 of 38,485 rows, no sign it was a sample</div>
+    </div>
+    <div class="card stat accent-teal">
+      <div class="n">34</div>
+      <div class="l">of 58 mailboxes may start a new person</div>
+      <div class="s up">was 28, and the watch band is now empty</div>
+    </div>
+    <div class="card stat accent-amber">
+      <div class="n">5,142</div>
+      <div class="l">people on the shelf, never emailed</div>
+      <div class="s warn">up 1. Unmoved for five mornings</div>
+    </div>
+  </div>
+
+  <h2>The shape of the day</h2>
+
+  <p>A quiet cycle with five things in it, four of them small. Mailboxes drifted back into the clear band through the day in ones and twos, the recovery lane walked its tenth lap, enrichment took its single remaining lead, and then at 06:41Z the weekly sweep ran.</p>
+
+  <div class="card" style="padding:0">
+    <div class="cap">
+      <div class="crow">
+        <div class="who"><b>07:20Z</b><br><span class="muted">this repo's session-start send</span></div>
+        <div class="ctrack"></div>
+        <div class="right"><b>0</b> ready leads, exit 0</div>
+      </div>
+      <div class="crow">
+        <div class="who"><b>10:05Z, 11:05Z, 15:05Z</b><br><span class="muted">four mailboxes come back</span></div>
+        <div class="ctrack"><div class="room" style="width:55.2%"></div><div class="mid" style="width:3.4%"></div><div class="fu" style="width:41.4%"></div></div>
+        <div class="right"><b>32</b> clear · 2 watch · 24 stop</div>
+      </div>
+      <div class="crow">
+        <div class="who"><b>00:05Z</b><br><span class="muted">the last two on watch clear</span></div>
+        <div class="ctrack"><div class="room" style="width:58.6%"></div><div class="fu" style="width:41.4%"></div></div>
+        <div class="right"><b>34</b> clear · 0 watch · 24 stop</div>
+      </div>
+      <div class="crow">
+        <div class="who"><b>02:01Z</b><br><span class="muted">the recovery lane's collect pass</span></div>
+        <div class="ctrack"><div class="room" style="width:0.7%"></div></div>
+        <div class="right"><b>1</b> of 150 leads gave a point</div>
+      </div>
+      <div class="crow">
+        <div class="who"><b>04:01Z</b><br><span class="muted">the verify pass, then the shelf</span></div>
+        <div class="ctrack"><div class="room" style="width:0.7%"></div></div>
+        <div class="right"><b>1</b> person parked</div>
+      </div>
+      <div class="crow">
+        <div class="who"><b>06:41Z to 06:43Z</b><br><span class="muted">the weekly floor sweep, pass 1</span></div>
+        <div class="ctrack"><div class="room" style="width:0.2%"></div><div class="mid" style="width:57.9%"></div><div class="fu" style="width:41.9%"></div></div>
+        <div class="right"><b>149</b> crossed of 66,488</div>
+      </div>
+    </div>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--good)"></span>mailboxes clear to start a new person, or work that produced something</span>
+      <span><span class="dot" style="background:var(--amber);opacity:.7"></span>on watch, or re-read and still below the floor</span>
+      <span><span class="dot" style="background:var(--red);opacity:.72"></span>stopped, or unchanged and not re-read</span>
+    </div>
+  </div>
+  <p class="muted">Band rows are scaled to the 58 mailboxes and are the gate's own hourly readings out of <code>automator/state/inbox-health.json</code>, so the 28 and the 34 are one instrument 24 hours apart. The sweep row is scaled to the 66,488 channels it re-checked. The single park agrees two ways: <code>approved_hold</code> went 6,814 to 6,815 and the enrichment chain reports one lead bundled.</p>
+
+  <h2>The three questions</h2>
+
+  <div class="q accent-teal">
+    <div class="ask"><span class="qn">Q1</span><span>Zero emails again. Two quiet days in a row. Is something broken?</span></div>
+    <p><b>No. It was Sunday, and Saturday before it.</b> <code>siege-plan.timer</code> runs Monday to Friday, so no plan was written and none should have been, and SmartLead only delivers Monday to Thursday anyway. The snapshot says it in its own words: <code>sending_day: false</code>, <code>binding_constraint: not_a_sending_day</code>, <code>plan_found: false</code>.</p>
+    <p>The one send this repo ran was its own session-start <code>npm run send</code> at 07:20Z, which found 0 parked leads and exited 0. Correct, because the shelf is fired by Siege rather than from here.</p>
+    <p class="muted">Monday's push is the one to read, and it inherits two weekends of due follow-ups. Every offer is three emails on days 0, 4 and 10 against a four-day delivery week, so read <code>mailbox_capacity</code> against <code>followups_due</code> and not the free-slot count on its own.</p>
+  </div>
+
+  <div class="q accent-red">
+    <div class="ask"><span class="qn">Q2</span><span>The snapshot says 2,578 leads left the send queue. Who did we just lose?</span></div>
+    <p><b>Nobody. That line is 6.7% of a write that moved no one, and it reads exactly like the one that moved 881.</b></p>
+    <p>What actually ran was <code>graduate-channels-weekly.sh</code> in the lead-finder, which fires on Mondays. It re-reads the live subscriber count for every channel parked below the 3,000-subscriber floor, in batches of 50, and sends the ones that have grown back through scoring. This week it checked <b>66,488 channels</b>, refreshed the count on the <b>38,485</b> whose subscriber number had changed since last Monday, and found <b>149 that crossed the floor</b>. 66,002 are still below it and 337 have left YouTube.</p>
+    <p>Those 38,485 single-row updates landed in <b>155 separate seconds across 154 seconds of wall clock</b>. The field that reports bulk rewrites groups by the second and keeps the eight biggest, which is the right instrument for one <code>UPDATE</code> and the wrong one for a writer that pages through a book. So it printed the eight busiest seconds, and nothing on the line said the list had been cut.</p>
+
+    <div class="cap" style="padding:14px 0 6px">
+      <div class="frow">
+        <div class="who"><b>What the snapshot said</b><br><span class="muted">8 of 155 clusters</span></div>
+        <div class="ftrack"><div class="wt" style="width:6.7%"></div></div>
+        <div class="right"><b>2,578</b> rows</div>
+      </div>
+      <div class="frow">
+        <div class="who"><b>What the sweep wrote</b><br><span class="muted">all 155 clusters</span></div>
+        <div class="ftrack"><div class="ok" style="width:100%"></div></div>
+        <div class="right"><b>38,485</b> rows</div>
+      </div>
+      <div class="frow">
+        <div class="who"><b>What it moved</b><br><span class="muted">review_status changes</span></div>
+        <div class="ftrack"></div>
+        <div class="right"><b>0</b> people</div>
+      </div>
+    </div>
+
+    <p>The giveaway was on the line all along and said nothing on its own: <code>already_emailed: 0</code> on all eight rows. A real reclassification of leads with email addresses on them catches people we have written to. The 10-13 ICP audit caught 720 of them.</p>
+    <p class="muted">Those two writes are the same size class and the same destination label, and only one of them cost anything: 881 rows into <code>rejected</code> in a single second at 16:26Z with <code>[NOT ICP 2026-10-13]</code> stamped in the notes, 720 already emailed, 684 live SmartLead sequences paused. Both print as "N leads moved to a status outside the send queue". The fix below is the line that separates them.</p>
+  </div>
+
+  <div class="q accent-amber">
+    <div class="ask"><span class="qn">Q3</span><span>One person parked. Is the recovery lane finished?</span></div>
+    <p><b>Its book is, for now. The methods are fine.</b> The 02:01Z collect pass walked 150 leads and <b>found 324 contact points on 103 of them, of which 310 were already stored</b>. One lead produced the 14 that were new. That is a full re-walk of a picked-over book, not a broken pass: two thirds of the leads it touched gave the methods something, we just already had it.</p>
+    <p>Across the cycle, free collection added <b>27 contact points and 5 email addresses across 4 people</b>, against 275 points and 122 addresses over the prior seven days. The lane is on its <b>tenth lap of a 2,411-lead book</b>, and <code>collect_book_stranded</code> held at 3 for the 36th straight day, so no selector gap has reopened.</p>
+    <p>The paid lane that used to carry this volume is sitting out. Apify's monthly allowance is down to its $10 reserve, <code>spendable</code> reads <code>-$0.0002</code>, and nothing runs until the budget resets on <b>31 October</b>.</p>
+    <p class="muted">Brave resolved sites normally: 99 searches, 0 key refusals, <code>cause: resolution_ok</code>. Worth noting anyway, because <b>the ownership gate refused 71 of the 80 candidate sites Brave returned</b>, which is the 2026-10-10 shape. That gate is deliberate and no amount of search credit changes it. The pass's largest error cause, <code>34-channel-page: page rendered with no outbound links</code> at 29% of 132 errors, is a content outcome rather than a fault. The largest real fault is <code>17-podcast: iTunes refused-or-throttled</code> at 21 errors, Apple metering its Search API per IP, unchanged from 10-15.</p>
+  </div>
+
+  <h2>The thing worth your attention</h2>
+  <div class="card accent-red" style="padding:18px 20px">
+    <h3>Every mailbox with your name on it is now clear. Every stopped mailbox has a made-up name, and they are getting worse while suspended.</h3>
+    <p>Friday's debrief found the fleet had split in two. Saturday's found the halves no longer overlapped on any measure. Today the split is total on the one measure you can act on.</p>
+
+    <div class="tablewrap" style="margin:12px 0 14px">
+      <table>
+        <tr><th>Measure</th><th>The 34 clear</th><th>The 24 stopped</th></tr>
+        <tr><td>Warmup emails landing in spam</td><td><span class="num">0 of 1,767</span></td><td><span class="num">101 of 269</span>, 38%</td></tr>
+        <tr><td>Health score, lowest to highest</td><td><span class="num">96.7 to 98.4</span></td><td><span class="num">35.5 to 92.2</span>, median 52.8</td></tr>
+        <tr><td>Whose name is on the mailbox</td><td><span class="num">25</span> Casey, <span class="num">9</span> made-up</td><td><span class="num">0</span> Casey, <span class="num">24</span> made-up</td></tr>
+        <tr><td>Mailboxes InboxKit is itself cutting volume on</td><td><span class="num">0</span></td><td><span class="num">21</span> of 24</td></tr>
+      </table>
+    </div>
+
+    <p><b>All 25 mailboxes carrying your own name are in the clear half.</b> Yesterday one was still stopped; today none is. Of the 33 made-up-name mailboxes, 24 are stopped and 9 are clear. The sort is no longer close.</p>
+
+    <p><b>And the stopped half got measurably worse in a day, while suspended.</b> Its median health score fell from 59.1 to 52.8, its floor from 40.8 to 35.5, and its volume cuts went from 20 to 21. <b>Nine of those 21 cuts were written during this cycle.</b> Suspending a mailbox in SmartLead stops the cold email. It does not stop InboxKit warmup, so those domains are still sending into spam filters at reduced volume, and the reduction is InboxKit protecting itself rather than anyone resting the domain.</p>
+
+    <div class="dgrid" style="margin:10px 0 0">
+      <div class="dchip bad"><code>martydurgan@tubegrowthagency</code><span>79% spam</span></div>
+      <div class="dchip bad"><code>altonberge@tubegrowthagency</code><span>77% spam</span></div>
+      <div class="dchip bad"><code>shanebogan@tubeleadsagency</code><span>73% spam, was 53%</span></div>
+      <div class="dchip bad"><code>keithprohaskamueller@videoclientsagency</code><span>67% spam</span></div>
+      <div class="dchip bad"><code>christianlynch@tubeleadsagency</code><span>56% spam</span></div>
+      <div class="dchip bad"><code>owenhansen@ytgetsclients</code><span>51% spam</span></div>
+      <div class="dchip bad"><code>lawrenceleffler@contentgetsleads</code><span>23% spam</span></div>
+      <div class="dchip bad"><code>malcolmwatsica@ytgrowthagency</code><span>21% spam</span></div>
+      <div class="dchip bad"><code>danflatley@ytgrowthagency</code><span>15% spam</span></div>
+    </div>
+    <p class="muted" style="margin-top:10px">The nine cuts written this cycle, all on suspended mailboxes, all carrying a made-up name. Percentages are InboxKit's own reading in its <code>volume_cut</code> note. <code>shanebogan</code> is the one to watch: it read 53% yesterday.</p>
+  </div>
+
+  <h2>What broke → what's fixed</h2>
+  <div class="tablewrap">
+    <table>
+      <tr><th>What it looked like</th><th>What it actually was</th><th>State</th></tr>
+      <tr class="fix">
+        <td>2,578 leads left the send queue, 128 of them with an email address</td>
+        <td>The weekly subscriber-floor sweep writing one row at a time. It refreshed 38,485 subscriber counts across 155 one-second clusters in 154 seconds, and the bulk-rewrite field groups by the second and keeps the eight biggest. So the snapshot printed 6.7% of the write with nothing saying it was a sample, and the shape it printed is the shape of a real demotion. The write changed no one's status. The field that was built on 10-14 to catch the 881-lead ICP audit cannot tell that audit apart from a sweep passing by</td>
+        <td>Fixed in the orchestrator, <code>604bbdc</code>. <code>parked.bulk_rewrite</code> now carries <code>rows_in_window</code> (the real size), <code>truncated</code> and <code>rows_reported</code> (so the understatement is arithmetic rather than a guess), <code>clusters</code> and <code>shape</code> (one statement cannot spread over 155 seconds and a paged re-walk cannot land on one), and <code>moved</code>, read off the destination status's own population against yesterday's snapshot. <code>review_status_population</code> is now written each cycle as that baseline. Verified live: 38,485 rows, 155 clusters, <code>truncated: true</code>, <code>shape: batched_sweep</code>, <code>moved: unknown</code> because today is the first run with no baseline behind it. Eight regression cases added, suite green, typecheck clean</td>
+      </tr>
+      <tr>
+        <td>Four mailboxes on watch, three nearly clear</td>
+        <td>Correct and now resolved. All four cleared during the cycle, and two more came off the stop band, which is why the fleet reads 34 clear with an empty watch band against Saturday's 28 and 4. Six returners, every one on your own name, staggered through the day at 10:05Z, 11:05Z, 15:05Z and twice at 00:05Z</td>
+        <td>Working as intended. Saturday's debrief predicted 31 by Monday; the gate delivered 34</td>
+      </tr>
+      <tr>
+        <td>The stopped half is getting worse while suspended</td>
+        <td>Confirmed with a day of movement, not just a snapshot. Median score 59.1 to 52.8, floor 40.8 to 35.5, volume cuts 20 to 21, nine cut notes written this cycle at 15% to 79% of warmup mail in spam. SmartLead suspension does not stop InboxKit warmup</td>
+        <td>Open, and it is a decision rather than a bug. Resting a domain means turning its warmup down at InboxKit, which no repo here owns</td>
+      </tr>
+      <tr>
+        <td>Enrichment did almost nothing, again</td>
+        <td>Correct and finished. One batch took one lead and failed none, because <b>6,805 of the 6,815 people in the hold pool already have a bundle</b>, 99.9%. The chain idles on a poll and takes whatever trickles in</td>
+        <td>Working as intended. The lane the 2026-09-08 pause redirected everything into has run out of work</td>
+      </tr>
+      <tr>
+        <td>Campaign 4010851, four people loaded and never started</td>
+        <td>Unchanged. SmartLead answered 429 when Siege tried to start it on Friday, nothing retried, and the failure count stayed 0</td>
+        <td>Open, in <code>automator</code>. Those four count as sent, so nothing else will pick them up. Three days old</td>
+      </tr>
+    </table>
+  </div>
+
+  <h2>Recommended next, ranked</h2>
+  <ol class="recs">
+    <li><b>Decide about the made-up-name domains.</b> Third day on this list and the case is now as plain as it gets: all 25 mailboxes with your name on them are clear and have put 0 of 1,767 warmup emails in spam, while 24 of the 33 made-up-name mailboxes are stopped at 38% spam and a median score of 52.8. The new fact today is movement: that half got worse in 24 hours and picked up nine fresh volume cuts while suspended, because warmup keeps running. Resting them means turning warmup down at InboxKit. Retiring them means buying replacement domains. Until one of those happens the fleet's ceiling is about 34 mailboxes and the stopped domains keep burning.</li>
+    <li><b>The floor sweep is now the pipeline's only source of new people. Treat it as a lane.</b> It found 149 channels that crossed 3,000 subscribers, for 1,330 YouTube quota units and a few cents of scoring. Two of them were already written and pushed to SmartLead by 07:21Z this morning, unattended, which is the whole loop working. It runs once a week on Mondays, it has no debrief line of its own, and nothing watches it. Worth knowing before you decide anything about the discovery pause.</li>
+    <li><b>Monday's push is the first real send in three days, and follow-ups will eat into it.</b> 34 clear mailboxes is the most in five weeks. Two weekends of due follow-ups land on top of Monday's own, so read <code>mailbox_capacity</code> against <code>followups_due</code> in the plan rather than the slot remainder.</li>
+    <li><b>Give Siege's slot order a first-touch term.</b> Unchanged, and the number has not moved in five mornings: 5,142 enriched people have never been written to, and the shelf gained 1 person all weekend. One tie-breaker inside <code>priority_key</code> in <code>automator/scripts/siege.py</code> would stop re-offers taking every slot without touching the tier logic.</li>
+    <li><b>Restart the campaign SmartLead refused.</b> Four people loaded into campaign 4010851, never started, three days old.</li>
+    <li><b>Decide about the discovery pause.</b> Its stated job is done at 99.9% enriched. The two lanes that refill the shelf are a book on its tenth lap finding 14 new points in 324 and a paid lane with nothing spendable until 31 October. The third, the floor sweep, produced 149 people this morning without finding a single new channel, so it is not what the pause stops. The flag is untouched and stays untouched until you say otherwise.</li>
+    <li>Six cycles have metrics and no debrief (09-17, 09-18, 09-19, 08-17, 08-18, 07-11). No risk, backfillable any time.</li>
+  </ol>
+
+  <div class="foot">
+    <b>Clean-run facts:</b> 0 fatal signatures, 0 halts, 0 crashes, 0 failed enrichment leads. <b>$0.00 Anthropic</b> for the 36th straight cycle. OpenRouter billed <b>$1.31 across the whole account</b> with $78.61 left, which is 60 days of runway at this rate. Apify sat out with 0 price strikes until the allowance resets on 31 October. Brave ran 99 searches with zero key refusals and <code>cause: resolution_ok</code>. <code>needs_contact</code> held at 3,437 and <code>collect_book_stranded</code> at 3 for the 36th straight day, so no selector gap has reopened. The YouTube key pool probed 20 minutes after the reset at <b>15 working of 66</b>, whose cause is settled and which binds nothing except keyword search; the floor sweep ran on it without trouble. <b>0 new channels discovered, by your 2026-09-08 order</b>, and the flag is untouched.
+  </div>
+
+</div>
