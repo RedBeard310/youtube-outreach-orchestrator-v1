@@ -3488,4 +3488,21 @@ async function main(): Promise<void> {
   console.log(JSON.stringify(snapshot, null, 2));
 }
 
-main().catch((e) => { console.error(`[debrief-data] fatal: ${e instanceof Error ? e.stack : e}`); process.exit(1); });
+// ONLY WHEN THIS FILE IS THE THING BEING RUN (2026-10-19).
+//
+// `main()` used to fire on import, and this module is imported by
+// debrief-data.selftest.ts. So every selftest run quietly started a second full gatherer
+// pass — dozens of Postgres queries, a 66-key YouTube probe, a systemd sweep — and whether
+// it got far enough to overwrite `logs/autopilot-debrief-<date>.json` came down to whether
+// the selftest's `process.exit` won the race. It usually did, which is why this went
+// unnoticed. It lost once today: importing the module to exercise one pure function
+// rewrote the day's snapshot 39 minutes past the cycle boundary, and the only reason that
+// was harmless is that `counts_post_cycle_arrivals` says when it was measured.
+//
+// The one real caller passes this file as argv[1] (`npx tsx .../debrief-data.ts` in
+// debrief.sh), so matching on the entry file's name is enough and needs no ESM/CJS
+// `import.meta` branch — tsx compiles this to CJS.
+const entryFile = process.argv[1] ?? '';
+if (/(^|[\\/])debrief-data\.(ts|js|cjs|mjs)$/.test(entryFile)) {
+  main().catch((e) => { console.error(`[debrief-data] fatal: ${e instanceof Error ? e.stack : e}`); process.exit(1); });
+}
