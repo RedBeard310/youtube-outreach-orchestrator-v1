@@ -2970,6 +2970,14 @@ async function main(): Promise<void> {
         brave_accepted: att.braveAccepted,
         gate_rejected: att.braveGateRejected,
         social_only: att.braveSocialOnly,
+        // THE REFUSAL COUNT THAT IS A VOLUME (2026-10-20). `brave_refusals` above is
+        // the latched warning line, capped at 1 per pass however many lookups died,
+        // and `cause` used to read `search_dead` off it being nonzero. These two are
+        // the collect CLI's own per-search counts, so a reader can see whether search
+        // actually stopped. On 2026-10-20 they were 2 and 0 against 43 searches and
+        // 34 candidates found, and the cause was the ownership gate.
+        brave_refused_searches: att.braveRefusedSearches,
+        brave_errored_searches: att.braveErroredSearches,
         cause: noSiteCause(att, Number(process.env.AUTOPILOT_NO_SITE_ALARM_PCT ?? 70)),
         pass_summary: passes.length > 0 ? passes[passes.length - 1]!.summary : null,
         // A ZERO-POINT PASS WAS UNREADABLE FROM THIS FILE ALONE (2026-10-08). pass_summary
@@ -3341,7 +3349,17 @@ async function main(): Promise<void> {
         'READ site_resolution BEFORE BLAMING A PICKED-OVER BOOK: it describes the newest ' +
         'completed collect pass, nine of thirteen collection methods need the creator website ' +
         'first, and collapsed:true means the lane had almost no input that pass whatever the ' +
-        "book's state. brave_refusals>0 names a spent search plan. " +
+        "book's state. brave_refusals IS NOT A SPENT PLAN — READ brave_refused_searches " +
+        'INSTEAD (2026-10-20): the first is the latched all-keys-refused warning, which ' +
+        'prints at most once per pass and fires on a single transient 429 against a funded ' +
+        'plan, and cause named search_dead off it being nonzero. On 2026-10-20 that ' +
+        'reported a spent plan, and "43 of 43 leads ran with no web search at all", about a ' +
+        'pass whose own footer on the next line counted 2 refused searches out of 43 and 34 ' +
+        'candidate sites found — the ownership gate threw out 33 of those 34, and Brave ' +
+        'credit could not have bought one extra site. search_dead now requires refusals to ' +
+        'hold most of the searches (searchDied() in src/recovery/bloodhound-lane.ts). ' +
+        'brave_refused_searches and brave_errored_searches are the real volumes, and they ' +
+        'are null, not zero, for a pass logged before 2026-10-05. ' +
         'READ site_resolution.cause RATHER THAN GUESSING AT A COLLAPSED PASS (2026-10-10): ' +
         'collapsed with 0 refusals used to be read as "either a resolution fault or a ' +
         'site-less slice" and was in fact a third thing — Brave answers, returns a real ' +

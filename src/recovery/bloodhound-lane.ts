@@ -1743,6 +1743,30 @@ export function collectPassAttribution(
   braveSearches: number | null;
   braveCandidates: number | null;
   braveSocialOnly: number | null;
+  /** Searches that were REFUSED by every key, counted by the collect CLI itself —
+   *  a real volume, unlike `braveRefusals`, which the latch caps at 1.
+   *
+   *  WHY THIS READING EXISTS (2026-10-20). The 09-28 note above says the latched
+   *  line can never be a volume and `leadsAfterRefusal` is the measurement
+   *  instead. That bound is far too loose when the refusal lands early: the latch
+   *  fires the first time every key refuses ONE lookup, which happens on a
+   *  transient 429 against a healthy plan, and from then on every lead in the
+   *  pass is counted as having "run with search dead". The 2026-10-20 pass is the
+   *  shape: the line printed before its first lead, so the lane reported 43 of 43
+   *  leads running with no search at all — while this counter, on the very next
+   *  line of the same log, said 2 of 43 searches were refused and 34 found a real
+   *  candidate site. Search was alive for 41 of 43 lookups and the ownership gate
+   *  threw out 33 of the 34 candidates.
+   *
+   *  The consequence was a spend decision pointed at the wrong thing: `cause` read
+   *  `search_dead`, which the alarm renders as "raise the cap or add keys", for a
+   *  pass whose constraint Brave credit cannot touch. The footer regex had been
+   *  capturing this group since 2026-10-05 and discarding it.
+   *
+   *  Null for a pass logged before the footer line existed — unknowable, NOT zero. */
+  braveRefusedSearches: number | null;
+  /** Searches that failed some other way (network, timeout, a non-402 status). */
+  braveErroredSearches: number | null;
   /** Leads that needed a search while NO key was configured — the 2026-10-05
    *  fault, which prints a different line and no counts. */
   braveUnconfigured: number | null;
@@ -1834,6 +1858,8 @@ export function collectPassAttribution(
   let braveCandidates: number | null = null;
   let braveSocialOnly: number | null = null;
   let braveUnconfigured: number | null = null;
+  let braveRefusedSearches: number | null = null;
+  let braveErroredSearches: number | null = null;
   for (const raw of lines.slice(ends[pick]!.at + 1, ends[pick]!.at + 9)) {
     const line = raw.trim();
     if (/^\[rec\w+\]/.test(line)) break; // the next pass has started
@@ -1843,6 +1869,8 @@ export function collectPassAttribution(
       braveSearches = 0;
       braveCandidates = 0;
       braveSocialOnly = 0;
+      braveRefusedSearches = 0;
+      braveErroredSearches = 0;
       break;
     }
     const b = BRAVE.exec(line);
@@ -1850,6 +1878,8 @@ export function collectPassAttribution(
       braveSearches = Number(b[1]);
       braveCandidates = Number(b[2]);
       braveSocialOnly = Number(b[3]);
+      braveRefusedSearches = Number(b[4]);
+      braveErroredSearches = Number(b[5]);
       braveUnconfigured = 0;
       break;
     }
@@ -1880,6 +1910,8 @@ export function collectPassAttribution(
     braveSearches,
     braveCandidates,
     braveSocialOnly,
+    braveRefusedSearches,
+    braveErroredSearches,
     braveUnconfigured,
     braveAccepted,
     braveGateRejected,
@@ -1895,7 +1927,9 @@ export function collectPassAttribution(
  *  log carried the answer. Ordered by what a reader should act on:
  *
  *   - `search_off`       no key configured. A fault, free to fix. (2026-10-05)
- *   - `search_dead`      every key refused inside the pass. Costs money to fix.
+ *   - `search_dead`      key refusals took MOST of the pass's searches. Costs
+ *                        money to fix. See `searchDied()` for why "most" and not
+ *                        "any" (2026-10-20).
  *   - `ownership_gate`   Brave answered with real candidates and the strict
  *                        ownership gate refused most of them. NOT buyable.
  *   - `no_candidates`    Brave answered and the hits were social/third-party.
@@ -1917,12 +1951,47 @@ export type NoSiteCause =
   | 'resolution_ok'
   | 'unmeasured';
 
+/** Did search actually DIE in this pass, or did one lookup bounce off a healthy plan?
+ *
+ *  WHY THIS IS NOT `braveRefusals > 0` (2026-10-20). `searchBrave()` latches its
+ *  all-keys-refused warning the first time every key refuses a single lookup, so the
+ *  line fires on a transient 429 against a funded plan and never fires again however
+ *  the rest of the pass goes. Treating that one latched line as "the search plan is
+ *  the cause" is a claim with no measurement behind it — the same bug class as
+ *  09-12, 09-13, 09-22, 09-27, 09-28 and 10-10, which is six outings for one mistake.
+ *
+ *  The 2026-10-20 pass is the shape. The line printed before its first lead, so the
+ *  cause read `search_dead` and the alarm's remedy was "raise the cap or add keys",
+ *  while the pass's own footer on the next line of the same log said 2 of 43 searches
+ *  were refused and 34 came back with a real candidate site. The ownership gate threw
+ *  out 33 of those 34. Brave credit could not have bought a single extra site, and
+ *  `ownership_gate` already exists to say exactly that.
+ *
+ *  So ask the counter, not the latch: refusals have to hold most of the pass's
+ *  searches before the plan is named as the cause. A plan that genuinely caps mid-pass
+ *  refuses every lookup after that point and clears this bar easily; a plan that
+ *  dropped one lookup does not.
+ *
+ *  Falls back to the latched line when the footer is missing, which is every pass
+ *  logged before 2026-10-05: unknowable is not a licence to under-report a real
+ *  outage, and that is the direction the 09-27 fix was written to protect. */
+export function searchDied(
+  att: NonNullable<ReturnType<typeof collectPassAttribution>>,
+  deadPct = 50,
+): boolean {
+  if (att.braveRefusals === 0) return false;
+  // No footer: the latched line is the only evidence there is.
+  if (att.braveRefusedSearches === null || att.braveSearches === null) return true;
+  if (att.braveSearches === 0) return true; // refused before it could count one
+  return (att.braveRefusedSearches / att.braveSearches) * 100 >= deadPct;
+}
+
 export function noSiteCause(
   att: NonNullable<ReturnType<typeof collectPassAttribution>>,
   alarmPct = 70,
 ): NoSiteCause {
   if ((att.braveUnconfigured ?? 0) > 0) return 'search_off';
-  if (att.braveRefusals > 0) return 'search_dead';
+  if (searchDied(att)) return 'search_dead';
   if (att.noSitePct < alarmPct) return 'resolution_ok';
   if (att.braveCandidates === null || att.braveGateRejected === null) return 'unmeasured';
   // Which half of the no-site leads is bigger: the ones Brave could not find a

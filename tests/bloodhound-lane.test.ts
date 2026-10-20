@@ -19,6 +19,8 @@ import {
   parseCauseEntries,
   collectYield,
   collectPassAttribution,
+  noSiteCause,
+  searchDied,
   MAX_CONSECUTIVE_REWINDS,
   MAX_CONSECUTIVE_SEARCH_DEAD_REWINDS,
   VERIFIABLE_IDS_SQL,
@@ -972,4 +974,101 @@ test('parseCauseEntries: the rarer-cause tail is not mistaken for a cause', () =
   ]);
   assert.deepEqual(parseCauseEntries(''), []);
   assert.deepEqual(parseCauseEntries('and 2 rarer cause(s)'), []);
+});
+
+// --- searchDied / noSiteCause: a refusal is not a spent plan.  2026-10-20 ----
+// THE REGRESSION THIS EXISTS FOR. `noSiteCause()` returned `search_dead` whenever
+// the latched all-keys-refused line appeared at all, and the latch fires the first
+// time every key refuses ONE lookup — a transient 429 against a funded plan does
+// it. The 2026-10-20 collect pass printed the line before its first lead, so the
+// cycle snapshot read `cause: search_dead` ("costs money to fix") and the alarm
+// text read "raise the cap or add keys", while the pass's own footer on the very
+// next line of the same log counted 2 refused searches out of 43 and 34 candidate
+// sites found. The ownership gate threw out 33 of those 34. Brave credit could not
+// have bought a single extra site, and `ownership_gate` existed to say so.
+const braveLine = (s: number, cand: number, social: number, refused: number, err = 0) =>
+  `[bloodhound] Brave website resolution: ${s} searches, ${cand} resolved a candidate site, ${social} answered with only social/third-party hits, ${refused} hit a key refusal, ${err} errored.`;
+
+test('collectPassAttribution: the footer refusal and error counts are read', () => {
+  const log = [
+    attPass(attIds(0, 40), { hit: 25, none: 2 }),
+    [REFUSAL, attPass(attIds(500, 43), { hit: 0, none: 42 })].join('\n'),
+    braveLine(43, 34, 7, 2, 0),
+  ].join('\n');
+  const a = collectPassAttribution(log)!;
+  assert.equal(a.braveRefusals, 1, 'the latch still caps the line count at one');
+  assert.equal(a.braveRefusedSearches, 2, 'and the footer carries the real volume');
+  assert.equal(a.braveErroredSearches, 0);
+});
+
+test('searchDied: two refused searches of 43 is not a dead plan', () => {
+  // The 2026-10-20 pass, to the number.
+  const log = [
+    attPass(attIds(0, 40), { hit: 25, none: 2 }),
+    [REFUSAL, attPass(attIds(500, 43), { hit: 0, none: 42 })].join('\n'),
+    braveLine(43, 34, 7, 2, 0),
+  ].join('\n');
+  const a = collectPassAttribution(log)!;
+  assert.equal(searchDied(a), false, 'search answered 41 of its 43 lookups');
+  assert.ok(a.noSitePct >= 70, 'the pass did collapse');
+  assert.equal(noSiteCause(a), 'ownership_gate',
+    'and the gate that threw out 33 of 34 candidates is the cause, not the plan');
+});
+
+test('searchDied: a plan that caps mid-pass is still named', () => {
+  // Refused from search 50 onward: the shape the 09-27 fix was written for, and
+  // the one this must not stop reporting.
+  const log = [
+    attPass(attIds(0, 40), { hit: 25, none: 2 }),
+    [REFUSAL, attPass(attIds(500, 150), { hit: 0, none: 140 })].join('\n'),
+    braveLine(150, 38, 5, 100, 0),
+  ].join('\n');
+  const a = collectPassAttribution(log)!;
+  assert.equal(searchDied(a), true);
+  assert.equal(noSiteCause(a), 'search_dead');
+});
+
+test('searchDied: no footer means the latched line is the only evidence', () => {
+  // Every pass logged before 2026-10-05. Unknowable must not quietly become "fine".
+  const log = [
+    attPass(attIds(0, 40), { hit: 25, none: 2 }),
+    [REFUSAL, attPass(attIds(500, 40), { hit: 0, none: 38 })].join('\n'),
+  ].join('\n');
+  const a = collectPassAttribution(log)!;
+  assert.equal(a.braveRefusedSearches, null);
+  assert.equal(searchDied(a), true);
+  assert.equal(noSiteCause(a), 'search_dead');
+});
+
+test('searchDied: no refusal line at all is never a dead plan', () => {
+  const log = [
+    attPass(attIds(0, 40), { hit: 25, none: 2 }),
+    attPass(attIds(500, 40), { hit: 0, none: 38 }),
+    braveLine(40, 30, 8, 0, 2),
+  ].join('\n');
+  const a = collectPassAttribution(log)!;
+  assert.equal(searchDied(a), false);
+  assert.equal(noSiteCause(a), 'ownership_gate');
+});
+
+test('noSiteCause: search_off still outranks everything', () => {
+  const log = [
+    attPass(attIds(0, 40), { hit: 25, none: 2 }),
+    [REFUSAL, attPass(attIds(500, 40), { hit: 0, none: 38 })].join('\n'),
+    '[bloodhound] Brave website resolution was OFF: no BRAVE_SEARCH_API_KEY is set in this process, so 38 lead(s) that needed a lookup got none.',
+  ].join('\n');
+  const a = collectPassAttribution(log)!;
+  assert.equal(noSiteCause(a), 'search_off');
+  assert.equal(a.braveRefusedSearches, 0, 'an OFF pass refused nothing, it asked nothing');
+});
+
+test('noSiteCause: a healthy pass under the alarm bar reads resolution_ok', () => {
+  const log = [
+    attPass(attIds(0, 40), { hit: 25, none: 2 }),
+    [REFUSAL, attPass(attIds(500, 40), { hit: 20, none: 4 })].join('\n'),
+    braveLine(40, 30, 6, 1, 0),
+  ].join('\n');
+  const a = collectPassAttribution(log)!;
+  assert.equal(searchDied(a), false);
+  assert.equal(noSiteCause(a), 'resolution_ok');
 });
