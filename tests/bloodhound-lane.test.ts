@@ -345,6 +345,72 @@ test('lastCollectPassSearchDead reads the newest pass only', () => {
   rmSync(dir, { recursive: true, force: true });
 });
 
+// --- 2026-10-21: the rewind was still running on the latched line ---
+// searchDied() settled on 2026-10-20 that the all-keys-refused line fires on ONE
+// transient refusal and is not a spent plan. The snapshot and the alarm moved to
+// it; this function did not, so at 2026-10-21T00:00:56Z the lane rewound its
+// cursor for `previous_pass_search_dead` and re-walked 150 leads over the 10-20
+// 05:00 pass, which asked Brave 43 times, lost 2, and found 34 real candidates.
+test('a transient refusal in a pass that mostly searched fine does not rewind', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'bh-'));
+  const p = join(dir, 'collect.log');
+  const leads = (n: number, from = 0) => Array.from({ length: n }, (_, i) =>
+    `[rec${from + i}AAAAAAAA] "C${from + i}" site=https://c${from + i}.com/ +0 pts, 1 skipped, 0 err`);
+  // The 10-20 05:00 shape: the latch prints before the first lead, and the
+  // footer on the next line says search was alive for 41 of 43 lookups.
+  writeFileSync(p, [
+    '',
+    'Bloodhound: 43 leads',
+    '[bloodhound] All 2 Brave Search API key(s) refused: 429 Too Many Requests',
+    ...leads(43),
+    'Collected 1 contact points from 1/43 leads.',
+    '[bloodhound] Brave website resolution: 43 searches, 34 resolved a candidate site, '
+      + '7 answered with only social/third-party hits, 2 hit a key refusal, 0 errored.',
+    '',
+  ].join('\n'));
+  assert.equal(lastCollectPassSearchDead(p), false);
+
+  // A genuinely spent plan still rewinds: most of the pass's searches refused.
+  writeFileSync(p, [
+    '',
+    'Bloodhound: 43 leads',
+    '[bloodhound] All 2 Brave Search API key(s) refused: 402 Usage limit exceeded',
+    ...leads(43),
+    'Collected 0 contact points from 0/43 leads.',
+    '[bloodhound] Brave website resolution: 43 searches, 0 resolved a candidate site, '
+      + '0 answered with only social/third-party hits, 41 hit a key refusal, 0 errored.',
+    '',
+  ].join('\n'));
+  assert.equal(lastCollectPassSearchDead(p), true);
+
+  // A pass too short for the alarm's 30-lead sample is still judged: a rewind
+  // asks about THE LAST PASS, whatever size it was.
+  writeFileSync(p, [
+    '',
+    'Bloodhound: 6 leads',
+    '[bloodhound] All 2 Brave Search API key(s) refused: 429 Too Many Requests',
+    ...leads(6),
+    'Collected 1 contact points from 1/6 leads.',
+    '[bloodhound] Brave website resolution: 6 searches, 5 resolved a candidate site, '
+      + '0 answered with only social/third-party hits, 1 hit a key refusal, 0 errored.',
+    '',
+  ].join('\n'));
+  assert.equal(lastCollectPassSearchDead(p), false);
+
+  // No footer at all (a pass logged before 2026-10-05): the latched line is the
+  // only evidence there is, so it still counts.
+  writeFileSync(p, [
+    '',
+    'Bloodhound: 43 leads',
+    '[bloodhound] All 2 Brave Search API key(s) refused: 402 Usage limit exceeded',
+    ...leads(43),
+    'Collected 0 contact points from 0/43 leads.',
+    '',
+  ].join('\n'));
+  assert.equal(lastCollectPassSearchDead(p), true);
+  rmSync(dir, { recursive: true, force: true });
+});
+
 // --- 2026-09-11: a failed pass is not automatically a re-walkable one ---
 // The 24h to 2026-09-11T07:00Z: the collect cursor sat on the book's short tail,
 // the tail was unsearchable with Brave capped, and three passes in a row logged

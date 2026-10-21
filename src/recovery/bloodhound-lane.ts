@@ -161,7 +161,25 @@ export function lastCollectPassFinished(
  *  pin the walk in place forever.
  *
  *  Returns null when the log cannot answer, which is treated as "search was
- *  fine" — an unknown must never rewind. */
+ *  fine" — an unknown must never rewind.
+ *
+ *  IT READ THE LATCHED LINE, WHICH IS NOT THE QUESTION (2026-10-21). The line
+ *  this matched prints at most ONCE per pass, the first time every key refuses
+ *  ONE lookup, so a single transient 429 against a funded plan set it for the
+ *  whole pass. `searchDied()` was written on 2026-10-20 to settle exactly that,
+ *  using the real per-search volumes off the pass footer, and the snapshot and
+ *  the hourly alarm both moved to it — this function did not, so the lane's own
+ *  rewind kept running on the retired signal. It cost a measured re-walk: the
+ *  10-20 05:00 pass asked Brave 43 times, 2 were refused and 34 found a real
+ *  candidate site, and at 2026-10-21T00:00:56Z the lane rewound its cursor for
+ *  `previous_pass_search_dead` and walked 150 leads it had already walked.
+ *  `rewindWaiver` caught the second one ("rewalk_produced_nothing"), which is
+ *  the only reason the episode stopped at one.
+ *
+ *  So judge it with the SAME function the alarm and the debrief use. Three
+ *  separate re-implementations of this pass boundary have gone wrong (09-13,
+ *  09-22, 09-28) and a fourth living here would be the worst place for it: the
+ *  lane would act on a reading its own report contradicts. */
 export function lastCollectPassSearchDead(
   path = COLLECT_LOG_PATH,
   tailBytes = 512_000,
@@ -176,8 +194,19 @@ export function lastCollectPassSearchDead(
       const tail = buf.toString('utf8');
       const header = tail.lastIndexOf('\nBloodhound: ');
       if (header < 0) return null;
-      // Matches the searchBrave() all-keys-refused line, whatever the status.
-      return /Brave Search API key\(s\) refused/.test(tail.slice(header));
+      // minSample 1, not the default 30: the alarm asks "is this lane healthy",
+      // for which a short tail-of-a-lap batch is a bad sample, but a rewind asks
+      // "could THE LAST PASS search", and that pass is whatever size it was. A
+      // 43-lead lap-closer is the exact pass that triggered the 10-21 re-walk,
+      // and judging an older, larger one instead would rewind on the wrong
+      // evidence. The per-search footer counts are per-pass, so they are just as
+      // accurate on a small batch.
+      const att = collectPassAttribution(tail, { minSample: 1 });
+      // No completed pass in the tail (a rotated log, a pass that logged no
+      // leads at all): the latched line is then all the evidence there is, which
+      // is the same fallback searchDied() makes for a footerless pass.
+      if (!att) return /Brave Search API key\(s\) refused/.test(tail.slice(header));
+      return searchDied(att);
     } finally {
       closeSync(fd);
     }

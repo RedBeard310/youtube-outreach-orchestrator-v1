@@ -1309,9 +1309,10 @@ async function main(): Promise<void> {
   // opening lines, so a refusal logged by the following pass was read as evidence
   // about this one. That is the third copy of "a private copy of a predicate it
   // was meant to track" (2026-09-13's collectBookDepth, 2026-09-22's tail read).
-  // collectPassAttribution() bounds the pass, matches the refusal line with the
-  // same regex lastCollectPassSearchDead() rewinds on, and reports what the
-  // refusal cost in leads rather than in latched log lines.
+  // collectPassAttribution() bounds the pass and reports what the refusal cost in
+  // leads rather than in latched log lines. Since 2026-10-21 the lane's own
+  // rewind calls searchDied() over the same attribution, so the alarm and the
+  // rewind now share the whole judgement and not just the regex.
   if (existsSync(COLLECT_LOG) && !bookDrained) {
     try {
       const logText = readFileSync(COLLECT_LOG, 'utf8');
