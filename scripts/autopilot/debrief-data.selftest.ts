@@ -1,4 +1,4 @@
-import { bulkRewriteShape, bandGateFacts, fleetFacts, inboxGateFacts, apifyBatchFacts, apifyLedgerLine, normalizePushReason, offerFromBatchId, siegePushOutcome, classifyKeyProbe, cyclePacificDay, enrichmentChainFacts, isSendingDay, projectRecoveryBudget, MAX_MISSING_DEBRIEFS, missingDebriefs, pushRunVerdict, unitStartedAt, sendPlanHealth, siegePlanFacts, summarizeSendLines, isVerifiedOrBeyond, laneYield, priorAdvanceSource, priorSeedsAdvanced, priorSeedsWalked, reconcileAdvanced, sessionSeedsAdvanced, sessionStartMs, walkRateTrend } from './debrief-data.ts';
+import { bulkRewriteShape, bandGateFacts, fleetFacts, inboxGateFacts, apifyBatchFacts, apifyLedgerLine, NO_PUSH_OUTCOME, normalizePushReason, offerFromBatchId, siegePlanLeadIds, siegePushOutcome, classifyKeyProbe, cyclePacificDay, enrichmentChainFacts, isSendingDay, projectRecoveryBudget, MAX_MISSING_DEBRIEFS, missingDebriefs, pushRunVerdict, unitStartedAt, sendPlanHealth, siegePlanFacts, summarizeSendLines, isVerifiedOrBeyond, laneYield, priorAdvanceSource, priorSeedsAdvanced, priorSeedsWalked, reconcileAdvanced, sessionSeedsAdvanced, sessionStartMs, walkRateTrend } from './debrief-data.ts';
 let fail = 0;
 const ok = (name: string, got: unknown, want: unknown) => {
   const pass = JSON.stringify(got) === JSON.stringify(want);
@@ -602,6 +602,75 @@ ok('a second skip in one batch takes the second verdict, not the first again',
   [['quality gate: closing block — the locked closing block is missing or reworded',
     'quality gate: opener — must start "Hey <First name>,"'],
    [{ offer: 'attack-enemy-propose-5-ideas', leads: 2 }]]);
+// 2026-10-21: the counters above count log lines, and the question is about people. Two
+// cycles running the arithmetic read as a shortfall that wasn't one, and the real loss on
+// 10-21 printed no line at all. Verbatim shapes from both cycles.
+const JOIN_LOG = [
+  // recRESENT1 is skipped in one batch and sent in another, same run — the 10-20 shape.
+  '[2026-10-20T10:27:33Z]   |   SENT  recRESENT1AAAAAAA    a@b.com  smartlead_lead=1',
+  '[2026-10-20T10:29:02Z]   |   batch_id   = siege-2026-10-20-22824591-voice-objection-proof-e73e82',
+  '[2026-10-20T10:29:02Z]   |   SKIP  recRESENT1AAAAAAA    is absent from this batch\'s Siege manifest',
+  // recGONE2 is skipped and never sent — a person really lost.
+  '[2026-10-20T10:29:10Z]   |   SKIP  recGONE2BBBBBBBBB    batch report marked it failed',
+  // recREFUSED3 is SmartLead's refusal, which outranks any skip on the same lead.
+  '[2026-10-20T10:30:18Z]   |   FAIL  recREFUSED3CCCCCC    SmartLead did not add the lead (no reason given)',
+  '[2026-10-20T10:30:18Z]   |   SKIP  recREFUSED3CCCCCC    batch report marked it failed',
+  // recSILENT4 is in the plan and appears nowhere above. The 10-21 shape.
+].join('\n');
+const PLANNED = ['recRESENT1AAAAAAA', 'recGONE2BBBBBBBBB', 'recREFUSED3CCCCCC', 'recSILENT4DDDDDD'];
+const JOINED = siegePushOutcome(JOIN_LOG, '2026-10-20T07:00:00.000Z', '2026-10-21T07:00:00.000Z', PLANNED);
+ok('the shortfall is counted per person, not per log line',
+  [JOINED.planned_leads, JOINED.people_emailed, JOINED.people_lost], [4, 1, 3]);
+ok('a skip that was re-sent in another batch cost a draft and not a person',
+  [JOINED.skipped, JOINED.skipped_then_sent], [3, 1]);
+// The 10-20 debrief named two leads as lost to the manifest gate. Neither was in the plan.
+ok('a skip for somebody the plan never carried cost a draft and not a person either',
+  (() => { const p = siegePushOutcome(
+    '[2026-10-19T10:28:11Z]   |   SKIP  recNEVERPLANNEDAA    not in the Siege manifest\n'
+    + '[2026-10-19T10:28:12Z]   |   SKIP  recPLANNEDLOSTBBB    batch report marked it failed',
+    '2026-10-19T07:00:00.000Z', '2026-10-20T07:00:00.000Z', ['recPLANNEDLOSTBBB']);
+    return [p.skipped, p.skipped_unplanned, p.people_lost, p.lost_to_skip]; })(),
+  [2, 1, 1, 1]);
+ok('the loss splits by what the log said, and a FAIL outranks a SKIP on the same lead',
+  [JOINED.lost_to_fail, JOINED.lost_to_skip, JOINED.lost_silently], [1, 1, 1]);
+ok('a planned lead the push never mentioned is named, which is the only trace it leaves',
+  JOINED.lost_ids.includes('recSILENT4DDDDDD'), true);
+ok('the 10-21 shape exactly: every skip re-sent, one planned person lost silently',
+  (() => { const p = siegePushOutcome(
+    '[2026-10-20T10:27:33Z]   |   SENT  recRESENT1AAAAAAA    a@b.com  smartlead_lead=1\n'
+    + '[2026-10-20T10:29:02Z]   |   SKIP  recRESENT1AAAAAAA    is absent from this batch\'s Siege manifest',
+    '2026-10-20T07:00:00.000Z', '2026-10-21T07:00:00.000Z',
+    ['recRESENT1AAAAAAA', 'recSILENT4DDDDDD']);
+    return [p.skipped, p.people_lost, p.lost_silently, p.lost_ids]; })(),
+  [1, 1, 1, ['recSILENT4DDDDDD']]);
+ok('no plan to join against reports nulls, never a clean push',
+  (() => { const p = siegePushOutcome(JOIN_LOG, '2026-10-20T07:00:00.000Z', '2026-10-21T07:00:00.000Z');
+    return [p.sent, p.planned_leads, p.people_lost, p.lost_silently, p.lost_ids]; })(),
+  [1, null, null, null, []]);
+ok('a plan whose shape changed reads as unknown, not as everyone lost',
+  [siegePlanLeadIds({ assignments: [{ nope: 1 }] }), siegePlanLeadIds({ summary: {} }),
+    siegePlanLeadIds(null)],
+  [null, null, null]);
+ok('lead ids are read off the plan under any of the three keys automator has used',
+  siegePlanLeadIds({ assignments: [{ lead_id: 'recA' }, { id: 'recB' }, { record_id: 'recC' }] }),
+  ['recA', 'recB', 'recC']);
+ok('a lead planned into two batches is one person, counted once',
+  (() => { const p = siegePushOutcome(
+    '[2026-10-20T10:27:33Z]   |   SENT  recDUPE1AAAAAAAAA    a@b.com  smartlead_lead=1',
+    '2026-10-20T07:00:00.000Z', '2026-10-21T07:00:00.000Z',
+    ['recDUPE1AAAAAAAAA', 'recDUPE1AAAAAAAAA']);
+    return [p.planned_leads, p.people_emailed, p.people_lost]; })(),
+  [1, 1, 0]);
+ok('NO_PUSH_OUTCOME carries the join as unmeasured too',
+  [NO_PUSH_OUTCOME.planned_leads, NO_PUSH_OUTCOME.people_lost, NO_PUSH_OUTCOME.lost_ids],
+  [null, null, []]);
+ok('a reason is still the reason now the lead id is its own capture group',
+  (() => { const p = siegePushOutcome(
+    '[2026-10-20T10:30:18Z]   |   FAIL  recREFUSED3CCCCCC    SmartLead did not add the lead (bounce_count=1)',
+    '2026-10-20T07:00:00.000Z', '2026-10-21T07:00:00.000Z', null);
+    return p.reasons; })(),
+  [{ reason: 'SmartLead did not add the lead (bounce_count=1)', leads: 1 }]);
+
 ok('a batch id of an unreadable shape names no offer rather than guessing one',
   [offerFromBatchId('siege-2026-10-09-23650563-joke-ai-slop-1484cc'),
     offerFromBatchId('siege-nonsense'), offerFromBatchId('siege-2026-10-09-23650563-joke-ai-slop')],

@@ -733,6 +733,34 @@ export type SiegePushOutcome = {
   /** Which offer's writer produced the skipped drafts, so the fix has an address.
    *  Empty when nothing was skipped. See siegePushOutcome(). */
   skipped_by_offer: Array<{ offer: string; leads: number }>;
+  /** The plan's own lead list joined against the lines above, so the counters answer
+   *  "how many PEOPLE got no email" instead of "how many events happened". Every field
+   *  here is null when the plan could not be read: unknown, never zero. See the
+   *  reconciliation block on siegePushOutcome(). */
+  planned_leads: number | null;
+  /** Planned people the push really emailed. Counts a person once however many batches
+   *  tried them. */
+  people_emailed: number | null;
+  /** Planned people who ended the run with no email. This is the shortfall. */
+  people_lost: number | null;
+  /** ...of which SmartLead refused them (a FAIL and no SENT anywhere). */
+  lost_to_fail: number | null;
+  /** ...of which we declined to offer them (a SKIP and no SENT anywhere). */
+  lost_to_skip: number | null;
+  /** ...of which the log said NOTHING about at all. No SENT, no FAIL, no SKIP. */
+  lost_silently: number | null;
+  /** Those people, named, so the morning is one grep and not a hand-written join.
+   *  Capped at 12. */
+  lost_ids: string[];
+  /** Skips that cost a draft and not a person: a SKIP in one batch, a SENT in another,
+   *  same run. This is why `skipped` can exceed `people_lost` and must not be read as
+   *  a loss on its own. */
+  skipped_then_sent: number | null;
+  /** The other reason a skip costs nobody: the lead was never in the plan. A draft got
+   *  written for somebody this plan does not carry, and the gate refused it. Wasted
+   *  writer time, zero people lost — and the shape that made the 10-20 debrief name two
+   *  "lost" leads who were never planned. */
+  skipped_unplanned: number | null;
 };
 
 export const NO_PUSH_OUTCOME: SiegePushOutcome = {
@@ -744,6 +772,15 @@ export const NO_PUSH_OUTCOME: SiegePushOutcome = {
   escalations: null,
   reasons: [],
   skipped_by_offer: [],
+  planned_leads: null,
+  people_emailed: null,
+  people_lost: null,
+  lost_to_fail: null,
+  lost_to_skip: null,
+  lost_silently: null,
+  lost_ids: [],
+  skipped_then_sent: null,
+  skipped_unplanned: null,
 };
 
 export type SendPlanHealth = SiegePlanFacts & SiegeUnitFacts & {
@@ -915,6 +952,23 @@ export function sendPlanHealth(
       'reason. Their reasons were in the log all along (an em dash outside the sign-off ' +
       'twice, bare-title format, opener shape, a rank superlative). `reasons` now covers ' +
       'failed and skipped together, because the question is why a planned email did not go. ' +
+      'AND READ people_lost, NOT sent AGAINST planned, FOR THE SHORTFALL (2026-10-21): every ' +
+      'counter beside it counts log lines, and one planned person can collect several of ' +
+      'them or none. On 10-20, 12 skips cost 2 people, because ten of the twelve were ' +
+      'written again in another batch and sent in the same run. On 10-21 all 3 skips were ' +
+      're-sent and cost nobody, and the one person actually lost appeared in no counter and ' +
+      'no reason at all: the push never reached them, so it printed no SENT, no FAIL and no ' +
+      'SKIP, and the only trace was unpushed_planned:1 — a remainder a re-sent skip can ' +
+      'cancel out. Both answers took a hand-written join of plan.json against the log. ' +
+      'push_outcome now carries that join: planned_leads / people_emailed / people_lost are ' +
+      'people, the loss splits into lost_to_fail (SmartLead refused it), lost_to_skip (we ' +
+      'declined to offer it) and lost_silently (the log said nothing about them at all), ' +
+      'skipped_then_sent and skipped_unplanned are the two reasons a skip count can exceed ' +
+      'the loss, and lost_ids names them, capped at 12. The 10-20 debrief\'s own answer was ' +
+      'wrong the other way: the two leads it named as lost to the manifest gate were never ' +
+      'in the plan (skipped_unplanned), and that cycle\'s three real losses were planned ' +
+      'drafts the writer\'s quality gate rejected (lost_to_skip). All of it is null when the ' +
+      'plan cannot be read, which is unknown and NOT a clean push. ' +
       'AND READ send_plan.fleet BEFORE READING ANY OF THE ABOVE AS A SHORTFALL (2026-10-15): ' +
       'it carries the fleet\'s day-over-day move, which nothing did until then. Over the ' +
       'three cycles after the record 782-email push the plan read 57 live inboxes and an ' +
@@ -1004,8 +1058,41 @@ export function sendPlanHealth(
  *
  *  `skipped_by_offer` comes from the same loop because the fix is a different one per
  *  skill: on 2026-10-10 four of the five skips came out of ONE offer's writer
- *  (attack-enemy-propose-5-ideas) and the snapshot could not say so. */
-export function siegePushOutcome(log: string, sinceISO: string, untilISO: string): SiegePushOutcome {
+ *  (attack-enemy-propose-5-ideas) and the snapshot could not say so.
+ *
+ *  THESE COUNTERS COUNT EVENTS, AND THE QUESTION IS ABOUT PEOPLE (2026-10-21). Each
+ *  number above is a line in a log, and a planned person can collect several of them or
+ *  none, so the tallies do not add up to the plan and cannot be made to. Two cycles
+ *  running they were read as a shortfall and were not one:
+ *
+ *    10-20   176 planned, 173 sent, 12 skipped. TEN of the twelve were written again in
+ *            another batch and sent in the same run. Two people were lost.
+ *    10-21   116 planned, 115 sent, 3 skipped. ALL THREE were sent in another batch.
+ *            One person was lost, and nothing in the log mentioned them once.
+ *
+ *  And the 10-20 answer was itself wrong, which this join also settles: the two leads
+ *  that debrief named as lost to the manifest gate were never in the plan at all, so no
+ *  planned person was lost that way. The cycle's three real losses were planned leads
+ *  whose drafts the writer's own quality gate rejected — `skipped_unplanned` against
+ *  `lost_to_skip`, two shapes one `skipped` counter had been reporting as one thing.
+ *
+ *  Both answers took a hand-written join of `plan.json` against the log, which is the
+ *  manual step every one of these fixes exists to remove — and the 10-21 loss could not
+ *  be found any other way, because a planned lead the push never reaches prints no line
+ *  at all: no SENT, no FAIL, no SKIP, no ESCALATE. It is absent from every counter here
+ *  and from `reasons`, and the only trace is arithmetic, `unpushed_planned: 1`, which is
+ *  a remainder that a re-sent skip can cancel out.
+ *
+ *  So join the two. `planned_leads` / `people_emailed` / `people_lost` are per-person,
+ *  the loss is split by what the log said about each one, `skipped_then_sent` explains a
+ *  skip count larger than the loss, and `lost_ids` names them. Null throughout when the
+ *  plan is unreadable: the join is unknown then, not clean. */
+export function siegePushOutcome(
+  log: string,
+  sinceISO: string,
+  untilISO: string,
+  plannedIds: string[] | null = null,
+): SiegePushOutcome {
   const since = Date.parse(sinceISO);
   const until = Date.parse(untilISO);
   let sent = 0;
@@ -1019,6 +1106,11 @@ export function siegePushOutcome(log: string, sinceISO: string, untilISO: string
   // writer's `still broken:` lines; drained in order by that batch's SKIP lines.
   const gateReasons = new Map<string, string[]>();
   const gateUsed = new Map<string, number>();
+  // Who the push said what about, for the per-person join below. A lead can appear in
+  // more than one of these — that is the whole point of keeping them apart.
+  const sentIds = new Set<string>();
+  const failedIds = new Set<string>();
+  const skippedIds = new Set<string>();
   // The batch whose lines we are currently inside. Both the writer invocation (a path
   // ending `<batch-id>/leads.json`) and the push header (`batch_id = <batch-id>`) name it.
   let batch: string | null = null;
@@ -1046,17 +1138,20 @@ export function siegePushOutcome(log: string, sinceISO: string, untilISO: string
     // copy failed validation (`| <channel> FAIL 236w fails 2->2->2->2` on 10-05). That lead
     // was never pushed, so counting it here would overstate the push's losses by one and
     // invent a reason that has nothing to do with SmartLead.
-    if (/\bSENT\s+rec[A-Za-z0-9]{8,}/.test(line)) { sent++; continue; }
-    const fail = /\bFAIL\s+rec[A-Za-z0-9]{8,}\s+(.*)$/.exec(line);
+    const sentLead = /\bSENT\s+(rec[A-Za-z0-9]{8,})/.exec(line);
+    if (sentLead) { sent++; sentIds.add(sentLead[1]!); continue; }
+    const fail = /\bFAIL\s+(rec[A-Za-z0-9]{8,})\s+(.*)$/.exec(line);
     if (fail) {
       failed++;
-      const reason = normalizePushReason(fail[1]!);
+      failedIds.add(fail[1]!);
+      const reason = normalizePushReason(fail[2]!);
       reasons.set(reason, (reasons.get(reason) ?? 0) + 1);
       continue;
     }
-    const skip = /\bSKIP\s+rec[A-Za-z0-9]{8,}\s+(.*)$/.exec(line);
+    const skip = /\bSKIP\s+(rec[A-Za-z0-9]{8,})\s+(.*)$/.exec(line);
     if (skip) {
       skipped++;
+      skippedIds.add(skip[1]!);
       if (batch) {
         const offer = offerFromBatchId(batch);
         if (offer) skippedByOffer.set(offer, (skippedByOffer.get(offer) ?? 0) + 1);
@@ -1066,7 +1161,7 @@ export function siegePushOutcome(log: string, sinceISO: string, untilISO: string
       const queue = batch ? gateReasons.get(batch) ?? [] : [];
       const i = batch ? gateUsed.get(batch) ?? 0 : 0;
       if (batch) gateUsed.set(batch, i + 1);
-      const raw = i < queue.length ? `quality gate: ${queue[i]!}` : skip[1]!;
+      const raw = i < queue.length ? `quality gate: ${queue[i]!}` : skip[2]!;
       const reason = normalizePushReason(raw);
       reasons.set(reason, (reasons.get(reason) ?? 0) + 1);
       continue;
@@ -1078,6 +1173,35 @@ export function siegePushOutcome(log: string, sinceISO: string, untilISO: string
     }
   }
 
+  // The per-person join. A planned lead with a SENT anywhere in the run got an email,
+  // however many batches fumbled them first; one with no SENT did not, and what the log
+  // said about them is the whole diagnosis. Order matters: a FAIL is SmartLead's refusal
+  // and outranks our own SKIP when a lead collected both.
+  const planned = plannedIds === null ? null : [...new Set(plannedIds)];
+  const lost = planned === null ? null : planned.filter((id) => !sentIds.has(id));
+  const join = planned === null || lost === null
+    ? {
+      planned_leads: null, people_emailed: null, people_lost: null,
+      lost_to_fail: null, lost_to_skip: null, lost_silently: null,
+      lost_ids: [], skipped_then_sent: null, skipped_unplanned: null,
+    }
+    : {
+      planned_leads: planned.length,
+      people_emailed: planned.length - lost.length,
+      people_lost: lost.length,
+      lost_to_fail: lost.filter((id) => failedIds.has(id)).length,
+      lost_to_skip: lost.filter((id) => !failedIds.has(id) && skippedIds.has(id)).length,
+      lost_silently: lost.filter((id) => !failedIds.has(id) && !skippedIds.has(id)).length,
+      // Named, because the loss is usually one or two people and a name is actionable
+      // where a count is not. Capped for the same reason everything else here is.
+      lost_ids: lost.slice(0, 12),
+      skipped_then_sent: [...skippedIds].filter((id) => sentIds.has(id)).length,
+      skipped_unplanned: (() => {
+        const inPlan = new Set(planned);
+        return [...skippedIds].filter((id) => !inPlan.has(id)).length;
+      })(),
+    };
+
   return {
     log_found: true,
     sent,
@@ -1085,6 +1209,7 @@ export function siegePushOutcome(log: string, sinceISO: string, untilISO: string
     skipped,
     batches_failed_before_first_lead: deadBatches,
     escalations,
+    ...join,
     reasons: [...reasons.entries()]
       .map(([reason, leads]) => ({ reason, leads }))
       .sort((a, b) => b.leads - a.leads || a.reason.localeCompare(b.reason))
@@ -1173,6 +1298,35 @@ export function cyclePacificDay(sinceISO: string): string {
   return pacificDate(new Date(Date.parse(sinceISO) + 12 * 60 * 60 * 1000));
 }
 
+/** The lead ids the plan assigned, for the per-person join in siegePushOutcome().
+ *
+ *  Pure, and as forgiving as siegePlanFacts() for the same reason: automator owns this
+ *  file's shape. Returns null rather than an empty list when it cannot find ids, so a
+ *  renamed key reads as "join unknown" instead of "every planned person was lost". */
+export function siegePlanLeadIds(raw: unknown): string[] | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const a = (raw as { assignments?: unknown }).assignments;
+  if (!Array.isArray(a)) return null;
+  const out: string[] = [];
+  for (const row of a) {
+    if (!row || typeof row !== 'object') continue;
+    const r = row as Record<string, unknown>;
+    const id = r.lead_id ?? r.id ?? r.record_id;
+    if (typeof id === 'string' && id.length > 0) out.push(id);
+  }
+  return out.length > 0 ? out : null;
+}
+
+function readSiegePlanLeadIds(day: string): string[] | null {
+  const f = join(AUTOMATOR_REPO, 'state', 'siege', day, 'plan.json');
+  if (!existsSync(f)) return null;
+  try {
+    return siegePlanLeadIds(JSON.parse(readFileSync(f, 'utf8')));
+  } catch {
+    return null;
+  }
+}
+
 function readSiegePlan(day: string): SiegePlanFacts {
   const f = join(AUTOMATOR_REPO, 'state', 'siege', day, 'plan.json');
   if (!existsSync(f)) return NO_PLAN;
@@ -1187,14 +1341,18 @@ function readSiegePlan(day: string): SiegePlanFacts {
 // unreadable log degrades to "not measured" rather than to zeros. The log is append-only
 // and grows across months, so only the tail is read — one cycle cannot be more than a few
 // thousand lines and reading the whole file would get slower every day.
-function readSiegePushOutcome(sinceISO: string, untilISO: string): SiegePushOutcome {
+function readSiegePushOutcome(
+  sinceISO: string,
+  untilISO: string,
+  plannedIds: string[] | null = null,
+): SiegePushOutcome {
   const f = join(AUTOMATOR_REPO, 'logs', 'siege.log');
   if (!existsSync(f)) return NO_PUSH_OUTCOME;
   try {
     const whole = readFileSync(f, 'utf8');
     const lines = whole.split('\n');
     const tail = lines.slice(Math.max(0, lines.length - 20000)).join('\n');
-    return siegePushOutcome(tail, sinceISO, untilISO);
+    return siegePushOutcome(tail, sinceISO, untilISO, plannedIds);
   } catch {
     return NO_PUSH_OUTCOME;
   }
@@ -3125,7 +3283,9 @@ async function main(): Promise<void> {
     sendLog.sent_sum,
     siegeUnitVerdict(siegeUnit, sinceISO, untilISO),
     siegeUnit,
-    readSiegePushOutcome(sinceISO, untilISO),
+    // The plan's own lead list, so the push's event counters can be joined into
+    // per-person ones. See the reconciliation block on siegePushOutcome().
+    readSiegePushOutcome(sinceISO, untilISO, readSiegePlanLeadIds(cycleDay)),
   );
   // The fleet's own day-over-day move, which no snapshot carried until 2026-10-15 —
   // see FleetFacts. Both reads are filesystem-only and degrade to nulls.
