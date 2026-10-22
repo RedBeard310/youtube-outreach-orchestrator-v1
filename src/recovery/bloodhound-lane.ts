@@ -1468,6 +1468,22 @@ export type CollectPass = {
   topFaultCause: string | null;
   topFaultCauseCount: number | null;
   topFaultCausePct: number | null;
+  /** The same causes with the METHOD NAME dropped, summed (2026-10-22). A cause key is
+   *  `<method>: <condition>`, so one condition that stops every method on the same lead
+   *  arrives as one row per method and each row looks small. On the 2026-10-21 23:00Z
+   *  pass `cross-domain redirect` was 32 + 21 + 16 + 16 + 16 = 101 of 209 errors under
+   *  five different method names, and `topFaultCausePct` read 15% for the largest single
+   *  row — the 2026-10-12 lesson (a key that keeps a per-lead token splits one fault into
+   *  many) one level up, because the method name is per-method and the condition is not.
+   *  Largest first. Benign only when every method reporting it is benign. */
+  conditionList: { condition: string; count: number }[] | null;
+  topFaultCondition: string | null;
+  topFaultConditionCount: number | null;
+  topFaultConditionPct: number | null;
+  /** How much of the pass's error count the roll-up could see. The CLI names six causes
+   *  and summarises the rest, so every condition count is a LOWER bound; this says by how
+   *  much. 100 means the line named everything. */
+  conditionCoveragePct: number | null;
   /** Method ids the collect CLI's breaker took out of the pass. */
   deadMethods: string[] | null;
 };
@@ -1483,6 +1499,36 @@ const BENIGN_CAUSES = ["page rendered with no outbound links"];
 
 function isBenignCause(cause: string): boolean {
   return BENIGN_CAUSES.some((b) => cause.includes(b));
+}
+
+/** A cause with its method name dropped, so the same condition under different methods
+ *  becomes one key. Keys look like `28-sitemap: non-HTML content-type` or
+ *  `apify:endspec/x: fetch failed`; anything without a recognisable method prefix is
+ *  returned whole rather than guessed at. */
+export function causeCondition(cause: string): string {
+  const m = /^(?:\d{2}-[A-Za-z0-9-]+|apify:[^\s:]+):\s*(.+)$/.exec(cause.trim());
+  return (m ? m[1]! : cause).trim();
+}
+
+/** Sum the named cause entries by condition, largest first. */
+export function rollUpConditions(
+  entries: { cause: string; count: number }[],
+): { condition: string; count: number; benign: boolean }[] {
+  const by = new Map<string, { count: number; benign: boolean }>();
+  for (const e of entries) {
+    const key = causeCondition(e.cause);
+    const prev = by.get(key);
+    // Benign is a property of the method's own message, so a condition is only a content
+    // outcome when every method reporting it says so. One real fault in the group makes
+    // the whole group worth looking at.
+    const benign = isBenignCause(e.cause);
+    by.set(key, prev
+      ? { count: prev.count + e.count, benign: prev.benign && benign }
+      : { count: e.count, benign });
+  }
+  return [...by.entries()]
+    .map(([condition, v]) => ({ condition, count: v.count, benign: v.benign }))
+    .sort((a, b) => b.count - a.count || a.condition.localeCompare(b.condition));
 }
 
 /** Split the named part of a cause/shape line into its `Nx cause` entries. */
@@ -1552,6 +1598,18 @@ export function collectPasses(logText: string, minSample = 30): CollectPass[] {
         current.topFaultCausePct = fault && total > 0
           ? Math.round((fault.count / total) * 100)
           : null;
+        const conditions = rollUpConditions(all);
+        current.conditionList = conditions.length > 0
+          ? conditions.map(({ condition, count }) => ({ condition, count }))
+          : null;
+        const faultCond = conditions.find((c) => !c.benign) ?? null;
+        current.topFaultCondition = faultCond?.condition ?? null;
+        current.topFaultConditionCount = faultCond?.count ?? null;
+        current.topFaultConditionPct = faultCond && total > 0
+          ? Math.round((faultCond.count / total) * 100)
+          : null;
+        const named = all.reduce((s, e) => s + e.count, 0);
+        current.conditionCoveragePct = total > 0 ? Math.round((named / total) * 100) : null;
       }
       continue;
     }
@@ -1575,6 +1633,8 @@ export function collectPasses(logText: string, minSample = 30): CollectPass[] {
       topErrorCause: null, topErrorCauseCount: null, errorCauseShapes: null,
       topErrorCausePct: null,
       causeList: null, topFaultCause: null, topFaultCauseCount: null, topFaultCausePct: null,
+      conditionList: null, topFaultCondition: null, topFaultConditionCount: null,
+      topFaultConditionPct: null, conditionCoveragePct: null,
     };
     out.push(pass);
     current = pass;

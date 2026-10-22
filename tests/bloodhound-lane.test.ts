@@ -17,6 +17,8 @@ import {
   collectRewalkCause,
   collectPasses,
   parseCauseEntries,
+  causeCondition,
+  rollUpConditions,
   collectYield,
   collectPassAttribution,
   noSiteCause,
@@ -1030,6 +1032,84 @@ test('collectPasses: a pass with no cause line leaves every cause field null, no
   assert.equal(p.topFaultCause, null);
   assert.equal(p.topFaultCauseCount, null);
   assert.equal(p.topErrorCause, null);
+});
+
+// 2026-10-22: the cause key keeps the method name, and it has to — but a condition that
+// stops every method on the same lead then arrives as one row per method, each looking
+// small. The live 10-21 23:00Z pass, verbatim: `cross-domain redirect` is 101 of 209 errors
+// under five method names while the largest single row is 32, which is 15%.
+const CONDITION_LOG = [
+  'Collected 1 contact points from 1/150 leads.',
+  '[bloodhound] Method error causes: 209 across 27 cause(s), top 15% — 32x 14-external-links: cross-domain redirect | 22x 18-rdap: RDAP N not-found | 21x 28-sitemap: cross-domain redirect | 16x 01-mailto: cross-domain redirect | 16x 02-subpages: cross-domain redirect | 16x 16-jsonld: cross-domain redirect; and 21 rarer cause(s)',
+].join('\n');
+
+test('collectPasses: one condition under five method names is rolled up into one row', () => {
+  const p = collectPasses(CONDITION_LOG)[0]!;
+  assert.deepEqual(p.conditionList?.[0], { condition: 'cross-domain redirect', count: 101 });
+  assert.equal(p.topFaultCondition, 'cross-domain redirect');
+  assert.equal(p.topFaultConditionCount, 101);
+  // 101 of 209, against the 15% the per-method row reported for the same condition.
+  assert.equal(p.topFaultConditionPct, 48);
+  assert.equal(p.topFaultCausePct, 15);
+  // The line named 123 of 209 errors, so every count above is a lower bound and says so.
+  assert.equal(p.conditionCoveragePct, 59);
+});
+
+test('collectPasses: a condition is benign only when every method reporting it is', () => {
+  const p = collectPasses(CAUSE_LOG)[0]!;
+  // Two methods report the same abort; it becomes one row of 4.
+  assert.deepEqual(p.conditionList, [
+    { condition: 'page rendered with no outbound links', count: 51 },
+    { condition: 'iTunes N', count: 28 },
+    { condition: 'This operation was aborted', count: 4 },
+  ]);
+  // The 60% content outcome is still skipped at the condition level.
+  assert.equal(p.topFaultCondition, 'iTunes N');
+  assert.equal(p.topFaultConditionCount, 28);
+});
+
+test('collectPasses: a pass with no cause line has no condition roll-up either', () => {
+  const p = collectPasses('Collected 4 contact points from 3/150 leads.')[0]!;
+  assert.equal(p.conditionList, null);
+  assert.equal(p.topFaultCondition, null);
+  assert.equal(p.conditionCoveragePct, null);
+});
+
+test('causeCondition: an unrecognised prefix is kept whole rather than guessed at', () => {
+  assert.equal(causeCondition('28-sitemap: /sitemap_index.xml: fetch failed'),
+    '/sitemap_index.xml: fetch failed');
+  assert.equal(causeCondition('apify:endspec/youtube-instant-email-scraper: run failed'),
+    'run failed');
+  assert.equal(causeCondition('something nobody prefixed'), 'something nobody prefixed');
+  assert.equal(causeCondition('Error: connect ETIMEDOUT'), 'Error: connect ETIMEDOUT');
+});
+
+test('rollUpConditions: benignness is the message\'s, and a group keeps it only if all of it is', () => {
+  // Same benign message under two methods: still a content outcome, now counted once.
+  const benign = rollUpConditions([
+    { cause: '34-channel-page: page rendered with no outbound links', count: 9 },
+    { cause: '02-subpages: page rendered with no outbound links', count: 1 },
+  ]);
+  assert.deepEqual(benign, [
+    { condition: 'page rendered with no outbound links', count: 10, benign: true },
+  ]);
+  // A condition is a group key, not a message, so one real fault sharing it makes the
+  // whole group worth reading. Guards against a future benign entry that is generic
+  // enough to land on a condition a broken method also reports.
+  const mixed = rollUpConditions([
+    { cause: '34-channel-page: page rendered with no outbound links', count: 9 },
+    { cause: '18-rdap: page rendered with no outbound links / 403', count: 1 },
+  ]);
+  assert.equal(mixed[0]!.condition, 'page rendered with no outbound links');
+  assert.equal(mixed[0]!.benign, true);
+  assert.equal(mixed[1]!.benign, true);
+  const fault = rollUpConditions([
+    { cause: '28-sitemap: cross-domain redirect', count: 7 },
+    { cause: '01-mailto: cross-domain redirect', count: 3 },
+  ]);
+  assert.deepEqual(fault, [
+    { condition: 'cross-domain redirect', count: 10, benign: false },
+  ]);
 });
 
 test('parseCauseEntries: the rarer-cause tail is not mistaken for a cause', () => {

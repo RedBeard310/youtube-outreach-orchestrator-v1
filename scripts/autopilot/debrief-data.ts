@@ -761,6 +761,19 @@ export type SiegePushOutcome = {
    *  writer time, zero people lost — and the shape that made the 10-20 debrief name two
    *  "lost" leads who were never planned. */
   skipped_unplanned: number | null;
+  /** How many people the morning's approval covered, from that day's sample. The push was
+   *  never asked to send more than this, whatever `planned_leads` says. */
+  approved_leads: number | null;
+  /** Planned people the approval does NOT cover, so Siege held them for tomorrow on
+   *  purpose. NOT a loss. See the approval-trim block on siegePushOutcome(). */
+  deferred_unapproved: number | null;
+  /** Those people, named, capped at 12 — so "they wait for tomorrow" can be checked
+   *  against tomorrow's plan instead of taken on faith. */
+  deferred_ids: string[];
+  /** The same count read off Siege's own log line, as a cross-check on the file read.
+   *  A disagreement with `deferred_unapproved` means the approval files and the run that
+   *  pushed are describing different things, which is worth seeing. */
+  deferred_logged: number | null;
 };
 
 export const NO_PUSH_OUTCOME: SiegePushOutcome = {
@@ -781,6 +794,10 @@ export const NO_PUSH_OUTCOME: SiegePushOutcome = {
   lost_ids: [],
   skipped_then_sent: null,
   skipped_unplanned: null,
+  approved_leads: null,
+  deferred_unapproved: null,
+  deferred_ids: [],
+  deferred_logged: null,
 };
 
 export type SendPlanHealth = SiegePlanFacts & SiegeUnitFacts & {
@@ -969,6 +986,25 @@ export function sendPlanHealth(
       'in the plan (skipped_unplanned), and that cycle\'s three real losses were planned ' +
       'drafts the writer\'s quality gate rejected (lost_to_skip). All of it is null when the ' +
       'plan cannot be read, which is unknown and NOT a clean push. ' +
+      'AND READ approved_leads, NOT planned_leads, AS WHAT THE PUSH WAS ASKED FOR ' +
+      '(2026-10-22): plan.json is not the push\'s instruction. Siege runs twice each ' +
+      'morning — a sample run records the people it covers, then the push run rebuilds the ' +
+      'plan from scratch so a block added during the morning is honoured, and that rebuild ' +
+      'can pull in somebody nobody approved. approval_is_current() trims the day back to ' +
+      'the approved list and logs "N planned today were not in the approved list; they wait ' +
+      'for tomorrow". Those people print no SENT, no FAIL and no SKIP for exactly the same ' +
+      'reason a person the push never reached prints none, so on 10-21 all 18 of them were ' +
+      'counted as lost_silently and the snapshot said 18 of 149 people were lost on a day ' +
+      'nobody was lost. leads.siege_plan agrees with the overstatement, because the rebuild ' +
+      'writes its rows BEFORE the trim: 131 pushed, 18 left at planned. It had already ' +
+      'misreported the day before at a believable size — the lead the 10-21 debrief named ' +
+      'as lost with no line anywhere in the log was deferred on 10-20, approved the next ' +
+      'morning and sent at 2026-10-21T10:39:02Z, a one-day wait reported as a ' +
+      'disappearance. approved_leads is what the push was asked for, deferred_unapproved ' +
+      'and deferred_ids are the people held for tomorrow and are excluded from every lost_* ' +
+      'figure, and deferred_logged is Siege\'s own count of them so the files and the run ' +
+      'cannot silently disagree. Null, not zero, when the approval files are missing or the ' +
+      'approval is for another day or another sample: the trim is unknowable then. ' +
       'AND READ send_plan.fleet BEFORE READING ANY OF THE ABOVE AS A SHORTFALL (2026-10-15): ' +
       'it carries the fleet\'s day-over-day move, which nothing did until then. Over the ' +
       'three cycles after the record 782-email push the plan read 57 live inboxes and an ' +
@@ -1086,12 +1122,42 @@ export function sendPlanHealth(
  *  So join the two. `planned_leads` / `people_emailed` / `people_lost` are per-person,
  *  the loss is split by what the log said about each one, `skipped_then_sent` explains a
  *  skip count larger than the loss, and `lost_ids` names them. Null throughout when the
- *  plan is unreadable: the join is unknown then, not clean. */
+ *  plan is unreadable: the join is unknown then, not clean.
+ *
+ *  AND THE PUSH IS NOT ASKED TO SEND THE WHOLE PLAN ON DISK (2026-10-22). `plan.json` is
+ *  not the push's instruction. Siege runs twice each morning: a sample run writes a plan
+ *  and records the people it covers, then the push run REBUILDS the plan from scratch so a
+ *  block added during the morning is honoured. That rebuild can also pull in somebody new,
+ *  and nobody approved them, so `approval_is_current()` in automator trims the day back to
+ *  the approved list and says so in one line:
+ *
+ *    [2026-10-21T10:20:34Z]   18 planned today were not in the approved list; they wait
+ *                             for tomorrow
+ *
+ *  Those people are held by design. They print no SENT, no FAIL and no SKIP for exactly
+ *  the same reason a person the push never reached prints none, so the join above counted
+ *  all 18 of them as `lost_silently` and the snapshot reported 18 people lost out of 149
+ *  on a day nobody was lost at all. The rebuild also writes its own rows to
+ *  `leads.siege_plan` BEFORE the trim, so the database agrees with the overstatement: 131
+ *  rows `pushed`, 18 left at `planned`.
+ *
+ *  It had already misreported the day before at a size small enough to believe. The 10-21
+ *  debrief named `reckjbAvfyqs7jSeD` as a person lost with no line anywhere in the log —
+ *  that lead was deferred on 10-20 by this same trim, approved the next morning, and sent
+ *  at 2026-10-21T10:39:02Z. A one-day wait, reported as a disappearance.
+ *
+ *  So read the approved set too. `approved_leads` is what the push was asked for,
+ *  `deferred_unapproved` and `deferred_ids` are the people held for tomorrow, they are
+ *  excluded from every `lost_*` figure, and `deferred_logged` carries Siege's own count of
+ *  them so the file read and the run cannot silently disagree. Null, not zero, when the
+ *  approval files are missing or stale — then the trim's size is unknown and the old
+ *  arithmetic is all there is. */
 export function siegePushOutcome(
   log: string,
   sinceISO: string,
   untilISO: string,
   plannedIds: string[] | null = null,
+  approvedIds: string[] | null = null,
 ): SiegePushOutcome {
   const since = Date.parse(sinceISO);
   const until = Date.parse(untilISO);
@@ -1114,6 +1180,9 @@ export function siegePushOutcome(
   // The batch whose lines we are currently inside. Both the writer invocation (a path
   // ending `<batch-id>/leads.json`) and the push header (`batch_id = <batch-id>`) name it.
   let batch: string | null = null;
+  // Null until the log says something about the approval trim, so "the line never printed"
+  // and "it printed a zero" stay different answers.
+  let deferredLogged: number | null = null;
 
   for (const line of log.split('\n')) {
     const stamp = /^\[(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ)\]/.exec(line);
@@ -1166,6 +1235,13 @@ export function siegePushOutcome(
       reasons.set(reason, (reasons.get(reason) ?? 0) + 1);
       continue;
     }
+    // Siege's own count of the approval trim, as a cross-check on reading the files.
+    // Worded by approval_is_current() in automator/scripts/siege-plan.py.
+    const deferLine = /(\d+)\s+planned today were not in the approved list/.exec(line);
+    if (deferLine) {
+      deferredLogged = (deferredLogged ?? 0) + Number(deferLine[1]);
+      continue;
+    }
     if (line.includes('ESCALATE')) {
       escalations++;
       // The driver prints its own JSON payload; "pushed": 0 is the batch that moved nothing.
@@ -1178,16 +1254,32 @@ export function siegePushOutcome(
   // said about them is the whole diagnosis. Order matters: a FAIL is SmartLead's refusal
   // and outranks our own SKIP when a lead collected both.
   const planned = plannedIds === null ? null : [...new Set(plannedIds)];
-  const lost = planned === null ? null : planned.filter((id) => !sentIds.has(id));
-  const join = planned === null || lost === null
+  // The approval trim. A planned person the approval does not cover was held for tomorrow
+  // on purpose, so they are neither emailed nor lost — they are simply not this push's
+  // job. With no approval on file the trim's size is unknown, and the whole plan is the
+  // only denominator there is.
+  const approved = approvedIds === null ? null : new Set(approvedIds);
+  const deferred = planned === null || approved === null
+    ? null
+    : planned.filter((id) => !approved.has(id));
+  const asked = planned === null
+    ? null
+    : deferred === null ? planned : planned.filter((id) => !deferred.includes(id));
+  const lost = asked === null ? null : asked.filter((id) => !sentIds.has(id));
+  const join = planned === null || asked === null || lost === null
     ? {
       planned_leads: null, people_emailed: null, people_lost: null,
       lost_to_fail: null, lost_to_skip: null, lost_silently: null,
       lost_ids: [], skipped_then_sent: null, skipped_unplanned: null,
+      approved_leads: approved === null ? null : approved.size,
+      deferred_unapproved: null, deferred_ids: [],
     }
     : {
       planned_leads: planned.length,
-      people_emailed: planned.length - lost.length,
+      approved_leads: approved === null ? null : approved.size,
+      deferred_unapproved: deferred === null ? null : deferred.length,
+      deferred_ids: (deferred ?? []).slice(0, 12),
+      people_emailed: asked.length - lost.length,
       people_lost: lost.length,
       lost_to_fail: lost.filter((id) => failedIds.has(id)).length,
       lost_to_skip: lost.filter((id) => !failedIds.has(id) && skippedIds.has(id)).length,
@@ -1210,6 +1302,7 @@ export function siegePushOutcome(
     batches_failed_before_first_lead: deadBatches,
     escalations,
     ...join,
+    deferred_logged: deferredLogged,
     reasons: [...reasons.entries()]
       .map(([reason, leads]) => ({ reason, leads }))
       .sort((a, b) => b.leads - a.leads || a.reason.localeCompare(b.reason))
@@ -1317,6 +1410,44 @@ export function siegePlanLeadIds(raw: unknown): string[] | null {
   return out.length > 0 ? out : null;
 }
 
+/** The lead ids the morning's approval covers — the people the push was actually asked to
+ *  send. See the approval-trim block on siegePushOutcome().
+ *
+ *  The list lives in the SAMPLE file; `approval.json` carries only a count and the
+ *  fingerprint of the sample it approved. Both conditions automator checks before trimming
+ *  are checked here, for the same reason: an approval for another day, or for a sample that
+ *  changed afterwards, does not authorise anybody. Returns null rather than an empty list
+ *  whenever that cannot be established, so a missing file reads as "the trim is unknown"
+ *  and never as "every planned person was deferred". */
+export function siegeApprovedLeadIds(sampleRaw: unknown, approvalRaw: unknown, day: string): string[] | null {
+  if (!sampleRaw || typeof sampleRaw !== 'object') return null;
+  if (!approvalRaw || typeof approvalRaw !== 'object') return null;
+  const sample = sampleRaw as Record<string, unknown>;
+  const approval = approvalRaw as Record<string, unknown>;
+  if (approval.day !== day) return null;
+  if (approval.fingerprint !== sample.fingerprint) return null;
+  const ids = sample.planned_lead_ids;
+  if (!Array.isArray(ids)) return null;
+  const out = ids.filter((id): id is string => typeof id === 'string' && id.length > 0);
+  return out.length > 0 ? out : null;
+}
+
+function readSiegeApprovedLeadIds(day: string): string[] | null {
+  const dir = join(AUTOMATOR_REPO, 'state', 'siege', day);
+  const sample = join(dir, 'samples.json');
+  const approval = join(dir, 'approval.json');
+  if (!existsSync(sample) || !existsSync(approval)) return null;
+  try {
+    return siegeApprovedLeadIds(
+      JSON.parse(readFileSync(sample, 'utf8')),
+      JSON.parse(readFileSync(approval, 'utf8')),
+      day,
+    );
+  } catch {
+    return null;
+  }
+}
+
 function readSiegePlanLeadIds(day: string): string[] | null {
   const f = join(AUTOMATOR_REPO, 'state', 'siege', day, 'plan.json');
   if (!existsSync(f)) return null;
@@ -1345,6 +1476,7 @@ function readSiegePushOutcome(
   sinceISO: string,
   untilISO: string,
   plannedIds: string[] | null = null,
+  approvedIds: string[] | null = null,
 ): SiegePushOutcome {
   const f = join(AUTOMATOR_REPO, 'logs', 'siege.log');
   if (!existsSync(f)) return NO_PUSH_OUTCOME;
@@ -1352,7 +1484,7 @@ function readSiegePushOutcome(
     const whole = readFileSync(f, 'utf8');
     const lines = whole.split('\n');
     const tail = lines.slice(Math.max(0, lines.length - 20000)).join('\n');
-    return siegePushOutcome(tail, sinceISO, untilISO, plannedIds);
+    return siegePushOutcome(tail, sinceISO, untilISO, plannedIds, approvedIds);
   } catch {
     return NO_PUSH_OUTCOME;
   }
@@ -3197,6 +3329,28 @@ async function main(): Promise<void> {
         top_method_fault_cause: passes.length > 0 ? passes[passes.length - 1]!.topFaultCause : null,
         top_method_fault_cause_count: passes.length > 0 ? passes[passes.length - 1]!.topFaultCauseCount : null,
         top_method_fault_cause_pct: passes.length > 0 ? passes[passes.length - 1]!.topFaultCausePct : null,
+        // AND A CAUSE KEY STILL CARRIES THE METHOD NAME, WHICH SPLITS ONE CONDITION INTO
+        // MANY (2026-10-22). The 10-12 fix dropped every per-lead token from the key so
+        // `fetch failed` became one row with a real count. The method name survived, and it
+        // has to — but a condition that stops every method on the same lead then arrives as
+        // one row per method, each looking small. On the 2026-10-21 23:00Z pass
+        // `cross-domain redirect` was 32 + 21 + 16 + 16 + 16 = 101 of 209 errors under five
+        // method names while top_method_fault_cause_pct read 15%, pointing at the largest
+        // single row of a condition holding nearly half the pass.
+        //
+        // So read top_method_fault_condition FIRST and the cause rows as the breakdown.
+        // Every count here is a LOWER bound: the CLI names six causes and summarises the
+        // rest, and condition_coverage_pct says how much of the pass the roll-up saw.
+        top_method_fault_condition: passes.length > 0
+          ? passes[passes.length - 1]!.topFaultCondition : null,
+        top_method_fault_condition_count: passes.length > 0
+          ? passes[passes.length - 1]!.topFaultConditionCount : null,
+        top_method_fault_condition_pct: passes.length > 0
+          ? passes[passes.length - 1]!.topFaultConditionPct : null,
+        method_condition_list: passes.length > 0
+          ? passes[passes.length - 1]!.conditionList : null,
+        condition_coverage_pct: passes.length > 0
+          ? passes[passes.length - 1]!.conditionCoveragePct : null,
         methods_dead: passes.length > 0 ? passes[passes.length - 1]!.deadMethods : null,
       };
     } catch {
@@ -3284,8 +3438,14 @@ async function main(): Promise<void> {
     siegeUnitVerdict(siegeUnit, sinceISO, untilISO),
     siegeUnit,
     // The plan's own lead list, so the push's event counters can be joined into
-    // per-person ones. See the reconciliation block on siegePushOutcome().
-    readSiegePushOutcome(sinceISO, untilISO, readSiegePlanLeadIds(cycleDay)),
+    // per-person ones, and the approved list, because the push is only ever asked for the
+    // people that covers. See the reconciliation block on siegePushOutcome().
+    readSiegePushOutcome(
+      sinceISO,
+      untilISO,
+      readSiegePlanLeadIds(cycleDay),
+      readSiegeApprovedLeadIds(cycleDay),
+    ),
   );
   // The fleet's own day-over-day move, which no snapshot carried until 2026-10-15 —
   // see FleetFacts. Both reads are filesystem-only and degrade to nulls.
@@ -3582,7 +3742,20 @@ async function main(): Promise<void> {
         'that is not a known content outcome — READ THAT FIRST. A null fault cause beside a ' +
         'large method_errors means the whole pass was content outcomes, which is a ' +
         'picked-over book and not a fault. Both null before the cause line existed, which ' +
-        'is unknowable and NOT zero. The same cycle fixed the reason the status was ' +
+        'is unknowable and NOT zero. ' +
+        'AND READ top_method_fault_condition BEFORE top_method_fault_cause (2026-10-22): a ' +
+        'cause key is "<method>: <condition>", so one condition that stops every method on ' +
+        'the same lead arrives as one row per method and each row looks small. On the ' +
+        '2026-10-21 23:00Z pass "cross-domain redirect" was 32 + 21 + 16 + 16 + 16 = 101 of ' +
+        '209 errors under five method names, and top_method_fault_cause_pct read 15% for ' +
+        'the largest single row of a condition holding nearly half the pass — the 10-12 ' +
+        'lesson (a key that keeps a per-lead token splits one fault into many) one level up, ' +
+        'because the method name is per-method and the condition is not. ' +
+        'method_condition_list is the roll-up, largest first, and the cause rows are its ' +
+        'breakdown. EVERY COUNT THERE IS A LOWER BOUND: the CLI names six causes and ' +
+        'summarises the rest, so condition_coverage_pct says how much of the pass the ' +
+        'roll-up could see. A condition is only benign when every method reporting it is. ' +
+        'The same cycle fixed the reason the status was ' +
         'unreadable: both error condensers collapse digits to N, so every bare HTTP status ' +
         'in the lane now carries a word beside it (httpReason() in the email repo) and a ' +
         'future "iTunes N" reads "iTunes N rate-limited". ' +

@@ -1,4 +1,4 @@
-import { bulkRewriteShape, bandGateFacts, fleetFacts, inboxGateFacts, apifyBatchFacts, apifyLedgerLine, NO_PUSH_OUTCOME, normalizePushReason, offerFromBatchId, siegePlanLeadIds, siegePushOutcome, classifyKeyProbe, cyclePacificDay, enrichmentChainFacts, isSendingDay, projectRecoveryBudget, MAX_MISSING_DEBRIEFS, missingDebriefs, pushRunVerdict, unitStartedAt, sendPlanHealth, siegePlanFacts, summarizeSendLines, isVerifiedOrBeyond, laneYield, priorAdvanceSource, priorSeedsAdvanced, priorSeedsWalked, reconcileAdvanced, sessionSeedsAdvanced, sessionStartMs, walkRateTrend } from './debrief-data.ts';
+import { bulkRewriteShape, bandGateFacts, fleetFacts, inboxGateFacts, apifyBatchFacts, apifyLedgerLine, NO_PUSH_OUTCOME, normalizePushReason, offerFromBatchId, siegeApprovedLeadIds, siegePlanLeadIds, siegePushOutcome, classifyKeyProbe, cyclePacificDay, enrichmentChainFacts, isSendingDay, projectRecoveryBudget, MAX_MISSING_DEBRIEFS, missingDebriefs, pushRunVerdict, unitStartedAt, sendPlanHealth, siegePlanFacts, summarizeSendLines, isVerifiedOrBeyond, laneYield, priorAdvanceSource, priorSeedsAdvanced, priorSeedsWalked, reconcileAdvanced, sessionSeedsAdvanced, sessionStartMs, walkRateTrend } from './debrief-data.ts';
 let fail = 0;
 const ok = (name: string, got: unknown, want: unknown) => {
   const pass = JSON.stringify(got) === JSON.stringify(want);
@@ -664,6 +664,64 @@ ok('a lead planned into two batches is one person, counted once',
 ok('NO_PUSH_OUTCOME carries the join as unmeasured too',
   [NO_PUSH_OUTCOME.planned_leads, NO_PUSH_OUTCOME.people_lost, NO_PUSH_OUTCOME.lost_ids],
   [null, null, []]);
+
+// 2026-10-22: the approval trim. The push run rebuilds the plan, so plan.json can hold
+// people the morning's approval never covered; Siege holds those for tomorrow and they
+// print no line at all, which read as lost_silently. Live 10-21 shape: 149 on disk, 131
+// approved, 131 sent, nobody lost.
+const TRIM_LOG = [
+  '[2026-10-21T10:20:34Z]   18 planned today were not in the approved list; they wait for tomorrow',
+  '[2026-10-21T10:20:34Z] Casey approved today\'s plan; writing the rest and pushing',
+  '[2026-10-21T10:24:01Z]   |   SENT  recAPPROVED1AAAAA    a@b.com  smartlead_lead=1',
+  '[2026-10-21T10:24:11Z]   |   SENT  recAPPROVED2BBBBB    c@d.com  smartlead_lead=2',
+].join('\n');
+const TRIMMED = siegePushOutcome(TRIM_LOG, '2026-10-21T07:00:00.000Z', '2026-10-22T07:00:00.000Z',
+  ['recAPPROVED1AAAAA', 'recAPPROVED2BBBBB', 'recDEFERRED3CCCC'],
+  ['recAPPROVED1AAAAA', 'recAPPROVED2BBBBB']);
+ok('a planned person the approval does not cover is deferred, not lost',
+  [TRIMMED.planned_leads, TRIMMED.approved_leads, TRIMMED.deferred_unapproved,
+    TRIMMED.people_emailed, TRIMMED.people_lost, TRIMMED.lost_silently],
+  [3, 2, 1, 2, 0, 0]);
+ok('the deferred people are named, so tomorrow\'s plan can be checked for them',
+  [TRIMMED.deferred_ids, TRIMMED.lost_ids], [['recDEFERRED3CCCC'], []]);
+ok('Siege\'s own count of the trim is carried beside the file read',
+  TRIMMED.deferred_logged, 18);
+ok('a cycle whose log never mentions the trim reports null, not zero',
+  siegePushOutcome('[2026-10-21T10:24:01Z]   |   SENT  recA1AAAAAAAAAAAA    a@b.com',
+    '2026-10-21T07:00:00.000Z', '2026-10-22T07:00:00.000Z', ['recA1AAAAAAAAAAAA'], null).deferred_logged,
+  null);
+ok('with no approval on file the trim is unknown and the whole plan is the denominator',
+  (() => { const p = siegePushOutcome(TRIM_LOG, '2026-10-21T07:00:00.000Z', '2026-10-22T07:00:00.000Z',
+    ['recAPPROVED1AAAAA', 'recAPPROVED2BBBBB', 'recDEFERRED3CCCC'], null);
+    return [p.approved_leads, p.deferred_unapproved, p.people_lost, p.lost_silently]; })(),
+  [null, null, 1, 1]);
+// The two conditions automator checks before trimming. Either one failing means the
+// approval authorises nobody, so the trim's size is unknowable rather than zero.
+ok('an approval for another day, or for a sample that changed, authorises nobody',
+  [siegeApprovedLeadIds({ fingerprint: 'f1', planned_lead_ids: ['recA'] },
+    { day: '2026-10-20', fingerprint: 'f1' }, '2026-10-21'),
+    siegeApprovedLeadIds({ fingerprint: 'f2', planned_lead_ids: ['recA'] },
+      { day: '2026-10-21', fingerprint: 'f1' }, '2026-10-21'),
+    siegeApprovedLeadIds({ fingerprint: 'f1', planned_lead_ids: [] },
+      { day: '2026-10-21', fingerprint: 'f1' }, '2026-10-21'),
+    siegeApprovedLeadIds(null, null, '2026-10-21')],
+  [null, null, null, null]);
+ok('a matching approval hands back the sample\'s own list',
+  siegeApprovedLeadIds({ fingerprint: 'ef1700f27e56', planned_lead_ids: ['recA', 'recB'] },
+    { day: '2026-10-21', fingerprint: 'ef1700f27e56', approved_lead_count: 2 }, '2026-10-21'),
+  ['recA', 'recB']);
+// The 10-20 cycle, which the 10-21 debrief read as a person lost with no line anywhere.
+// That lead was deferred, approved the next morning, and sent at 10-21T10:39:02Z.
+ok('the 10-20 answer is settled: one deferred person, nobody lost',
+  (() => { const p = siegePushOutcome(
+    '[2026-10-20T10:19:13Z]   1 planned today were not in the approved list; they wait for tomorrow\n'
+    + '[2026-10-20T10:27:33Z]   |   SENT  recRESENT1AAAAAAA    a@b.com  smartlead_lead=1\n'
+    + '[2026-10-20T10:29:02Z]   |   SKIP  recRESENT1AAAAAAA    is absent from this batch\'s Siege manifest',
+    '2026-10-20T07:00:00.000Z', '2026-10-21T07:00:00.000Z',
+    ['recRESENT1AAAAAAA', 'reckjbAvfyqs7jSeD'], ['recRESENT1AAAAAAA']);
+    return [p.people_lost, p.lost_silently, p.deferred_unapproved, p.deferred_logged,
+      p.skipped, p.skipped_then_sent]; })(),
+  [0, 0, 1, 1, 1, 1]);
 ok('a reason is still the reason now the lead id is its own capture group',
   (() => { const p = siegePushOutcome(
     '[2026-10-20T10:30:18Z]   |   FAIL  recREFUSED3CCCCCC    SmartLead did not add the lead (bounce_count=1)',
