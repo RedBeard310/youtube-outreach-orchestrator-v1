@@ -3169,6 +3169,29 @@ async function openRouterHealth(sinceISO: string, untilISO: string): Promise<Rec
   };
 }
 
+/**
+ * The live `first_touch_pct` pair, worded for the note that teaches how to read it.
+ *
+ * Both halves can be null and they mean different things, so neither is printed as a
+ * number unless it is one: a null `first_touch_pct` is a cycle that emailed nobody (no
+ * denominator), and a null `first_touch_pct_prev_7d` is a prior week that emailed
+ * nobody. "0%" and "no emails to measure" are not the same reading, and a note that
+ * flattened one into the other would be the same class of fault as the frozen figures
+ * it replaces. A null block (the query failed) is unknown, not zero.
+ */
+export function firstTouchReadingText(
+  ft: { first_touch_pct: number | null; first_touch_pct_prev_7d: number | null } | null,
+): string {
+  if (!ft) return 'unavailable this cycle (the query failed), which is not the same as zero';
+  const now = ft.first_touch_pct === null
+    ? 'no emails to measure this cycle'
+    : `${ft.first_touch_pct}% this cycle`;
+  const prev = ft.first_touch_pct_prev_7d === null
+    ? 'no emails over the prior week either'
+    : `${ft.first_touch_pct_prev_7d}% over the prior week`;
+  return `${now} against ${prev}`;
+}
+
 async function main(): Promise<void> {
   const now = new Date();
   const date = pacificDate(now);
@@ -3195,6 +3218,16 @@ async function main(): Promise<void> {
   // countFirstTouchBetween() for the two cycles that printed a lossless push beside a
   // shelf that had not moved one person, and said nothing.
   const firstTouch = await countFirstTouchBetween(sinceISO, untilISO).catch(() => null);
+  // A NOTE THAT SAYS "THIS CYCLE" MUST MEAN THIS CYCLE (2026-10-23). The sentence below
+  // teaching how to read the pair froze 2026-10-17's own figures into its wording and
+  // re-stated them every cycle after as "1.3% this cycle against 68.7% over the prior
+  // week". Six days later the live pair was 0% against 0.3% and the note still printed
+  // the old numbers inside a clause that names the current cycle — in the one field
+  // whose whole purpose is to stop a reader quoting a figure that describes another day,
+  // and read by the debrief agent, which takes these notes as the instructions. It is
+  // the only "N% this cycle" left in any note; the rest name their dates. Computed, so
+  // it cannot go stale again.
+  const firstTouchReading = firstTouchReadingText(firstTouch);
 
   // Why the shelf moved, when it moved in one statement. Same fail-soft rule as the
   // calls below: a broken query degrades to null, it does not take the debrief down.
@@ -3581,7 +3614,7 @@ async function main(): Promise<void> {
         'nothing, and between them they reached ONE new person — every other email was a ' +
         'repeat offer, and the shelf printed exactly 5,138 ready and 1,663 already-sent on ' +
         'three consecutive mornings. first_touch_pct against first_touch_pct_prev_7d is the ' +
-        'reading: 1.3% this cycle against 68.7% over the prior week. It is not a fault — ' +
+        'reading: ' + firstTouchReading + '. It is not a fault — ' +
         'repeat offers are deliberate since 2026-10-07 — but it is a different day from the ' +
         'one total describes, and the pair of them is what says which. Read it beside ' +
         'send_plan.waiting_for_a_slot: Siege fills slots by tier and the Whale tier ran out ' +

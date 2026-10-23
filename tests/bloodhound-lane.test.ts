@@ -33,6 +33,7 @@ import {
   rescoreCommands,
   type LaneState,
 } from '../src/recovery/bloodhound-lane.ts';
+import { firstTouchReadingText } from '../scripts/autopilot/debrief-data.ts';
 
 // The recovery lane runs inside the campaign's fade pivot, which fires many
 // times a day. The cadence gate is what keeps it from re-spawning Bloodhound
@@ -1217,4 +1218,39 @@ test('noSiteCause: a healthy pass under the alarm bar reads resolution_ok', () =
   const a = collectPassAttribution(log)!;
   assert.equal(searchDied(a), false);
   assert.equal(noSiteCause(a), 'resolution_ok');
+});
+
+// --- A note that says "this cycle" must mean this cycle (2026-10-23) -----------------
+//
+// The first_touch note froze 2026-10-17's own pair into its wording and re-stated it
+// every cycle after as "1.3% this cycle against 68.7% over the prior week". On
+// 2026-10-23 the live pair was 0% against 0.3% and the note still printed the old
+// numbers inside a clause naming the current cycle.
+
+test('firstTouchReadingText: prints the live pair, not a frozen one', () => {
+  // The real 2026-10-23 cycle: 117 people, 0 first touches, 2 of 651 the week before.
+  assert.equal(
+    firstTouchReadingText({ first_touch_pct: 0, first_touch_pct_prev_7d: 0.3 }),
+    '0% this cycle against 0.3% over the prior week',
+  );
+  // And the 2026-10-17 cycle the old wording was frozen from, which it still renders.
+  assert.equal(
+    firstTouchReadingText({ first_touch_pct: 1.3, first_touch_pct_prev_7d: 68.7 }),
+    '1.3% this cycle against 68.7% over the prior week',
+  );
+});
+
+test('firstTouchReadingText: a missing denominator is not 0%', () => {
+  // A zero-send day (10-18 and 10-19 were both weekend cycles) has no denominator, so
+  // "0%" would be a claim the data cannot make.
+  assert.equal(
+    firstTouchReadingText({ first_touch_pct: null, first_touch_pct_prev_7d: 0.3 }),
+    'no emails to measure this cycle against 0.3% over the prior week',
+  );
+  assert.equal(
+    firstTouchReadingText({ first_touch_pct: 0, first_touch_pct_prev_7d: null }),
+    '0% this cycle against no emails over the prior week either',
+  );
+  // And a failed query is unknown, which is not the same as zero.
+  assert.match(firstTouchReadingText(null), /unavailable this cycle .* not the same as zero/);
 });
