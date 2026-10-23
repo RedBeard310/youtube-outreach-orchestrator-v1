@@ -1,0 +1,323 @@
+<!doctype html><meta charset="utf-8">
+<title>Lead Run Debrief — 2026-10-23</title>
+<style>
+  :root {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+      --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+      --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+    --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+    --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 40px 22px 80px; }
+  .eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); font-weight: 600; }
+  h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.12; margin: 10px 0 6px; text-wrap: balance; letter-spacing: -.02em; }
+  h2 { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); margin: 44px 0 16px; font-weight: 700; }
+  h3 { font-size: 18px; margin: 0 0 6px; letter-spacing: -.01em; }
+  p { margin: 0 0 14px; }
+  .lede { font-size: 18px; color: var(--ink-soft); max-width: 68ch; }
+  .tag { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--amber-soft); color: var(--amber); letter-spacing: .02em; }
+  .tag.good { background: var(--teal-soft); color: var(--teal); }
+  .tag.bad { background: var(--red-soft); color: var(--red); }
+  .grid { display: grid; gap: 14px; }
+  .stats { grid-template-columns: repeat(4, 1fr); margin-top: 26px; }
+  @media (max-width: 720px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; box-shadow: var(--shadow); }
+  .stat .n { font-size: 30px; font-weight: 750; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .stat .l { font-size: 12.5px; color: var(--ink-soft); margin-top: 3px; }
+  .stat .s { font-size: 12px; margin-top: 8px; font-weight: 600; }
+  .up { color: var(--good); } .down { color: var(--red); } .warn { color: var(--amber); }
+  .accent-red { border-left: 3px solid var(--red); }
+  .accent-teal { border-left: 3px solid var(--teal); }
+  .accent-amber { border-left: 3px solid var(--amber); }
+
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-soft); padding: 0 14px 14px; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+
+  .q { border-radius: 14px; padding: 20px 22px; margin-bottom: 14px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); }
+  .q .ask { font-size: 17px; font-weight: 700; color: var(--ink); margin-bottom: 10px; display: flex; gap: 10px; align-items: baseline; }
+  .q .ask .qn { color: var(--red); font-weight: 800; flex: 0 0 auto; }
+  .q p { color: var(--ink-soft); }
+  .q b { color: var(--ink); }
+  .pill { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink); background: var(--panel-2); padding: 1px 7px; border-radius: 6px; border: 1px solid var(--line); white-space: nowrap; }
+  pre { background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; overflow-x: auto; font-size: 12.5px; line-height: 1.5; color: var(--ink); margin: 0 0 14px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+  th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); }
+  td .num { font-variant-numeric: tabular-nums; font-weight: 650; }
+  .fix td:first-child { color: var(--good); font-weight: 650; }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); box-shadow: var(--shadow); }
+  ol.recs { padding-left: 0; list-style: none; counter-reset: r; margin: 0; }
+  ol.recs li { counter-increment: r; position: relative; padding: 14px 16px 14px 52px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 10px; box-shadow: var(--shadow); }
+  ol.recs li::before { content: counter(r); position: absolute; left: 14px; top: 14px; width: 26px; height: 26px; border-radius: 8px; background: var(--teal-soft); color: var(--teal); font-weight: 800; font-size: 14px; display: grid; place-items: center; }
+  ol.recs b { color: var(--ink); }
+  .foot { margin-top: 46px; padding: 16px 18px; border-radius: 12px; background: var(--amber-soft); border: 1px solid var(--line); font-size: 14px; color: var(--ink-soft); }
+  .foot b { color: var(--ink); }
+  .muted { color: var(--ink-soft); font-size: 13.5px; }
+
+  /* The day's events, scaled so the ratio inside each bar is the story. */
+  .cap { display: grid; gap: 12px; padding: 16px 18px; }
+  .crow { display: grid; grid-template-columns: 170px 1fr 200px; gap: 12px; align-items: center; font-size: 13px; }
+  @media (max-width: 720px) { .crow { grid-template-columns: 1fr; gap: 4px; } }
+  .crow .who b { color: var(--ink); }
+  .crow .who { color: var(--ink-soft); }
+  .ctrack { height: 22px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; display: flex; position: relative; }
+  .ctrack .fu { background: var(--red); opacity: .72; height: 100%; }
+  .ctrack .room { background: var(--good); height: 100%; min-width: 2px; }
+  .ctrack .mid { background: var(--amber); opacity: .7; height: 100%; }
+  .crow .right { color: var(--ink-soft); text-align: right; font-variant-numeric: tabular-nums; }
+  .crow .right b { color: var(--ink); }
+
+  .frow { display: grid; grid-template-columns: 210px 1fr 170px; gap: 12px; align-items: center; font-size: 13px; }
+  @media (max-width: 720px) { .frow { grid-template-columns: 1fr; gap: 4px; } }
+  .frow .who b { color: var(--ink); }
+  .frow .who { color: var(--ink-soft); }
+  .ftrack { height: 22px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; display: flex; }
+  .ftrack .ok { background: var(--good); height: 100%; }
+  .ftrack .wt { background: var(--amber); opacity: .8; height: 100%; }
+  .ftrack .st { background: var(--red); opacity: .78; height: 100%; }
+  .frow .right { color: var(--ink-soft); text-align: right; font-variant-numeric: tabular-nums; }
+  .frow .right b { color: var(--ink); }
+  .dgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px; }
+  .dchip { font-size: 12.5px; padding: 7px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel-2); display: flex; justify-content: space-between; gap: 8px; }
+  .dchip.bad { background: var(--red-soft); }
+  .dchip.good { background: var(--teal-soft); }
+  .dchip code { font-size: 12px; }
+  .dchip span { font-variant-numeric: tabular-nums; color: var(--ink-soft); white-space: nowrap; }
+</style>
+
+<div class="wrap">
+
+
+  <div class="eyebrow">Lead Run Debrief · YouTube outreach</div>
+  <h1>2026-10-23: a clean push, nobody new, and half the fleet stopped</h1>
+  <p class="lede"><b>117 emails went out and not one person was lost.</b> That is the first fully clean reading from the fix that shipped yesterday: 130 people approved, 119 planned, 2 held for today on purpose, 117 loaded, nothing failed, and 16 per-lead skips that were all written again in another batch and sent in the same run. The two quiet problems both got worse. <b>None of the 117 reached somebody who had never heard from us</b>, which makes it 620 emails and 2 new people across five sending days, and the sending fleet crossed a line: <b>30 of 58 mailboxes are now stopped</b>, the first time more than half the fleet cannot send. The one piece of good news is in the same reading. The clear band rose by 2, its first rise in four days.</p>
+  <div style="margin-top:14px"><span class="tag good">0 PEOPLE LOST</span> <span class="tag bad">0 FIRST TOUCHES OF 117</span> <span class="tag bad">30 OF 58 STOPPED</span> <span class="tag good">+2 CLEAR, FIRST RISE IN 4 DAYS</span> <span class="tag">2 PARKED</span></div>
+
+  <div class="grid stats">
+    <div class="card stat accent-teal">
+      <div class="n">0</div>
+      <div class="l">planned people the push lost</div>
+      <div class="s up">117 loaded · 2 held for today · 16 skips all re-sent</div>
+    </div>
+    <div class="card stat accent-red">
+      <div class="n">0</div>
+      <div class="l">people who had never heard from us</div>
+      <div class="s down">all 117 were repeat offers</div>
+    </div>
+    <div class="card stat accent-red">
+      <div class="n">30</div>
+      <div class="l">mailboxes stopped</div>
+      <div class="s down">of 58 · past half for the first time</div>
+    </div>
+    <div class="card stat accent-amber">
+      <div class="n">1,692</div>
+      <div class="l">people ready, waiting for a slot</div>
+      <div class="s warn">whale 510 · strong7 355 · other7 827</div>
+    </div>
+  </div>
+
+  <h2>The shape of the day</h2>
+
+  <p>A normal weekday. Siege planned, trimmed and pushed inside twenty minutes. Everything else was small and mostly re-read work: five collect passes over 750 lead-walks that found one contact point nobody had stored before, two enrichment batches of one lead each, and a band gate that resolved the twelve mailboxes sitting on watch into five recovered and five stopped.</p>
+
+  <div class="card" style="padding:0">
+    <div class="cap">
+      <div class="crow">
+        <div class="who"><b>07:02Z</b><br><span class="muted">the recovery lane's verify pass</span></div>
+        <div class="ctrack"><div class="room" style="width:100%"></div></div>
+        <div class="right"><b>1</b> lead checked, exit 0</div>
+      </div>
+      <div class="crow">
+        <div class="who"><b>07:05Z</b><br><span class="muted">the band gate's morning reading</span></div>
+        <div class="ctrack"><div class="room" style="width:37.9%"></div><div class="mid" style="width:10.3%"></div><div class="fu" style="width:51.7%"></div></div>
+        <div class="right"><b>22</b> clear · 6 watch · 30 stop</div>
+      </div>
+      <div class="crow">
+        <div class="who"><b>07:20Z</b><br><span class="muted">this repo's session-start send</span></div>
+        <div class="ctrack"></div>
+        <div class="right"><b>0</b> ready leads, exit 0</div>
+      </div>
+      <div class="crow">
+        <div class="who"><b>09:46Z</b><br><span class="muted">the old inbox health gate</span></div>
+        <div class="ctrack"></div>
+        <div class="right"><b>0</b> paused, 0 resumed</div>
+      </div>
+      <div class="crow">
+        <div class="who"><b>10:19Z</b><br><span class="muted">Siege writes the day's plan</span></div>
+        <div class="ctrack"><div class="room" style="width:91.5%"></div><div class="fu" style="width:8.5%"></div></div>
+        <div class="right"><b>119</b> planned of 130 approved</div>
+      </div>
+      <div class="crow">
+        <div class="who"><b>10:34Z</b><br><span class="muted">the push trims and sends</span></div>
+        <div class="ctrack"><div class="room" style="width:98.3%"></div><div class="mid" style="width:1.7%"></div></div>
+        <div class="right"><b>117</b> loaded · 2 held for today</div>
+      </div>
+      <div class="crow">
+        <div class="who"><b>five collect passes</b><br><span class="muted">points the lane had never seen</span></div>
+        <div class="ctrack"><div class="room" style="width:0.2%"></div><div class="fu" style="width:99.8%"></div></div>
+        <div class="right"><b>1</b> new of 586 found</div>
+      </div>
+      <div class="crow">
+        <div class="who"><b>all five passes</b><br><span class="muted">addresses found, which is what parks</span></div>
+        <div class="ctrack"><div class="room" style="width:2%"></div><div class="fu" style="width:98%"></div></div>
+        <div class="right"><b>3</b> people · 2 parked</div>
+      </div>
+    </div>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--good)"></span>emails loaded, mailboxes clear, or work that produced something</span>
+      <span><span class="dot" style="background:var(--amber);opacity:.7"></span>held on purpose, or mailboxes on watch</span>
+      <span><span class="dot" style="background:var(--red);opacity:.72"></span>people the plan could not fit, mailboxes stopped, work that produced nothing</span>
+    </div>
+  </div>
+  <p class="muted">The plan row is scaled to the 130 people this morning's approval covered, of which the rebuild could fit 119, because free mailbox slots were 119. The push row is scaled to those 119 rows. Band rows are scaled to the 58 mailboxes and come from the gate's own hourly readings 24.0 hours apart, so the 20 and the 22 are one instrument against itself (<code>band_delta_comparable: true</code>). The two parks agree three ways: <code>approved_hold</code> read 6,818 at the start of the cycle and 6,820 at the end, <code>needs_contact</code> fell 3,436 to 3,434, and the free collect passes found a new address for 3 people.</p>
+
+  <h2>The three questions</h2>
+
+  <div class="q accent-teal">
+    <div class="ask"><span class="qn">Q1</span><span>117 sent against 119 planned. Is that the clean reading yesterday's fix promised?</span></div>
+    <p><b>Yes. Nobody was lost, and this is the first cycle where the snapshot says so on its own.</b></p>
+    <p>The day reads cleanly end to end, and every figure in the chain agrees with the one next to it:</p>
+    <pre>130   people this morning's approval covered
+119   rows the push run's rebuild wrote      (free mailbox slots: 119)
+  2   of those 119 were not on the approved list, held for today
+117   loaded into SmartLead, 0 failed
+  0   people lost</pre>
+    <p>The 2 held people are <code>rectQuC1Y8R24T1w7</code> and <code>reckl59GwKZc3zk4I</code>, and Siege's own log counted the same 2, so the file read and the run agree. <b>Before yesterday's fix both would have printed as lost in silence</b>, because a person the approval gate holds prints exactly what a person the push never reached prints: no <code>SENT</code>, no <code>FAIL</code>, no <code>SKIP</code>. That is the fault the 10-21 and 10-22 debriefs each got wrong in opposite directions, and it is now settled.</p>
+    <p><b>The 16 skips cost nobody either.</b> All 16 were "absent from this batch's Siege manifest", all 16 were written again in their own batch and sent in the same run, and they split 9 <code>voice-objection-proof</code> and 7 <code>short-save-time</code>. That is the batch crossover in <code>automator</code> first named on 10-20, when it was 12. It wastes writer time and the compose spend behind it, and the gate catches every one, so it costs no people.</p>
+    <p class="muted"><b>One new shape, and it is the fleet talking.</b> The rebuild planned 119 against 130 approved, so <b>11 approved people got no slot at all</b>. That is the opposite direction from yesterday, when the plan held 149 against 131 approved. The slot count is now below the approved list, which means the fleet, not the approval gate, is what trimmed the day.</p>
+  </div>
+
+  <div class="q accent-red">
+    <div class="ask"><span class="qn">Q2</span><span>Five sending days of clean pushes. How many new people has that reached?</span></div>
+    <p><b>Two.</b></p>
+    <p>Across 10-17, 10-20, 10-21, 10-22 and 10-23 the pipeline loaded <b>620 emails and reached 2 people who had never heard from us</b>. One of those two came off the shelf. Today was 0 of 117, and over the prior seven days it was 2 of 651, which is 0.3%.</p>
+    <p><b>The inventory says the same thing from the other side, and it is the clearest number in the snapshot.</b> Of the 6,820 people parked and ready, 5,147 have never been written to and 1,663 have. That second figure has now printed <b>1,663 on eight consecutive mornings</b>, 10-16 through 10-23, while those 620 emails went out. Only a first touch off the shelf moves it, and there has been one in that span. Meanwhile the shelf's other half grew every single morning, 5,138 to 5,147.</p>
+    <p><b>The ordering is the mechanism and it has not changed.</b> Siege hands out mailbox slots by tier, then score, then subscriber count, and nothing in that sort asks whether a person has heard from us. The queue of ready people with no slot has gone 1,012, 1,427, 1,596, 1,575, <b>1,692</b> across those five days. The whale tier holds 510 of them, up from 383 yesterday, and its never-emailed supply ran out on the 10-13 push, so every one of those 510 is a repeat offer with first call on a slot. Below it sit 355 in <code>strong7</code> and 827 in <code>other7</code>, which is where the never-written-to people are.</p>
+    <p class="muted">Repeat offers are deliberate, your call on 10-07, and five lossless pushes in a row is real work. The only claim here is that total emails and first touches measure different things, and the second has been at or near zero for a week while the first looked healthy.</p>
+  </div>
+
+  <div class="q accent-amber">
+    <div class="ask"><span class="qn">Q3</span><span>Half the fleet is stopped. Is it still getting worse?</span></div>
+    <p><b>The stopped band is the worst it has been, and the clear band went up for the first time in four days. Both are true because the watch band resolved.</b></p>
+    <p>Twelve mailboxes were on watch yesterday morning. By this morning <b>five had come back to clear and five had been stopped</b>, with two more arriving on watch. So the clear band went 20 to 22 and the stopped band went 26 to <b>30 of 58</b>, which is the first time more than half the fleet cannot send. Both readings are the gate's own, 24.0 hours apart, from its retained run history.</p>
+    <p><b>Those two bands are not worth the same.</b> Watch means follow-ups only and runs on a 48-hour clean-time clock, so a mailbox on watch can lift itself. A stop is a health judgement and costs about two weeks of warmup to undo. Trading five recoveries for five stops is not a flat trade, and the stopped band has not fallen once this month.</p>
+    <p><b>Capacity fell again, for the fourth straight day.</b> At plan time the fleet offered <b>285 messages a day</b> against 405 yesterday, 465 before that and 495 before that. Free mailbox slots were 119, the <code>day_cap</code> warmup ramp was 870, and 130 follow-ups were already due. The ramp has not been the ceiling for over a week. The mailboxes are, and now they are below the size of the approved list.</p>
+    <p class="muted">Follow-ups were light and no inbox was full, so this is the gate's own health judgement and not a follow-up wave crowding new sends out. The old health gate ran at 09:46Z and paused nobody, which is expected: the band gate has owned health pauses since 10-15 and has adopted 30 of them.</p>
+  </div>
+
+  <h2>The thing worth your attention</h2>
+
+  <div class="card accent-red">
+    <h3>There are now two separate ceilings on new conversations, and fixing either one alone buys very little.</h3>
+    <p>You own <b>5,147 researched people nobody has written to</b>, 99.9% of them with a finished bundle. Two things stand between that bank and a conversation, and they multiply rather than add:</p>
+    <div class="dgrid" style="margin:14px 0 10px">
+      <div class="dchip bad"><code>ordering</code><span>0 of 117 slots to a new person</span></div>
+      <div class="dchip bad"><code>fleet</code><span>285 msg/day, 30 of 58 stopped</span></div>
+    </div>
+    <p><b>Fix the ordering alone</b> and the fleet caps you at 285 messages a day across four delivery days, minus the 130 follow-ups already owed, so roughly 150 first touches a day at best. That would still drain the bank in about ten weeks, which is a real answer.</p>
+    <p><b>Fix the fleet alone</b> and nothing changes at all, because the extra slots go to the same whale re-offer queue that took all 117 today. Capacity has fallen 495 to 285 over four days and first touches sat at zero through every one of them, which is the proof: the two are independent.</p>
+    <p>That is why the ordering is ranked first below. It is free, it lives in one sort key, and it is the only one of the two that converts inventory you already paid for into conversations this week.</p>
+    <p class="muted">Every lane that could refill the shelf is also at its end state, which is unchanged from yesterday and worth restating because it bounds the other side of the arithmetic: the free recovery lane is on lap 11 of a mined-out book (585 of 586 points already stored), Apify sits at its $10 reserve until 31 October, enrichment has ten leads left of 6,820, and discovery is off by your 09-08 order. Nothing here touches <code>logs/discovery-paused.flag</code>.</p>
+  </div>
+
+  <h2>The fleet</h2>
+
+  <div class="card" style="padding:0">
+    <div class="cap">
+      <div class="frow">
+        <div class="who"><b>2026-10-22, 07:05Z</b><br><span class="muted">yesterday morning</span></div>
+        <div class="ftrack"><div class="ok" style="width:34.5%"></div><div class="wt" style="width:20.7%"></div><div class="st" style="width:44.8%"></div></div>
+        <div class="right"><b>20</b> · 12 · 26</div>
+      </div>
+      <div class="frow">
+        <div class="who"><b>2026-10-23, 07:05Z</b><br><span class="muted">this morning</span></div>
+        <div class="ftrack"><div class="ok" style="width:37.9%"></div><div class="wt" style="width:10.3%"></div><div class="st" style="width:51.7%"></div></div>
+        <div class="right"><b>22</b> · 6 · 30</div>
+      </div>
+    </div>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--good)"></span>clear to start a new person</span>
+      <span><span class="dot" style="background:var(--amber);opacity:.8"></span>on watch, follow-ups only</span>
+      <span><span class="dot" style="background:var(--red);opacity:.78"></span>stopped</span>
+    </div>
+  </div>
+  <p><b>The clear band has gone 34, 31, 27, 20, 22 across five mornings, and the stopped band 24, 24, 25, 26, 30.</b> Five mailboxes came back this cycle, the first returns since Saturday: <code>casey_brown@callcontentgetsclients.com</code>, <code>casey_brown@contentgetsclientsdigital.com</code>, and three on <code>contentgetsleads.com</code>. That is the 48-hour clock working as designed on mailboxes that were only ever on watch.</p>
+  <p class="muted">The made-up-name domain decision from 10-17 is still open and still sets the ceiling on how large this fleet can ever be. Separately, the plan-time count of live inboxes fell 27 to 19 over its own 24 hours, which looks like it contradicts the band gate's +2. It does not: the plan was written at 10:19Z yesterday and the band readings are 07:05Z on both mornings, so the plan-time figure is the older of the two and the sequence across all three readings is 20, then 19, then 22. The newest instrument is the one that went up.</p>
+
+  <h2>What broke → what's fixed</h2>
+
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>What it said</th><th>What was true</th><th>Fixed</th></tr></thead>
+      <tbody>
+        <tr class="fix">
+          <td>Collect pass: 158 method errors, <code>top_method_fault_cause</code> = <code>18-rdap: RDAP N not-found</code> at <b>20%</b>, the field whose whole job is to name the thing that might really be broken</td>
+          <td>It names an answer, not a failure. <code>rdap.org</code>'s bootstrap replies <code>404 "No RDAP service is available for this resource"</code> when the registry for that whole top-level domain offers no RDAP at all. Probed live: <code>lin.ee</code> and <code>linktr.ee</code> both 404, while <code>google.com</code>, <code>carnivoretoday.com</code>, <code>smpaus.com.au</code> and <code>beacons.ai</code> all redirect through to their registry. It is permanent per domain ending and no retry changes it. The real fault that pass was <code>cross-domain redirect</code> at 68 of 158 across five methods, which yesterday's condition roll-up had already named correctly while the cause row contradicted it. Third outing of the 10-15 lesson: the largest cause can be a deliberate content outcome.</td>
+          <td>email repo <code>e52cb61c9</code>. A 404 now returns <code>skipped: "no RDAP service for this TLD"</code>, so it stays counted and named in the skip histogram, leaves the error total, and leaves the breaker's arming test (right too, since tripping the method over endings that have no RDAP would also take it from the leads whose ending has it). The reason carries no domain, because it is the histogram's key. 403, 429 and 5xx all stay errors. 3 regression cases, 291 tests green, typecheck clean, verified against live 404 and 302 domains.</td>
+        </tr>
+        <tr class="fix">
+          <td>The <code>first_touch</code> note, the field whose entire purpose is to stop a reader quoting a figure from another day, has been printing "1.3% this cycle against 68.7% over the prior week" every cycle since 10-17</td>
+          <td>Those were 10-17's own numbers, frozen into the sentence's wording. The live pair this cycle is <b>0% against 0.3%</b>, and the stale figures sat inside a clause that names the current cycle. These notes are what the debrief agent reads as its instructions, so a stale figure there becomes a figure in a report.</td>
+          <td>orchestrator <code>4a5fe3c</code>. <code>firstTouchReadingText()</code> computes it from the live pair. Neither half prints as a number unless it is one: a cycle that emailed nobody has no denominator (both weekend cycles were that shape), a prior week that emailed nobody is the same, and a failed query is unknown. Flattening any of those to "0%" would be the same fault again. It was the only "N% this cycle" left in any note. 5 assertions, 120 tests green, selftest all pass, typecheck clean.</td>
+        </tr>
+        <tr>
+          <td>Yesterday's approval-gate fix had its first full cycle</td>
+          <td>It held, and this is the first clean reading from it. 130 approved, 119 planned, 2 held and named, 117 sent, <b>0 lost</b>, with Siege's own count of the held people agreeing with the file read. Under the old join those 2 would have printed as lost in silence.</td>
+          <td>No change needed.</td>
+        </tr>
+        <tr>
+          <td>16 per-lead skips, up from 12 on 10-20 and 3 on 10-21</td>
+          <td>All 16 are the <code>automator</code> batch crossover: a draft written into a batch whose manifest covers different people. All 16 were re-written in their own batch and sent in the same run, so they cost compose work and no people. 9 <code>voice-objection-proof</code>, 7 <code>short-save-time</code>.</td>
+          <td>No change here. It lives in Siege, which I do not modify, and it is ranked below.</td>
+        </tr>
+        <tr>
+          <td><code>parked_today: 2</code>, two enrichment batches of one lead each, and a collect pass that found 1 new point in 586</td>
+          <td>None is a fault. 585 of the 586 points were already on file, which is a full re-walk of a book on lap 11, and the pass asked Brave only 3 times because 148 of 150 leads already had a website stored. Site resolution read <code>cause: resolution_ok</code> with 2 leads site-less. Enrichment is at 99.9% with ten leads left in the pool. Both lanes are idle because their input is dry.</td>
+          <td>No change. The shelf-refill question is a spend and strategy call, not a bug.</td>
+        </tr>
+        <tr>
+          <td>66 YouTube keys probed 20 minutes after the quota reset, 15 working, <code>pool_collapsed: true</code></td>
+          <td>Settled on 09-16: the quota on 50 of those projects was cut, so the reset cannot refill them. Not an incident and not fixable by adding keys to those accounts.</td>
+          <td>No change. Discovery is paused and the lanes that do run use 1-unit calls, so this binds nothing today.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Recommended next, ranked</h2>
+
+  <ol class="recs">
+    <li><b>Give Siege's slot order a first-touch floor.</b> Five sending days, 620 emails, 2 people who had never heard from us, 1 of them off the shelf, and <code>already_sent</code> frozen at 1,663 for eight mornings. 1,692 ready people got no slot today and 1,182 of them sit in the two lower tiers where the never-written-to people are. This is the only lever that turns inventory you already paid for into conversations this week, it costs nothing but the ordering, and it lives in <code>siege.fill_slots</code> in <code>automator</code>, which I do not modify. A per-day minimum number of first touches would be enough.</li>
+    <li><b>Deal with the fleet, knowing it will not help until the ordering does.</b> 30 of 58 stopped is past half for the first time, capacity has gone 495 to 285 in four days, and free slots (119) are now below the approved list (130), so the fleet is what trims the day. The five returns this cycle were all mailboxes that had only reached watch, and the stopped band has not fallen once this month, so the question worth asking is what keeps pushing health down past normal churn. The made-up-name domain decision from 10-17 sets the ceiling above all of it.</li>
+    <li><b>Fix the batch crossover in Siege.</b> 16 drafts this cycle, 12 on 10-20, 3 on 10-21, all caught by the manifest gate and all re-written. It costs no people, which is why it sits third, but it is paying the compose model twice for the same person and the count is trending up.</li>
+    <li><b>Sample <code>cross-domain redirect</code> once.</b> It is 68 of 158 collect errors, 43% of the pass, now the clear top fault with the RDAP row correctly out of the way. It means a stored creator website redirects to another domain and the identity gate will not follow. Some of that is right (a link-in-bio shortener pointing at its host, which is what the top example is). Some may be a creator who moved host and could be re-resolved. Cheap to check now that it is named, and worthless to guess at.</li>
+    <li><b>Decide about the shelf-refill lanes.</b> Unchanged and still yours: enrichment is finished with ten leads left of 6,820, the free lane is on lap 11 of a picked-over book, and Apify reopens on 31 October at roughly 19 cents a person. The pause's stated job (put every resource into enriching what we already have) is complete.</li>
+  </ol>
+
+  <div class="foot">
+    <b>Clean run.</b> 0 fatal error signatures, 0 halt flags, no crashes. <b>$0 billed to the Anthropic API</b>, as every cycle since 08-01, against the $75 soft ceiling. OpenRouter spent $1.72 account-wide over 24 hours with $71.68 left, about 42 days of runway, and the lead-finder's own log recorded 0 calls. Apify sits at its $10 reserve until 31 October with 0 price strikes. <b>0 new channels discovered, by your 09-08 order</b>, and <code>logs/discovery-paused.flag</code> is untouched; the podcast timer fired once and logged that it was halted, which is the flag working. Window 2026-10-22T07:00Z to 2026-10-23T07:00Z, grounded in <code>logs/autopilot-debrief-2026-10-23.json</code>, read 20 minutes after the boundary.
+  </div>
+
+</div>
