@@ -656,7 +656,7 @@ export type SiegeUnitFacts = {
   unit_last_started: string | null;
 };
 
-const NO_UNIT: SiegeUnitFacts = {
+export const NO_UNIT: SiegeUnitFacts = {
   sending_day: null,
   unit_state: null,
   unit_last_result: null,
@@ -848,6 +848,30 @@ export function pushRunVerdict(
 // not push — Siege plus any batch driven by hand from the email repo. It cannot be
 // attributed further from here, and it does not need to be: the question is whether
 // the planned batch moved at all.
+//
+/** `nothing_lost`: a plan that moved and cost nobody (2026-10-24).
+ *
+ *  `binding_constraint` is the one field a reader looks at before any other, and until
+ *  now its fallback answer was computed from plan.json alone: `planned` minus what
+ *  reached SmartLead, anything left over called `partial_push`. That is the same fault
+ *  the 2026-10-22 fix removed from inside `push_outcome`, one level up — plan.json is
+ *  not the push's instruction. Siege plans twice each morning and `approval_is_current()`
+ *  trims the re-plan back to the approved list, so a planned person can be held for
+ *  tomorrow on purpose and leave a gap here that nobody lost.
+ *
+ *  On 2026-10-23 that is exactly what happened: 150 planned, 148 sent, and the missing
+ *  two were `deferred_unapproved` — held for the next day by the approval gate, named in
+ *  `deferred_ids`, and cross-checked against Siege's own `deferred_logged`. Seventeen
+ *  skips all got written again and sent in the same run (`skipped_then_sent: 17`). The
+ *  push's own per-person join read `people_lost: 0`, `lost_to_fail: 0`, `lost_to_skip: 0`,
+ *  `lost_silently: 0` — a lossless push — while the headline field said `partial_push`.
+ *
+ *  So when the join is available and says nobody ended the run without an email, do not
+ *  name a shortfall. `people_lost: null` is unknown, not zero, and keeps the old
+ *  conservative `partial_push`: the plan could not be read, so the day cannot be cleared.
+ *  The two real ceilings (`mailbox_slots`, `day_cap`) and `push_killed` still outrank
+ *  this — they say what sized or stopped the day, which is a different question from
+ *  whether it lost anybody. */
 export function sendPlanHealth(
   facts: SiegePlanFacts,
   sentInCycle: number | null,
@@ -887,6 +911,9 @@ export function sendPlanHealth(
     // the leads. Ranked below the two real ceilings: a push killed after it had
     // already sent everything the ramp allowed cost nothing.
     else if (pushUnitResult !== null && pushUnitResult !== 'success') binding = 'push_killed';
+    // Whether a plan that moved fell short is a question about PEOPLE, and plan.json
+    // cannot answer it (2026-10-24). See the `nothing_lost` block below.
+    else if (pushOutcome.people_lost === 0) binding = 'nothing_lost';
     else binding = 'partial_push';
   }
 
@@ -940,6 +967,16 @@ export function sendPlanHealth(
       'happened, which on a weekend is a weekday two days back — unlike ' +
       'push_unit_result, which is null unless that run was inside this cycle. A unit_state ' +
       'of failed left over from a prior cycle does not block the next timer firing. ' +
+      'binding_constraint:nothing_lost means the plan moved and the push\'s own ' +
+      'per-person join found nobody who ended the run without an email — a lossless ' +
+      'push, not a shortfall. It replaces partial_push for that shape (2026-10-24): the ' +
+      'fallback used to be plan.json arithmetic, planned minus what reached SmartLead, ' +
+      'which is the 10-22 fault one level up because plan.json is not the push\'s ' +
+      'instruction. On 2026-10-23 the headline field read partial_push against 150 ' +
+      'planned and 148 sent while push_outcome read people_lost:0 on the same snapshot; ' +
+      'the missing two were deferred_unapproved, held for the next day by the approval ' +
+      'gate. partial_push now means people_lost is genuinely above zero, or null — and ' +
+      'null is an unreadable plan, which is unknown and NOT a clean day. ' +
       'READ push_outcome BEFORE CALLING partial_push A SOFT SHORTFALL: it carries the ' +
       "push's own tally of what it dropped and why. On 2026-10-05, 53 of 129 planned " +
       'emails were refused per-lead and 3 whole batches died at listCampaignMailboxes ' +

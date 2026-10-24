@@ -1,4 +1,4 @@
-import { bulkRewriteShape, bandGateFacts, fleetFacts, inboxGateFacts, apifyBatchFacts, apifyLedgerLine, NO_PUSH_OUTCOME, normalizePushReason, offerFromBatchId, siegeApprovedLeadIds, siegePlanLeadIds, siegePushOutcome, classifyKeyProbe, cyclePacificDay, enrichmentChainFacts, isSendingDay, projectRecoveryBudget, MAX_MISSING_DEBRIEFS, missingDebriefs, pushRunVerdict, unitStartedAt, sendPlanHealth, siegePlanFacts, summarizeSendLines, isVerifiedOrBeyond, laneYield, priorAdvanceSource, priorSeedsAdvanced, priorSeedsWalked, reconcileAdvanced, sessionSeedsAdvanced, sessionStartMs, walkRateTrend } from './debrief-data.ts';
+import { bulkRewriteShape, bandGateFacts, fleetFacts, inboxGateFacts, apifyBatchFacts, apifyLedgerLine, NO_PUSH_OUTCOME, normalizePushReason, offerFromBatchId, siegeApprovedLeadIds, siegePlanLeadIds, siegePushOutcome, classifyKeyProbe, cyclePacificDay, enrichmentChainFacts, isSendingDay, projectRecoveryBudget, MAX_MISSING_DEBRIEFS, missingDebriefs, NO_UNIT, pushRunVerdict, unitStartedAt, sendPlanHealth, siegePlanFacts, summarizeSendLines, isVerifiedOrBeyond, laneYield, priorAdvanceSource, priorSeedsAdvanced, priorSeedsWalked, reconcileAdvanced, sessionSeedsAdvanced, sessionStartMs, walkRateTrend } from './debrief-data.ts';
 let fail = 0;
 const ok = (name: string, got: unknown, want: unknown) => {
   const pass = JSON.stringify(got) === JSON.stringify(want);
@@ -359,6 +359,38 @@ ok('no unit verdict measured -> the old answer, never an invented one',
 // the honest answer.
 ok('a real ceiling outranks a late kill',
   sendPlanHealth(siegePlanFacts(PLAN_1001), 150, 0, 'timeout').binding_constraint, 'day_cap');
+
+// --- a plan that moved and lost nobody is not a shortfall (2026-10-24) ---
+// The live 10-23 shape: 150 planned, 148 sent, the two missing held for the next day by
+// the approval gate, and the push's own per-person join reading people_lost 0.
+const LOSSLESS = {
+  ...NO_PUSH_OUTCOME,
+  log_found: true, sent: 148, failed: 0, skipped: 17,
+  planned_leads: 150, approved_leads: 157, people_emailed: 148,
+  people_lost: 0, lost_to_fail: 0, lost_to_skip: 0, lost_silently: 0,
+  skipped_then_sent: 17, skipped_unplanned: 0,
+  deferred_unapproved: 2, deferred_logged: 2,
+};
+ok('10-23: a 2-email gap the approval gate deferred is not partial_push',
+  (() => { const h = sendPlanHealth(siegePlanFacts(PLAN_1001), 148, 0, 'success', NO_UNIT, LOSSLESS);
+    return [h.unpushed_planned, h.push_outcome.people_lost, h.binding_constraint]; })(),
+  [2, 0, 'nothing_lost']);
+// The point of the field: a real loss still gets named.
+ok('one person really lost is still partial_push',
+  sendPlanHealth(siegePlanFacts(PLAN_1001), 135, 0, 'success', NO_UNIT,
+    { ...LOSSLESS, sent: 135, people_emailed: 149, people_lost: 1, lost_to_skip: 1 },
+  ).binding_constraint, 'partial_push');
+// An unreadable plan cannot clear the day. Unknown is not zero.
+ok('no per-person join -> the old conservative answer',
+  sendPlanHealth(siegePlanFacts(PLAN_1001), 148, 0, 'success', NO_UNIT, NO_PUSH_OUTCOME)
+    .binding_constraint, 'partial_push');
+// A lossless push does not excuse a kill or a ceiling: those size or stop the day.
+ok('a kill still outranks a lossless join',
+  sendPlanHealth(siegePlanFacts(PLAN_1001), 148, 0, 'timeout', NO_UNIT, LOSSLESS)
+    .binding_constraint, 'push_killed');
+ok('a ceiling the day pressed still outranks a lossless join',
+  sendPlanHealth(siegePlanFacts(PLAN_1001), 150, 0, 'success', NO_UNIT, LOSSLESS)
+    .binding_constraint, 'day_cap');
 // pushRunVerdict — only this cycle's run may speak for this cycle.
 ok('a run inside the window speaks for it',
   pushRunVerdict('timeout', '2026-10-01T10:17:22.000Z', '2026-10-01T07:00:00.000Z', '2026-10-02T07:00:00.000Z'),
