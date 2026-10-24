@@ -1,0 +1,252 @@
+<title>Lead Run Debrief — 2026-10-24</title>
+<style>
+  :root {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+      --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+      --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+    --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+    --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 40px 22px 80px; }
+  .eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); font-weight: 600; }
+  h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.12; margin: 10px 0 6px; text-wrap: balance; letter-spacing: -.02em; }
+  h2 { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); margin: 44px 0 16px; font-weight: 700; }
+  h3 { font-size: 18px; margin: 0 0 6px; letter-spacing: -.01em; }
+  p { margin: 0 0 14px; }
+  .lede { font-size: 18px; color: var(--ink-soft); max-width: 68ch; }
+  .tag { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--amber-soft); color: var(--amber); letter-spacing: .02em; }
+  .tag.good { background: var(--teal-soft); color: var(--teal); }
+  .grid { display: grid; gap: 14px; }
+  .stats { grid-template-columns: repeat(4, 1fr); margin-top: 26px; }
+  @media (max-width: 720px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; box-shadow: var(--shadow); }
+  .stat .n { font-size: 30px; font-weight: 750; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .stat .l { font-size: 12.5px; color: var(--ink-soft); margin-top: 3px; }
+  .stat .s { font-size: 12px; margin-top: 8px; font-weight: 600; }
+  .up { color: var(--good); } .down { color: var(--red); } .warn { color: var(--amber); }
+  .accent-red { border-left: 3px solid var(--red); }
+  .accent-teal { border-left: 3px solid var(--teal); }
+  .accent-amber { border-left: 3px solid var(--amber); }
+
+  /* shape-of-day bar strips */
+  .strip { display: flex; align-items: flex-end; gap: 10px; height: 130px; padding: 14px 16px 10px; overflow-x: auto; }
+  .col { flex: 1 0 40px; display: flex; flex-direction: column; justify-content: flex-end; height: 100%; }
+  .col .bars { display: flex; align-items: flex-end; gap: 3px; height: 100%; }
+  .bar { flex: 1 1 0; border-radius: 3px 3px 0 0; background: var(--teal); min-height: 3px; }
+  .bar.zero { background: var(--red); height: 3px !important; }
+  .bar.stop { background: var(--red); }
+  .bar.watch { background: var(--amber); }
+  .xlab { font-size: 11px; color: var(--ink-soft); text-align: center; padding-top: 6px; font-variant-numeric: tabular-nums; }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-soft); padding: 0 16px 14px; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+
+  .q { border-radius: 14px; padding: 20px 22px; margin-bottom: 14px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); }
+  .q .ask { font-size: 17px; font-weight: 700; color: var(--ink); margin-bottom: 10px; display: flex; gap: 10px; align-items: baseline; }
+  .q .ask .qn { color: var(--red); font-weight: 800; flex: 0 0 auto; }
+  .q.accent-teal .ask .qn { color: var(--teal); }
+  .q p { color: var(--ink-soft); }
+  .q b { color: var(--ink); }
+  .pill { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink); background: var(--panel-2); padding: 1px 7px; border-radius: 6px; border: 1px solid var(--line); white-space: nowrap; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+  th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); }
+  td .num { font-variant-numeric: tabular-nums; font-weight: 650; }
+  .fix td:first-child { color: var(--good); font-weight: 650; }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); box-shadow: var(--shadow); }
+  ol.recs { padding-left: 0; list-style: none; counter-reset: r; margin: 0; }
+  ol.recs li { counter-increment: r; position: relative; padding: 14px 16px 14px 52px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 10px; box-shadow: var(--shadow); }
+  ol.recs li::before { content: counter(r); position: absolute; left: 14px; top: 14px; width: 26px; height: 26px; border-radius: 8px; background: var(--teal-soft); color: var(--teal); font-weight: 800; font-size: 14px; display: grid; place-items: center; }
+  ol.recs b { color: var(--ink); }
+  .foot { margin-top: 46px; padding: 16px 18px; border-radius: 12px; background: var(--amber-soft); border: 1px solid var(--line); font-size: 14px; color: var(--ink-soft); }
+  .foot b { color: var(--ink); }
+  .muted { color: var(--ink-soft); font-size: 13.5px; }
+  code { background: var(--panel-2); padding: 1px 5px; border-radius: 5px; border: 1px solid var(--line); font-size: .9em; }
+</style>
+
+<div class="wrap">
+
+  <div class="eyebrow">Lead Run Debrief · YouTube outreach</div>
+  <h1>2026-10-24: nine new people, and the fleet's worst morning yet</h1>
+  <p class="lede">The first-touch drought broke. <b>148 emails went out, nobody was lost, and 9 of them reached a creator who had never heard from us</b>, against 2 new people in the whole prior week. The shelf's sent counter moved for the first time in nine mornings. In the same cycle the sending fleet reached its lowest clear count on record: <b>34 of 58 mailboxes cannot send.</b></p>
+  <div style="margin-top:14px">
+    <span class="tag good">9 FIRST TOUCHES · 0 PEOPLE LOST</span>
+    <span class="tag" style="margin-left:6px">34 OF 58 MAILBOXES STOPPED</span>
+  </div>
+
+  <div class="grid stats">
+    <div class="card stat accent-teal">
+      <div class="n">9</div>
+      <div class="l">people emailed for the first time</div>
+      <div class="s up">prior 7 days: 2 of 611</div>
+    </div>
+    <div class="card stat accent-teal">
+      <div class="n">148</div>
+      <div class="l">emails loaded, <b>0 people lost</b></div>
+      <div class="s up">150 planned · 2 held for today</div>
+    </div>
+    <div class="card stat accent-red">
+      <div class="n">17</div>
+      <div class="l">mailboxes clear to send, of 58</div>
+      <div class="s down">was 22 · was 34 five days ago</div>
+    </div>
+    <div class="card stat accent-amber">
+      <div class="n">1,723</div>
+      <div class="l">people waiting for a slot</div>
+      <div class="s warn">against 150 slots in the plan</div>
+    </div>
+  </div>
+
+  <h2>The shape of the day</h2>
+  <div class="card" style="padding:0">
+    <div class="strip" id="ft"></div>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--teal)"></span>people emailed for the first time, per cycle</span>
+      <span><span class="dot" style="background:var(--red)"></span>a cycle that reached nobody new</span>
+    </div>
+  </div>
+  <p class="muted">Six cycles, oldest on the left. <b>0, 0, 0, 1, 0, 9.</b> The 10-19 bar is a Sunday, when SmartLead sends nothing by design. The jump is not a one-day flip: the <code>strong7</code> tier has owned the plan for three days and its first touches went 0, then 1, then 9 as it worked through its own backlog of repeat offers.</p>
+
+  <div class="card" style="padding:0; margin-top:18px">
+    <div class="strip" id="band"></div>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--teal)"></span>clear to send</span>
+      <span><span class="dot" style="background:var(--amber)"></span>on watch</span>
+      <span><span class="dot" style="background:var(--red)"></span>stopped</span>
+    </div>
+  </div>
+  <p class="muted">The same six mornings, read off the band gate at 07:05Z each day. Clear mailboxes went <b>34, 31, 27, 20, 22, 17</b>. Stopped went <b>24, 24, 25, 26, 30, 34</b>. Every morning's move looked small. Five days of them cost half the fleet.</p>
+
+  <h2>The three questions</h2>
+
+  <div class="q accent-teal">
+    <div class="ask"><span class="qn">Q1</span><span>Did the push finally reach anybody new?</span></div>
+    <p><b>Yes, 9 people, and the shelf moved to prove it.</b> Of 148 emails, <span class="pill">9 first touches</span> went to creators who had never heard from us. The prior seven days managed 2 across 611 emails. Five of the nine came off <code>approved_hold</code>, which is the only kind that drains the shelf, and the shelf's own sent counter went <b>1,663 to 1,666</b> after sitting at 1,663 for nine straight mornings.</p>
+    <p>The mechanism is a tier working through its queue, not a setting somebody changed. Siege fills slots by tier, and the plan has been <code>strong7</code> for three days running: <b>134 of 149 on 10-21, 118 of 119 on 10-22, 146 of 150 on 10-23.</b> First touches across those three days went 0, 1, 9. The whale tier ran out of never-emailed people back on the 10-13 push, and <code>strong7</code> had its own repeat-offer backlog to clear first. It has started clearing it. <b>One cycle is a trend worth watching, not a turn worth banking.</b></p>
+  </div>
+
+  <div class="q accent-red">
+    <div class="ask"><span class="qn">Q2</span><span>Why is the fleet still shrinking?</span></div>
+    <p>Because the band gate keeps moving mailboxes down faster than they recover. Inside this cycle it moved <b>5 to stop and 5 to watch, against 2 back to normal</b>. That leaves <span class="pill">17 normal · 7 watch · 34 stop</span> of 58, the lowest clear count since the gate took over health pauses on 2026-10-15. Two mailboxes did come back, both on <code>bookcontentgetsclients.com</code>.</p>
+    <p>This is now the binding limit on everything else. The warmup ramp allows <b>870 emails a day</b> and the live mailboxes would only accept <b>150</b>, so six sevenths of the day's permitted volume sits behind mailboxes that cannot send. <b>Nothing in the five pipeline repos fixes this.</b> The band gate lives in <code>automator</code>, and a health band is deliverability, which costs about two weeks of warmup to undo once it is lost.</p>
+    <p>One reading needs care. At plan time the fleet looked <em>better</em> than the day before, <b>23 live inboxes and 345 messages a day against 19 and 285</b>, and both readings are 24.0h apart and comparable. The band gate's worse reading was taken at 07:05Z <em>today</em>, after this cycle's push ran at 10:37Z yesterday. So the push got a bigger fleet than the previous day, sent 148, and then five more mailboxes were stopped. Tomorrow's plan is the one that pays for it. A large pull sitting beside a large push is a question worth asking the same morning, not a proof that one caused the other.</p>
+  </div>
+
+  <div class="q accent-amber">
+    <div class="ask"><span class="qn">Q3</span><span>Why did enrichment and the recovery lane do almost nothing?</span></div>
+    <p><b>Both have run out of book, and neither is broken.</b> Enrichment did <span class="pill">1 batch, 1 lead</span> because <b>6,811 of 6,821 parked leads are already enriched, 99.9%</b>. One lead arrived in the cycle and one lead got done. There is nothing left to work on, so a near-zero reading is the correct one.</p>
+    <p>The recovery lane is the same story at lap <b>11</b> of a 2,403-lead book. Its newest pass walked 150 leads, <b>found 634 contact points and 629 of them were already on file</b>, keeping 5. That is a full re-walk of picked-over ground, which the grounded snapshot distinguishes from a fault on purpose: <code>methods_found</code> above zero with almost no new points is a drained book, while <code>methods_found: 0</code> would be the shape to chase. Site resolution was healthy (<b>4% with no site, 0 Brave refusals, 0 errors</b>, <code>cause: resolution_ok</code>), and <code>stranded</code> held at 3, so no selector gap has reopened. The cycle recovered <b>2 addresses from 2 people</b> against 22 over the prior week.</p>
+  </div>
+
+  <h2>The thing worth your attention</h2>
+  <div class="card accent-red">
+    <p style="margin-bottom:8px"><b>The shelf is 5,145 people deep and the fleet can carry 150 a day.</b></p>
+    <p class="muted" style="margin-bottom:0">Discovery is paused by your order, so nothing new arrives: the cycle parked <b>1 person</b> and the pool went 6,820 to 6,821. That is fine while there is a shelf, and there is: 5,145 creators written to nobody, which is roughly 35 weekday pushes at the current size. The problem is the other end. 1,723 people are queued for 150 slots, and the slot count is set by how many mailboxes the band gate will let send. Every mailbox it stops makes the queue longer and the shelf older, and no amount of enrichment or recovery changes that number. <b>The constraint moved from finding people to being able to email them.</b></p>
+  </div>
+
+  <h2>The fleet</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Reading</th><th>This cycle</th><th>Day before</th><th>What it means</th></tr></thead>
+      <tbody>
+        <tr><td>Clear to send (band gate, 07:05Z)</td><td class="num down">17</td><td class="num">22</td><td>Lowest since the gate took over on 10-15</td></tr>
+        <tr><td>On watch</td><td class="num warn">7</td><td class="num">6</td><td>On their way to stopped unless they recover</td></tr>
+        <tr><td>Stopped</td><td class="num down">34</td><td class="num">30</td><td>Of 58. All 34 owned by the band gate</td></tr>
+        <tr><td>Moves inside the cycle</td><td class="num">2 up, 5 to watch, 5 to stop</td><td class="num">5 up, 2 watch, 5 stop</td><td>Recoveries are not keeping pace</td></tr>
+        <tr><td>Live inboxes (plan time, 10:20Z)</td><td class="num up">23</td><td class="num">19</td><td>A different instrument, 3 hours later in the day</td></tr>
+        <tr><td>Mailbox capacity</td><td class="num up">345/day</td><td class="num">285/day</td><td>What the live mailboxes are allowed in total</td></tr>
+        <tr><td>Free slots after follow-ups</td><td class="num">150</td><td class="num">119</td><td>345 capacity minus 80 follow-ups due and the rest</td></tr>
+        <tr><td>Warmup ramp (<code>day_cap</code>)</td><td class="num">870</td><td class="num">870</td><td>Not the ceiling. The fleet is</td></tr>
+        <tr><td>Old health gate</td><td class="num">0 paused, 0 resumed</td><td class="num">0 paused</td><td>Superseded. The band gate owns all 34</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>What broke → what's fixed</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Issue</th><th>Mechanism</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr class="fix"><td>The headline field called a lossless push a shortfall</td><td><code>binding_constraint</code> fell back to plan.json arithmetic: planned minus what reached SmartLead, anything left over named <code>partial_push</code>. The two missing emails were people the approval gate held for the next day on purpose. <code>push_outcome</code> read <code>people_lost: 0</code> on the same snapshot</td><td class="up">Fixed in <code>cb9130b</code> (orchestrator). New value <code>nothing_lost</code>; <code>partial_push</code> now needs a real loss</td></tr>
+        <tr><td>34 of 58 mailboxes cannot send</td><td>The band gate moves mailboxes down on health faster than they earn their way back. Clear count 34 to 17 in five days</td><td class="down">Open, and the top lever. Lives in <code>automator</code>, and it is a deliverability call, not a code fix</td></tr>
+        <tr><td>1,723 people queued for 150 slots</td><td>Slots are capacity minus follow-ups owed. Every offer is a three-email sequence on days 0, 4 and 10, so a big push mortgages the next week</td><td class="warn">Structural. Shrinks as the fleet recovers, not before</td></tr>
+        <tr><td>Apify email recovery did nothing</td><td>$9.9998 left against a $10 reserve, so spendable is <b>-$0.0002</b>. 0 batches, <code>halted: false</code>, 0 price strikes</td><td class="warn">By design. The $100 allowance is the calendar month and refills on 11-01</td></tr>
+        <tr><td><code>cross-domain redirect</code> is 41% of collect-pass errors</td><td>66 of 160 across five methods. <code>sameSite()</code> compares registrable domains, so these redirects really do leave the creator's site</td><td>Not a fault. This is the ownership gate from the 2026-08-18 audit refusing to file a stranger's contacts. Left alone deliberately</td></tr>
+        <tr><td>15 of 66 YouTube keys working</td><td>50 still exhausted after the midnight-PT reset, 1 blocked. The quota on those projects was cut, so the reset cannot refill them</td><td>Settled, and inert. Discovery is paused and enrichment runs on 1-unit calls</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Recommended next, ranked</h2>
+  <ol class="recs">
+    <li><b>Decide what to do about the fleet. This is the only thing that matters right now.</b> 34 of 58 mailboxes are stopped, the clear count has halved in five days, and the warmup ramp allows 870 emails a day against 150 the fleet will actually take. Two choices, both yours: let the banded mailboxes sit on follow-ups only and wait out the recovery clock, or add warmed capacity. Everything downstream is gated on this number and no pipeline repo can move it.</li>
+    <li><b>Watch whether <code>strong7</code> keeps producing first touches.</b> 0, then 1, then 9 across three days it has owned the plan. If the next cycle holds near 9 or climbs, the shelf has genuinely started draining and the repeat-offer logjam is over. If it drops back to 0, the 9 was a pocket of never-emailed people inside one tier and the queue order is still the problem. One more cycle answers it.</li>
+    <li><b>617 whale-tier people wait while the plan takes 4 of them.</b> Queue depth and plan composition are being decided by different rules, and the gap is large enough to be worth a look. Worth understanding before anybody changes the tier order, because the tier that is currently producing first touches is the one being favoured already.</li>
+    <li><b>Nothing to do on enrichment or recovery, and that is the finding.</b> Enrichment is 99.9% complete with 10 leads left in the entire pool. The recovery lane is at lap 11 of a book where 629 of 634 points found are already on file. Both are drained, not broken. Apify refills on 11-01 with $100, which at the measured $0.115 per lead is roughly 700 more leads and about $100 of OpenRouter enrichment behind them.</li>
+    <li><b>The shelf is the asset, and it is aging.</b> 5,145 creators enriched and never emailed, about 35 weekday pushes at the current size, with discovery paused so nothing replaces them. No action needed while the fleet is the constraint. Worth remembering when it stops being one.</li>
+  </ol>
+
+  <div class="foot">
+    <b>Cost and safety:</b> <b>$0 Anthropic</b> this cycle. OpenRouter is at <b>$70.01</b> against $1.67 a day across the account, about <b>42 days of runway</b>. <b>0 fatal error signatures, no halt flag, no escalation</b> beyond the one the push logs normally. Discovery wrote <b>0 new channels</b>, which is your 2026-09-08 order working as intended, not a stall. The orchestrator's own send path fired once and sent nothing, correctly: all 148 emails were pushed by Siege from <code>automator</code>, which is the send path.
+  </div>
+
+</div>
+
+<script>
+  // first touches per cycle, 2026-10-19 -> 2026-10-24 (sent_today.first_touch.first_touch)
+  renderStrip('ft',
+    [[0],[0],[0],[1],[0],[9]],
+    ['10-19','10-20','10-21','10-22','10-23','10-24'],
+    ['']);
+  // band gate at 07:05Z each morning: normal / watch / stop
+  renderStrip('band',
+    [[34,0,24],[31,3,24],[27,6,25],[20,12,26],[22,6,30],[17,7,34]],
+    ['10-19','10-20','10-21','10-22','10-23','10-24'],
+    ['', 'watch', 'stop']);
+
+  function renderStrip(id, cols, labels, kinds) {
+    var el = document.getElementById(id);
+    var max = 0;
+    cols.forEach(function (c) { c.forEach(function (v) { if (v > max) max = v; }); });
+    cols.forEach(function (c, i) {
+      var col = document.createElement('div');
+      col.className = 'col';
+      var bars = document.createElement('div');
+      bars.className = 'bars';
+      c.forEach(function (v, j) {
+        var b = document.createElement('div');
+        b.className = 'bar' + (v === 0 ? ' zero' : '') + (kinds[j] ? ' ' + kinds[j] : '');
+        b.style.height = Math.max(3, Math.round((v / max) * 100)) + '%';
+        b.title = v;
+        bars.appendChild(b);
+      });
+      var lab = document.createElement('div');
+      lab.className = 'xlab';
+      lab.textContent = labels[i];
+      col.appendChild(bars);
+      col.appendChild(lab);
+      el.appendChild(col);
+    });
+  }
+</script>
