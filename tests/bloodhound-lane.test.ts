@@ -783,6 +783,51 @@ test('collectPassAttribution: too small a sample is null, not a clean reading', 
   assert.equal(collectPassAttribution(attPass(attIds(0, 12), { hit: 1, none: 1 })), null);
 });
 
+// --- newerPassesSkipped: is the judged pass actually the newest?  2026-10-25 ---
+// THE REGRESSION THIS EXISTS FOR. The floor above is right, but it was silent, so
+// the snapshot note, the hourly alarm and every debrief called the judged pass "the
+// newest completed collect pass". On 2026-10-25 the lane closed lap 11 with an
+// 11-lead tail at 03:01Z and the reading described the 150-lead pass from 21:00Z
+// the evening before — one pass and ten hours back, with nothing saying so.
+
+test('collectPassAttribution: a lap tail newer than the judged pass is counted, not hidden', () => {
+  const log = [
+    attPass(attIds(0, 40), { hit: 25, none: 2 }),
+    attPass(attIds(500, 150), { hit: 0, none: 139 }), // the judged pass
+    attPass(attIds(900, 11), { hit: 0, none: 11 }),   // the 10-25 lap tail
+  ].join('\n');
+  const a = collectPassAttribution(log)!;
+  assert.equal(a.sampled, 150, 'still judges the newest pass big enough to read');
+  assert.equal(a.newerPassesSkipped, 1);
+  assert.equal(a.newerPassesSkippedLeads, 11);
+});
+
+test('collectPassAttribution: the newest pass reports zero skipped', () => {
+  const log = [
+    attPass(attIds(0, 40), { hit: 25, none: 2 }),
+    attPass(attIds(500, 40), { hit: 1, none: 2 }),
+  ].join('\n');
+  const a = collectPassAttribution(log)!;
+  assert.equal(a.newerPassesSkipped, 0);
+  assert.equal(a.newerPassesSkippedLeads, 0);
+});
+
+test('collectPassAttribution: several short passes stack up rather than cancel out', () => {
+  // The freeze shape: the collect batch is set under the floor, so every pass
+  // after the last big one is skipped and `cause` silently stops moving.
+  const log = [
+    attPass(attIds(0, 40), { hit: 25, none: 2 }),
+    attPass(attIds(100, 20), { hit: 0, none: 20 }),
+    attPass(attIds(200, 20), { hit: 0, none: 20 }),
+    attPass(attIds(300, 20), { hit: 0, none: 20 }),
+  ].join('\n');
+  const a = collectPassAttribution(log)!;
+  assert.equal(a.sampled, 40, 'the stale big pass is still what gets read');
+  assert.equal(a.newerPassesSkipped, 3);
+  assert.equal(a.newerPassesSkippedLeads, 60);
+  assert.ok(a.noSitePct < 70, 'and it reads healthy while three live passes resolved nothing');
+});
+
 // --- braveRefusals: could this pass search at all?  Added 2026-09-27 ---------
 // THE REGRESSION THIS EXISTS FOR (the mirror image of the one above). The 09-22
 // fix assumed the all-keys-refused line prints on every pass, so it hard-coded

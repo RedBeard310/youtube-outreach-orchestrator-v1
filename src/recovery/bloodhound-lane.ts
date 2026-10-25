@@ -1886,6 +1886,25 @@ export function collectPassAttribution(
    *  back with Brave credit, however loud the no-site rate. */
   braveGateRejected: number | null;
   historyPasses: number;
+  /** Completed passes NEWER than the judged one, skipped for being under
+   *  `minSample`, and the leads in them.
+   *
+   *  WHY THESE EXIST (2026-10-25). The judged pass is the newest one big enough
+   *  to read, which is deliberate — a short tail-of-lap batch is not a sample of
+   *  the lane — but nothing said so, and every caller calls what it gets back
+   *  "the newest completed collect pass". On 2026-10-25 that sentence was false:
+   *  the lane closed lap 11 at 03:01Z with an 11-lead tail, and the snapshot
+   *  (and the alarm) described the 150-lead pass from 21:00Z the evening before,
+   *  ten hours and one pass back, with nothing in either output saying a newer
+   *  pass existed.
+   *
+   *  It is a silent cap, and it can freeze. The collect batch is configuration
+   *  (it has been 40 and it has been 150); set it under the floor and EVERY pass
+   *  is skipped, `cause` stops moving, and the field that decides whether to
+   *  spend on Brave keys quietly describes a pass from weeks ago while still
+   *  being read as today's. Nonzero here means the reading is behind the lane. */
+  newerPassesSkipped: number;
+  newerPassesSkippedLeads: number;
 } | null {
   const minSample = opts.minSample ?? 30;
   const lines = logText.split('\n');
@@ -2005,6 +2024,8 @@ export function collectPassAttribution(
     braveAccepted,
     braveGateRejected,
     historyPasses: pick,
+    newerPassesSkipped: ends.length - 1 - pick,
+    newerPassesSkippedLeads: ends.slice(pick + 1).reduce((n, e) => n + e.of, 0),
   };
 }
 

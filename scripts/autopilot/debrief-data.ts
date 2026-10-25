@@ -3312,6 +3312,16 @@ async function main(): Promise<void> {
         no_site_pct: att.noSitePct,
         no_site: att.noSite,
         sampled: att.sampled,
+        // THIS BLOCK IS NOT ALWAYS THE NEWEST PASS (2026-10-25). The 30-lead floor
+        // above is deliberate — a lap tail is not a sample of the lane — but it was
+        // silent, so the note, the alarm and twelve debriefs all called the judged
+        // pass "the newest completed collect pass". On the day this shipped it was
+        // one pass and ten hours behind: an 11-lead tail closed lap 11 at 03:01Z and
+        // this block described the 150-lead pass from 21:00Z. Nonzero here says the
+        // reading is behind the lane; a standing nonzero says the batch has been set
+        // under the floor and `cause` has stopped moving while still reading as today.
+        newer_passes_skipped: att.newerPassesSkipped,
+        newer_passes_skipped_leads: att.newerPassesSkippedLeads,
         rewalk_pct: att.rewalkPct,
         brave_refusals: att.braveRefusals,
         leads_after_refusal: att.leadsAfterRefusal,
@@ -3737,9 +3747,23 @@ async function main(): Promise<void> {
         'low yield at a high lap count is a picked-over book rather than a fault, so read it ' +
         'against free_contact_points_prev_7d. ' +
         'READ site_resolution BEFORE BLAMING A PICKED-OVER BOOK: it describes the newest ' +
-        'completed collect pass, nine of thirteen collection methods need the creator website ' +
-        'first, and collapsed:true means the lane had almost no input that pass whatever the ' +
-        "book's state. brave_refusals IS NOT A SPENT PLAN — READ brave_refused_searches " +
+        'completed collect pass OF AT LEAST 30 LEADS, nine of thirteen collection methods ' +
+        'need the creator website first, and collapsed:true means the lane had almost no ' +
+        "input that pass whatever the book's state. " +
+        'CHECK newer_passes_skipped BEFORE CALLING THIS "the newest pass" (2026-10-25): the ' +
+        '30-lead floor is deliberate, because a short tail-of-lap batch is not a sample of ' +
+        'the lane, but it was silent, and every reader of this block called what it got back ' +
+        'the newest pass. On 2026-10-25 the lane closed lap 11 at 03:01Z with an 11-lead ' +
+        'tail and this block described the 150-lead pass from 21:00Z the evening before — ' +
+        'ten hours and one pass back, with nothing saying so. newer_passes_skipped is how ' +
+        'many completed passes are newer than the one described here and ' +
+        'newer_passes_skipped_leads is how many leads they walked; 0 means this really is ' +
+        'the newest. A standing nonzero is the shape to chase: the collect batch is ' +
+        'configuration (it has been 40 and it has been 150), and set under the floor every ' +
+        'pass is skipped, cause stops moving, and the field that decides whether to buy ' +
+        'Brave keys describes a pass from weeks ago while reading as today. The whole block ' +
+        'is null when no pass clears the floor, which is unknown and NOT a clean lane. ' +
+        'brave_refusals IS NOT A SPENT PLAN — READ brave_refused_searches ' +
         'INSTEAD (2026-10-20): the first is the latched all-keys-refused warning, which ' +
         'prints at most once per pass and fires on a single transient 429 against a funded ' +
         'plan, and cause named search_dead off it being nonzero. On 2026-10-20 that ' +
