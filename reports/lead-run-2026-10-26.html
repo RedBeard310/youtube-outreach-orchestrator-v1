@@ -1,0 +1,262 @@
+<title>Lead Run Debrief · 2026-10-26</title>
+<style>
+  :root {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+      --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+      --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+    --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+    --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 40px 22px 80px; }
+  .eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); font-weight: 600; }
+  h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.12; margin: 10px 0 6px; text-wrap: balance; letter-spacing: -.02em; }
+  h2 { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); margin: 44px 0 16px; font-weight: 700; }
+  h3 { font-size: 18px; margin: 0 0 6px; letter-spacing: -.01em; }
+  p { margin: 0 0 14px; }
+  .lede { font-size: 18px; color: var(--ink-soft); max-width: 68ch; }
+  .tag { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--amber-soft); color: var(--amber); letter-spacing: .02em; }
+  .tag.good { background: var(--teal-soft); color: var(--teal); }
+  .grid { display: grid; gap: 14px; }
+  .stats { grid-template-columns: repeat(4, 1fr); margin-top: 26px; }
+  @media (max-width: 720px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; box-shadow: var(--shadow); }
+  .stat .n { font-size: 30px; font-weight: 750; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .stat .l { font-size: 12.5px; color: var(--ink-soft); margin-top: 3px; }
+  .stat .s { font-size: 12px; margin-top: 8px; font-weight: 600; }
+  .up { color: var(--good); } .down { color: var(--red); } .warn { color: var(--amber); }
+  .accent-red { border-left: 3px solid var(--red); }
+  .accent-teal { border-left: 3px solid var(--teal); }
+  .accent-amber { border-left: 3px solid var(--amber); }
+
+  /* shape-of-day bar strips */
+  .strip { display: flex; align-items: flex-end; gap: 10px; height: 130px; padding: 14px 16px 10px; overflow-x: auto; }
+  .col { flex: 1 0 40px; display: flex; flex-direction: column; justify-content: flex-end; height: 100%; }
+  .col .bars { display: flex; align-items: flex-end; gap: 3px; height: 100%; }
+  .bar { flex: 1 1 0; border-radius: 3px 3px 0 0; background: var(--teal); min-height: 3px; }
+  .bar.zero { background: var(--red); height: 3px !important; }
+  .bar.stop { background: var(--red); }
+  .bar.watch { background: var(--amber); }
+  .xlab { font-size: 11px; color: var(--ink-soft); text-align: center; padding-top: 6px; font-variant-numeric: tabular-nums; }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-soft); padding: 0 16px 14px; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+
+  .q { border-radius: 14px; padding: 20px 22px; margin-bottom: 14px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); }
+  .q .ask { font-size: 17px; font-weight: 700; color: var(--ink); margin-bottom: 10px; display: flex; gap: 10px; align-items: baseline; }
+  .q .ask .qn { color: var(--red); font-weight: 800; flex: 0 0 auto; }
+  .q.accent-teal .ask .qn { color: var(--teal); }
+  .q p { color: var(--ink-soft); }
+  .q b { color: var(--ink); }
+  .pill { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink); background: var(--panel-2); padding: 1px 7px; border-radius: 6px; border: 1px solid var(--line); white-space: nowrap; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+  th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); }
+  td .num { font-variant-numeric: tabular-nums; font-weight: 650; }
+  .fix td:first-child { color: var(--good); font-weight: 650; }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); box-shadow: var(--shadow); }
+  ol.recs { padding-left: 0; list-style: none; counter-reset: r; margin: 0; }
+  ol.recs li { counter-increment: r; position: relative; padding: 14px 16px 14px 52px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 10px; box-shadow: var(--shadow); }
+  ol.recs li::before { content: counter(r); position: absolute; left: 14px; top: 14px; width: 26px; height: 26px; border-radius: 8px; background: var(--teal-soft); color: var(--teal); font-weight: 800; font-size: 14px; display: grid; place-items: center; }
+  ol.recs b { color: var(--ink); }
+  .foot { margin-top: 46px; padding: 16px 18px; border-radius: 12px; background: var(--amber-soft); border: 1px solid var(--line); font-size: 14px; color: var(--ink-soft); }
+  .foot b { color: var(--ink); }
+  .muted { color: var(--ink-soft); font-size: 13.5px; }
+  code { background: var(--panel-2); padding: 1px 5px; border-radius: 5px; border: 1px solid var(--line); font-size: .9em; }
+</style>
+
+<div class="wrap">
+
+
+  <div class="eyebrow">Lead Run Debrief · YouTube outreach</div>
+  <h1>2026-10-26: 13 mailboxes left, and 11 of the sidelined ones are healthy</h1>
+  <p class="lede">Sunday, so nothing was sent and nothing should have been. The reading that matters is the fleet, and yesterday's "it stopped falling" did not hold: <b>five more mailboxes came off the clear list, leaving 13 of 58 able to start a new email.</b> The reason is worth your time. Of the 45 mailboxes now held back, <b>11 are already healthy</b>. Eight are sitting out a 48-hour waiting period with good scores, three of those within an hour of finishing it, and three more are held only because a sibling address on the same domain is sick.</p>
+  <div style="margin-top:14px">
+    <span class="tag">13 OF 58 CLEAR · LOWEST THIS MONTH</span>
+    <span class="tag good" style="margin-left:6px">0 NEWLY STOPPED</span>
+    <span class="tag" style="margin-left:6px">NOT A SENDING DAY</span>
+  </div>
+
+  <div class="grid stats">
+    <div class="card stat accent-red">
+      <div class="n">13</div>
+      <div class="l">mailboxes clear to start a new email, of 58</div>
+      <div class="s down">was 18 · 5 moved to watch, 0 stopped</div>
+    </div>
+    <div class="card stat accent-amber">
+      <div class="n">11</div>
+      <div class="l">held mailboxes that are already healthy</div>
+      <div class="s warn">8 on a 48h clock, 3 held by a sibling</div>
+    </div>
+    <div class="card stat accent-teal">
+      <div class="n">15</div>
+      <div class="l">contact points found by the recovery lane</div>
+      <div class="s">2 email addresses, from 10 people</div>
+    </div>
+    <div class="card stat">
+      <div class="n">1</div>
+      <div class="l">person parked in <code>approved_hold</code></div>
+      <div class="s">6,822 to 6,823 · shelf 5,147 unwritten</div>
+    </div>
+  </div>
+
+  <h2>The shape of the day</h2>
+  <div class="card" style="padding:0">
+    <div class="strip" id="band"></div>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--teal)"></span>clear to send</span>
+      <span><span class="dot" style="background:var(--amber)"></span>on watch</span>
+      <span><span class="dot" style="background:var(--red)"></span>stopped</span>
+    </div>
+  </div>
+  <p class="muted">Seven mornings, all read off the health gate's own history at 07:05Z, so this is one instrument against itself. Clear went <b>31, 27, 20, 22, 17, 18, 13</b>. Watch went <b>3, 6, 12, 6, 7, 6, 11</b>. Stopped held at <b>34</b> for the third morning. Nothing was stopped today. The clear count fell anyway, because a mailbox moved to watch gets zero slots for a new email, so watch costs the same as stopped for new volume. Follow-ups still go out from it.</p>
+
+  <div class="card" style="padding:0; margin-top:18px">
+    <div class="strip" id="cost"></div>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--teal)"></span>published cost per enriched lead, by cycle</span>
+      <span><span class="dot" style="background:var(--red)"></span>no figure published</span>
+    </div>
+  </div>
+  <p class="muted">The same field across nine mornings: <b>$0.32, $1.43, $1.07, none, $1.43, $0.86, $1.73, $1.68</b>, and today <b>$0.17</b>. It is supposed to be what one lead costs to enrich. Nothing about enrichment changed across those nine days. The number moved because it was one day's whole bill divided by however few leads happened to finish, and that is now fixed. The last bar is the first measured reading.</p>
+
+  <h2>The three questions</h2>
+
+  <div class="q accent-red">
+    <div class="ask"><span class="qn">Q1</span><span>Why did the sendable fleet shrink on a day nothing was sent?</span></div>
+    <p>Because five mailboxes were moved from clear to watch, and <b>a mailbox on watch is given no slots for a new email</b>. Nothing was stopped, the stopped band held at 34, and the clear count still fell 18 to 13. That is the lowest it has been this month, against 34 a week ago.</p>
+    <p>Here is the part that changes how you read it. <b>11 of the 45 held mailboxes are healthy right now.</b> Eight of them have a clean reading and are waiting out a rule that needs 48 unbroken hours at a score of 90 or better before the hold lifts. Three of those eight are at <span class="pill">47 of 48 hours</span>, so they clear within the hour unless a new reading knocks them back. One at 96.7 has been stopped since Friday and is 40 hours into the same wait. Three more are on watch for no fault of their own: when two of a domain's three addresses are sick, the third is held too, and all three of those score <span class="pill">96.7</span>.</p>
+    <p>So the two rules compound. The bar to go on watch is a score under 90, and the bar to come off a hold is 90 or better held for two full days. A single email landing in a spam folder drops a mailbox from 96.7 to about 89.9, which costs it two days, and through the sibling rule it can cost its two neighbours the same two days. <code>contentgetsclientsdigital.com</code> did exactly that at 04:05Z today: one address read 88.4, and a sibling scoring 96.7 that had been clean since 10-16 was held alongside it. <b>Two of today's five lost slots are collateral, not sickness.</b></p>
+    <p>None of this lives in the five pipeline repos. The gate is <code>scripts/inbox-health.py</code> in <code>automator</code>, and both numbers it turns on are config.</p>
+  </div>
+
+  <div class="q accent-amber">
+    <div class="ask"><span class="qn">Q2</span><span>Is the recovery lane finding anything new?</span></div>
+    <p>Barely, and the reason is that it has read this book before. The collect pass started a fresh lap and is back in the easy half, so web search cost almost nothing: <span class="pill">4 searches</span> against 440 yesterday, and only 4 of 150 leads had no website on file. It found <b>673 contact methods and 669 of them were already recorded</b>. Four were new, from 3 of 150 people. Across the cycle the lane added 15 contact points and 2 email addresses, against 94 points and 21 addresses over the prior week.</p>
+    <p>That is not a fault. The lane has walked its 2,398-lead book 12 times, and a re-walk is supposed to be mostly recognition. It does mean <b>the lane's output is now set by how much of its book is still unread, which is none of it</b>, rather than by Brave credit or by the verify queue. Both of those are clear: zero search refusals, and <code>stranded</code> held at 3.</p>
+    <p>One real fault did show up in the method errors, and it is fixed. Of 175 errors in the judged pass, <b>100 were the same condition</b>, <code>cross-domain redirect</code>, spread across five different methods. A redirect is what a link-shortening address does: <code>pin.it</code> answers by sending you to <code>pinterest.com</code>. When a lead's channel links one of those, the code was filing it as that creator's website, which did worse than waste a page fetch. It filled the website slot, so the lane never went on to check the site it had already found for that person, and never asked Brave either. Every page method on that lead then died on the same redirect, every lap, permanently. Nine of the hundred were <code>pin.it</code>, eight <code>paypal.me</code>, four <code>selar.co</code>, three <code>openinapp.link</code>.</p>
+  </div>
+
+  <div class="q accent-teal">
+    <div class="ask"><span class="qn">Q3</span><span>Is anything broken?</span></div>
+    <p><b>No.</b> Zero fatal error signatures, no halt flag, no escalation, and <b>$0 billed to the Anthropic API</b>. Enrichment did 1 batch of 1 lead because <b>6,813 of 6,823 parked leads are already enriched, 99.9%</b>, so ten are left in the whole pool. Apify sat at its $10 reserve and ran nothing, which is deliberate until the allowance refills on 11-01. The 36,909 <code>below_threshold</code> rows rewritten in 149 seconds at 06:41Z are the weekly subscriber-floor sweep re-stamping its own population, not a demotion: the population moved by 24.</p>
+    <p>The YouTube key pool reads 15 working of 66. That is settled and inert. The quota on those projects was cut, so a midnight reset cannot refill them, and finding new channels is off by your 2026-09-08 order anyway. The orchestrator's own send path fired once at 07:20Z and sent one email, which is a lead parked under <code>review_status=approved</code> rather than off the <code>approved_hold</code> shelf. It landed after the cycle closed, so it belongs to tomorrow's count.</p>
+  </div>
+
+  <h2>The thing worth your attention</h2>
+  <div class="card accent-red">
+    <p style="margin-bottom:8px"><b>Monday starts with 13 mailboxes able to open a conversation, and the prior week ran at about 136 emails a day on 18.</b></p>
+    <p class="muted" style="margin-bottom:0">That is roughly a 28% cut in new-email capacity going into the first sending day of the week. Over the prior seven days, <b>680 people got an email and 10 of them had never heard from us</b>, which is 1.5%. The shelf is now <b>5,147 creators enriched and never written to</b>, and the count already written to has not moved off 1,666 in ten days. Two ceilings hold that, and they stack: the fleet decides how many new emails exist at all, and Siege's slot order decides who gets them. Eleven of the held mailboxes should come back on their own over the next two days if nothing re-dips. Whether they do is the thing to read on Monday and Tuesday, because if they clear, capacity roughly doubles without anyone touching a setting.</p>
+  </div>
+
+  <h2>The cycle in numbers</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Reading</th><th>This cycle</th><th>Day before</th><th>What it means</th></tr></thead>
+      <tbody>
+        <tr><td>Emails loaded</td><td class="num">0</td><td class="num">0</td><td>Sunday. <code>binding_constraint: not_a_sending_day</code></td></tr>
+        <tr><td>Clear to send (health gate, 07:05Z)</td><td class="num down">13</td><td class="num">18</td><td>Of 58. Lowest this month, was 34 a week ago</td></tr>
+        <tr><td>On watch / stopped</td><td class="num">11 / 34</td><td class="num">6 / 34</td><td>Stopped flat for a third morning. Watch does the damage</td></tr>
+        <tr><td>Moves inside the cycle</td><td class="num down">0 up, 5 watch, 0 stop</td><td class="num">3 up, 2 watch, 0 stop</td><td><code>band_delta_comparable: true</code>, 24h apart</td></tr>
+        <tr><td>Held but healthy</td><td class="num warn">11 of 45</td><td class="num">not measured</td><td>8 on a 48h clock, 3 held by a sick sibling</td></tr>
+        <tr><td>Parked into <code>approved_hold</code></td><td class="num">1</td><td class="num">1</td><td>Pool 6,823. <code>needs_contact</code> 3,431</td></tr>
+        <tr><td>Shelf: never written to</td><td class="num">5,147</td><td class="num">5,146</td><td>Against 1,666 already written to, unmoved for ten days</td></tr>
+        <tr><td>Free recovery lane</td><td class="num">15 points · 2 addresses · 10 people</td><td class="num">12 · 2 · 4</td><td>Prior 7 days: 94 points, 21 addresses</td></tr>
+        <tr><td>Collect pass judged</td><td class="num">150 leads · 2.7% no site</td><td class="num">150 · 92.7%</td><td><code>cause: resolution_ok</code>, lap 12, book 2,398</td></tr>
+        <tr><td>Methods found vs already on file</td><td class="num">673 found · 669 known</td><td class="num">110 · 110</td><td>4 new points from 3 of 150 people. Re-walk 100%</td></tr>
+        <tr><td>Brave searches in the cycle</td><td class="num">4</td><td class="num">440</td><td>Back in the half of the book that carries a website</td></tr>
+        <tr><td>Method errors in the judged pass</td><td class="num warn">175</td><td class="num">89</td><td>100 of them one fixable fault, below</td></tr>
+        <tr><td>Enrichment</td><td class="num">1 batch, 1 lead</td><td class="num">1 batch, 1 lead</td><td>99.9% bundled, ten leads left in the pool</td></tr>
+        <tr><td>Cost per enriched lead</td><td class="num">$0.1654</td><td class="num">$1.6791</td><td>First measured reading: 30 days, 770 leads, $127.36</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>What broke → what's fixed</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Issue</th><th>Mechanism</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr class="fix"><td>The field that decides whether email recovery can afford to run was one day's whole LLM bill wearing a per-lead label</td><td><code>openrouter_usd_per_enriched_lead</code> divided the account's daily spend by the leads that day enriched. That is a real unit cost only while enrichment is the account's heavy caller, which stopped being true when the pool finished bundling: the chain now idles on 0 to 9 trickle arrivals a day while the account still spends about $1.50 on everything else. The published figure swung <b>$0.32 to $3.74</b> over the month on nothing but its denominator, and read $0.00 on 10-16, which says enrichment is free. It had never been multiplied through only because the Apify allowance has been spent all month</td><td class="up">Fixed in <code>5abd704</code> (orchestrator). The rate is now the lowest of four trailing windows, each needing 30 leads and a real daily reading. Today: <b>$0.1654</b> over 30 days and 770 leads, against a known-good $0.1468 from 10-01</td></tr>
+        <tr class="fix"><td>A link that only redirects was becoming the lead's website, which ended that lead for good</td><td>100 of 175 method errors, 57%, were <code>cross-domain redirect</code> across five methods. <code>pin.it</code>, <code>selar.co</code>, <code>openinapp.link</code> and <code>t.mtrbio.com</code> were filling the website slot, so the lane never fell through to the site it had already stored or to a Brave search, and every page method died on the same redirect each lap. The guard list already held every analogue (<code>bit.ly</code>, <code>goo.gl</code>, <code>paypal.me</code>, <code>linktr.ee</code>) and had no test over it</td><td class="up">Fixed in <code>e2a9b55</code> (email repo). Public redirectors and link-in-bio hosts added, plus a 21-assertion selftest. Branded shorteners left alone on purpose, see the levers below</td></tr>
+        <tr><td>45 of 58 mailboxes cannot open a new conversation</td><td>Health bands, set hourly in <code>automator</code>. Clear count 34 to 13 in a week. 11 of the 45 are healthy and waiting on timers</td><td class="warn">Open, and still the only thing that sets volume. Worse than yesterday</td></tr>
+        <tr><td>One sick address holds its two healthy siblings</td><td>The domain rule: two of three addresses sick puts the third on watch. Three mailboxes scoring 96.7 are held this way today, and a 96.7 clean since 10-16 was pulled in at 04:05Z</td><td class="warn">Working as designed, and its cost is now measurable. A deliberate call, in <code>automator</code></td></tr>
+        <tr><td>The recovery lane is re-reading a book it already knows</td><td>669 of 673 contact methods found were already on file. Lap 12 of 2,398 leads, 100% re-walk</td><td>Expected. It caps the lane at a point or two a day until new people arrive</td></tr>
+        <tr><td>Apify email recovery did nothing</td><td>$9.9997 left against a $10 reserve, so spendable is -$0.0003. 0 batches, 0 price strikes, not halted</td><td class="warn">By design. The $100 allowance is the calendar month and refills on 11-01</td></tr>
+        <tr><td>One collection method has been silent for 68 days</td><td><code>04-holehe</code>, last contact point 2026-08-18, 51 lifetime. Four methods produced this cycle: <code>34-channel-page</code>, <code>16-jsonld</code>, <code>01-mailto</code>, <code>02-subpages</code></td><td>Watching. Not worth a fix at 51 points lifetime</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Recommended next, ranked</h2>
+  <ol class="recs">
+    <li><b>Read the fleet on Monday and Tuesday before changing anything.</b> Eleven held mailboxes are healthy and on timers, three of them within an hour of clearing. If they come back, you go from 13 clear to around 24 with no action at all, and capacity roughly doubles. If they get knocked back below 90 again on Monday's sending volume, the timers are being reset faster than they run out, and that is the real problem rather than any individual mailbox.</li>
+    <li><b>The two numbers in the health gate are worth one look.</b> The watch bar is a score under 90 and recovery needs 90 or better for 48 straight hours, so a mailbox at 89.9 loses two days and, through the sibling rule, can cost two neighbours the same two days. Today that cost two of five lost slots on addresses scoring 96.7. Loosening either number trades deliverability for volume, so it is your call, not mine. What is new is that the price is now visible: 11 of 45 held mailboxes are healthy.</li>
+    <li><b>Decide whether to follow a creator's own branded shortener.</b> This cycle had <code>aba.link</code> redirecting to <code>andersonadvisors.com</code>, <code>ltrp.xyz</code> to <code>linguatrip.com</code>, <code>genesisivf.org</code> to <code>genesisfertilityhospitals.com</code>. Those destinations really are the creator's site, reached from a link the creator published, and the lane refuses all of them, so those leads yield nothing on every lap. The safe version is to require the destination to pass the same ownership test a search result already has to pass: the domain has to read like the creator's name and their name has to appear on the page. That is stronger evidence than the search path you already accept. I left it alone because it changes what gets collected, and that is a data-quality decision.</li>
+    <li><b>Plan for Apify's 11-01 refill with a real unit cost.</b> $100 of allowance at the measured $0.115 a lead is roughly 700 recovered leads. Enriching them costs about <b>$116</b> at today's newly measured $0.1654 a lead. OpenRouter holds $66.79 with 43 days of runway at the current burn, so the refill needs a top-up decision beside it. The old figure would have said $190 and told you the pipeline could not afford its own recovery.</li>
+    <li><b>Nothing to do about the recovery lane's thin yield.</b> 15 contact points and 2 addresses, with 669 of 673 methods already on file. The book is fully walked, so the lane now tracks arrivals rather than effort. Finding new channels is off by your order, which means the only inflow is the weekly subscriber-floor sweep and the two email addresses a day this lane recovers.</li>
+  </ol>
+
+  <div class="foot">
+    <b>Cost and safety:</b> <b>$0 Anthropic</b> this cycle. OpenRouter is at <b>$66.79</b> against $1.56 a day across the account, about <b>43 days of runway</b>. Apify sits at its $10 reserve until 11-01. <b>0 fatal error signatures, no halt flag, no escalation.</b> Discovery wrote <b>0 new channels</b>, which is your 2026-09-08 order working as intended and not a stall. Nothing was sent, which a Sunday is supposed to look like. Two fixes shipped: <code>5abd704</code> in the orchestrator, <code>e2a9b55</code> in the email repo.
+  </div>
+
+</div>
+
+<script>
+  // health gate at 07:05Z each morning: clear / watch / stop, 2026-10-20 -> 2026-10-26
+  renderStrip('band',
+    [[31,3,24],[27,6,25],[20,12,26],[22,6,30],[17,7,34],[18,6,34],[13,11,34]],
+    ['10-20','10-21','10-22','10-23','10-24','10-25','10-26'],
+    ['', 'watch', 'stop']);
+  // published openrouter_usd_per_enriched_lead, cents, 2026-10-18 -> 2026-10-26
+  renderStrip('cost',
+    [[32],[143],[107],[0],[143],[86],[173],[168],[17]],
+    ['10-18','10-19','10-20','10-21','10-22','10-23','10-24','10-25','10-26'],
+    ['']);
+
+  function renderStrip(id, cols, labels, kinds) {
+    var el = document.getElementById(id);
+    var max = 0;
+    cols.forEach(function (c) { c.forEach(function (v) { if (v > max) max = v; }); });
+    cols.forEach(function (c, i) {
+      var col = document.createElement('div');
+      col.className = 'col';
+      var bars = document.createElement('div');
+      bars.className = 'bars';
+      c.forEach(function (v, j) {
+        var b = document.createElement('div');
+        b.className = 'bar' + (v === 0 ? ' zero' : '') + (kinds[j] ? ' ' + kinds[j] : '');
+        b.style.height = Math.max(3, Math.round((v / max) * 100)) + '%';
+        b.title = v;
+        bars.appendChild(b);
+      });
+      var lab = document.createElement('div');
+      lab.className = 'xlab';
+      lab.textContent = labels[i];
+      col.appendChild(bars);
+      col.appendChild(lab);
+      el.appendChild(col);
+    });
+  }
+</script>
