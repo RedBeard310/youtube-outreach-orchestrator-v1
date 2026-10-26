@@ -2915,6 +2915,161 @@ export function enrichmentChainFacts(
   return { batches, leads_done: done, leads_failed: failed, in_flight: Math.max(0, launched - batches) };
 }
 
+// WHY THE PER-LEAD ENRICHMENT COST IS MEASURED OVER A WINDOW (2026-10-26).
+//
+// `openrouter_usd_per_enriched_lead` used to be one cycle's whole account spend
+// divided by the leads that cycle enriched. That reads as a unit cost and is only
+// one when the backfill is the account's heavy caller, which it was while the pool
+// was draining. It no longer is: the pool is 99.9% bundled, the chain idles, and a
+// cycle enriches 0-9 trickle arrivals while the account still spends ~$1.50/day on
+// everything else. So the published figure became "today's whole account bill, in a
+// field labelled per lead", and across 2026-10-10..26 it swung $0.3191 to $3.7355 on
+// nothing but the size of its denominator. One cycle read $0.00/lead on 10-16, which
+// says enrichment is free.
+//
+// It has never yet been multiplied through, because `channels_affordable` has been 0
+// all month (Apify allowance spent, $10 reserve). That is the freeze: the moment the
+// allowance resets on the 1st, channels_affordable jumps to ~1,280 and whatever
+// 1-lead number that morning produced becomes the multiplier on
+// `openrouter_cost_of_projected_leads_usd` and on `balance_covers_projected` — the
+// field that decides whether the recovery lane can afford to run.
+//
+// So measure it over several trailing windows and keep the TIGHTEST of them. Every
+// window charges the whole account bill to enrichment, so every window is an upper
+// bound on the true cost, and the lowest of several upper bounds is the best one — no
+// threshold on "was the backfill busy" needed, which is the judgement a sample floor
+// alone cannot make. A window only counts if it holds at least PER_LEAD_SAMPLE_FLOOR
+// leads and every day in it has a real spend reading, so nothing is extrapolated;
+// this repo has written daily `account_spend_usd` into its own snapshots since 08-31
+// and the chain log holds every batch, so both columns are measured.
+//
+// On 2026-10-26 the windows read $1.4884/1 lead, $11.83/8, $23.50/33 and $128.90/770,
+// and the answer is the 30-day $0.167 — which agrees with the 10-01 live shape
+// ($0.1468 over 133 leads) instead of being 9x it. It self-sharpens: when the backfill
+// runs hot again the 1-day window becomes the tightest and wins on its own. When no
+// window clears the floor the cost is null and `per_lead_unmeasured` names why — null
+// already propagates to an unknown projection, the conservative answer, where a wrong
+// number is not.
+export const PER_LEAD_WINDOWS_DAYS = [1, 7, 14, 30] as const;
+/** Leads an enrichment sample needs before its dollars-per-lead is publishable. At
+ *  ~15 model calls a lead that is ~450 calls, enough that one odd lead cannot own
+ *  the rate. Below it the figure is the account's bill, not a unit cost. */
+export const PER_LEAD_SAMPLE_FLOOR = 30;
+
+export type CostWindow = {
+  /** Trailing length in days, ending at cycle close. */
+  days: number;
+  /** Summed account spend over the window, or null if any day in it has no reading. */
+  spend_usd: number | null;
+  /** Leads the enrichment chain finished in the same window. */
+  leads: number;
+  /** Days in the window that had a spend reading, for the reader. */
+  days_measured: number;
+};
+
+export type PerLeadCost = {
+  usd: number | null;
+  window_days: number | null;
+  sample_leads: number;
+  sample_spend_usd: number | null;
+  unmeasured: string | null;
+};
+
+/**
+ * Dollars per enriched lead: the tightest upper bound any usable trailing window
+ * gives. Pure. Returns null plus a named reason rather than a rate it cannot
+ * measure, because this feeds a spend decision.
+ */
+export function perEnrichedLeadCost(
+  windows: CostWindow[],
+  floorLeads: number = PER_LEAD_SAMPLE_FLOOR,
+): PerLeadCost {
+  const ordered = [...windows].sort((a, b) => a.days - b.days);
+  const widest = ordered[ordered.length - 1];
+  // A complete window with a zero bill is a missing meter, not free enrichment.
+  const usable = ordered.filter((w) => w.leads >= floorLeads && w.spend_usd !== null && w.spend_usd > 0);
+  let best: CostWindow | null = null;
+  let bestUsd = Infinity;
+  for (const w of usable) {
+    const usd = w.spend_usd! / w.leads;
+    // Strictly lower, so a tie keeps the narrower (fresher) window.
+    if (usd < bestUsd) { best = w; bestUsd = usd; }
+  }
+  if (best) {
+    return {
+      usd: Number(bestUsd.toFixed(4)),
+      window_days: best.days,
+      sample_leads: best.leads,
+      sample_spend_usd: Number(best.spend_usd!.toFixed(4)),
+      unmeasured: null,
+    };
+  }
+  if (!widest) {
+    return { usd: null, window_days: null, sample_leads: 0, sample_spend_usd: null, unmeasured: 'no_windows' };
+  }
+  // Report against the widest window examined, so a short sample shows how short.
+  const cleared = ordered.filter((w) => w.leads >= floorLeads);
+  const reason = cleared.length === 0
+    ? 'sample_below_floor'
+    : cleared.every((w) => w.spend_usd === null)
+      ? 'no_spend_reading'
+      : 'spend_reading_zero';
+  return {
+    usd: null,
+    window_days: null,
+    sample_leads: widest.leads,
+    sample_spend_usd: widest.spend_usd === null ? null : Number(widest.spend_usd.toFixed(4)),
+    unmeasured: reason,
+  };
+}
+
+export type CostDay = {
+  /** Pacific cycle date this day's readings belong to. */
+  date: string;
+  /** That cycle's measured OpenRouter account spend, or null if never recorded. */
+  spend_usd: number | null;
+  leads: number;
+};
+
+/**
+ * Fold per-day readings (NEWEST FIRST) into trailing windows. Pure.
+ *
+ * A window's spend is null unless every day in it has a reading AND the window is
+ * fully covered, so a gap in the snapshot history cannot quietly shrink the
+ * numerator while the chain log still contributes that day's leads — which would
+ * understate the cost, the unsafe direction.
+ */
+export function costWindows(
+  days: CostDay[],
+  windowDays: readonly number[] = PER_LEAD_WINDOWS_DAYS,
+): CostWindow[] {
+  return windowDays.map((n) => {
+    const slice = days.slice(0, n);
+    const measured = slice.filter((d) => d.spend_usd !== null);
+    const complete = slice.length === n && measured.length === n;
+    return {
+      days: n,
+      spend_usd: complete ? Number(slice.reduce((s, d) => s + (d.spend_usd ?? 0), 0).toFixed(4)) : null,
+      leads: slice.reduce((s, d) => s + d.leads, 0),
+      days_measured: measured.length,
+    };
+  });
+}
+
+/** One prior cycle's measured OpenRouter account spend, out of the snapshot this
+ *  script wrote that day. Written since 2026-08-31; null on a missing or malformed
+ *  file so an absent day reads as unknown rather than as a $0 bill. */
+export function priorAccountSpend(date: string, logsDir: string = LOGS): number | null {
+  const p = join(logsDir, `autopilot-debrief-${date}.json`);
+  if (!existsSync(p)) return null;
+  try {
+    const prior = JSON.parse(readFileSync(p, 'utf8')) as {
+      openrouter_today?: { account_spend_usd?: unknown };
+    };
+    return num(prior.openrouter_today?.account_spend_usd);
+  } catch { return null; }
+}
+
 /**
  * Convert the remaining Apify allowance into leads, and those leads into the
  * OpenRouter dollars enriching them will cost. Pure arithmetic on measured rates,
@@ -2925,11 +3080,10 @@ export function projectRecoveryBudget(input: {
   pricePerRun: number;
   recoveredInCycle: number | null;
   channelsInCycle: number;
-  enrichedInCycle: number;
-  accountSpendUsd: number | null;
+  perLead: PerLeadCost;
   balanceUsd: number | null;
 }): Record<string, unknown> {
-  const { spendableUsd, pricePerRun, recoveredInCycle, channelsInCycle, enrichedInCycle } = input;
+  const { spendableUsd, pricePerRun, recoveredInCycle, channelsInCycle, perLead } = input;
   const channels = spendableUsd !== null && spendableUsd > 0
     ? Math.floor(spendableUsd / pricePerRun)
     : 0;
@@ -2937,21 +3091,23 @@ export function projectRecoveryBudget(input: {
     ? Number((recoveredInCycle / channelsInCycle).toFixed(4))
     : null;
   const projectedLeads = perChannel !== null ? Math.round(channels * perChannel) : null;
-  // Cost per enriched lead, from the provider's own meter over the same cycle that
-  // did the enriching. Attributing ALL account spend to enrichment is an upper
-  // bound and deliberately so: on a cycle where the backfill is the only heavy
-  // caller it is near-exact, and erring high is the safe direction for a runway.
-  const perLead = input.accountSpendUsd !== null && enrichedInCycle > 0
-    ? Number((input.accountSpendUsd / enrichedInCycle).toFixed(4))
-    : null;
-  const enrichCost = projectedLeads !== null && perLead !== null
-    ? Number((projectedLeads * perLead).toFixed(2))
+  const enrichCost = projectedLeads !== null && perLead.usd !== null
+    ? Number((projectedLeads * perLead.usd).toFixed(2))
     : null;
   return {
     channels_affordable: channels,
     recovered_per_channel: perChannel,
     projected_leads: projectedLeads,
-    openrouter_usd_per_enriched_lead: perLead,
+    // Still an upper bound: ALL account spend in the window is charged to
+    // enrichment, because no repo on this account meters itself. Erring high is the
+    // safe direction for a runway. What changed is that the denominator is now a
+    // sample big enough to carry a rate (see PER_LEAD_SAMPLE_FLOOR).
+    openrouter_usd_per_enriched_lead: perLead.usd,
+    per_lead_window_days: perLead.window_days,
+    per_lead_sample_leads: perLead.sample_leads,
+    per_lead_sample_spend_usd: perLead.sample_spend_usd,
+    per_lead_sample_floor: PER_LEAD_SAMPLE_FLOOR,
+    per_lead_unmeasured: perLead.unmeasured,
     openrouter_cost_of_projected_leads_usd: enrichCost,
     openrouter_balance_usd: input.balanceUsd,
     balance_covers_projected: enrichCost !== null && input.balanceUsd !== null
@@ -3000,10 +3156,33 @@ function recoveryBudgetHealth(
   }
 
   let chain = { batches: 0, leads_done: 0, leads_failed: 0, in_flight: 0 };
+  let chainText = '';
   const chainLog = join(LOGS, 'backfill-2026-07', 'chain.log');
   if (existsSync(chainLog)) {
-    try { chain = enrichmentChainFacts(readFileSync(chainLog, 'utf8'), sinceISO, untilISO); } catch { /* keep zeros */ }
+    try {
+      chainText = readFileSync(chainLog, 'utf8');
+      chain = enrichmentChainFacts(chainText, sinceISO, untilISO);
+    } catch { /* keep zeros */ }
   }
+
+  // Per-day spend and enrichment for the trailing windows, newest first. Spend comes
+  // from each cycle's own snapshot (the live reading for the cycle being written now,
+  // which has no file yet); leads come from the chain log over the same 24h.
+  const liveSpend = typeof openrouter.account_spend_usd === 'number' ? openrouter.account_spend_usd : null;
+  const DAY_MS = 24 * 60 * 60 * 1000;
+  const widest = Math.max(...PER_LEAD_WINDOWS_DAYS);
+  const costDays: CostDay[] = [];
+  for (let i = 0; i < widest; i++) {
+    const dayUntil = new Date(Date.parse(untilISO) - i * DAY_MS).toISOString();
+    const daySince = new Date(Date.parse(untilISO) - (i + 1) * DAY_MS).toISOString();
+    const date = cyclePacificDay(daySince);
+    costDays.push({
+      date,
+      spend_usd: i === 0 ? liveSpend : priorAccountSpend(date),
+      leads: chainText ? enrichmentChainFacts(chainText, daySince, dayUntil).leads_done : 0,
+    });
+  }
+  const perLead = perEnrichedLeadCost(costWindows(costDays));
 
   // The lane writes its live ledger reading every tick, resting or not
   // (apify-endspec-loop.sh, 2026-10-02). Prefer it when it is newer than the newest
@@ -3056,11 +3235,10 @@ function recoveryBudgetHealth(
       pricePerRun: PRICE_PER_RUN,
       recoveredInCycle: recovered,
       channelsInCycle: channels,
-      enrichedInCycle: chain.leads_done,
-      accountSpendUsd: typeof openrouter.account_spend_usd === 'number' ? openrouter.account_spend_usd : null,
+      perLead,
       balanceUsd: typeof openrouter.balance_usd === 'number' ? openrouter.balance_usd : null,
     }),
-    note: 'Apify allowance read off the newest endspec run log (no token, no network) — `budget_read_at` is its age. `projection` turns the unspent allowance into leads at the cycle\'s measured recovery rate, then into the OpenRouter dollars those leads will cost to enrich, so the two budgets are decided together. `openrouter_usd_per_enriched_lead` charges ALL account spend to enrichment, which is an upper bound. `halted`/`price_strikes` are the lane\'s own brake: 2 strikes stops it for the month.',
+    note: 'Apify allowance read off the newest endspec run log (no token, no network) — `budget_read_at` is its age. `projection` turns the unspent allowance into leads at the cycle\'s measured recovery rate, then into the OpenRouter dollars those leads will cost to enrich, so the two budgets are decided together. `openrouter_usd_per_enriched_lead` charges ALL account spend to enrichment, so it is an upper bound, and it is the TIGHTEST bound of several trailing windows, each needing at least `per_lead_sample_floor` enriched leads and a real spend reading every day — read `per_lead_window_days` and `per_lead_sample_leads` with it. A single idle cycle cannot set it any more (one cycle enriching 1 lead priced it at $1.49 on 2026-10-26 and $3.74 on 10-10). Null plus `per_lead_unmeasured` means no window could carry a rate, which is unknown, NOT free. `halted`/`price_strikes` are the lane\'s own brake: 2 strikes stops it for the month.',
   };
 }
 

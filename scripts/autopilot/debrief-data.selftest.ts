@@ -1,4 +1,4 @@
-import { bulkRewriteShape, bandGateFacts, fleetFacts, inboxGateFacts, apifyBatchFacts, apifyLedgerLine, NO_PUSH_OUTCOME, normalizePushReason, offerFromBatchId, siegeApprovedLeadIds, siegePlanLeadIds, siegePushOutcome, classifyKeyProbe, cyclePacificDay, enrichmentChainFacts, isSendingDay, projectRecoveryBudget, MAX_MISSING_DEBRIEFS, missingDebriefs, NO_UNIT, pushRunVerdict, unitStartedAt, sendPlanHealth, siegePlanFacts, summarizeSendLines, isVerifiedOrBeyond, laneYield, priorAdvanceSource, priorSeedsAdvanced, priorSeedsWalked, reconcileAdvanced, sessionSeedsAdvanced, sessionStartMs, walkRateTrend } from './debrief-data.ts';
+import { bulkRewriteShape, bandGateFacts, fleetFacts, inboxGateFacts, apifyBatchFacts, apifyLedgerLine, NO_PUSH_OUTCOME, normalizePushReason, offerFromBatchId, siegeApprovedLeadIds, siegePlanLeadIds, siegePushOutcome, classifyKeyProbe, cyclePacificDay, costWindows, enrichmentChainFacts, isSendingDay, perEnrichedLeadCost, PER_LEAD_SAMPLE_FLOOR, projectRecoveryBudget, MAX_MISSING_DEBRIEFS, missingDebriefs, NO_UNIT, pushRunVerdict, unitStartedAt, sendPlanHealth, siegePlanFacts, summarizeSendLines, isVerifiedOrBeyond, laneYield, priorAdvanceSource, priorSeedsAdvanced, priorSeedsWalked, reconcileAdvanced, sessionSeedsAdvanced, sessionStartMs, walkRateTrend } from './debrief-data.ts';
 let fail = 0;
 const ok = (name: string, got: unknown, want: unknown) => {
   const pass = JSON.stringify(got) === JSON.stringify(want);
@@ -482,32 +482,106 @@ ok('a quiet cycle is zeros, not a crash',
   enrichmentChainFacts(CHAIN, '2026-09-28T07:00:00Z', '2026-09-29T07:00:00Z'),
   { batches: 0, leads_done: 0, leads_failed: 0, in_flight: 0 });
 
+// Dollars per enriched lead, measured over a window instead of one cycle (2026-10-26).
+const PER_LEAD_133 = perEnrichedLeadCost(
+  [{ days: 1, spend_usd: 19.5239, leads: 133, days_measured: 1 }]);
+ok('a single busy cycle carries the rate on its own',
+  [PER_LEAD_133.usd, PER_LEAD_133.window_days, PER_LEAD_133.sample_leads],
+  [0.1468, 1, 133]);
+// The live 10-26 shape: the pool is bundled out, so the chain trickles and only the
+// 30-day window holds enough leads to price one.
+const LIVE_WINDOWS = [
+  { days: 1, spend_usd: 1.4884, leads: 1, days_measured: 1 },
+  { days: 7, spend_usd: 11.83, leads: 8, days_measured: 7 },
+  { days: 14, spend_usd: 23.5, leads: 33, days_measured: 14 },
+  { days: 30, spend_usd: 128.9, leads: 770, days_measured: 30 },
+];
+ok('an idle cycle no longer prices a lead at the whole account bill',
+  perEnrichedLeadCost(LIVE_WINDOWS),
+  { usd: 0.1674, window_days: 30, sample_leads: 770, sample_spend_usd: 128.9, unmeasured: null });
+ok('the tightest bound wins, so a hot cycle prices itself and not the month',
+  perEnrichedLeadCost([
+    { days: 1, spend_usd: 2, leads: 40, days_measured: 1 },
+    { days: 30, spend_usd: 100, leads: 900, days_measured: 30 },
+  ]),
+  { usd: 0.05, window_days: 1, sample_leads: 40, sample_spend_usd: 2, unmeasured: null });
+ok('a tie keeps the fresher window',
+  perEnrichedLeadCost([
+    { days: 1, spend_usd: 4, leads: 40, days_measured: 1 },
+    { days: 30, spend_usd: 90, leads: 900, days_measured: 30 },
+  ]).window_days,
+  1);
+ok('too few leads anywhere is unmeasured and says how short it fell',
+  perEnrichedLeadCost([
+    { days: 1, spend_usd: 1.5, leads: 1, days_measured: 1 },
+    { days: 30, spend_usd: 40, leads: 12, days_measured: 30 },
+  ]),
+  { usd: null, window_days: null, sample_leads: 12, sample_spend_usd: 40, unmeasured: 'sample_below_floor' });
+ok('a $0 bill over a real sample is a missing meter, not free enrichment',
+  (() => { const p = perEnrichedLeadCost([{ days: 1, spend_usd: 0, leads: 133, days_measured: 1 }]);
+    return [p.usd, p.unmeasured]; })(),
+  [null, 'spend_reading_zero']);
+ok('leads but no spend reading is unknown, not zero cost',
+  (() => { const p = perEnrichedLeadCost([{ days: 1, spend_usd: null, leads: 133, days_measured: 0 }]);
+    return [p.usd, p.unmeasured]; })(),
+  [null, 'no_spend_reading']);
+
+// costWindows: a window is only usable when every day in it was really measured.
+const COST_DAYS = [
+  { date: '2026-10-26', spend_usd: 1.4884, leads: 1 },
+  { date: '2026-10-25', spend_usd: 1.6791, leads: 2 },
+  { date: '2026-10-24', spend_usd: 1.7304, leads: 40 },
+];
+ok('windows fold newest-first and sum both columns',
+  costWindows(COST_DAYS, [1, 3]),
+  [{ days: 1, spend_usd: 1.4884, leads: 1, days_measured: 1 },
+   { days: 3, spend_usd: 4.8979, leads: 43, days_measured: 3 }]);
+ok('a window longer than the history is not measurable',
+  costWindows(COST_DAYS, [7])[0],
+  { days: 7, spend_usd: null, leads: 43, days_measured: 3 });
+ok('one missing day nulls the window spend rather than understating it',
+  costWindows([COST_DAYS[0]!, { date: '2026-10-25', spend_usd: null, leads: 2 }], [2])[0],
+  { days: 2, spend_usd: null, leads: 3, days_measured: 1 });
+
 // The projection. $71.92 left, $10 reserved -> 882 channels at $0.0702.
 ok('remaining allowance priced in leads and then in OpenRouter dollars',
   projectRecoveryBudget({
     spendableUsd: 61.92, pricePerRun: 0.0702,
     recoveredInCycle: 244, channelsInCycle: 400,
-    enrichedInCycle: 133, accountSpendUsd: 19.5239, balanceUsd: 165.28,
+    perLead: PER_LEAD_133, balanceUsd: 165.28,
   }),
   { channels_affordable: 882, recovered_per_channel: 0.61, projected_leads: 538,
-    openrouter_usd_per_enriched_lead: 0.1468, openrouter_cost_of_projected_leads_usd: 78.98,
+    openrouter_usd_per_enriched_lead: 0.1468, per_lead_window_days: 1,
+    per_lead_sample_leads: 133, per_lead_sample_spend_usd: 19.5239,
+    per_lead_sample_floor: PER_LEAD_SAMPLE_FLOOR, per_lead_unmeasured: null,
+    openrouter_cost_of_projected_leads_usd: 78.98,
     openrouter_balance_usd: 165.28, balance_covers_projected: true });
 ok('a balance that does not cover the projection says so',
   (() => { const p = projectRecoveryBudget({
     spendableUsd: 61.92, pricePerRun: 0.0702, recoveredInCycle: 244, channelsInCycle: 400,
-    enrichedInCycle: 133, accountSpendUsd: 19.5239, balanceUsd: 40,
+    perLead: PER_LEAD_133, balanceUsd: 40,
   }); return p.balance_covers_projected; })(),
   false);
 ok('an unmeasured recovery rate projects null, never 0 leads',
   (() => { const p = projectRecoveryBudget({
     spendableUsd: 61.92, pricePerRun: 0.0702, recoveredInCycle: null, channelsInCycle: 0,
-    enrichedInCycle: 0, accountSpendUsd: null, balanceUsd: 165.28,
+    perLead: perEnrichedLeadCost([{ days: 1, spend_usd: null, leads: 0, days_measured: 0 }]),
+    balanceUsd: 165.28,
   }); return [p.projected_leads, p.openrouter_usd_per_enriched_lead, p.balance_covers_projected]; })(),
   [null, null, null]);
+// The freeze this guards: the allowance resets, channels_affordable jumps, and an
+// unpriceable lead must leave the cost unknown instead of multiplying a bad rate.
+ok('a reset allowance with an unmeasurable rate leaves the cost unknown, not wrong',
+  (() => { const p = projectRecoveryBudget({
+    spendableUsd: 90, pricePerRun: 0.0702, recoveredInCycle: 244, channelsInCycle: 400,
+    perLead: perEnrichedLeadCost(LIVE_WINDOWS.slice(0, 2)), balanceUsd: 66.86,
+  }); return [p.channels_affordable, p.projected_leads, p.openrouter_usd_per_enriched_lead,
+    p.openrouter_cost_of_projected_leads_usd, p.balance_covers_projected]; })(),
+  [1282, 782, null, null, null]);
 ok('a drained allowance affords nothing and prices nothing',
   (() => { const p = projectRecoveryBudget({
     spendableUsd: -3.89, pricePerRun: 0.0702, recoveredInCycle: 244, channelsInCycle: 400,
-    enrichedInCycle: 133, accountSpendUsd: 19.5239, balanceUsd: 165.28,
+    perLead: PER_LEAD_133, balanceUsd: 165.28,
   }); return [p.channels_affordable, p.projected_leads, p.openrouter_cost_of_projected_leads_usd]; })(),
   [0, 0, 0]);
 
