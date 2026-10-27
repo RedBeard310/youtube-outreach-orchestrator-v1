@@ -1004,6 +1004,75 @@ ok('no window means the moves are unknown, not zero',
     return [b.band_moved_to_normal, b.band_moved_to_stop, b.band_returned];
   })(),
   [null, null, []]);
+// The 2026-10-27 fault: band_moved_to_normal:6 beside band_normal_change:0 read as "six
+// came back, six unrelated ones fell". Five of the six that came back were the ones that
+// fell, and the fleet peaked at 19 clear mid-cycle before finishing back at 13. Shape and
+// numbers are real, trimmed to the runs that moved.
+const BAND_ROUNDTRIP = {
+  generated_at: '2026-10-27T07:05:21Z',
+  config: { recover: { hours: 48, score_at_least: 90 } },
+  owned: {},
+  mailboxes: {
+    // Five returned and were re-stopped; one held its band.
+    'ask.a@x.com': { band: 'stop', score: 55.0, reasons: ['score 55 under 80', '4 of 29 warmup emails in spam in 3 days'] },
+    'ask.b@x.com': { band: 'stop', score: 55.0, reasons: ['score 55 under 80'] },
+    'ask.c@x.com': { band: 'stop', score: 64.4, reasons: ['score 64.4 under 80'] },
+    'start.a@x.com': { band: 'stop', score: 48.7, reasons: ['score 48.7 under 80'] },
+    'start.b@x.com': { band: 'stop', score: 48.7, reasons: ['score 48.7 under 80'] },
+    'hi.a@x.com': { band: 'normal', score: 96.7, reasons: [] },
+    // Held but well: two on the recovery clock, one paying for its siblings, and one
+    // genuinely sick so it must not be counted as either.
+    'clock.a@x.com': { band: 'watch', score: 96.7, reasons: ['recovering: clean reading, 47h of 48h at 90+'] },
+    'clock.b@x.com': { band: 'stop', score: 92.2, reasons: ['recovering: clean reading, 22h of 48h at 90+'] },
+    'sib.a@x.com': { band: 'watch', score: 96.7, reasons: ['domain watch: 2 of 3 mailboxes on x.com are in watch or stop'] },
+    'sick.a@x.com': { band: 'stop', score: 38.5, reasons: ['score 38.5 under 80'] },
+  },
+  runs: [
+    { at: '2026-10-26T07:05:15Z', counts: { normal: 13, watch: 11, stop: 34 }, to_normal: [], to_watch: [], to_stop: [] },
+    { at: '2026-10-26T09:05:16Z', counts: { normal: 17, watch: 7, stop: 34 }, to_normal: ['ask.a@x.com', 'ask.b@x.com', 'hi.a@x.com', 'ask.c@x.com'], to_watch: [], to_stop: [] },
+    { at: '2026-10-26T15:05:15Z', counts: { normal: 19, watch: 6, stop: 33 }, to_normal: ['start.a@x.com', 'start.b@x.com'], to_watch: [], to_stop: [] },
+    { at: '2026-10-26T17:05:09Z', counts: { normal: 15, watch: 10, stop: 33 }, to_normal: [], to_watch: ['ask.a@x.com', 'ask.b@x.com', 'ask.c@x.com', 'other@x.com'], to_stop: [] },
+    { at: '2026-10-26T18:05:18Z', counts: { normal: 13, watch: 11, stop: 34 }, to_normal: [], to_watch: ['start.a@x.com'], to_stop: ['start.b@x.com'] },
+    { at: '2026-10-27T03:05:12Z', counts: { normal: 13, watch: 8, stop: 37 }, to_normal: [], to_watch: [], to_stop: ['start.a@x.com'] },
+    { at: '2026-10-27T04:05:02Z', counts: { normal: 13, watch: 6, stop: 39 }, to_normal: [], to_watch: [], to_stop: ['ask.a@x.com', 'ask.b@x.com'] },
+    { at: '2026-10-27T07:05:21Z', counts: { normal: 13, watch: 6, stop: 39 }, to_normal: [], to_watch: [], to_stop: [] },
+  ],
+};
+const RT_WINDOW = { sinceISO: '2026-10-26T07:00:00.000Z', untilISO: '2026-10-27T07:00:00.000Z' };
+ok('a flat clear count hides the peak the fleet actually reached',
+  (() => {
+    const b = bandGateFacts(BAND_ROUNDTRIP, RT_WINDOW);
+    return [b.band_normal, b.band_normal_prev, b.band_normal_change, b.band_peak_normal, b.band_peak_normal_at];
+  })(),
+  [13, 13, 0, 19, '2026-10-26T15:05:15Z']);
+ok('five of the six returners went back down inside the same cycle',
+  (() => {
+    const b = bandGateFacts(BAND_ROUNDTRIP, RT_WINDOW);
+    return [b.band_moved_to_normal, b.band_round_trips, b.band_returned_still_normal, b.band_round_trip_ids.length];
+  })(),
+  [6, 5, 1, 5]);
+ok('a demotion before the mailbox was ever handed normal is not a round trip',
+  bandGateFacts(BAND_ROUNDTRIP, RT_WINDOW).band_round_trip_ids.includes('other@x.com'),
+  false);
+ok('held but healthy, split into the one that lifts itself and the one paying for siblings',
+  (() => {
+    const b = bandGateFacts(BAND_ROUNDTRIP, RT_WINDOW);
+    return [b.band_held_but_healthy, b.band_held_but_healthy_on_clock,
+      b.band_held_but_healthy_sibling, b.band_held_healthy_soonest_hours];
+  })(),
+  [3, 2, 1, 1]);
+ok('no window: the moves and the round trips are unknown, but the held-but-well count is not',
+  (() => {
+    const b = bandGateFacts(BAND_ROUNDTRIP);
+    return [b.band_peak_normal, b.band_round_trips, b.band_returned_still_normal, b.band_held_but_healthy];
+  })(),
+  [null, null, null, 3]);
+ok('no per-mailbox map costs the outcome fields, not the move counts (the 10-18 shape)',
+  (() => {
+    const b = bandGateFacts(BAND_HISTORY, { sinceISO: '2026-10-17T07:00:00.000Z', untilISO: '2026-10-18T07:00:00.000Z' });
+    return [b.band_moved_to_normal, b.band_returned_still_normal, b.band_held_but_healthy, b.band_peak_normal];
+  })(),
+  [3, null, null, 28]);
 ok('a history with no run 12-36h back reports the baseline as not comparable',
   (() => {
     const b = bandGateFacts({ runs: [

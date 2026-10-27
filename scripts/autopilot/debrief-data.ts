@@ -322,6 +322,45 @@ export type FleetFacts = {
   band_moved_to_stop: number | null;
   /** Who came back, capped. A batch returning in one hour is worth seeing by name. */
   band_returned: string[];
+  /** --- AND A MOVE COUNT CANNOT SAY WHERE THE MAILBOX ENDED UP (2026-10-27) ---
+   *
+   *  `band_moved_to_normal` counts events, and the morning question is an outcome. On
+   *  2026-10-27 the block read `band_moved_to_normal: 6`, `band_normal_change: 0` and
+   *  named all six returners — which reads as "six came back and six unrelated ones
+   *  fell". FIVE OF THE SIX THAT CAME BACK WERE THE ONES THAT FELL. The clear count went
+   *  13 -> 17 at 09:05Z -> 19 at 15:05Z -> 15 at 17:05Z -> 13 at 18:05Z, and the stopped
+   *  band finished at 39 against 34, its highest. The 10-26 debrief's #1 lever was
+   *  "read the fleet Monday: if those mailboxes come back, capacity roughly doubles",
+   *  and the published fields said they came back. They came back and were re-stopped
+   *  inside the same cycle, every one of them on fresh warmup spam hits.
+   *
+   *  So carry the outcome beside the move: the peak the fleet actually reached inside
+   *  the cycle, how many returners are still normal at the newest reading, and how many
+   *  did a round trip. A revolving door and a recovery must not print the same numbers.
+   *
+   *  Null, not 0, without a window or without the gate's per-mailbox map: unknown and
+   *  measured-as-nothing differ. */
+  band_peak_normal: number | null;
+  band_peak_normal_at: string | null;
+  band_returned_still_normal: number | null;
+  band_round_trips: number | null;
+  band_round_trip_ids: string[];
+  /** --- AND THE NUMBER THE FLEET DECISION TURNS ON WAS HAND-DERIVED TWICE (2026-10-27) ---
+   *
+   *  "How many held mailboxes are already healthy" is what says whether capacity comes
+   *  back on its own or needs a config change. It was hand-queried out of automator's
+   *  state file for the 10-26 debrief (11 of 45) and again for 10-27 (8 of 45), and the
+   *  10-26 table had to print "not measured" for the day before. It is in the gate's own
+   *  file: a band other than normal with a score at or above `recover.score_at_least`.
+   *
+   *  The split is the decision. A mailbox on the recovery clock lifts itself; one held
+   *  only because two siblings on its domain are sick is paying for someone else's
+   *  deliverability. `band_held_healthy_soonest_hours` is how long the closest one still
+   *  has to wait, read off the gate's own "Nh of Mh" wording. */
+  band_held_but_healthy: number | null;
+  band_held_but_healthy_on_clock: number | null;
+  band_held_but_healthy_sibling: number | null;
+  band_held_healthy_soonest_hours: number | null;
 };
 
 const NO_FLEET: FleetFacts = {
@@ -360,6 +399,15 @@ const NO_FLEET: FleetFacts = {
   band_moved_to_watch: null,
   band_moved_to_stop: null,
   band_returned: [],
+  band_peak_normal: null,
+  band_peak_normal_at: null,
+  band_returned_still_normal: null,
+  band_round_trips: null,
+  band_round_trip_ids: [],
+  band_held_but_healthy: null,
+  band_held_but_healthy_on_clock: null,
+  band_held_but_healthy_sibling: null,
+  band_held_healthy_soonest_hours: null,
 };
 
 /** Parse the inbox health gate's own state file. Pure, so the selftest can feed it one.
@@ -449,6 +497,10 @@ export function bandGateFacts(
   | 'band_prev_at' | 'band_normal_prev' | 'band_watch_prev' | 'band_stop_prev'
   | 'band_normal_change' | 'band_stop_change' | 'band_gap_hours' | 'band_delta_comparable'
   | 'band_moved_to_normal' | 'band_moved_to_watch' | 'band_moved_to_stop' | 'band_returned'
+  | 'band_peak_normal' | 'band_peak_normal_at' | 'band_returned_still_normal'
+  | 'band_round_trips' | 'band_round_trip_ids'
+  | 'band_held_but_healthy' | 'band_held_but_healthy_on_clock'
+  | 'band_held_but_healthy_sibling' | 'band_held_healthy_soonest_hours'
 >, never> & { reasons: Record<string, string[]> } {
   const blank = {
     band_gate_run_at: null, band_normal: null, band_watch: null,
@@ -458,6 +510,10 @@ export function bandGateFacts(
     band_gap_hours: null, band_delta_comparable: null,
     band_moved_to_normal: null, band_moved_to_watch: null, band_moved_to_stop: null,
     band_returned: [],
+    band_peak_normal: null, band_peak_normal_at: null,
+    band_returned_still_normal: null, band_round_trips: null, band_round_trip_ids: [],
+    band_held_but_healthy: null, band_held_but_healthy_on_clock: null,
+    band_held_but_healthy_sibling: null, band_held_healthy_soonest_hours: null,
   };
   if (!raw || typeof raw !== 'object') return blank;
   type Run = {
@@ -471,6 +527,8 @@ export function bandGateFacts(
     generated_at?: unknown;
     runs?: unknown;
     owned?: Record<string, { reasons?: unknown }>;
+    mailboxes?: Record<string, { band?: unknown; score?: unknown; reasons?: unknown }>;
+    config?: { recover?: { score_at_least?: unknown } };
   };
   const runs = (Array.isArray(s.runs) ? s.runs : []) as Run[];
   const last = runs.length > 0 ? runs[runs.length - 1] : null;
@@ -520,20 +578,79 @@ export function bandGateFacts(
   let toWatch: number | null = null;
   let toStop: number | null = null;
   const returned: string[] = [];
+  // The outcome beside the move (2026-10-27): the peak the fleet reached inside the
+  // cycle, and which returners did not keep the band they were given.
+  let peak: number | null = null;
+  let peakAt: string | null = null;
+  let roundTrips: number | null = null;
+  const roundTripIds: string[] = [];
+  const cameBack = new Set<string>();
   if (window) {
     const a = Date.parse(window.sinceISO);
     const b = Date.parse(window.untilISO);
     if (Number.isFinite(a) && Number.isFinite(b)) {
       toNormal = 0; toWatch = 0; toStop = 0;
+      const fellBack = new Set<string>();
       for (const r of runs) {
         if (typeof r?.at !== 'string') continue;
         const ms = Date.parse(r.at);
         if (!Number.isFinite(ms) || ms < a || ms >= b) continue;
         const n = Array.isArray(r.to_normal) ? r.to_normal.map(String) : [];
+        const w = Array.isArray(r.to_watch) ? r.to_watch.map(String) : [];
+        const st = Array.isArray(r.to_stop) ? r.to_stop.map(String) : [];
         toNormal += n.length;
-        toWatch += Array.isArray(r.to_watch) ? r.to_watch.length : 0;
-        toStop += Array.isArray(r.to_stop) ? r.to_stop.length : 0;
-        for (const e of n) if (returned.length < 12) returned.push(e);
+        toWatch += w.length;
+        toStop += st.length;
+        for (const e of n) {
+          if (returned.length < 12) returned.push(e);
+          cameBack.add(e);
+        }
+        // Ordered walk, so a demotion only counts against a mailbox that had already
+        // been handed `normal` earlier in this same cycle.
+        for (const e of [...w, ...st]) if (cameBack.has(e)) fellBack.add(e);
+        const nrm = num((r.counts && typeof r.counts === 'object' ? r.counts : {}).normal);
+        if (nrm !== null && (peak === null || nrm > peak)) { peak = nrm; peakAt = r.at; }
+      }
+      roundTrips = fellBack.size;
+      for (const e of fellBack) if (roundTripIds.length < 12) roundTripIds.push(e);
+    }
+  }
+
+  // Where the returners actually ended up, and which held mailboxes are already well.
+  // Both read the gate's own per-mailbox map, so both are null when it is absent.
+  const boxes = s.mailboxes && typeof s.mailboxes === 'object' ? s.mailboxes : null;
+  let stillNormal: number | null = null;
+  let healthy: number | null = null;
+  let onClock: number | null = null;
+  let sibling: number | null = null;
+  let soonest: number | null = null;
+  if (boxes) {
+    if (window) {
+      stillNormal = 0;
+      for (const e of cameBack) if (String(boxes[e]?.band ?? '') === 'normal') stillNormal++;
+    }
+    const bar = num(s.config?.recover?.score_at_least) ?? 90;
+    healthy = 0; onClock = 0; sibling = 0;
+    for (const rec of Object.values(boxes)) {
+      if (!rec || typeof rec !== 'object') continue;
+      if (String(rec.band ?? '') === 'normal') continue;
+      const score = num(rec.score);
+      if (score === null || score < bar) continue;
+      healthy++;
+      const why = (Array.isArray(rec.reasons) ? rec.reasons.map(String) : []);
+      const clockish = why.filter((r) => /recovering/i.test(r));
+      if (clockish.length > 0) {
+        onClock++;
+        // The gate publishes its own progress as "47h of 48h at 90+". Take what is left.
+        for (const r of clockish) {
+          const m = /(\d+(?:\.\d+)?)h\s+of\s+(\d+(?:\.\d+)?)h/.exec(r);
+          if (!m) continue;
+          const left = Number(m[2]) - Number(m[1]);
+          if (!Number.isFinite(left) || left < 0) continue;
+          if (soonest === null || left < soonest) soonest = Number(left.toFixed(1));
+        }
+      } else if (why.some((r) => /domain watch|sibling/i.test(r))) {
+        sibling++;
       }
     }
   }
@@ -556,6 +673,15 @@ export function bandGateFacts(
     band_moved_to_watch: toWatch,
     band_moved_to_stop: toStop,
     band_returned: returned,
+    band_peak_normal: peak,
+    band_peak_normal_at: peakAt,
+    band_returned_still_normal: stillNormal,
+    band_round_trips: roundTrips,
+    band_round_trip_ids: roundTripIds,
+    band_held_but_healthy: healthy,
+    band_held_but_healthy_on_clock: onClock,
+    band_held_but_healthy_sibling: sibling,
+    band_held_healthy_soonest_hours: soonest,
   };
 }
 
@@ -631,6 +757,15 @@ export function fleetFacts(
     band_moved_to_watch: band.band_moved_to_watch,
     band_moved_to_stop: band.band_moved_to_stop,
     band_returned: band.band_returned,
+    band_peak_normal: band.band_peak_normal,
+    band_peak_normal_at: band.band_peak_normal_at,
+    band_returned_still_normal: band.band_returned_still_normal,
+    band_round_trips: band.band_round_trips,
+    band_round_trip_ids: band.band_round_trip_ids,
+    band_held_but_healthy: band.band_held_but_healthy,
+    band_held_but_healthy_on_clock: band.band_held_but_healthy_on_clock,
+    band_held_but_healthy_sibling: band.band_held_but_healthy_sibling,
+    band_held_healthy_soonest_hours: band.band_held_healthy_soonest_hours,
   };
 }
 
@@ -1094,7 +1229,33 @@ export function sendPlanHealth(
       'automator/config/inbox-health.json recover.hours could not credit any clean time ' +
       'before the gate\'s own first run, so the first cohort aged out together. They are ' +
       'null, not 0, on a snapshot written without a window: unknown and measured-as-nothing ' +
-      'differ. band_returned names them, capped at 12.',
+      'differ. band_returned names them, capped at 12. ' +
+      'AND READ band_round_trips AND band_returned_still_normal BEFORE READING ' +
+      'band_moved_to_normal AS A RECOVERY (2026-10-27): a move count says a mailbox was ' +
+      'handed a band, not that it kept it. That morning the block read ' +
+      'band_moved_to_normal:6, band_normal_change:0 and named all six returners, which ' +
+      'reads as six coming back while six unrelated ones fell. FIVE OF THE SIX THAT CAME ' +
+      'BACK WERE THE ONES THAT FELL: clear went 13 to 17 at 09:05Z to 19 at 15:05Z to 15 ' +
+      'at 17:05Z to 13 at 18:05Z, the stopped band finished at 39 against 34, and each of ' +
+      'the five was re-stopped on fresh warmup spam inside hours of returning (3 to 5 ' +
+      'spam hits across 28 to 48 warmup emails, scores 96.7 down to 48.7). The 10-26 ' +
+      'debrief\'s #1 lever was "if those mailboxes come back, capacity roughly doubles", ' +
+      'and the published fields said they came back. band_peak_normal / _at is the highest ' +
+      'clear count any run inside the cycle reached, so a fleet that rose and fell cannot ' +
+      'print flat; band_returned_still_normal is how many returners hold normal at the ' +
+      'newest reading; band_round_trips and band_round_trip_ids are the ones that went ' +
+      'back down inside the same cycle. A revolving door and a recovery no longer read ' +
+      'the same. AND band_held_but_healthy IS THE NUMBER THE FLEET DECISION TURNS ON: a ' +
+      'held mailbox scoring at or above recover.score_at_least will lift itself, so it ' +
+      'says whether capacity returns for free or needs a config change. It was hand-' +
+      'queried out of automator\'s state file two mornings running (11 of 45 on 10-26, 8 ' +
+      'of 45 on 10-27) and the 10-26 table had to print "not measured" for the day before. ' +
+      '_on_clock is waiting out recover.hours and lifts itself; _sibling is held only ' +
+      'because two addresses on its domain are sick, which is someone else\'s ' +
+      'deliverability being charged to a well mailbox; band_held_healthy_soonest_hours is ' +
+      'what the closest one still owes, read off the gate\'s own "Nh of Mh" wording. All ' +
+      'of these are null, not 0, when the gate\'s per-mailbox map is absent or no window ' +
+      'was supplied.',
   };
 }
 
