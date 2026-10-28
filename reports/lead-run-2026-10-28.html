@@ -1,0 +1,287 @@
+<title>Lead Run Debrief · 2026-10-28</title>
+<style>
+  :root {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+      --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+      --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+    --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+    --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 40px 22px 80px; }
+  .eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); font-weight: 600; }
+  h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.12; margin: 10px 0 6px; text-wrap: balance; letter-spacing: -.02em; }
+  h2 { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); margin: 44px 0 16px; font-weight: 700; }
+  h3 { font-size: 18px; margin: 0 0 6px; letter-spacing: -.01em; }
+  p { margin: 0 0 14px; }
+  .lede { font-size: 18px; color: var(--ink-soft); max-width: 68ch; }
+  .tag { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--amber-soft); color: var(--amber); letter-spacing: .02em; }
+  .tag.good { background: var(--teal-soft); color: var(--teal); }
+  .tag.bad { background: var(--red-soft); color: var(--red); }
+  .grid { display: grid; gap: 14px; }
+  .stats { grid-template-columns: repeat(4, 1fr); margin-top: 26px; }
+  @media (max-width: 720px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; box-shadow: var(--shadow); }
+  .stat .n { font-size: 30px; font-weight: 750; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .stat .l { font-size: 12.5px; color: var(--ink-soft); margin-top: 3px; }
+  .stat .s { font-size: 12px; margin-top: 8px; font-weight: 600; }
+  .up { color: var(--good); } .down { color: var(--red); } .warn { color: var(--amber); }
+  .accent-red { border-left: 3px solid var(--red); }
+  .accent-teal { border-left: 3px solid var(--teal); }
+  .accent-amber { border-left: 3px solid var(--amber); }
+
+  /* shape-of-day bar strips */
+  .strip { display: flex; align-items: flex-end; gap: 10px; height: 130px; padding: 14px 16px 10px; overflow-x: auto; }
+  .col { flex: 1 0 40px; display: flex; flex-direction: column; justify-content: flex-end; height: 100%; }
+  .col .bars { display: flex; align-items: flex-end; gap: 3px; height: 100%; }
+  .bar { flex: 1 1 0; border-radius: 3px 3px 0 0; background: var(--teal); min-height: 3px; }
+  .bar.zero { background: var(--red); height: 3px !important; }
+  .bar.stop { background: var(--red); }
+  .bar.watch { background: var(--amber); }
+  .xlab { font-size: 11px; color: var(--ink-soft); text-align: center; padding-top: 6px; font-variant-numeric: tabular-nums; }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-soft); padding: 0 16px 14px; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+
+  .q { border-radius: 14px; padding: 20px 22px; margin-bottom: 14px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); }
+  .q .ask { font-size: 17px; font-weight: 700; color: var(--ink); margin-bottom: 10px; display: flex; gap: 10px; align-items: baseline; }
+  .q .ask .qn { color: var(--red); font-weight: 800; flex: 0 0 auto; }
+  .q.accent-teal .ask .qn { color: var(--teal); }
+  .q p { color: var(--ink-soft); }
+  .q b { color: var(--ink); }
+  .pill { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink); background: var(--panel-2); padding: 1px 7px; border-radius: 6px; border: 1px solid var(--line); white-space: nowrap; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+  th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); }
+  td .num { font-variant-numeric: tabular-nums; font-weight: 650; }
+  .fix td:first-child { color: var(--good); font-weight: 650; }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); box-shadow: var(--shadow); }
+  ol.recs { padding-left: 0; list-style: none; counter-reset: r; margin: 0; }
+  ol.recs li { counter-increment: r; position: relative; padding: 14px 16px 14px 52px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 10px; box-shadow: var(--shadow); }
+  ol.recs li::before { content: counter(r); position: absolute; left: 14px; top: 14px; width: 26px; height: 26px; border-radius: 8px; background: var(--teal-soft); color: var(--teal); font-weight: 800; font-size: 14px; display: grid; place-items: center; }
+  ol.recs b { color: var(--ink); }
+  .foot { margin-top: 46px; padding: 16px 18px; border-radius: 12px; background: var(--amber-soft); border: 1px solid var(--line); font-size: 14px; color: var(--ink-soft); }
+  .foot b { color: var(--ink); }
+  .muted { color: var(--ink-soft); font-size: 13.5px; }
+  code { background: var(--panel-2); padding: 1px 5px; border-radius: 5px; border: 1px solid var(--line); font-size: .9em; }
+  tr.good td:first-child { color: var(--good); font-weight: 650; }
+  tr.bad td:first-child { color: var(--red); font-weight: 650; }
+</style>
+
+<div class="wrap">
+
+
+  <div class="eyebrow">Lead Run Debrief · YouTube outreach</div>
+  <h1>2026-10-28: the fleet is not 58 mailboxes, it is 20 domains, and only 6 of them work</h1>
+  <p class="lede">Yesterday's question was whether the 45 held mailboxes can be recovered at all. The answer is in the data now, and it is sharper than expected. Sort the fleet by sending domain instead of by mailbox and it splits almost perfectly in two: <b>six domains carrying sixteen mailboxes have one spam complaint between them across 767 warmup emails</b>, and <b>fourteen domains carrying forty-two mailboxes have 244 across 664</b>. That is not a fleet with some sick members. It is six good domains and fourteen burned ones. The three mailboxes that cleared yesterday all held their band today, which is the first clean recovery since the gate started, but three more went down, and all three were on one domain going down together.</p>
+  <p class="lede">Separately, and chasing a number that printed flat when it could not have been: <b>54 parked people are stamped as already emailed and have never been emailed.</b> Nothing in the pipeline will ever write to them.</p>
+  <div style="margin-top:14px">
+    <span class="tag">6 GOOD DOMAINS, 14 BURNED</span>
+    <span class="tag good" style="margin-left:6px">3 RETURNERS HELD · FIRST TIME</span>
+    <span class="tag good" style="margin-left:6px">11.8% FIRST TOUCH · BEST THIS MONTH</span>
+    <span class="tag bad" style="margin-left:6px">54 STRANDED</span>
+  </div>
+
+  <div class="grid stats">
+    <div class="card stat accent-red">
+      <div class="n">1 vs 244</div>
+      <div class="l">spam complaints, good domains vs burned ones</div>
+      <div class="s down">767 warmup emails against 664. Same fleet, same week</div>
+    </div>
+    <div class="card stat accent-teal">
+      <div class="n">6 of 51</div>
+      <div class="l">people emailed for the first time</div>
+      <div class="s up">11.8%, against 2.3% across the prior week</div>
+    </div>
+    <div class="card stat accent-red">
+      <div class="n">54</div>
+      <div class="l">ready people stamped as emailed, never emailed</div>
+      <div class="s down">53 of them from the 10-13 push. Found today</div>
+    </div>
+    <div class="card stat accent-amber">
+      <div class="n">14 → 41</div>
+      <div class="l">clear to send, against stopped</div>
+      <div class="s warn">Peaked at 16. Watch drained 6 to 3</div>
+    </div>
+  </div>
+
+  <h2>The shape of the day</h2>
+  <div class="card" style="padding:0">
+    <div class="strip" id="hours"></div>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--teal)"></span>mailboxes clear to start a new email, hour by hour through the cycle</span>
+    </div>
+  </div>
+  <p class="muted">One mailbox cleared at 08:05Z and two more at 11:05Z, taking the sendable fleet from <b>13 to 16</b>. It sat at 16 for eight hours. Then at 20:05Z two mailboxes dropped to watch, and over the next eleven hours all three mailboxes on <code>clientsfromvideo.com</code> were stopped, one after another, closing the cycle at <b>14</b>. Unlike yesterday, the three that came back are all still clear. The loss came from somewhere else.</p>
+
+  <div class="card" style="padding:0; margin-top:18px">
+    <div class="strip" id="band"></div>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--teal)"></span>clear to send</span>
+      <span><span class="dot" style="background:var(--amber)"></span>on watch</span>
+      <span><span class="dot" style="background:var(--red)"></span>stopped</span>
+    </div>
+  </div>
+  <p class="muted">Seven mornings at 07:05Z, one instrument against itself. Clear went <b>20, 22, 17, 18, 13, 13, 14</b>, so the fall has flattened. The red bar has not: stopped went <b>26, 30, 34, 34, 34, 39, 41</b>, and the amber bar has thinned from 12 to 3. Mailboxes are still leaving watch for stop faster than they return to clear, and with watch nearly empty, the next losses have to come out of the clear band itself.</p>
+
+  <h2>The three questions</h2>
+
+  <div class="q accent-red">
+    <div class="ask"><span class="qn">Q1</span><span>Are the 45 held mailboxes recoverable?</span></div>
+    <p>Three of them are. The rest need new domains. Here is the whole fleet grouped by the domain it sends from, which nothing had done before today:</p>
+    <div class="tablewrap" style="margin: 0 0 14px">
+      <table>
+        <thead><tr><th>Sending domain</th><th>Clear</th><th>Watch</th><th>Stopped</th><th>Warmup spam</th><th>Volume cut by the provider</th></tr></thead>
+        <tbody>
+          <tr class="good"><td>Six clean domains, 16 mailboxes</td><td class="num">14</td><td class="num">2</td><td class="num">0</td><td class="num up">1 of 767</td><td class="num">none</td></tr>
+          <tr class="good"><td><code>ytgrowthagency.com</code></td><td class="num">0</td><td class="num">1</td><td class="num">2</td><td class="num up">0 of 82</td><td class="num">none</td></tr>
+          <tr class="bad"><td>Thirteen burned domains, 39 mailboxes</td><td class="num">0</td><td class="num">0</td><td class="num">39</td><td class="num down">244 of 582</td><td class="num down">32 mailboxes</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>Every clear mailbox reads <span class="pill">96.7</span> or better and sits on one of six domains. Every stopped mailbox except two sits on one of thirteen others, and those thirteen are averaging <b>a 42% spam rate on their warmup mail</b>. Worst of them: <code>contentgetsleads.com</code> at 25 of 32, <code>ytgetsclients.com</code> at 26 of 34, <code>tubeleadsagency.com</code> at 24 of 32. These are not mailboxes having a bad week. A domain whose mail lands in spam one time in three has a reputation problem, and reputation belongs to the domain, not to the three addresses on it.</p>
+    <p><b>The exception proves the rule, and it is the one piece of good news.</b> <code>ytgrowthagency.com</code> has <b>zero spam complaints across 82 warmup emails</b> and all three of its mailboxes read 96.7. Two are stopped anyway, waiting out the 48-hour recovery clock (46 and 47 hours served), and the third is held only because the other two are. That is a clean domain held by a timer, and it should clear on its own within two hours of this report.</p>
+    <p>So the honest capacity picture is <b>19 mailboxes, not 58</b>: 14 clear now, 2 on watch at 96.7 with their clocks nearly done, and <code>ytgrowthagency.com</code>'s 3. At the 15 messages a day each mailbox currently allows, that is roughly <b>285 emails a day</b> against <b>1,943 ready people waiting for a slot</b>. The remaining 39 are not a waiting problem that patience solves. The provider agrees and is acting on it independently: it cut warmup volume on <b>19 mailboxes today</b>, 15 of those for a critical spam rate, on top of 13 yesterday.</p>
+  </div>
+
+  <div class="q accent-teal">
+    <div class="ask"><span class="qn">Q2</span><span>What did the day send, and did it reach anyone new?</span></div>
+    <p>It reached more new people, as a share of the day, than any cycle this month. <b>52 emails loaded. 6 of the 51 people reached had never heard from us, which is 11.8%</b>, against 13 of 567 across the prior seven days, or 2.3%. All six came off the enriched shelf, which is the only place a first touch can drain inventory from. The best prior day this month was 9 of 148, or 6.1%.</p>
+    <p>One person was lost, and the push named them: SmartLead refused the lead with <code>bounce_count=1</code>, meaning it had the address on file as bouncing. One other email was skipped and then written again in a later batch in the same run, so it cost nobody. 51 of 52 planned people got an email.</p>
+    <p>The ceiling is the fleet and nothing else. The warmup ramp would allow <b>870</b> emails today. The live inboxes would accept <b>52</b>. Follow-ups owed <b>zero</b>, so this was not a day where a follow-up wave ate the slots: the mailboxes simply are not there. Of the 1,943 people waiting, <b>906 are in the top tier</b>.</p>
+  </div>
+
+  <div class="q accent-amber">
+    <div class="ask"><span class="qn">Q3</span><span>Is anything broken?</span></div>
+    <p><b>Yes, and it is new.</b> Zero fatal error signatures, no halt flag, no escalation, <b>$0 billed to the Anthropic API</b>, and every lane behaved. But 54 parked people are stamped as having been emailed when nobody has ever emailed them, and the pipeline has no way to reach them. That is the section below this one.</p>
+    <p>Everything else is quiet and correct. Enrichment ran <b>1 batch for 1 lead</b>, because 6,814 of 6,825 parked leads are already enriched, leaving eleven in the whole pool. Apify sat at its $10 reserve and did nothing, which is right until the monthly allowance refills on 11-01. The recovery lane added <b>12 contact points and 4 email addresses from 9 people</b>, against 87 points and 17 addresses over the prior week, and <b>2 of those people parked</b> into the shelf. The collect pass walked 150 leads on lap 12 of a 2,394-lead book, found 633 contact methods and <b>629 of them were already on file</b>, with <code>cause: resolution_ok</code> and zero search refusals. A picked-over book, not a fault.</p>
+    <p><b>One correction to yesterday's report.</b> It read the <code>cross-domain redirect</code> fault rate as improving after the fix (100 of 175, then 55 of 152) while saying plainly that the two passes walked different leads. Today it is <b>71 of 114, or 62%</b>, which is higher than either. The fix is real and still in place, so what moved was the slice of leads, which is what the hedge warned about. Treat the redirect rate as un-measured until two passes cover comparable ground.</p>
+  </div>
+
+  <h2>The thing worth your attention</h2>
+  <div class="card accent-red">
+    <p style="margin-bottom:8px"><b>54 ready, researched, verified people are marked as already contacted and have never been sent an email. No lane in the pipeline will ever write to them.</b></p>
+    <p class="muted">Loading a lead into SmartLead is not sending them an email. SmartLead accepts the lead, then its own scheduler sends later, Monday to Thursday. If the lead is withdrawn from the campaign before that happens, no email ever goes out. Siege does exactly that when a sequence has to be pulled, and it correctly deletes the lead's row from the send ledger, because nothing was sent. What it does not do is undo the lead's own two marks: <code>outreach_status = sent_to_smartlead</code> and a <code>last_contacted_at</code> timestamp.</p>
+    <p class="muted">Those two marks are what every other part of the pipeline reads. So the person becomes invisible three times over. The shelf's inventory count only lists leads at <code>ready_data_scraped</code>, so they drop out of it. <code>npm run send</code> selects the same statuses, so it never offers them. And Siege's own history loader counts a mark plus a timestamp as a send that happened, so its planner believes the offer was already used. <b>None of the 54 has appeared in a send plan since 10-13.</b></p>
+    <p class="muted">All 54 have a verified email address, a written subject line, a finished research bundle and no do-not-contact flag. <b>53 of them date from 2026-10-13</b>, the record 782-email day, whose live sequences were pulled that same afternoon when the ICP audit ran. The 782 figure every debrief since has quoted as the record push put email in front of at most 728 people.</p>
+    <p class="muted" style="margin-bottom:0">The giveaway was sitting in the published snapshot for two mornings and nobody read it, including me. Six people were emailed for the first time this cycle, all six off the shelf, and the shelf's count of people already written to printed <b>1,667 against 1,667</b>. A running total of people who have been written to cannot stay flat while six people join it. It stayed flat because those six had been marked before they were ever sent anything, which is the same defect seen from the other end. That count is now grounded on the send ledger instead of the mark, and the gap between the two is published with the lead ids, so a stranded group cannot hide inside a healthy-looking number again.</p>
+  </div>
+
+  <h2>The cycle in numbers</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Reading</th><th>This cycle</th><th>Day before</th><th>What it means</th></tr></thead>
+      <tbody>
+        <tr><td>Emails loaded</td><td class="num">52</td><td class="num">61</td><td>51 from Siege, 1 from the orchestrator</td></tr>
+        <tr><td>People reached for the first time</td><td class="num up">6 of 51 · 11.8%</td><td class="num">3 of 58 · 5.2%</td><td>Best share this month. Prior 7 days: 13 of 567, 2.3%</td></tr>
+        <tr><td>People lost from the push</td><td class="num warn">1</td><td class="num">0</td><td>SmartLead refused it: <code>bounce_count=1</code></td></tr>
+        <tr><td>Clear to send (07:05Z)</td><td class="num up">14</td><td class="num">13</td><td>Of 58. Peaked at 16 at 11:05Z</td></tr>
+        <tr><td>On watch / stopped</td><td class="num down">3 / 41</td><td class="num">6 / 39</td><td>Stopped at its highest. Watch nearly drained</td></tr>
+        <tr><td>Returned to clear, and kept it</td><td class="num up">3 returned · 3 kept</td><td class="num">6 returned · 1 kept</td><td>Zero round trips. First clean recovery</td></tr>
+        <tr><td>Mailboxes lost this cycle</td><td class="num down">3</td><td class="num">6</td><td>All three on <code>clientsfromvideo.com</code>, within four hours</td></tr>
+        <tr><td>Clean domains vs burned</td><td class="num">6 vs 14</td><td class="num">not measured</td><td>1 spam of 767 against 244 of 664</td></tr>
+        <tr><td>Held but healthy</td><td class="num warn">5 of 44</td><td class="num">8 of 45</td><td>4 on the 48h clock (one done), 1 held by a sibling</td></tr>
+        <tr><td>Mailboxes with volume cut today</td><td class="num down">19</td><td class="num">23 as reported</td><td>15 of the 19 critical. A newer cut overwrites the field, so yesterday's now reads 13 and the pair is not comparable</td></tr>
+        <tr><td>Binding constraint</td><td>partial_push</td><td>mailbox_slots</td><td>52 slots against an 870 allowance. 0 follow-ups owed</td></tr>
+        <tr><td>Ready people waiting for a slot</td><td class="num">1,943</td><td class="num">1,730</td><td>906 whale, 207 strong, 830 other</td></tr>
+        <tr><td>Parked into <code>approved_hold</code></td><td class="num">2</td><td class="num">0</td><td>Pool 6,825. Both came from the recovery lane</td></tr>
+        <tr><td>Shelf: never written to</td><td class="num">5,147</td><td class="num">5,146</td><td>Marked as written to 1,667</td></tr>
+        <tr><td>Shelf: actually emailed</td><td class="num down">1,613</td><td class="num">not measured</td><td><b>54 marked and never emailed.</b> New field</td></tr>
+        <tr><td>Free recovery lane</td><td class="num">12 points · 4 addresses · 9 people</td><td class="num">11 · 1 · 6</td><td>Prior 7 days: 87 points, 17 addresses</td></tr>
+        <tr><td>Collect pass judged</td><td class="num">150 leads · 2% no site</td><td class="num">150 · 3.3%</td><td><code>cause: resolution_ok</code>, lap 12, book 2,394</td></tr>
+        <tr><td>Methods found vs already on file</td><td class="num">633 found · 629 known</td><td class="num">656 · 651</td><td>Re-walk 100%. <code>stranded</code> held at 3</td></tr>
+        <tr><td>Cross-domain redirect faults</td><td class="num down">71 of 114 · 62%</td><td class="num">55 of 152 · 36%</td><td>Different leads. Treat the trend as un-measured</td></tr>
+        <tr><td>Enrichment</td><td class="num">1 batch, 1 lead</td><td class="num">0 batches</td><td>99.8% bundled, eleven leads left in the pool</td></tr>
+        <tr><td>Cost per enriched lead</td><td class="num">$0.1676</td><td class="num">$0.1684</td><td>30 days, 766 leads, $128.37. Steady</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>What broke → what's fixed</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Issue</th><th>Mechanism</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr class="fix"><td>54 ready people are marked as emailed and have never been emailed, and nothing will ever write to them</td><td>The push marks a lead <code>sent_to_smartlead</code> with a <code>last_contacted_at</code> timestamp when SmartLead <b>accepts</b> it into a campaign. Acceptance is not delivery. When a sequence is withdrawn before SmartLead sends, <code>automator/scripts/siege_live.py</code> deletes the send-ledger row, correctly, and leaves both marks standing. The marks then hide the person from the shelf inventory, from <code>npm run send</code>, and from Siege's own planner, which reads a mark plus a timestamp as a completed send. 53 of the 54 date from 10-13, so the record 782-email push reached at most 728 people</td><td class="up">Detector fixed in <code>c095e2f</code> (orchestrator). The shelf now counts <code>emailed</code> off the send ledger and publishes <code>marked_sent_never_emailed</code> with the lead ids. The repair itself is a status write, which belongs to the send path and not here</td></tr>
+        <tr><td>Thirteen sending domains are burned, carrying 39 of the 41 stopped mailboxes</td><td>244 spam complaints across 582 warmup emails on those thirteen, against 1 across 767 on the six clean ones. Worst three are at 25 of 32, 26 of 34 and 24 of 32. The provider has cut warmup volume on 32 of their mailboxes</td><td class="warn">Open, and this is the volume decision. Reputation is a domain-level property, so no per-mailbox rule recovers it</td></tr>
+        <tr><td>Three clean mailboxes are stopped by a timer, not by their health</td><td><code>ytgrowthagency.com</code>: 0 spam of 82, all three at 96.7, two serving 46 and 47 hours of a 48-hour recovery clock, the third held only by the sick-sibling rule</td><td class="up">Self-clearing. Expected back within about two hours of this report, and the band gate needs no change for it</td></tr>
+        <tr class="fix"><td>Yesterday's claim that the redirect fix was reducing faults did not hold</td><td>100 of 175 faults, then 55 of 152, now 71 of 114 (62%). Each pass walks a different slice of leads, which yesterday's report said in the same paragraph as the trend</td><td class="up">Corrected above. The fix is in place; the measurement was never comparable, so no trend should be quoted from it</td></tr>
+        <tr><td>1,943 ready people cannot get an email</td><td>52 mailbox slots against a warmup allowance of 870, with zero follow-ups owed, so the whole shortfall is missing mailboxes. 906 of the waiting are top tier</td><td class="warn">Open. Downstream of the domain problem above</td></tr>
+        <tr><td>The recovery lane is re-reading a book it already knows</td><td>629 of 633 contact methods found were already on file. Lap 12 of 2,394 leads, 100% re-walk</td><td>Expected. It still produced 4 addresses and 2 parks</td></tr>
+        <tr><td>Apify email recovery did nothing</td><td>$9.9997 left against a $10 reserve. 0 batches, 0 price strikes, not halted</td><td class="warn">By design. The $100 allowance is the calendar month and refills on 11-01</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Recommended next, ranked</h2>
+  <ol class="recs">
+    <li><b>Buy new sending domains. The fleet question is answered.</b> Fourteen of twenty domains are burned, and they hold 42 of the 58 mailboxes. The six that work have one spam complaint between them across 767 warmup emails, so the method and the copy are fine and the domains are not. Waiting does not fix a domain reputation, and the provider is already cutting volume on 32 of those mailboxes faster than the gate can recover them. Real capacity today is about 19 mailboxes, roughly 285 emails a day, against 1,943 people ready and waiting. This is a spend decision and it is yours.</li>
+    <li><b>Decide what happens to the 54 stranded people.</b> They are ready to email: verified address, written subject, finished research, no block. Reaching them means flipping <code>outreach_status</code> back to <code>ready_data_scraped</code> and clearing <code>last_contacted_at</code> on those 54 ids, after which the normal queue picks them up. I did not do it: this repo only counts, and a status write on the send path is the email repo's or Siege's call, not a debrief's. Say the word and I will put the change in the right repo with the ids attached.</li>
+    <li><b>Then check whether the same mark has stranded people outside the shelf.</b> Today's count only looked at <code>approved_hold</code>, because that is the shelf. The same withdraw path can mark any lead in any status, so the honest answer for the whole lead table is unknown. One query answers it and the new field makes it cheap to keep answering.</li>
+    <li><b>Watch <code>ytgrowthagency.com</code> tomorrow, because it is the one real test of the recovery rule.</b> Yesterday's five failures all came off dirty domains, so they told us about the domain, not about the clock. These three are clean, their clock is nearly done, and they will come back on reputation that was never damaged. If they hold, the rule works and the problem is purely domains. If they fail too, the rule is also wrong and the 48-hour clock needs to measure sending rather than silence.</li>
+    <li><b>The first-touch share is the one number improving, and it improved on fewer emails.</b> 6 new people on 52 emails, against 3 on 61 the day before and 13 across the whole prior week. The ratio got better, not the volume. When new domains land and slots open, the thing to check is whether those slots go to new people or back into repeat offers to the 906 waiting top-tier leads.</li>
+  </ol>
+
+  <div class="foot">
+    <b>Cost and safety:</b> <b>$0 Anthropic</b> this cycle. OpenRouter is at <b>$63.70</b> against $1.44 a day across the account, about <b>44 days of runway</b>. Apify sits at its $10 reserve until 11-01. Cost per enriched lead held at <b>$0.1676</b>. <b>0 fatal error signatures, no halt flag, no escalation.</b> The YouTube key pool reads 15 working of 66, settled and inert. Discovery wrote <b>0 new channels</b>, which is your 2026-09-08 order working as intended and not a stall. One fix shipped: <code>c095e2f</code> in the orchestrator, with the reasoning in <code>664849c</code>.
+  </div>
+
+</div>
+
+<script>
+  // mailboxes clear to send, at health-gate runs inside the cycle 10-27 07:00Z -> 10-28 07:00Z
+  renderStrip('hours',
+    [[13],[14],[14],[16],[16],[16],[16],[14],[14],[14],[14],[14]],
+    ['07:05','08:05','10:05','11:05','13:05','16:05','19:05','20:05','22:05','01:05','04:05','07:05'],
+    ['']);
+  // health gate at 07:05Z each morning: clear / watch / stop, 2026-10-22 -> 2026-10-28
+  renderStrip('band',
+    [[20,12,26],[22,6,30],[17,7,34],[18,6,34],[13,11,34],[13,6,39],[14,3,41]],
+    ['10-22','10-23','10-24','10-25','10-26','10-27','10-28'],
+    ['', 'watch', 'stop']);
+
+  function renderStrip(id, cols, labels, kinds) {
+    var el = document.getElementById(id);
+    var max = 0;
+    cols.forEach(function (c) { c.forEach(function (v) { if (v > max) max = v; }); });
+    cols.forEach(function (c, i) {
+      var col = document.createElement('div');
+      col.className = 'col';
+      var bars = document.createElement('div');
+      bars.className = 'bars';
+      c.forEach(function (v, j) {
+        var b = document.createElement('div');
+        b.className = 'bar' + (v === 0 ? ' zero' : '') + (kinds[j] ? ' ' + kinds[j] : '');
+        b.style.height = Math.max(3, Math.round((v / max) * 100)) + '%';
+        b.title = v;
+        bars.appendChild(b);
+      });
+      var lab = document.createElement('div');
+      lab.className = 'xlab';
+      lab.textContent = labels[i];
+      col.appendChild(bars);
+      col.appendChild(lab);
+      el.appendChild(col);
+    });
+  }
+</script>
