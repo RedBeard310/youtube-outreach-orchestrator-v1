@@ -493,30 +493,128 @@ export async function countFirstTouchBetween(
 // four delivery days eats about 800 a week, so the headline figure and the real
 // inventory diverge faster than the inventory grows. Counted here so no report has to
 // ask: `ready_to_write` is the inventory, `total` is the label.
-export async function countShelf(): Promise<{
+//
+// THE STAMP IS NOT AN EMAIL (2026-10-28). `already_sent` reads one field,
+// `outreach_status='sent_to_smartlead'`, which the push writes when SmartLead ACCEPTS a
+// lead into a campaign. Acceptance is not delivery: SmartLead's own scheduler sends later
+// (Mon-Thu 09:00-15:00 ET), and a lead can be withdrawn from the campaign before it ever
+// goes out. `automator/scripts/siege_live.py` does exactly that — it removes the lead and
+// DELETES its row from `leads.outreach_sends`, correctly, because no email happened. It
+// does not revert the lead's own `outreach_status` or `last_contacted_at`.
+//
+// So the two instruments drift, silently and in the expensive direction. On 2026-10-28,
+// 54 of the 1,667 stamped leads had no send row at all: 53 from 2026-10-13, the record
+// 782-email day whose live sequences Casey's ICP audit paused that afternoon, and 1 from
+// 10-07. Every one has a verified address, a written subject, a finished bundle, and no
+// do-not-contact flag. Nobody has ever emailed them, and nothing will:
+//
+//   - the stamp keeps them out of `ready_to_write`, so the published inventory is short
+//     by 54 people and reads as complete;
+//   - `APPROVED_FIRE_READY` selects `ready_data_scraped`/`email_drafted`, so `npm run send`
+//     skips them forever;
+//   - Siege's history loader credits a phantom send off
+//     `outreach_status='sent_to_smartlead' AND last_contacted_at IS NOT NULL`, so its
+//     planner believes the offer was already used, and none of the 54 has appeared in a
+//     plan since 10-13.
+//
+// The giveaway was in the published snapshot for a second morning and unread: six people
+// were emailed for the FIRST time in the cycle, all six off this shelf, and `already_sent`
+// printed 1,667 against 1,667. A cumulative count of people written to cannot stay flat
+// while six join it. It stayed flat because those six had been stamped before they were
+// ever sent to, which is the same defect seen from the other side.
+//
+// `emailed` is now grounded on the send ledger — a row in `leads.outreach_sends` is an
+// email we really put in front of somebody — and `marked_sent_never_emailed` publishes the
+// gap with the ids, so a stranded cohort can never again sit inside a healthy-looking
+// number. The ledger fields are null, not 0, when the ledger cannot be read: unknown and
+// measured-as-nothing differ, and this repo only counts (see CLAUDE.md "No business logic
+// here") — recovering these leads means reverting a stamp, which belongs to the send path.
+export type ShelfRow = {
+  id: string;
+  outreach_status: string | null;
+  bundled: boolean;
+  /** Has a row in `leads.outreach_sends`. `null` = the ledger could not be read. */
+  emailed: boolean | null;
+};
+
+export type ShelfTally = {
   ready_to_write: number;
   bundled: number;
+  /** The stamp. Counts acceptance into a campaign, which is not the same as an email. */
   already_sent: number;
+  /** The send ledger. People this pipeline really emailed. Null if unreadable. */
+  emailed: number | null;
+  /** Stamped `sent_to_smartlead` with no send row: nobody emailed them, nothing will. */
+  marked_sent_never_emailed: number | null;
+  marked_sent_never_emailed_ids: string[] | null;
   total: number;
-}> {
-  const base = getBase();
-  const rows = await withRetry(
-    () => base(tableName()).select({
-      filterByFormula: `{review_status}='approved_hold'`,
-      fields: ['outreach_status', 'enrichment_bundle_path'],
-    }).all(),
-    'countShelf',
-  );
+};
+
+/** How many stranded ids a snapshot names, same cap the fleet and push blocks use. */
+export const MAX_SHELF_STRANDED_IDS = 12;
+
+/** Pure, so the shape can be asserted against a live snapshot without a database. */
+export function shelfTally(rows: ShelfRow[]): ShelfTally {
   let ready = 0;
   let bundled = 0;
   let sent = 0;
+  let emailed = 0;
+  const stranded: string[] = [];
+  // One unreadable row makes the whole ledger reading unknown. A partial count here would
+  // be a smaller gap than the real one, which is the failure this field exists to stop.
+  let ledgerReadable = true;
   for (const r of rows) {
-    const status = r.get('outreach_status') as string | undefined;
+    const status = r.outreach_status;
     if (status === 'ready_data_scraped' || status === 'enriched') ready += 1;
     if (status === 'sent_to_smartlead') sent += 1;
-    if ((r.get('enrichment_bundle_path') as string | undefined)?.trim()) bundled += 1;
+    if (r.bundled) bundled += 1;
+    if (r.emailed === null) {
+      ledgerReadable = false;
+      continue;
+    }
+    if (r.emailed) emailed += 1;
+    else if (status === 'sent_to_smartlead') stranded.push(r.id);
   }
-  return { ready_to_write: ready, bundled, already_sent: sent, total: rows.length };
+  return {
+    ready_to_write: ready,
+    bundled,
+    already_sent: sent,
+    emailed: ledgerReadable ? emailed : null,
+    marked_sent_never_emailed: ledgerReadable ? stranded.length : null,
+    marked_sent_never_emailed_ids: ledgerReadable ? stranded.slice(0, MAX_SHELF_STRANDED_IDS) : null,
+    total: rows.length,
+  };
+}
+
+export async function countShelf(): Promise<ShelfTally> {
+  // One query, both instruments, so they cannot be read at two different moments.
+  try {
+    const rows = await query<{ id: string; outreach_status: string | null; bundled: boolean; emailed: boolean }>(
+      `SELECT lc.id,
+              lc.outreach_status,
+              (lc.enrichment_bundle_path IS NOT NULL AND btrim(lc.enrichment_bundle_path) <> '') AS bundled,
+              EXISTS (SELECT 1 FROM leads.outreach_sends s WHERE s.lead_id = lc.id)              AS emailed
+         FROM leads.lead_candidates lc
+        WHERE lc.review_status = 'approved_hold'`,
+    );
+    return shelfTally(rows);
+  } catch {
+    // The ledger join is the only new dependency, so lose it rather than the whole block.
+    const base = getBase();
+    const rows = await withRetry(
+      () => base(tableName()).select({
+        filterByFormula: `{review_status}='approved_hold'`,
+        fields: ['outreach_status', 'enrichment_bundle_path'],
+      }).all(),
+      'countShelf',
+    );
+    return shelfTally(rows.map((r) => ({
+      id: r.id,
+      outreach_status: (r.get('outreach_status') as string | undefined) ?? null,
+      bundled: Boolean((r.get('enrichment_bundle_path') as string | undefined)?.trim()),
+      emailed: null,
+    })));
+  }
 }
 
 export type BulkStatusWrite = {

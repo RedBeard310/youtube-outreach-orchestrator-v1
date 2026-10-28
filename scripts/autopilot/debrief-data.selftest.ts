@@ -1,4 +1,6 @@
 import { bulkRewriteShape, bandGateFacts, fleetFacts, inboxGateFacts, apifyBatchFacts, apifyLedgerLine, NO_PUSH_OUTCOME, normalizePushReason, offerFromBatchId, siegeApprovedLeadIds, siegePlanLeadIds, siegePushOutcome, classifyKeyProbe, cyclePacificDay, costWindows, enrichmentChainFacts, isSendingDay, perEnrichedLeadCost, PER_LEAD_SAMPLE_FLOOR, projectRecoveryBudget, MAX_MISSING_DEBRIEFS, missingDebriefs, NO_UNIT, pushRunVerdict, unitStartedAt, sendPlanHealth, siegePlanFacts, summarizeSendLines, isVerifiedOrBeyond, laneYield, priorAdvanceSource, priorSeedsAdvanced, priorSeedsWalked, reconcileAdvanced, sessionSeedsAdvanced, sessionStartMs, walkRateTrend } from './debrief-data.ts';
+import { MAX_SHELF_STRANDED_IDS, shelfTally, type ShelfRow } from '../../src/db.ts';
+
 let fail = 0;
 const ok = (name: string, got: unknown, want: unknown) => {
   const pass = JSON.stringify(got) === JSON.stringify(want);
@@ -1181,6 +1183,55 @@ ok('a status the prior snapshot never listed is unknown, not zero',
 ok('3 to 9 clusters is a handful of statements, not a sweep',
   bulkRewriteShape([{ ...SWEEP_ROLL[0], clusters: 4 }], SWEEP_CLUSTERS, null, null)![0].shape,
   'few_statements');
+
+// shelfTally — the stamp is not an email. See countShelf() in src/db.ts for the 54 leads
+// stamped sent_to_smartlead on 2026-10-13 that no lane will ever write to.
+const shelfRow = (over: Partial<ShelfRow>): ShelfRow =>
+  ({ id: 'rec1', outreach_status: 'ready_data_scraped', bundled: true, emailed: false, ...over });
+ok('a stamped lead with no send row is stranded, not sent',
+  (() => {
+    const t = shelfTally([
+      shelfRow({ id: 'a' }),
+      shelfRow({ id: 'b', outreach_status: 'sent_to_smartlead', emailed: true }),
+      shelfRow({ id: 'c', outreach_status: 'sent_to_smartlead', emailed: false }),
+    ]);
+    return [t.ready_to_write, t.already_sent, t.emailed, t.marked_sent_never_emailed, t.marked_sent_never_emailed_ids];
+  })(),
+  [1, 2, 1, 1, ['c']]);
+ok('the live 2026-10-28 shape: 1,667 stamped, 1,613 emailed, 54 stranded',
+  (() => {
+    const rows: ShelfRow[] = [];
+    for (let i = 0; i < 5147; i++) rows.push(shelfRow({ id: `r${i}` }));
+    for (let i = 0; i < 1613; i++) rows.push(shelfRow({ id: `s${i}`, outreach_status: 'sent_to_smartlead', emailed: true }));
+    for (let i = 0; i < 54; i++) rows.push(shelfRow({ id: `g${i}`, outreach_status: 'sent_to_smartlead', emailed: false }));
+    const t = shelfTally(rows);
+    return [t.total, t.ready_to_write, t.already_sent, t.emailed, t.marked_sent_never_emailed,
+      t.marked_sent_never_emailed_ids!.length];
+  })(),
+  [6814, 5147, 1667, 1613, 54, MAX_SHELF_STRANDED_IDS]);
+ok('an emailed lead that is not stamped does not count as stranded',
+  (() => {
+    const t = shelfTally([shelfRow({ id: 'a', outreach_status: 'email_drafted', emailed: true })]);
+    return [t.already_sent, t.emailed, t.marked_sent_never_emailed];
+  })(),
+  [0, 1, 0]);
+ok('the legacy enriched alias still counts as ready to write',
+  shelfTally([shelfRow({ outreach_status: 'enriched' })]).ready_to_write, 1);
+ok('an unreadable ledger is unknown, not a clean shelf',
+  (() => {
+    const t = shelfTally([
+      shelfRow({ id: 'a', outreach_status: 'sent_to_smartlead', emailed: null }),
+      shelfRow({ id: 'b', outreach_status: 'sent_to_smartlead', emailed: false }),
+    ]);
+    return [t.already_sent, t.emailed, t.marked_sent_never_emailed, t.marked_sent_never_emailed_ids];
+  })(),
+  [2, null, null, null]);
+ok('an empty shelf is zero, not unknown',
+  (() => {
+    const t = shelfTally([]);
+    return [t.total, t.emailed, t.marked_sent_never_emailed];
+  })(),
+  [0, 0, 0]);
 
 console.log(fail === 0 ? '\nALL PASS' : `\n${fail} FAILED`);
 process.exit(fail === 0 ? 0 : 1);

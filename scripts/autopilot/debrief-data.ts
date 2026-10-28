@@ -4202,6 +4202,9 @@ async function main(): Promise<void> {
       ready_to_write: shelf?.ready_to_write ?? null,
       bundled: shelf?.bundled ?? null,
       already_sent: shelf?.already_sent ?? null,
+      emailed: shelf?.emailed ?? null,
+      marked_sent_never_emailed: shelf?.marked_sent_never_emailed ?? null,
+      marked_sent_never_emailed_ids: shelf?.marked_sent_never_emailed_ids ?? null,
       approved_hold_total: shelf?.total ?? null,
       bundled_pct: shelf && shelf.total > 0 ? Math.round((1000 * shelf.bundled) / shelf.total) / 10 : null,
       note:
@@ -4212,7 +4215,29 @@ async function main(): Promise<void> {
         'the send path pushes (roughly 800 a week at the 200/day ramp across four delivery ' +
         'days) while the recovery lane adds one or two a day, so quoting the total overstates ' +
         'the weeks of email in the bank and the overstatement grows. bundled_pct measures ' +
-        'enrichment against the same total on purpose: a sent lead was enriched too.',
+        'enrichment against the same total on purpose: a sent lead was enriched too. ' +
+        'AND READ emailed, NOT already_sent, AS PEOPLE THIS PIPELINE HAS EMAILED ' +
+        '(2026-10-28): already_sent reads the outreach_status stamp, which the push writes ' +
+        'when SmartLead ACCEPTS a lead into a campaign, and acceptance is not delivery. ' +
+        'SmartLead sends later on its own schedule, and a lead can be withdrawn before it ' +
+        'ever goes out — automator/scripts/siege_live.py does that and deletes the row from ' +
+        'leads.outreach_sends, correctly, because no email happened, but it does not revert ' +
+        'the stamp or last_contacted_at. marked_sent_never_emailed is that gap, and on ' +
+        '2026-10-28 it was 54 of 1,667: 53 from the record 782-email day on 2026-10-13 ' +
+        'whose live sequences the ICP audit paused that afternoon, and 1 from 10-07. All 54 ' +
+        'have a verified address, a written subject, a finished bundle and no ' +
+        'do-not-contact flag, and nobody has ever emailed them. Nothing will, either: the ' +
+        'stamp keeps them out of ready_to_write, APPROVED_FIRE_READY skips them so npm run ' +
+        'send never offers them, and Siege credits a phantom send off ' +
+        "outreach_status='sent_to_smartlead' AND last_contacted_at IS NOT NULL, so none has " +
+        'been in a plan since 10-13. The giveaway sat in this block unread for two ' +
+        'mornings: six people were emailed for the FIRST time in the 10-28 cycle, all six ' +
+        'off this shelf, and already_sent printed 1,667 against 1,667. A cumulative count ' +
+        'of people written to cannot stay flat while six join it — it stayed flat because ' +
+        'those six were stamped before they were ever sent to. emailed and ' +
+        'marked_sent_never_emailed are null, not 0, when the send ledger cannot be read, ' +
+        'which is unknown and NOT a clean shelf. Recovering the stranded leads means ' +
+        'reverting a stamp, which is the send path\'s call and not this repo\'s.',
     },
     discovered_today: {
       total: discovered.length,
