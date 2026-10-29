@@ -391,7 +391,103 @@ export type FirstTouchCounts = {
   people_prev_7d: number;
   first_touch_prev_7d: number;
   first_touch_pct_prev_7d: number | null;
+  /**
+   * Of `first_touch`, how many a push had ALREADY credited on an earlier day — a drained
+   * backlog, not new supply. Null when `leads.siege_plan` cannot be read.
+   */
+  first_touch_recovered: number | null;
+  /** Of `first_touch`, how many had never been planned before. The real supply number. */
+  first_touch_new: number | null;
+  /** The oldest run_day behind a recovered first touch, as `YYYY-MM-DD`. Null if none. */
+  first_touch_recovered_oldest_day: string | null;
+  /** The same split over the prior seven days, so the baseline is comparable. */
+  first_touch_recovered_prev_7d: number | null;
+  first_touch_new_prev_7d: number | null;
 };
+
+/**
+ * Split a window's first touches into a recovered backlog and genuinely new people.
+ *
+ * WHY THIS EXISTS (2026-10-29). `first_touch` cannot tell the two apart, and on this
+ * cycle they looked like the same thing. It read 52 first touches at 36.1% against 19
+ * for the whole prior week at 3.8%, which reads as the Whale re-offer queue finally
+ * letting new people through — the one lever the 10-15 note said to watch. It was not.
+ * Fifty of the 51 shelf first touches were the stranded cohort the 10-28 debrief had
+ * just published: people a push stamped `sent_to_smartlead` on 2026-10-13 whose live
+ * SmartLead sequences the ICP audit paused that afternoon, so acceptance was credited
+ * and no email ever went out. The send path reverted the stamp inside one cycle and they
+ * flew, which is the right outcome and exactly what that debrief asked for. But the
+ * re-push overwrites `outreach_processed_at`, so all 51 now carry a 10-28 stamp and
+ * nothing in the row says they are fifteen days old. Telling a drained backlog from new
+ * supply took a hand join of `leads.siege_plan`, and without it the cycle published a
+ * 15-day one-off as a nine-fold jump in reach. The honest figure was ONE genuinely new
+ * person, and 5 across the eight days ending this cycle.
+ *
+ * A person counts as recovered when a `leads.siege_plan` row with `status='pushed'` sits
+ * on a `run_day` strictly before the day of their own first send, so a plan from earlier
+ * the same morning is not mistaken for a backlog. Keyed off the send's own date rather
+ * than the window, which keeps it right for a window that straddles midnight.
+ *
+ * Separate statement from the counts it annotates, and fail-soft at the call site:
+ * `siege_plan` is automator's table, so a rename costs these five fields and never
+ * `first_touch` itself. Null is unknown, NOT zero.
+ */
+/** One first-touch person and the oldest earlier day a push already credited them. */
+export type FirstTouchRow = { lead_id: string; oldest_pushed_day: string | null };
+
+/**
+ * Classify a window's first touches into a recovered backlog and new people.
+ *
+ * Pure, so the boundary rule can be asserted without a database. `oldest_pushed_day` is
+ * already restricted by the query to pushes STRICTLY BEFORE the person's own first send,
+ * so a plan from earlier the same morning arrives here as null and reads as new.
+ */
+export function recoveredTally(
+  rows: FirstTouchRow[],
+): { recovered: number; fresh: number; oldestDay: string | null } {
+  let recovered = 0;
+  let fresh = 0;
+  let oldestDay: string | null = null;
+  for (const r of rows) {
+    if (r.oldest_pushed_day) {
+      recovered++;
+      if (oldestDay === null || r.oldest_pushed_day < oldestDay) oldestDay = r.oldest_pushed_day;
+    } else {
+      fresh++;
+    }
+  }
+  return { recovered, fresh, oldestDay };
+}
+
+async function countFirstTouchRecovered(
+  sinceISO: string,
+  untilISO: string,
+): Promise<{ recovered: number; fresh: number; oldestDay: string | null }> {
+  const rows = await query<FirstTouchRow>(
+    `WITH touched AS (
+       SELECT s.lead_id, min(s.sent_at) AS cyc_first
+         FROM leads.outreach_sends s
+        WHERE s.sent_at >= $1 AND s.sent_at < $2
+        GROUP BY 1
+     ),
+     firsts AS (
+       SELECT t.lead_id, t.cyc_first
+         FROM touched t
+        WHERE NOT EXISTS (SELECT 1 FROM leads.outreach_sends p
+                           WHERE p.lead_id = t.lead_id AND p.sent_at < t.cyc_first)
+     )
+     SELECT f.lead_id,
+            to_char(min(sp.run_day) FILTER (WHERE sp.status = 'pushed'), 'YYYY-MM-DD')
+              AS oldest_pushed_day
+       FROM firsts f
+       LEFT JOIN leads.siege_plan sp
+              ON sp.lead_id = f.lead_id
+             AND sp.run_day < (f.cyc_first AT TIME ZONE 'UTC')::date
+      GROUP BY 1`,
+    [sinceISO, untilISO],
+  );
+  return recoveredTally(rows);
+}
 
 /**
  * How many of the cycle's emails reached somebody we had never written to.
@@ -467,6 +563,13 @@ export async function countFirstTouchBetween(
   const firstTouch = n(r.first_touch);
   const peoplePrev = n(r.people_prev);
   const firstTouchPrev = n(r.first_touch_prev);
+  // A recovered backlog and new supply print the same in first_touch. See
+  // countFirstTouchRecovered(). Its table belongs to automator, so a rename costs these
+  // five fields and never the counts above: null is unknown, NOT zero.
+  const [cyc, prev] = await Promise.all([
+    countFirstTouchRecovered(sinceISO, untilISO).catch(() => null),
+    countFirstTouchRecovered(prevStartISO, sinceISO).catch(() => null),
+  ]);
   return {
     people,
     first_touch: firstTouch,
@@ -476,6 +579,11 @@ export async function countFirstTouchBetween(
     people_prev_7d: peoplePrev,
     first_touch_prev_7d: firstTouchPrev,
     first_touch_pct_prev_7d: pct(firstTouchPrev, peoplePrev),
+    first_touch_recovered: cyc ? cyc.recovered : null,
+    first_touch_new: cyc ? cyc.fresh : null,
+    first_touch_recovered_oldest_day: cyc ? cyc.oldestDay : null,
+    first_touch_recovered_prev_7d: prev ? prev.recovered : null,
+    first_touch_new_prev_7d: prev ? prev.fresh : null,
   };
 }
 

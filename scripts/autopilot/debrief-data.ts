@@ -4006,7 +4006,25 @@ async function main(): Promise<void> {
         'send_plan.waiting_for_a_slot: Siege fills slots by tier and the Whale tier ran out ' +
         'of never-emailed people on the 10-13 push, so its re-offer queue takes every slot ' +
         'while ready lower-tier people wait. shelf_first_touch is how many first touches ' +
-        'came off approved_hold, which is the only number that drains the shelf.',
+        'came off approved_hold, which is the only number that drains the shelf. ' +
+        'AND READ first_touch_new, NOT first_touch, AS REACH (2026-10-29): a first touch ' +
+        'can be a backlog finally flying rather than a new person reached, and this cycle ' +
+        'they looked identical. It printed 52 first touches at 36.1% against 19 for the ' +
+        'whole prior week at 3.8%, a nine-fold jump that reads as the Whale re-offer queue ' +
+        'letting new people through at last. Fifty of the 51 shelf first touches were the ' +
+        'stranded cohort the 10-28 debrief had just published: stamped sent_to_smartlead on ' +
+        '2026-10-13, their live sequences paused by the ICP audit that afternoon, so ' +
+        'acceptance was credited and no email ever went out. The send path reverted the ' +
+        'stamp inside one cycle and they flew, which is the right outcome and exactly what ' +
+        'that debrief asked for — but the re-push OVERWRITES outreach_processed_at, so all ' +
+        '51 now carry a 10-28 stamp and nothing in the row says they are fifteen days old. ' +
+        'Separating them took a hand join of leads.siege_plan. first_touch_recovered is how ' +
+        'many a push had already credited on an earlier day, first_touch_new is how many had ' +
+        'never been planned at all, and first_touch_recovered_oldest_day is how old the ' +
+        'backlog was. The honest reading of this cycle is ONE genuinely new person, and 5 ' +
+        'across the eight days ending with it, so a 36.1% day and a 3.8% week describe the ' +
+        'same starvation. The stranded pool is drained to 4, so this cannot repeat at size. ' +
+        'All five are null, not 0, when siege_plan cannot be read: unknown, NOT zero.',
     },
     // Why the cycle sent what it sent. sent_today counts emails; this says whether a
     // batch was written and left standing. See the block comment on siegePlanFacts().

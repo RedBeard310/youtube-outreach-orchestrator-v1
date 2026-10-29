@@ -1,5 +1,5 @@
 import { bulkRewriteShape, bandGateFacts, fleetFacts, inboxGateFacts, apifyBatchFacts, apifyLedgerLine, NO_PUSH_OUTCOME, normalizePushReason, offerFromBatchId, siegeApprovedLeadIds, siegePlanLeadIds, siegePushOutcome, classifyKeyProbe, cyclePacificDay, costWindows, enrichmentChainFacts, isSendingDay, perEnrichedLeadCost, PER_LEAD_SAMPLE_FLOOR, projectRecoveryBudget, MAX_MISSING_DEBRIEFS, missingDebriefs, NO_UNIT, pushRunVerdict, unitStartedAt, sendPlanHealth, siegePlanFacts, summarizeSendLines, isVerifiedOrBeyond, laneYield, priorAdvanceSource, priorSeedsAdvanced, priorSeedsWalked, reconcileAdvanced, sessionSeedsAdvanced, sessionStartMs, walkRateTrend } from './debrief-data.ts';
-import { MAX_SHELF_STRANDED_IDS, shelfTally, type ShelfRow } from '../../src/db.ts';
+import { MAX_SHELF_STRANDED_IDS, recoveredTally, shelfTally, type ShelfRow } from '../../src/db.ts';
 
 let fail = 0;
 const ok = (name: string, got: unknown, want: unknown) => {
@@ -1232,6 +1232,40 @@ ok('an empty shelf is zero, not unknown',
     return [t.total, t.emailed, t.marked_sent_never_emailed];
   })(),
   [0, 0, 0]);
+
+// recoveredTally — a backlog finally flying is not a new person reached. See
+// countFirstTouchRecovered() in src/db.ts for the 51 of 52 first touches on 2026-10-29
+// that were the 10-13 stranded cohort, published as a nine-fold jump in reach.
+ok('the live 2026-10-29 shape: 52 first touches, 51 a 10-13 backlog, 1 new',
+  (() => {
+    const rows = [{ lead_id: 'new', oldest_pushed_day: null as string | null }];
+    for (let i = 0; i < 51; i++) rows.push({ lead_id: `r${i}`, oldest_pushed_day: '2026-10-13' });
+    const t = recoveredTally(rows);
+    return [t.recovered, t.fresh, t.oldestDay];
+  })(),
+  [51, 1, '2026-10-13']);
+ok('the oldest day is the oldest backlog, not the newest',
+  recoveredTally([
+    { lead_id: 'a', oldest_pushed_day: '2026-10-21' },
+    { lead_id: 'b', oldest_pushed_day: '2026-10-07' },
+    { lead_id: 'c', oldest_pushed_day: '2026-10-13' },
+  ]).oldestDay,
+  '2026-10-07');
+ok('a cycle that reached only new people carries no backlog day',
+  (() => {
+    const t = recoveredTally([
+      { lead_id: 'a', oldest_pushed_day: null },
+      { lead_id: 'b', oldest_pushed_day: null },
+    ]);
+    return [t.recovered, t.fresh, t.oldestDay];
+  })(),
+  [0, 2, null]);
+ok('a cycle with no first touches is zero, not unknown',
+  (() => {
+    const t = recoveredTally([]);
+    return [t.recovered, t.fresh, t.oldestDay];
+  })(),
+  [0, 0, null]);
 
 console.log(fail === 0 ? '\nALL PASS' : `\n${fail} FAILED`);
 process.exit(fail === 0 ? 0 : 1);
