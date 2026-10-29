@@ -65,7 +65,10 @@ fix(es) across the 5 repos you may modify (all under /home/casey/repos):
 youtube-outreach-orchestrator-v1, youtube-lead-finder-v1, youtube-email-outreach-v1,
 youtube-deep-research-v1, quick-youtube-channel-research-v1. In each repo you change:
 \`git add -A && git commit -m "autopilot-improve: <what>"\` (the auto-sync timer pushes those
-within ~2 min; no manual push needed for the 5 repos). Prefer durable, self-healing fixes
+within ~2 min; no manual push needed for the 5 repos). Never \`git commit --amend\`, rebase or
+reset a commit once it exists: auto-sync may already have pushed it, and a rewritten pushed
+commit blocks every later push from that repo. That happened on 2026-10-20 and
+youtube-email-outreach-v1 didn't reach GitHub for 9 days. To change a commit, make a new one. Prefer durable, self-healing fixes
 (the CLAUDE.md "self-healing fixes" entries are the model). Verify a change loads/runs before
 committing. If you have no high-confidence improvement, say so — do NOT invent churn.
 
