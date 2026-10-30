@@ -235,7 +235,9 @@ ok('plan facts read off the real shape',
   { plan_found: true, plan_day: '2026-09-29', email_paused: false, day_cap: 150,
     planned: 150, mailbox_slots: 16, live_inboxes: 2, offers_blocked: 2,
     mailbox_capacity: 30, followups_due: 14, inboxes_full: 0,
-    waiting_for_a_slot: null, waiting_by_tier: null, plan_generated_at: null });
+    waiting_for_a_slot: null, waiting_by_tier: null,
+    inboxes_total: 3, inboxes_no_campaign: 0, inboxes_only_no_campaign: 0,
+    plan_generated_at: null });
 ok('blocked offers count as an array too',
   siegePlanFacts({ summary: { offer_problems: [{ offer: 'a' }] } }).offers_blocked, 1);
 ok('a dead inbox contributes no slots',
@@ -245,7 +247,9 @@ ok('a dead inbox owes no follow-ups we can act on either',
   { plan_found: true, plan_day: null, email_paused: null, day_cap: null, planned: null,
     mailbox_slots: 0, live_inboxes: 0, offers_blocked: null,
     mailbox_capacity: 0, followups_due: 0, inboxes_full: 0,
-    waiting_for_a_slot: null, waiting_by_tier: null, plan_generated_at: null });
+    waiting_for_a_slot: null, waiting_by_tier: null,
+    inboxes_total: 1, inboxes_no_campaign: 0, inboxes_only_no_campaign: 0,
+    plan_generated_at: null });
 // THE 2026-10-12 SHAPE: the healthiest fleet of the week and the worst new-person
 // volume of the week, because follow-ups outran the whole allowance. The slot count
 // alone reads identically to a suspension wave, which is why the three fields exist.
@@ -264,13 +268,17 @@ ok('follow-ups eating the fleet is readable, not just the small slot count',
   { plan_found: true, plan_day: '2026-10-12', email_paused: null, day_cap: 870,
     planned: 13, mailbox_slots: 13, live_inboxes: 3, offers_blocked: null,
     mailbox_capacity: 45, followups_due: 55, inboxes_full: 2,
-    waiting_for_a_slot: null, waiting_by_tier: null, plan_generated_at: null });
+    waiting_for_a_slot: null, waiting_by_tier: null,
+    inboxes_total: 3, inboxes_no_campaign: 0, inboxes_only_no_campaign: 0,
+    plan_generated_at: null });
 ok('a renamed key costs one null, not the block',
   siegePlanFacts({ summary: { day_cap: 'oops' }, assignments: [1] }),
   { plan_found: true, plan_day: null, email_paused: null, day_cap: null,
     planned: 1, mailbox_slots: null, live_inboxes: null, offers_blocked: null,
     mailbox_capacity: null, followups_due: null, inboxes_full: null,
-    waiting_for_a_slot: null, waiting_by_tier: null, plan_generated_at: null });
+    waiting_for_a_slot: null, waiting_by_tier: null,
+    inboxes_total: null, inboxes_no_campaign: null, inboxes_only_no_campaign: null,
+    plan_generated_at: null });
 // THE 2026-10-16 SHAPE: every slot went to the tier that had already heard from us,
 // and 949 ready people below it waited. The plan carried that all along.
 ok('the queue behind a 1% first-touch day is summed and kept per tier',
@@ -328,6 +336,72 @@ ok('a deliberate email pause is not a missing approval',
     siegePlanFacts({ ...PLAN_29, summary: { ...PLAN_29.summary, email_paused: true } }), 0, 0);
     return [h.approval_pending, h.binding_constraint]; })(),
   [false, 'email_paused']);
+// THE 2026-10-29 SHAPE: SmartLead's campaign list came back empty on the live pass, so
+// all 58 mailboxes read "no Siege campaign yet", 12 of them with no other reason. The
+// day planned nobody, refused to push, and printed binding_constraint:null.
+const PLAN_29_OCT = {
+  summary: {
+    day: '2026-10-29', email_paused: false, day_cap: 870,
+    inboxes: [
+      ...new Array(45).fill(null).map(() => ({
+        live: false, free_before_fill: 0, campaign_id: null,
+        why_not: 'suspended in SmartLead; no Siege campaign yet',
+      })),
+      ...new Array(12).fill(null).map(() => ({
+        live: false, free_before_fill: 0, campaign_id: null,
+        why_not: 'no Siege campaign yet',
+      })),
+      { live: false, free_before_fill: 0, campaign_id: null,
+        why_not: 'health watch: follow-ups only (recovering, 3h of 48h at 90+); no Siege campaign yet' },
+    ],
+  },
+  assignments: [],
+};
+ok('a blanked campaign list is counted, and only the mailboxes it alone stopped',
+  (() => { const f = siegePlanFacts(PLAN_29_OCT);
+    return [f.inboxes_total, f.inboxes_no_campaign, f.inboxes_only_no_campaign, f.planned]; })(),
+  [58, 58, 12, 0]);
+ok('10-29: a plan that planned nobody names the blanked campaign list',
+  sendPlanHealth(siegePlanFacts(PLAN_29_OCT), 0, 0, 'exit-code',
+    { ...NO_UNIT, sending_day: true }).binding_constraint,
+  'campaign_list_empty');
+ok('a fleet that genuinely had no room is not blamed on the campaign list',
+  sendPlanHealth(
+    siegePlanFacts({
+      summary: { day: '2026-10-29', email_paused: false, day_cap: 870,
+        inboxes: [{ live: false, free_before_fill: 0, why_not: 'suspended in SmartLead' }] },
+      assignments: [],
+    }), 0, 0, null, { ...NO_UNIT, sending_day: true }).binding_constraint,
+  'no_mailbox_slots');
+ok('a plan with slots that still planned nobody wants a human, not a guess',
+  sendPlanHealth(
+    siegePlanFacts({
+      summary: { day: '2026-10-29', email_paused: false, day_cap: 870,
+        inboxes: [{ live: true, free_before_fill: 40 }] },
+      assignments: [],
+    }), 0, 0, null, { ...NO_UNIT, sending_day: true }).binding_constraint,
+  'planned_nobody');
+// One new mailbox awaiting its campaign is a real per-mailbox state, not a blanked list.
+ok('a single campaign-less mailbox is not the whole list going dark',
+  sendPlanHealth(
+    siegePlanFacts({
+      summary: { day: '2026-10-29', email_paused: false, day_cap: 870,
+        inboxes: [
+          { live: false, free_before_fill: 0, why_not: 'no Siege campaign yet' },
+          { live: true, free_before_fill: 0, why_not: '' },
+        ] },
+      assignments: [],
+    }), 0, 0, null, { ...NO_UNIT, sending_day: true }).binding_constraint,
+  'no_mailbox_slots');
+// A plan with no inbox list cannot answer the question — unknown, not a clean fleet.
+ok('no inbox list costs three nulls, not three zeros',
+  (() => { const f = siegePlanFacts({ summary: { day: '2026-10-29' } });
+    return [f.inboxes_total, f.inboxes_no_campaign, f.inboxes_only_no_campaign]; })(),
+  [null, null, null]);
+// A hand-driven batch means the day moved; the branches below describe it better.
+ok('a zero plan beside real sends is not the day\'s constraint',
+  sendPlanHealth(siegePlanFacts(PLAN_29_OCT), 40, 0, 'success',
+    { ...NO_UNIT, sending_day: true }).binding_constraint !== 'campaign_list_empty', true);
 // An unmeasured cycle must not read as a quiet one — the same rule summarizeSendLines keeps.
 ok('no send count -> no verdict',
   (() => { const h = sendPlanHealth(siegePlanFacts(PLAN_29), null, 4);

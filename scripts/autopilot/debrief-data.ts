@@ -77,6 +77,13 @@ export type SiegePlanFacts = {
   /** The same, per tier, so "the Whale queue ate the day" is readable rather than
    *  inferred. Keys are automator's tier names; null if the plan stops carrying them. */
   waiting_by_tier: Record<string, number> | null;
+  /** Every mailbox the plan describes, live or not. The denominator for the two below. */
+  inboxes_total: number | null;
+  /** Mailboxes the plan could not tie to a Siege campaign. */
+  inboxes_no_campaign: number | null;
+  /** Mailboxes whose ONLY disqualification was the missing campaign — they were
+   *  otherwise fit to send and sent nothing. See campaignGapTally(). */
+  inboxes_only_no_campaign: number | null;
   /** When Siege wrote the plan file we just read. NOT the start of the day: the file is
    *  overwritten in place, so a re-plan late at night replaces the morning's fleet
    *  snapshot and every number above describes the fleet AT THIS STAMP. See the
@@ -98,10 +105,63 @@ const NO_PLAN: SiegePlanFacts = {
   inboxes_full: null,
   waiting_for_a_slot: null,
   waiting_by_tier: null,
+  inboxes_total: null,
+  inboxes_no_campaign: null,
+  inboxes_only_no_campaign: null,
   plan_generated_at: null,
 };
 
 const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+
+/** The reason automator's siege-plan.py gives a mailbox it cannot tie to a campaign. */
+const NO_CAMPAIGN_REASON = 'no Siege campaign yet';
+
+/** HOW A WHOLE SENDING DAY CAN COST NOTHING AND NAME NO CAUSE (2026-10-29).
+ *
+ *  Siege runs twice each morning: a sample pass, then a live pass that rebuilds the plan
+ *  and pushes it. On 2026-10-29 the sample pass at 10:16:50Z read 12 LIVE mailboxes with
+ *  62 free slots against an 870 ramp. The live pass 4m30s later read ZERO, and all 58
+ *  mailboxes in the plan it wrote carried `campaign_id: null` and the reason
+ *  "no Siege campaign yet" — twelve of them with that as their ONLY reason. It then
+ *  refused to push ("nothing the approval covers is still plannable") and exited 1, and
+ *  62 approved people with verified addresses and finished bundles got no email on a
+ *  Thursday.
+ *
+ *  Nothing in the pipeline said why. `planned` was 0, so every branch of
+ *  sendPlanHealth() fell through and `binding_constraint` — the one field a reader looks
+ *  at first — printed null on the worst send day in weeks. A reader following this
+ *  block's own rules would have landed on the band gate (48 stopped) and called it a sick
+ *  fleet, which is the wrong answer: twelve mailboxes were fit to send and were disqualified
+ *  by a reason that is not about them.
+ *
+ *  A fleet cannot all lose its campaign at once. automator's `list_accounts()` is guarded
+ *  against exactly this shape — it retries and never returns a partial list, with a comment
+ *  saying what an empty one would cost — but `list_campaigns()` one function above it
+ *  returns `[]` for any failed read, with no retry and no raised error, so one bad answer
+ *  from SmartLead blanks the whole fleet silently. The guard belongs in automator, which is
+ *  the send path and not this repo's to edit (CLAUDE.md "No business logic here"). What
+ *  belongs here is that it can never again be read as anything else.
+ *
+ *  `only` is the number that matters: a mailbox already suspended also picks up the reason
+ *  when the list blanks, so it proves nothing, while a mailbox carrying it ALONE is a slot
+ *  the day really lost. Splitting on "; " can over-split a reason with a semicolon inside
+ *  it, which only ever adds parts, so `only` errs toward under-counting. All three are
+ *  null, not 0, when the plan carries no inbox list: unknown and measured-as-nothing differ. */
+export function campaignGapTally(
+  inboxes: Array<Record<string, unknown>> | null,
+): { total: number | null; noCampaign: number | null; only: number | null } {
+  if (inboxes === null) return { total: null, noCampaign: null, only: null };
+  let noCampaign = 0;
+  let only = 0;
+  for (const i of inboxes) {
+    const why = typeof i.why_not === 'string' ? i.why_not : '';
+    const parts = why.split('; ').map((p) => p.trim()).filter(Boolean);
+    if (!parts.includes(NO_CAMPAIGN_REASON)) continue;
+    noCampaign += 1;
+    if (i.live !== true && parts.length === 1) only += 1;
+  }
+  return { total: inboxes.length, noCampaign, only };
+}
 
 // Pure so the selftest can feed it a hand-built plan. Every field is optional on the
 // way in: automator owns this file's shape and may change it without telling us, and a
@@ -183,6 +243,9 @@ export function siegePlanFacts(raw: unknown): SiegePlanFacts {
       }
       return Object.keys(out).length > 0 ? out : null;
     })(),
+    inboxes_total: campaignGapTally(inboxes).total,
+    inboxes_no_campaign: campaignGapTally(inboxes).noCampaign,
+    inboxes_only_no_campaign: campaignGapTally(inboxes).only,
     plan_generated_at: typeof s.generated_at === 'string' ? s.generated_at : null,
   };
 }
@@ -1036,6 +1099,19 @@ export function sendPlanHealth(
   if (!facts.plan_found && unit.sending_day === false) binding = 'not_a_sending_day';
   else if (!facts.plan_found && unit.sending_day === true) binding = 'plan_missing_on_sending_day';
   else if (facts.email_paused === true) binding = 'email_paused';
+  // A PLAN THAT PLANNED NOBODY (2026-10-29). Until now this fell through every branch
+  // and printed null — see campaignGapTally() for the day it cost. Ranked above the
+  // ceilings because a plan holding nobody never reached one, and only claimed when
+  // nothing else sent either: a hand-driven batch means the day moved and the branches
+  // below describe it better.
+  else if (planned === 0 && unit.sending_day !== false
+    && (elsewhere === null || elsewhere === 0)) {
+    if (facts.inboxes_total !== null && facts.inboxes_total > 0
+      && facts.inboxes_no_campaign === facts.inboxes_total
+      && (facts.inboxes_only_no_campaign ?? 0) > 0) binding = 'campaign_list_empty';
+    else if (facts.mailbox_slots === 0) binding = 'no_mailbox_slots';
+    else binding = 'planned_nobody';
+  }
   else if (approvalPending === true) binding = 'awaiting_approval';
   else if (elsewhere !== null && elsewhere > 0) {
     // Only claim a ceiling when the day actually pressed against it.
@@ -1102,6 +1178,26 @@ export function sendPlanHealth(
       'happened, which on a weekend is a weekday two days back — unlike ' +
       'push_unit_result, which is null unless that run was inside this cycle. A unit_state ' +
       'of failed left over from a prior cycle does not block the next timer firing. ' +
+      'AND A PLAN THAT PLANNED NOBODY NOW NAMES ITSELF (2026-10-29): planned:0 used to ' +
+      'fall through every branch below and print binding_constraint:null, so the worst ' +
+      'send day in weeks carried no cause at all. That morning Siege\'s sample pass read ' +
+      '12 LIVE mailboxes with 62 free slots at 10:16:50Z, its live pass 4m30s later read ' +
+      'ZERO, and every one of the 58 mailboxes in the plan it wrote carried campaign_id ' +
+      'null and the reason "no Siege campaign yet" — twelve with that as their ONLY ' +
+      'reason. It refused to push and exited 1, and 62 approved people with verified ' +
+      'addresses got no email on a Thursday. A whole fleet cannot lose its campaign at ' +
+      'once: automator\'s list_campaigns() returns [] for any failed SmartLead read, with ' +
+      'no retry and no error, while list_accounts() directly below it is guarded against ' +
+      'exactly that. The guard belongs in automator (the send path, not this repo). ' +
+      'campaign_list_empty is that shape — every mailbox lost its campaign and at least ' +
+      'one was otherwise fit to send; no_mailbox_slots is a plan that genuinely had no ' +
+      'room; planned_nobody is neither and wants a human. READ ' +
+      'inboxes_only_no_campaign, NOT inboxes_no_campaign: a mailbox already suspended ' +
+      'picks the reason up too when the list blanks and proves nothing, while one ' +
+      'carrying it alone is a slot the day really lost. All three are null, not 0, when ' +
+      'the plan has no inbox list. DO NOT READ band_stop AS THE CAUSE ON SUCH A DAY: on ' +
+      '10-29 it read 48 stopped and looked like a sick fleet, and the twelve mailboxes ' +
+      'that could have sent were nowhere in it. ' +
       'binding_constraint:nothing_lost means the plan moved and the push\'s own ' +
       'per-person join found nobody who ended the run without an email — a lossless ' +
       'push, not a shortfall. It replaces partial_push for that shape (2026-10-24): the ' +
