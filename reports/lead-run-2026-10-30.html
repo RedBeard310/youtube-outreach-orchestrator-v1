@@ -1,0 +1,192 @@
+<title>Lead Run Debrief — 2026-10-30</title>
+<style>
+  :root {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+      --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+      --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+    --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+    --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 40px 22px 80px; }
+  .eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); font-weight: 600; }
+  h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.12; margin: 10px 0 6px; text-wrap: balance; letter-spacing: -.02em; }
+  h2 { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); margin: 44px 0 16px; font-weight: 700; }
+  h3 { font-size: 18px; margin: 0 0 6px; letter-spacing: -.01em; }
+  p { margin: 0 0 14px; }
+  .lede { font-size: 18px; color: var(--ink-soft); max-width: 68ch; }
+  .tag { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--amber-soft); color: var(--amber); letter-spacing: .02em; }
+  .tag.red { background: var(--red-soft); color: var(--red); }
+  .grid { display: grid; gap: 14px; }
+  .stats { grid-template-columns: repeat(4, 1fr); margin-top: 26px; }
+  @media (max-width: 720px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; box-shadow: var(--shadow); }
+  .stat .n { font-size: 30px; font-weight: 750; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .stat .l { font-size: 12.5px; color: var(--ink-soft); margin-top: 3px; }
+  .stat .s { font-size: 12px; margin-top: 8px; font-weight: 600; }
+  .up { color: var(--good); } .down { color: var(--red); } .warn { color: var(--amber); }
+  .accent-red { border-left: 3px solid var(--red); }
+  .accent-teal { border-left: 3px solid var(--teal); }
+  .accent-amber { border-left: 3px solid var(--amber); }
+
+  /* shape-of-day bar strip */
+  .strip { display: flex; align-items: flex-end; gap: 2px; height: 120px; padding: 14px 14px 10px; overflow-x: auto; }
+  .bar { flex: 1 0 6px; min-width: 5px; border-radius: 2px 2px 0 0; background: var(--teal); opacity: .9; }
+  .bar.zero { background: var(--red); height: 4px !important; opacity: .9; }
+  .bar.bad { background: var(--red); }
+  .bar.low { background: var(--amber); }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-soft); padding: 0 14px 14px; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+
+  .q { border-radius: 14px; padding: 20px 22px; margin-bottom: 14px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); }
+  .q .ask { font-size: 17px; font-weight: 700; color: var(--ink); margin-bottom: 10px; display: flex; gap: 10px; align-items: baseline; }
+  .q .ask .qn { color: var(--red); font-weight: 800; flex: 0 0 auto; }
+  .q p { color: var(--ink-soft); }
+  .q b { color: var(--ink); }
+  .pill { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink); background: var(--panel-2); padding: 1px 7px; border-radius: 6px; border: 1px solid var(--line); white-space: nowrap; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+  th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); }
+  td .num { font-variant-numeric: tabular-nums; font-weight: 650; }
+  .fix td:first-child { color: var(--good); font-weight: 650; }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); box-shadow: var(--shadow); margin-bottom: 14px; }
+  ol.recs { padding-left: 0; list-style: none; counter-reset: r; margin: 0; }
+  ol.recs li { counter-increment: r; position: relative; padding: 14px 16px 14px 52px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 10px; box-shadow: var(--shadow); }
+  ol.recs li::before { content: counter(r); position: absolute; left: 14px; top: 14px; width: 26px; height: 26px; border-radius: 8px; background: var(--teal-soft); color: var(--teal); font-weight: 800; font-size: 14px; display: grid; place-items: center; }
+  ol.recs b { color: var(--ink); }
+  .foot { margin-top: 46px; padding: 16px 18px; border-radius: 12px; background: var(--amber-soft); border: 1px solid var(--line); font-size: 14px; color: var(--ink-soft); }
+  .foot b { color: var(--ink); }
+  .muted { color: var(--ink-soft); font-size: 13.5px; }
+</style>
+
+
+<div class="wrap">
+
+  <div class="eyebrow">Lead Run Debrief · YouTube outreach</div>
+  <h1>2026-10-30 — a Thursday sent nothing, and an empty API reply is why</h1>
+  <p class="lede">Siege's first pass of the morning found <b>12 mailboxes clear to send and 62 free slots</b>. Its second pass, four and a half minutes later, found <b>zero</b>, refused to push, and exited with an error. <b>62 approved people with verified addresses and finished emails got nothing.</b> The fleet was fine. SmartLead handed back an empty list of campaigns, and one unguarded line turned that into a lost day.</p>
+  <div style="margin-top:14px"><span class="tag red">FIRST ZERO-EMAIL CYCLE THIS MONTH THAT HAD A PLAN</span> <span class="tag">THE FIX IS THREE LINES, IN AUTOMATOR</span></div>
+
+  <div class="grid stats">
+    <div class="card stat accent-red">
+      <div class="n">0</div>
+      <div class="l">emails sent</div>
+      <div class="s down">518 over the prior 7 days</div>
+    </div>
+    <div class="card stat accent-red">
+      <div class="n">62</div>
+      <div class="l">approved people who got nothing</div>
+      <div class="s down">verified, written, bundled</div>
+    </div>
+    <div class="card stat accent-amber">
+      <div class="n">12</div>
+      <div class="l">mailboxes were fit to send</div>
+      <div class="s warn">read as 0 by the push</div>
+    </div>
+    <div class="card stat accent-red">
+      <div class="n">1,995</div>
+      <div class="l">people waiting for a slot</div>
+      <div class="s down">968 whale · 198 strong7 · 829 other7</div>
+    </div>
+  </div>
+
+  <h2>The shape of the day</h2>
+  <div class="card" style="padding:0">
+    <div class="strip" id="strip"></div>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--amber)"></span>12 mailboxes clear, the first nine readings</span>
+      <span><span class="dot" style="background:var(--red)"></span>9 clear, the last sixteen</span>
+    </div>
+  </div>
+  <p class="muted">Each bar is one hourly band-gate reading (25 of them, 07:05Z to 07:05Z), and its height is how many mailboxes were clear to send. The day has no send event to plot, because there was no send. The fleet held flat at <b>12 clear for nine hours</b>, lost three at <b>16:05Z</b> (two moved to watch, three to stop), and sat at <b>9</b> for the rest of the cycle. Nothing came back. Worth noticing on its own: <b>the fleet shrank on a day it sent nothing at all</b>, so sending volume is not the only thing burning mailboxes.</p>
+
+  <h2>The three questions</h2>
+
+  <div class="q accent-red">
+    <div class="ask"><span class="qn">Q1</span><span>Why did a normal Thursday send zero emails?</span></div>
+    <p><b>One SmartLead API call came back empty and nothing checked it.</b> Siege plans twice each morning. The sample pass at <span class="pill">10:16:50Z</span> read the fleet and wrote it down: <b>12 mailboxes LIVE, 62 free slots</b> under an 870-message ramp, and named each one in the log. The live pass at <span class="pill">10:21:20Z</span>, the one that actually pushes, read <b>0 LIVE</b>. It then logged "62 approved people are no longer plannable", printed "REFUSING to push: nothing the approval covers is still plannable", and exited 1.</p>
+    <p>The plan file it left behind says exactly what happened. All <b>58 mailboxes carry <code>campaign_id: null</code></b> and the reason <code>no Siege campaign yet</code>, and <b>twelve of them carry that as their only reason</b>. Those twelve are the twelve that were live four and a half minutes earlier. For comparison, the plans for 10-23, 10-26, 10-27 and 10-28 each have <b>zero</b> mailboxes missing a campaign. The campaigns exist. The read of them failed.</p>
+    <p>The line is <code>list_campaigns()</code> in <code>automator/scripts/smartlead_api.py</code>. It returns <code>[]</code> for any answer it does not recognise, with no retry and no error raised. Directly below it, <code>list_accounts()</code> is carefully guarded against the same thing: it retries, it refuses to return a partial list, and it carries a comment explaining what an empty one would cost. The campaign list never got that guard, so one bad answer blanks the whole fleet in silence.</p>
+  </div>
+
+  <div class="q accent-amber">
+    <div class="ask"><span class="qn">Q2</span><span>Was it just a sick fleet? 48 of 58 mailboxes are stopped.</span></div>
+    <p><b>No, and that number is the trap.</b> The band gate really does have <b>48 mailboxes stopped, 1 on watch, 9 clear</b>, and on any other morning that is where you would look. It is the wrong answer here. The push did not fail because 48 mailboxes were sick. It failed because the <b>12 healthy ones were invisible to it</b>, and those twelve are nowhere in the stopped count.</p>
+    <p>The difference matters because the two have opposite fixes. A sick fleet needs new domains, a gentler ramp, and two weeks of warmup. This needs a retry on one HTTP call. If the stopped count had been read as the cause, the day would have been filed as more of the slow deliverability decline and the real defect would still be live this morning.</p>
+    <p>The fleet is genuinely weak, and that is a separate, real problem: <b>9 clear of 58</b>, down from 12, with <b>1,995 people ready and waiting</b> behind roughly 135 messages a day. Three of the held mailboxes are healthy and waiting out the 48-hour recovery clock, so a little capacity returns for free. None of that caused this.</p>
+  </div>
+
+  <div class="q accent-teal">
+    <div class="ask"><span class="qn">Q3</span><span>Did the stranded-cohort repair from 10-28 hold?</span></div>
+    <p><b>Yes, and it is finished.</b> The 54 people marked as emailed who had never been emailed are now <b>4</b>. Fifty flew on 10-29 and the rest of the stamp drift stopped. The shelf reads <b>5,148 ready to write, 1,668 stamped, 1,664 really emailed</b>, and the gap is small enough that it can no longer hide a cohort.</p>
+    <p>The recovery lane had an ordinary day underneath all this: <b>12 contact points, 1 new address, 8 people touched</b>, which is almost exactly one day's share of the 87 points and 16 addresses it found over the prior week. It is on lap 13 of a 2,391-lead book, so most of what it reads it has read before. Site resolution is healthy (<b>16.7% with no site</b>, zero Brave refusals), and the largest fault in the pass is <code>cross-domain redirect</code>, which stopped <b>61 of 113 method attempts across five methods</b>. That is one condition wearing five names, and it is the biggest single thing standing between the lane and more addresses.</p>
+  </div>
+
+  <h2>What broke → what's fixed</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Issue</th><th>Mechanism</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr><td><b>A whole sending day lost</b></td><td><code>list_campaigns()</code> returns <code>[]</code> on any failed read, so all 58 mailboxes lost their campaign and the push refused</td><td class="warn">Open, and urgent. Three lines in <code>automator</code>, outside the five repos (rec #1)</td></tr>
+        <tr class="fix"><td>The day named no cause at all</td><td><code>planned: 0</code> fell through every branch, so <code>binding_constraint</code> printed <code>null</code> on the worst send day in weeks</td><td class="up">Fixed: <code>campaign_list_empty</code> / <code>no_mailbox_slots</code> / <code>planned_nobody</code> (<code>977c68c</code>)</td></tr>
+        <tr class="fix"><td>Healthy mailboxes invisible in the snapshot</td><td>Nothing published which mailboxes were stopped only by the missing campaign</td><td class="up">Fixed: <code>inboxes_only_no_campaign</code>, reads 12 on this plan (<code>977c68c</code>)</td></tr>
+        <tr class="fix"><td>54 people stamped but never emailed</td><td>Stamp written on SmartLead acceptance, sequence pulled by the ICP audit, stamp never reverted</td><td class="up">Closed: down to 4, 50 sent on 10-29</td></tr>
+        <tr><td>Fleet fell 12 → 9 on a zero-send day</td><td>Three mailboxes stopped and two moved to watch at 16:05Z, with no traffic at all that cycle</td><td class="warn">Open. Sending volume is not the only thing burning them (rec #3)</td></tr>
+        <tr><td>Collect lane's largest fault</td><td><code>cross-domain redirect</code>, 61 of 113 method attempts, spread across five method names</td><td class="warn">Open. Touches the ownership gate, so it is Casey's call (rec #5)</td></tr>
+        <tr><td>Apify recovery lane parked</td><td>$9.9997 left against a $10 reserve, so the lane correctly stopped itself</td><td class="muted">Not a fault. The month resets <b>10-31</b>, tomorrow (rec #4)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Recommended next — ranked</h2>
+  <ol class="recs">
+    <li><b>Guard <code>list_campaigns()</code>, today, before the next push.</b> It is the shortest high-value fix in the pipeline right now: give it the same treatment <code>list_accounts()</code> already has twenty lines below it. Retry an empty or unrecognised answer a few times, and raise rather than return <code>[]</code> if it stays empty. <code>siege-plan.py</code> should also refuse to write a plan in which every mailbox lost its campaign, because that is not a state the fleet can actually be in. This lives in <code>automator</code>, which is the send path and outside the five repos this agent may edit, so it is reported and not shipped. <b>The next push runs in a few hours and will fail the same way if SmartLead answers badly again.</b></li>
+    <li><b>Re-plan the 62 people who were approved and dropped.</b> They were approved, had verified addresses, finished subjects and complete bundles, and the refusal was not about them. Nothing re-queues them automatically: Siege builds each morning's plan fresh, so they go back in the general pool and wait their turn by tier. With 1,995 people waiting and roughly 135 messages a day of capacity, "wait their turn" is a couple of weeks.</li>
+    <li><b>Ask why the fleet lost three mailboxes on a day it sent nothing.</b> The standing explanation for shrinkage has been that a big push burns inboxes. This cycle pushed zero emails and still went 12 clear to 9, with two more sliding to watch. Warmup traffic alone is now enough to stop a mailbox, which means new domains buy less than the arithmetic suggests. Worth one look at the spam readings behind those three before buying more.</li>
+    <li><b>The Apify allowance resets tomorrow.</b> $100 comes back on <b>10-31</b>, which is roughly 700 recovered leads at $0.115 each, with about $100 of OpenRouter enrichment behind them against a <b>$60.47</b> balance. It is the single biggest input the pipeline gets this month, and it front-loads, so the first days of November matter more than the rest.</li>
+    <li><b>Decide on <code>cross-domain redirect</code> in the collect lane.</b> It stopped 61 of 113 method attempts, more than half the pass, under five different method names. Some of those redirects are ordinary (a site moving to a new domain, or a page served from a host like Squarespace), and some are the ownership gate correctly refusing to file a stranger's details. Telling them apart is a real piece of work, and loosening an identity gate on a hunch is the one change that quietly poisons the lead data. Worth a decision, not a guess.</li>
+  </ol>
+
+  <div class="foot">
+    <b>Housekeeping.</b> Sending: <b>0 emails, 0 people</b>; the plan held nobody and <code>siege-plan.service</code> exited 1. Parked <b>+0</b> (<code>approved_hold</code> 6,826, flat; <code>needs_contact</code> 3,428). Shelf <b>5,148 ready to write</b>, 1,668 stamped, <b>1,664 really emailed</b>, 4 still stranded. Recovery lane: 12 contact points, 1 address, 8 people, lap 13, book 2,391, 3 stranded. <b>$0 billed to the Anthropic API</b>; OpenRouter $1.52/day with <b>$60.47</b> left (39.8 days) at $0.1673 per enriched lead. Apify sits at its $10 reserve until 10-31. YouTube keys <b>15 working of 66</b>, settled on 2026-09-16 and irrelevant while discovery is off. <b>0 fatal signatures, no halt, 0 new channels</b> by Casey's 2026-09-08 order; the campaign loop is still stopped and was left that way. One fix shipped: orchestrator <code>977c68c</code>.
+  </div>
+
+</div>
+
+<script>
+  // Mailboxes clear to send, one reading per hour, from automator/state/inbox-health.json
+  // runs[] inside the cycle (2026-10-29T07:05Z → 2026-10-30T07:05Z).
+  var seq = [12,12,12,12,12,12,12,12,12,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9];
+  var max = Math.max.apply(null, seq);
+  var strip = document.getElementById('strip');
+  // Proportional heights for every bar. 9 clear mailboxes is a weak fleet, not a dead
+  // one, so it must not render as the zero bar the 07-10 template used for a dead pass.
+  seq.forEach(function (v, i) {
+    var b = document.createElement('div');
+    b.className = 'bar' + (v <= 9 ? ' bad' : ' low');
+    b.style.height = Math.max(6, Math.round((v / max) * 100)) + '%';
+    b.title = v + ' mailboxes clear (reading ' + (i + 1) + ' of ' + seq.length + ')';
+    strip.appendChild(b);
+  });
+</script>
