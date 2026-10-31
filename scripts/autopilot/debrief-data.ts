@@ -1005,6 +1005,7 @@ export type SendPlanHealth = SiegePlanFacts & SiegeUnitFacts & {
   unpushed_planned: number | null;
   approval_pending: boolean | null;
   push_unit_result: string | null;
+  approval_recorded: boolean | null;
   binding_constraint: string | null;
   push_outcome: SiegePushOutcome;
   note: string;
@@ -1077,6 +1078,7 @@ export function sendPlanHealth(
   pushUnitResult: string | null = null,
   unit: SiegeUnitFacts = NO_UNIT,
   pushOutcome: SiegePushOutcome = NO_PUSH_OUTCOME,
+  approvalRecorded: boolean | null = null,
 ): SendPlanHealth {
   const elsewhere = sentInCycle === null || sentByThisRepo === null
     ? null
@@ -1112,6 +1114,36 @@ export function sendPlanHealth(
     else if (facts.mailbox_slots === 0) binding = 'no_mailbox_slots';
     else binding = 'planned_nobody';
   }
+  // THE UNIT THAT CRASHED AND SENT NOTHING (2026-10-30). Ranked above
+  // awaiting_approval because since Casey's 2026-09-30 standing approval there is no
+  // human left to wait for, so `awaiting_approval` on a weekday names a thing that
+  // cannot happen — and that is exactly what the worst field to be wrong about printed
+  // on 2026-10-30, a Friday where 69 planned people with written subjects got no email.
+  //
+  // `push_killed` already existed for a run systemd stopped, but it sits inside the
+  // `elsewhere > 0` arm below, so it could only ever be claimed by a push that had
+  // already sent something. A unit that failed having sent NOTHING could not name its
+  // own failure, which is the 2026-10-29 lesson (a shape that falls through every
+  // branch prints null, or worse, borrows the next branch's name) one level up.
+  //
+  // siege-plan.service is ONE `Type=oneshot` with five sequential ExecStart steps
+  // (warmup sync, `--samples 20`, siege-approve, `--live --approved`, siege-report) and
+  // systemd abandons every remaining step at the first non-zero exit. So a step BEFORE
+  // the push can cost the whole send day, and on 10-30 a step that sends nothing did:
+  // `--samples 20` raised a TypeError in `why_no_email()`, a function whose only job is
+  // to compose a human-readable sentence for the sample report, because a `fails` entry
+  // held dicts where it expected strings. The plan was already on disk and whole — 69
+  // people, 69 mailbox slots, no pause, no quota wall, campaigns intact. A cosmetic
+  // line of diagnostics took the day.
+  //
+  // Which step died is worth separating, because it points at different code, and the
+  // approval record measures it for free: siege-approve.py writes
+  // state/siege/<day>/approval.json in the step immediately before the push, and
+  // `--live --approved` refuses without a current one. Absent on a failed unit ⇒ the
+  // push step never ran. Only claimed when positively measured — null stays generic.
+  else if (approvalPending === true && pushUnitResult !== null && pushUnitResult !== 'success') {
+    binding = approvalRecorded === false ? 'unit_died_before_push' : 'push_unit_failed';
+  }
   else if (approvalPending === true) binding = 'awaiting_approval';
   else if (elsewhere !== null && elsewhere > 0) {
     // Only claim a ceiling when the day actually pressed against it.
@@ -1137,6 +1169,7 @@ export function sendPlanHealth(
     unpushed_planned: unpushed,
     approval_pending: approvalPending,
     push_unit_result: pushUnitResult,
+    approval_recorded: approvalRecorded,
     binding_constraint: binding,
     push_outcome: pushOutcome,
     note:
@@ -1167,6 +1200,33 @@ export function sendPlanHealth(
       'nothing. Fixed in youtube-email-outreach-v1 7fd02b6fd (src/db/cli-exit.ts), which ' +
       'took a batch 31s to 1.9s. If push_killed appears for a cycle after 2026-10-03, do ' +
       'not re-diagnose it as slowness: check that the fix is deployed, then the unit. ' +
+      'AND A UNIT THAT CRASHED AND SENT NOTHING NOW NAMES ITSELF, NOT AN APPROVAL WAIT ' +
+      '(2026-10-30): push_killed only ever applied to a push that had already sent ' +
+      'something, so a run that failed having sent NOTHING fell through to ' +
+      'awaiting_approval — which since the 2026-09-30 standing approval names a thing ' +
+      'that cannot happen. That is what the field a reader looks at first printed on ' +
+      'Friday 2026-10-30, when 69 planned people with verified addresses and written ' +
+      'subjects got no email. siege-plan.service is ONE Type=oneshot with five ' +
+      'sequential ExecStart steps (warmup sync, --samples 20, siege-approve, --live ' +
+      '--approved, siege-report) and systemd abandons every remaining step at the first ' +
+      'non-zero exit, so a step BEFORE the push can cost the whole day. It did: ' +
+      '--samples 20 raised a TypeError in why_no_email(), a function whose only job is to ' +
+      'write a human-readable sentence into the sample report, because a `fails` entry ' +
+      'held dicts where it expected strings (automator/scripts/siege-plan.py:1298). The ' +
+      'plan was already on disk and whole at 10:17:13Z — 69 people, 69 mailbox slots, no ' +
+      'pause, campaigns intact, quota fine. A cosmetic line of diagnostics took the day, ' +
+      'and the guard belongs in automator, which is the send path and not this repo\'s to ' +
+      'edit. unit_died_before_push is that shape: the unit failed inside this cycle, ' +
+      'nothing reached SmartLead, and approval_recorded is false, so the push step never ' +
+      'ran. push_unit_failed is the same failure where the approval WAS recorded (or ' +
+      'could not be read), so the push itself is what to look at. approval_recorded is ' +
+      'the existence of state/siege/<day>/approval.json, written in the step immediately ' +
+      'before the push and required by --live --approved, and it is null when the day has ' +
+      'no state directory at all: unknown, NOT absent. DO NOT CONFUSE THIS WITH THE 10-29 ' +
+      'SHAPE, which looks adjacent and is not: that day Siege DID reach the push, wrote ' +
+      'both samples.json and approval.json, and refused on purpose because its plan held ' +
+      'nobody sendable (campaign_list_empty). A crash before the push and a push that ' +
+      'declined are different repairs. ' +
       'plan_found:false means no plan on ' +
       'disk (Siege did not run), which is not the same as a plan that ran and pushed ' +
       'nothing — and READ sending_day BEFORE CALLING IT A FAULT: siege-plan.timer is ' +
@@ -1740,6 +1800,21 @@ function readSiegeApprovedLeadIds(day: string): string[] | null {
   } catch {
     return null;
   }
+}
+
+// Did Siege's own run get as far as recording the day's approval? (2026-10-30)
+//
+// siege-approve.py writes approval.json in the ExecStart step immediately before the
+// push, and `siege-plan.py --live --approved` refuses without a current one, so on a
+// failed unit an absent record means the push step never ran at all. Deliberately
+// looser than readSiegeApprovedLeadIds, which also needs samples.json to parse and
+// returns null for an approval that covers a different sample — here the question is
+// only whether the step ran, so existence is the whole answer. Mirrors the house rule:
+// a missing day directory is "not measured", not "no approval".
+function readSiegeApprovalRecorded(day: string): boolean | null {
+  const dir = join(AUTOMATOR_REPO, 'state', 'siege', day);
+  if (!existsSync(dir)) return null;
+  return existsSync(join(dir, 'approval.json'));
 }
 
 function readSiegePlanLeadIds(day: string): string[] | null {
@@ -3961,6 +4036,8 @@ async function main(): Promise<void> {
       readSiegePlanLeadIds(cycleDay),
       readSiegeApprovedLeadIds(cycleDay),
     ),
+    // Which step of the oneshot died, when one did — see the binding ladder.
+    readSiegeApprovalRecorded(cycleDay),
   );
   // The fleet's own day-over-day move, which no snapshot carried until 2026-10-15 —
   // see FleetFacts. Both reads are filesystem-only and degrade to nulls.

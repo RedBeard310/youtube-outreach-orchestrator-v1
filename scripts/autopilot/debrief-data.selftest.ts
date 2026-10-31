@@ -436,6 +436,61 @@ ok('no unit verdict measured -> the old answer, never an invented one',
 ok('a real ceiling outranks a late kill',
   sendPlanHealth(siegePlanFacts(PLAN_1001), 150, 0, 'timeout').binding_constraint, 'day_cap');
 
+// --- the unit that crashed and sent nothing (2026-10-30) ---
+// The live Friday 2026-10-30 shape: 69 planned, 69 mailbox slots, a whole plan on disk,
+// and the oneshot died in its `--samples 20` step on a TypeError inside why_no_email().
+// Steps 3-5 (siege-approve, the live push, the report) never ran, so no approval.json
+// was written and 69 people with written subjects got no email. The old ladder printed
+// `awaiting_approval` — a cause that cannot exist under the 2026-09-30 standing approval.
+const PLAN_1030 = {
+  summary: {
+    day: '2026-10-30', email_paused: false, day_cap: 870,
+    inboxes: new Array(9).fill({ live: true, free_before_fill: 8 }),
+  },
+  assignments: new Array(69).fill({ lead_id: 'x' }),
+};
+const UNIT_1030 = { ...NO_UNIT, sending_day: true };
+ok('10-30: a crashed unit that never reached the push names the step, not an approval',
+  (() => { const h = sendPlanHealth(
+    siegePlanFacts(PLAN_1030), 0, 0, 'exit-code', UNIT_1030, NO_PUSH_OUTCOME, false);
+    return [h.approval_pending, h.approval_recorded, h.unpushed_planned, h.binding_constraint]; })(),
+  [true, false, 69, 'unit_died_before_push']);
+// Same crash, but the approve step DID run, so the push itself is what to look at.
+ok('an approval on disk moves the blame to the push step',
+  sendPlanHealth(siegePlanFacts(PLAN_1030), 0, 0, 'exit-code', UNIT_1030, NO_PUSH_OUTCOME, true)
+    .binding_constraint, 'push_unit_failed');
+// Unmeasured must not borrow the more specific name: it stays the generic failure.
+ok('an unreadable approval record stays generic, never unit_died_before_push',
+  (() => { const h = sendPlanHealth(
+    siegePlanFacts(PLAN_1030), 0, 0, 'exit-code', UNIT_1030);
+    return [h.approval_recorded, h.binding_constraint]; })(),
+  [null, 'push_unit_failed']);
+// A unit that reported success and sent nothing is a different question, and the one
+// branch this fix must not swallow: the 09-29 assertion above still holds.
+ok('a successful unit that sent nothing is still an approval question',
+  sendPlanHealth(siegePlanFacts(PLAN_1030), 0, 0, 'success', UNIT_1030, NO_PUSH_OUTCOME, false)
+    .binding_constraint, 'awaiting_approval');
+// No verdict measured is not a crash. Guards the 2026-10-01 rule one branch over.
+ok('no unit verdict -> no crash claimed',
+  sendPlanHealth(siegePlanFacts(PLAN_1030), 0, 0, null, UNIT_1030, NO_PUSH_OUTCOME, false)
+    .binding_constraint, 'awaiting_approval');
+// A deliberate pause outranks it: nothing crashed the day that was switched off.
+ok('an email pause outranks a crashed unit',
+  sendPlanHealth(
+    siegePlanFacts({ ...PLAN_1030, summary: { ...PLAN_1030.summary, email_paused: true } }),
+    0, 0, 'exit-code', UNIT_1030, NO_PUSH_OUTCOME, false).binding_constraint, 'email_paused');
+// THE 10-29 SHAPE MUST NOT BE RENAMED BY THIS FIX. That day the unit also exited
+// non-zero, but its plan held nobody and it refused on purpose, which is a different
+// repair. planned:0 is ranked above this branch and keeps its own name.
+ok('a crashed unit does not steal campaign_list_empty from a plan that held nobody',
+  sendPlanHealth(siegePlanFacts(PLAN_29_OCT), 0, 0, 'exit-code', UNIT_1030, NO_PUSH_OUTCOME, true)
+    .binding_constraint, 'campaign_list_empty');
+// A day that moved emails and then died keeps push_killed: it says what stopped the day
+// after it had already sent, which is the 2026-10-01 question, not this one.
+ok('a push that sent something before dying stays push_killed',
+  sendPlanHealth(siegePlanFacts(PLAN_1001), 135, 0, 'timeout', NO_UNIT, NO_PUSH_OUTCOME, false)
+    .binding_constraint, 'push_killed');
+
 // --- a plan that moved and lost nobody is not a shortfall (2026-10-24) ---
 // The live 10-23 shape: 150 planned, 148 sent, the two missing held for the next day by
 // the approval gate, and the push's own per-person join reading people_lost 0.
