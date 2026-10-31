@@ -1903,6 +1903,87 @@ function showUnit(unit: string, props: string[]): Record<string, string> {
   }
 }
 
+/** Did today's send-path run fail, and which of its five steps died? (2026-10-30)
+ *
+ *  WHY. Nothing watched the send path hourly. `binding_constraint` names a dead send day
+ *  correctly now, but it is written by the debrief at 00:20 PT, which is fourteen hours
+ *  after the fact — so on 2026-10-29 and again on 2026-10-30, two consecutive sending
+ *  days failed, roughly 130 planned people with verified addresses got no email, and the
+ *  first anybody could have known was the next midnight. Both runs failed before 10:21Z.
+ *  The timer fires 06:15 PT and Siege stops pushing at 12:00 ET, so an alarm inside the
+ *  hour still leaves time to act on the same day; at midnight the day is simply gone.
+ *
+ *  An OBSERVATION, never an exit-7 anomaly. The repair for both of those days is in
+ *  automator, which the fix-agent may not edit, so spending a model on it every hour
+ *  would buy nothing. This writes one free line and gets out of the way.
+ *
+ *  Which step died points at different code, and the files Siege writes answer it for
+ *  free. The five ExecStart steps run in order — warmup sync, `--samples 20` (writes
+ *  samples.json), siege-approve (writes approval.json), `--live --approved` (the push),
+ *  siege-report — and systemd abandons the rest at the first non-zero exit. So a missing
+ *  samples.json puts the failure at or before the sample step (the 10-30 shape: a
+ *  TypeError in a report-formatting helper), samples without an approval puts it in the
+ *  approve step, and both present means the push or the report is what to read.
+ *
+ *  `run_key` is the run's own start stamp so this fires once per failed run rather than
+ *  every hour until midnight. Silent unless the failure is positively measured: not a
+ *  sending day, no verdict, a verdict from a previous day, or a success all return null.
+ *  A `success` result is never second-guessed from the files, because the step files
+ *  outlive the run that wrote them and would re-accuse a clean day. */
+export function siegeRunAlarm(opts: {
+  sendingDay: boolean | null;
+  lastResult: string | null;
+  lastStartedISO: string | null;
+  startedPacificDay: string | null;
+  today: string;
+  samplesRecorded: boolean | null;
+  approvalRecorded: boolean | null;
+}): { step: string; run_key: string; detail: string } | null {
+  if (opts.sendingDay !== true) return null;
+  if (!opts.lastResult || opts.lastResult === 'success') return null;
+  if (!opts.lastStartedISO) return null;
+  // A failure left behind by Friday's run must not be re-reported all weekend.
+  if (opts.startedPacificDay !== opts.today) return null;
+
+  const step = opts.samplesRecorded === false
+    ? 'samples'
+    : opts.approvalRecorded === false
+      ? 'approve'
+      : opts.samplesRecorded === null || opts.approvalRecorded === null
+        ? 'unknown'
+        : 'push_or_report';
+  const where = {
+    samples: 'It died at or before the `siege-plan.py --samples 20` step: no samples.json '
+      + 'was written, so siege-approve, the live push and the report never ran and nobody '
+      + 'planned today was offered to SmartLead. This is the 2026-10-30 shape, where a '
+      + 'TypeError inside why_no_email() — a helper that only formats a sentence for the '
+      + 'sample report — cost 69 approved people their email.',
+    approve: 'samples.json exists and approval.json does not, so it died in the '
+      + 'siege-approve.py step and the push never ran. Under Casey\'s 2026-09-30 standing '
+      + 'approval that step should not need a human.',
+    push_or_report: 'Both samples.json and approval.json were written, so the run reached '
+      + '`--live --approved` and the failure is in the push or the report. Check how many '
+      + 'people reached SmartLead before reading this as a total loss, and read the 10-29 '
+      + 'shape first: a push that refuses because its plan holds nobody sendable also '
+      + 'exits non-zero and is a different repair.',
+    unknown: 'Which step died could not be read — Siege wrote no state directory for '
+      + 'today, which is itself worth a look.',
+  }[step]!;
+
+  return {
+    step,
+    run_key: opts.lastStartedISO,
+    detail: `siege-plan.service failed on a sending day: it started ${opts.lastStartedISO} `
+      + `and ended \`${opts.lastResult}\`. ${where} siege-plan.service is ONE Type=oneshot `
+      + 'with five sequential ExecStart steps and systemd abandons every remaining step at '
+      + 'the first non-zero exit, so a step that sends nothing can still cost the whole '
+      + 'send day. Siege stops pushing at 12:00 ET, so there may still be time today: '
+      + '`journalctl -u siege-plan.service -e` for the traceback, then rerun the unit once '
+      + 'the cause is fixed. The send path lives in automator, NOT in the five repos the '
+      + 'fix-agent may edit, so this is a line for Casey and not a job to dispatch.',
+  };
+}
+
 // systemd prints its timestamps like "Thu 2026-10-01 10:15:25 UTC"; Date can read that
 // once the weekday is dropped. An unparseable or empty stamp yields null, not a guess.
 function systemdStamp(raw: string | undefined): string | null {
@@ -1912,8 +1993,12 @@ function systemdStamp(raw: string | undefined): string | null {
 }
 
 /** What Siege's timer and service say about themselves, plus whether the cycle's PT day
- *  was a sending day at all. See the block comment on SiegeUnitFacts. */
-function siegeUnitFacts(pacificDay: string): SiegeUnitFacts {
+ *  was a sending day at all. See the block comment on SiegeUnitFacts.
+ *
+ *  Exported for the hourly check-in (2026-10-30), which watches the same unit. One reader,
+ *  deliberately: two instruments reading one unit is how a snapshot and an alarm come to
+ *  disagree about the same morning, which this file has already paid for twice. */
+export function siegeUnitFacts(pacificDay: string): SiegeUnitFacts {
   const svc = showUnit('siege-plan.service', ['Result', 'ActiveState', 'ExecMainStartTimestamp']);
   const timer = showUnit('siege-plan.timer', ['TimersCalendar', 'LastTriggerUSec']);
   return {

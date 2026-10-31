@@ -22,6 +22,9 @@ import { homedir } from 'node:os';
 import { spawn, execSync } from 'node:child_process';
 import { summarizeToday, pacificDate } from './burn-ledger.js';
 import { countByReviewStatus } from '../../src/db.ts';
+// One reader for Siege's unit, shared with the debrief — see siegeUnitFacts(). Importing
+// this module is inert: its collection pass only runs when it is argv[1].
+import { siegeRunAlarm, siegeUnitFacts } from './debrief-data.ts';
 import {
   collectBookDepth,
   collectPassAttribution,
@@ -93,6 +96,8 @@ const MIN_SUPPLY_FOR_PARK_ALARM = Number(process.env.AUTOPILOT_MIN_SUPPLY_FOR_PA
 // bypassed or the campaign is between sessions. Cooldown-gated across BOTH harvest state
 // files so a genuine autocomplete saturation can't churn a harvest every single hour.
 const FINDER_REPO = process.env.LEAD_FINDER_REPO_PATH ?? '/home/casey/repos/youtube-lead-finder-v1';
+// Siege's own state, read-only. Same path debrief-data.ts uses.
+const AUTOMATOR_REPO = '/home/casey/repos/automator';
 const HARVEST_KICK_STATE = join(LOGS, 'autopilot-harvest-kick-state.json');
 const HARVEST_KICK_INTERVAL_H = Number(process.env.AUTOPILOT_HARVEST_KICK_INTERVAL_HOURS ?? 2);
 
@@ -1602,6 +1607,49 @@ async function main(): Promise<void> {
       }
     } catch { /* an unreadable chain log is not an incident */ }
   }
+
+  // --- 7d. THE SEND PATH, WHICH NOTHING HERE WATCHED (2026-10-30) ---
+  //
+  // Every check above watches finding and enriching. The send path had no hourly check at
+  // all, so when siege-plan.service failed on 2026-10-29 and again on 2026-10-30 — two
+  // consecutive sending days, roughly 130 planned people with verified addresses and
+  // written subjects getting no email — the first signal either time was the debrief at
+  // 00:20 PT the next morning, fourteen hours too late to do anything. Both runs had
+  // failed by 10:21Z and Siege stops pushing at 12:00 ET, so an alarm inside the hour is
+  // the difference between a recoverable morning and a lost day.
+  //
+  // Free: two `systemctl show` reads and two existsSync calls, no database, no network.
+  // An observation and never an exit-7 anomaly, because the repair for both of those days
+  // is in automator, which the fix-agent may not edit. See siegeRunAlarm() for the
+  // step-attribution ladder and why a `success` verdict is never second-guessed.
+  try {
+    const unit = siegeUnitFacts(day);
+    const siegeDir = join(AUTOMATOR_REPO, 'state', 'siege', day);
+    const dirThere = existsSync(siegeDir);
+    const alarm = siegeRunAlarm({
+      sendingDay: unit.sending_day,
+      lastResult: unit.unit_last_result,
+      lastStartedISO: unit.unit_last_started,
+      startedPacificDay: unit.unit_last_started
+        ? pacificDate(new Date(unit.unit_last_started))
+        : null,
+      today: day,
+      samplesRecorded: dirThere ? existsSync(join(siegeDir, 'samples.json')) : null,
+      approvalRecorded: dirThere ? existsSync(join(siegeDir, 'approval.json')) : null,
+    });
+    // Keyed on the failed run's own start stamp, so this says its piece once rather than
+    // every hour until midnight — the same rule the recovery-lane alarms were given on
+    // 2026-09-21 after one of them re-reported a single window twelve times.
+    if (alarm && !alreadyObserved('siege_send_day_failed', alarm.run_key)) {
+      appendFileSync(OBSERVATIONS, JSON.stringify({
+        ts: new Date().toISOString(), kind: 'siege_send_day_failed',
+        step: alarm.step, run_key: alarm.run_key, pass_key: alarm.run_key,
+        unit_state: unit.unit_state, unit_last_result: unit.unit_last_result,
+        unit_last_started: unit.unit_last_started, detail: alarm.detail,
+      }) + '\n');
+      console.log(`[checkin ${day}] OBSERVATION siege_send_day_failed — died in the ${alarm.step} step (${unit.unit_last_result}) at ${alarm.run_key}`);
+    }
+  } catch { /* an unreadable unit must not be reported as a dead send day */ }
 
   // Discovery is paused on Casey's instruction, so anything that only describes a
   // stopped lane is expected, not an anomaly. Everything else still escalates.

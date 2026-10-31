@@ -1,4 +1,4 @@
-import { bulkRewriteShape, bandGateFacts, fleetFacts, inboxGateFacts, apifyBatchFacts, apifyLedgerLine, NO_PUSH_OUTCOME, normalizePushReason, offerFromBatchId, siegeApprovedLeadIds, siegePlanLeadIds, siegePushOutcome, classifyKeyProbe, cyclePacificDay, costWindows, enrichmentChainFacts, isSendingDay, perEnrichedLeadCost, PER_LEAD_SAMPLE_FLOOR, projectRecoveryBudget, MAX_MISSING_DEBRIEFS, missingDebriefs, NO_UNIT, pushRunVerdict, unitStartedAt, sendPlanHealth, siegePlanFacts, summarizeSendLines, isVerifiedOrBeyond, laneYield, priorAdvanceSource, priorSeedsAdvanced, priorSeedsWalked, reconcileAdvanced, sessionSeedsAdvanced, sessionStartMs, walkRateTrend } from './debrief-data.ts';
+import { bulkRewriteShape, bandGateFacts, fleetFacts, inboxGateFacts, apifyBatchFacts, apifyLedgerLine, NO_PUSH_OUTCOME, normalizePushReason, offerFromBatchId, siegeApprovedLeadIds, siegePlanLeadIds, siegePushOutcome, classifyKeyProbe, cyclePacificDay, costWindows, enrichmentChainFacts, isSendingDay, perEnrichedLeadCost, PER_LEAD_SAMPLE_FLOOR, projectRecoveryBudget, MAX_MISSING_DEBRIEFS, missingDebriefs, NO_UNIT, pushRunVerdict, siegeRunAlarm, unitStartedAt, sendPlanHealth, siegePlanFacts, summarizeSendLines, isVerifiedOrBeyond, laneYield, priorAdvanceSource, priorSeedsAdvanced, priorSeedsWalked, reconcileAdvanced, sessionSeedsAdvanced, sessionStartMs, walkRateTrend } from './debrief-data.ts';
 import { MAX_SHELF_STRANDED_IDS, recoveredTally, shelfTally, type ShelfRow } from '../../src/db.ts';
 
 let fail = 0;
@@ -490,6 +490,55 @@ ok('a crashed unit does not steal campaign_list_empty from a plan that held nobo
 ok('a push that sent something before dying stays push_killed',
   sendPlanHealth(siegePlanFacts(PLAN_1001), 135, 0, 'timeout', NO_UNIT, NO_PUSH_OUTCOME, false)
     .binding_constraint, 'push_killed');
+
+// --- the hourly send-path alarm (2026-10-30) ---
+// Nothing watched the send path hourly, so 10-29 and 10-30 both failed before 10:21Z and
+// neither was visible until the next midnight. These assert the step-attribution ladder
+// and, more importantly, every way it must stay SILENT.
+const ALARM = {
+  sendingDay: true as boolean | null,
+  lastResult: 'exit-code' as string | null,
+  lastStartedISO: '2026-10-30T10:15:12.000Z' as string | null,
+  startedPacificDay: '2026-10-30' as string | null,
+  today: '2026-10-30',
+  samplesRecorded: false as boolean | null,
+  approvalRecorded: false as boolean | null,
+};
+ok('10-30: no samples.json puts the failure at the sample step',
+  (() => { const a = siegeRunAlarm(ALARM);
+    return [a?.step, a?.run_key]; })(),
+  ['samples', '2026-10-30T10:15:12.000Z']);
+ok('samples written but no approval blames the approve step',
+  siegeRunAlarm({ ...ALARM, samplesRecorded: true })?.step, 'approve');
+ok('both files written puts it in the push or the report',
+  siegeRunAlarm({ ...ALARM, samplesRecorded: true, approvalRecorded: true })?.step,
+  'push_or_report');
+ok('no state directory leaves the step unknown, never guessed',
+  siegeRunAlarm({ ...ALARM, samplesRecorded: null, approvalRecorded: null })?.step, 'unknown');
+// Silence, every way. A success is never second-guessed off the step files, which outlive
+// the run that wrote them and would re-accuse a clean day.
+ok('a successful run is never an alarm',
+  siegeRunAlarm({ ...ALARM, lastResult: 'success' }), null);
+ok('no verdict at all is not a failure',
+  siegeRunAlarm({ ...ALARM, lastResult: null }), null);
+ok('a weekend is not a failed sending day',
+  siegeRunAlarm({ ...ALARM, sendingDay: false }), null);
+ok('an unknown calendar makes no claim',
+  siegeRunAlarm({ ...ALARM, sendingDay: null }), null);
+// THE ONE THAT MATTERS FOR A WEEKEND: Friday's failed verdict is what the unit still
+// reports on Saturday and Sunday, and re-raising it all weekend is noise.
+ok('yesterday\'s failure is not today\'s',
+  siegeRunAlarm({ ...ALARM, today: '2026-10-31' }), null);
+ok('a verdict with no start stamp cannot be placed on a day',
+  siegeRunAlarm({ ...ALARM, lastStartedISO: null, startedPacificDay: null }), null);
+// The 10-29 run reached the push and refused on purpose; it still deserves the line, but
+// pointed at the push rather than at a crash in a reporting helper.
+ok('the 10-29 shape is reported against the push, not the sample step',
+  siegeRunAlarm({
+    ...ALARM, lastStartedISO: '2026-10-29T10:16:50.000Z',
+    startedPacificDay: '2026-10-29', today: '2026-10-29',
+    samplesRecorded: true, approvalRecorded: true,
+  })?.step, 'push_or_report');
 
 // --- a plan that moved and lost nobody is not a shortfall (2026-10-24) ---
 // The live 10-23 shape: 150 planned, 148 sent, the two missing held for the next day by
