@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lead Run Debrief — 2026-10-31</title>
+<style>
+  :root {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+      --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+      --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+    --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+    --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 40px 22px 80px; }
+  .eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); font-weight: 600; }
+  h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.12; margin: 10px 0 6px; text-wrap: balance; letter-spacing: -.02em; }
+  h2 { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); margin: 44px 0 16px; font-weight: 700; }
+  h3 { font-size: 18px; margin: 0 0 6px; letter-spacing: -.01em; }
+  p { margin: 0 0 14px; }
+  .lede { font-size: 18px; color: var(--ink-soft); max-width: 68ch; }
+  .tag { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--amber-soft); color: var(--amber); letter-spacing: .02em; }
+  .tag.red { background: var(--red-soft); color: var(--red); }
+  .grid { display: grid; gap: 14px; }
+  .stats { grid-template-columns: repeat(4, 1fr); margin-top: 26px; }
+  @media (max-width: 720px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; box-shadow: var(--shadow); }
+  .stat .n { font-size: 30px; font-weight: 750; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .stat .l { font-size: 12.5px; color: var(--ink-soft); margin-top: 3px; }
+  .stat .s { font-size: 12px; margin-top: 8px; font-weight: 600; }
+  .up { color: var(--good); } .down { color: var(--red); } .warn { color: var(--amber); }
+  .accent-red { border-left: 3px solid var(--red); }
+  .accent-teal { border-left: 3px solid var(--teal); }
+  .accent-amber { border-left: 3px solid var(--amber); }
+
+  .strip { display: flex; align-items: flex-end; gap: 2px; height: 120px; padding: 14px 14px 10px; overflow-x: auto; }
+  .bar { flex: 1 0 6px; min-width: 5px; border-radius: 2px 2px 0 0; background: var(--teal); opacity: .9; }
+  .bar.zero { background: var(--red); height: 4px !important; opacity: .9; }
+  .bar.bad { background: var(--red); }
+  .bar.low { background: var(--amber); }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-soft); padding: 0 14px 14px; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+
+  .q { border-radius: 14px; padding: 20px 22px; margin-bottom: 14px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); }
+  .q .ask { font-size: 17px; font-weight: 700; color: var(--ink); margin-bottom: 10px; display: flex; gap: 10px; align-items: baseline; }
+  .q .ask .qn { color: var(--red); font-weight: 800; flex: 0 0 auto; }
+  .q p { color: var(--ink-soft); }
+  .q b { color: var(--ink); }
+  .pill { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink); background: var(--panel-2); padding: 1px 7px; border-radius: 6px; border: 1px solid var(--line); white-space: nowrap; }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; background: var(--panel-2); padding: 1px 5px; border-radius: 5px; border: 1px solid var(--line); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+  th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); }
+  td .num { font-variant-numeric: tabular-nums; font-weight: 650; }
+  .fix td:first-child { color: var(--good); font-weight: 650; }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); box-shadow: var(--shadow); margin-bottom: 14px; }
+  ol.recs { padding-left: 0; list-style: none; counter-reset: r; margin: 0; }
+  ol.recs li { counter-increment: r; position: relative; padding: 14px 16px 14px 52px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 10px; box-shadow: var(--shadow); }
+  ol.recs li::before { content: counter(r); position: absolute; left: 14px; top: 14px; width: 26px; height: 26px; border-radius: 8px; background: var(--teal-soft); color: var(--teal); font-weight: 800; font-size: 14px; display: grid; place-items: center; }
+  ol.recs b { color: var(--ink); }
+  .foot { margin-top: 46px; padding: 16px 18px; border-radius: 12px; background: var(--amber-soft); border: 1px solid var(--line); font-size: 14px; color: var(--ink-soft); }
+  .foot b { color: var(--ink); }
+  .muted { color: var(--ink-soft); font-size: 13.5px; }
+  pre { background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 14px; overflow-x: auto; font-size: 13px; line-height: 1.5; margin: 0 0 14px; }
+</style>
+
+<div class="wrap">
+
+  <div class="eyebrow">Lead Run Debrief · YouTube outreach</div>
+  <h1>2026-10-31 — two sending days lost in a row, and this time it was the code that explains failures</h1>
+  <p class="lede">Siege built Friday's plan perfectly. <b>69 people, 69 mailbox slots, verified addresses, finished emails, campaigns intact, no pause.</b> Then the run died three minutes later in a helper whose only job is to write a sentence saying why somebody has no email. The push never ran. <b>Nobody got anything, for the second sending day running, from a completely different cause than Thursday's.</b></p>
+  <div style="margin-top:14px"><span class="tag red">SECOND ZERO-EMAIL SENDING DAY IN A ROW</span> <span class="tag">BOTH CAUSES LIVE IN AUTOMATOR</span></div>
+
+  <div class="grid stats">
+    <div class="card stat accent-red">
+      <div class="n">0</div>
+      <div class="l">emails sent</div>
+      <div class="s down">401 people over the prior 7 days</div>
+    </div>
+    <div class="card stat accent-red">
+      <div class="n">69</div>
+      <div class="l">approved people who got nothing</div>
+      <div class="s down">verified, written, bundled</div>
+    </div>
+    <div class="card stat accent-amber">
+      <div class="n">3 of 5</div>
+      <div class="l">steps of the send unit never ran</div>
+      <div class="s warn">systemd stopped at step 2</div>
+    </div>
+    <div class="card stat accent-red">
+      <div class="n">2,090</div>
+      <div class="l">people waiting for a slot</div>
+      <div class="s down">974 whale · 321 strong7 · 795 other7</div>
+    </div>
+  </div>
+
+  <h2>The shape of the day</h2>
+  <div class="card" style="padding:0">
+    <div class="strip" id="strip"></div>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--amber)"></span>9 mailboxes clear, 24 straight readings</span>
+      <span><span class="dot" style="background:var(--teal)"></span>10 clear, the final reading</span>
+    </div>
+  </div>
+  <p class="muted">Each bar is one hourly reading from the band gate, 25 of them from 07:05Z to 07:05Z, and its height is how many mailboxes were clear to send. There is no send to plot, because there was no send. The remarkable thing is how still it is: <b>48 stopped, 1 on watch and 9 clear for twenty-four consecutive readings</b>, not one mailbox moving in either direction, then one came back at the last reading to make it 10. Compare that with Monday, when the clear count went 13, 17, 19, 15, 13 in a single day. A flat fleet is not a healthy fleet here. It is a fleet where <b>83% of the mailboxes are stopped and nothing is changing that.</b></p>
+
+  <h2>The three questions</h2>
+
+  <div class="q accent-red">
+    <div class="ask"><span class="qn">Q1</span><span>Why did a second straight sending day send zero emails?</span></div>
+    <p><b>A function that writes explanations crashed, and it took the send with it.</b> The plan itself was never in doubt. At <span class="pill">10:17:13Z</span> Siege wrote a whole day to disk: <b>69 people against 69 free mailbox slots</b> under an 870-message ramp, 9 live inboxes, email not paused, and every mailbox carrying a real campaign id. That last part matters, because it is the one thing that went wrong on Thursday, and on Friday it was clean.</p>
+    <p>At <span class="pill">10:20:49Z</span> the run stopped with this:</p>
+    <pre>  File "/home/casey/repos/automator/scripts/siege-plan.py", line 1298, in why_no_email
+    fails = "; ".join(row.get("fails") or [])
+TypeError: sequence item 0: expected str instance, dict found</pre>
+    <p><code>why_no_email()</code> exists to turn a blank space in the morning sample report into a sentence. Its own comment says why it was written: "Casey cannot tell a skill that correctly declined to write from a writer that fell over." It joins a list of failure strings into readable text, and one of those failures arrived as a structured object instead of a string. <b>The code that exists to explain failures was taken down by an unexpected failure.</b></p>
+    <p>On its own that should have cost a report, not a day. What turned it into a lost day is the shape of the unit. <code>siege-plan.service</code> is a single systemd oneshot holding <b>five commands that run in order</b>: sync the warmup data, write and check 20 sample emails, record the standing approval, push the rest, write the report. <b>systemd abandons every remaining command the moment one of them exits non-zero.</b> The crash was in command two, so commands three, four and five never happened, and command four is the one that sends. The files on disk confirm it: Friday's folder holds <code>plan.json</code> and nothing else, where every other day this week holds <code>samples.json</code> and <code>approval.json</code> beside it.</p>
+    <p>So a cosmetic string operation, in a step that sends nothing and spends nothing, blocked a step that would have emailed 69 people.</p>
+  </div>
+
+  <div class="q accent-amber">
+    <div class="ask"><span class="qn">Q2</span><span>Is this the same thing that happened on Thursday?</span></div>
+    <p><b>No, and that is the worrying part.</b> It would be easier if two identical days meant one bug. These are two unrelated faults that happened to land back to back in the same unit.</p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th></th><th>Thursday 10-29</th><th>Friday 10-30</th></tr></thead>
+        <tbody>
+          <tr><td><b>What failed</b></td><td>SmartLead returned an empty campaign list and nothing checked it</td><td>A report helper raised a TypeError on a non-string value</td></tr>
+          <tr><td><b>The plan</b></td><td>Held nobody sendable. All 58 mailboxes read <code>campaign_id: null</code></td><td>Whole and correct. 69 people, 69 slots, campaigns intact</td></tr>
+          <tr><td><b>How far it got</b></td><td>Reached the push and refused on purpose</td><td>Died two steps before the push existed</td></tr>
+          <tr><td><b>On disk</b></td><td><code>samples.json</code> and <code>approval.json</code> both written</td><td>Neither written</td></tr>
+          <tr><td><b>People who got nothing</b></td><td class="num">62</td><td class="num">69</td></tr>
+          <tr><td><b>The repair</b></td><td>Guard the campaign read, in <code>smartlead_api.py</code></td><td>Guard the join, and stop a report step blocking the push</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>Both are in <b>automator</b>, which is the send path and outside the five repos this loop may edit, so neither repair could be shipped from here. What they share is the real lesson: <b>this one unit has at least two single points of failure that can silently cost a whole sending day</b>, and roughly 131 approved people have now paid for them in two days.</p>
+  </div>
+
+  <div class="q accent-teal">
+    <div class="ask"><span class="qn">Q3</span><span>What did the rest of the pipeline do while the send was down?</span></div>
+    <p><b>Everything else ran clean, quietly, and small.</b> No fatal error signatures, no halt, and <b>$0 of Anthropic spend.</b></p>
+    <p>The <b>recovery lane</b> added 19 contact points and 4 email addresses across 4 people, against 80 points and 14 addresses over the prior week. That is a picked-over book rather than a fault, and the measurements say so plainly: the newest collect pass resolved a website for <b>149 of 150 leads</b>, made only 4 Brave searches, had zero search refusals and zero rejections from the ownership gate, and its methods found <b>579 contact points of which 577 were already on file.</b> The lane is on its thirteenth lap of a 2,387-lead book. It is re-reading what it has already read, which is what a thirteenth lap looks like.</p>
+    <p>The <b>shelf</b> is in good shape: 5,148 people ready to write, <b>99.8% of the pool enriched</b>, and the stranded cohort from the 10-13 push is down from 54 to <b>4</b>, so that problem has closed itself as the 10-28 debrief predicted.</p>
+    <p>The <b>enrichment chain</b> was the one other thing genuinely broken, and it is now fixed. It launched 3 batches and failed all 3, every one on the same single lead, every one dying on a quota error from <b>Supadata, a transcript provider Casey cancelled in August.</b> Decodo replaced it as the primary months ago, but the old code treated an exhausted Supadata plan as an emergency worth killing the lead over, so that lead would have been retried forever. Details in the fixes table below.</p>
+    <p>Discovery stayed at zero, which is <b>Casey's instruction since 2026-09-08</b> and not a fault. The YouTube key pool reads 15 working of 66, also expected: the quota on 50 of those projects was cut, and it does not matter while discovery is off.</p>
+  </div>
+
+  <h2>What broke → what's fixed</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Status</th><th>Problem</th><th>What changed</th></tr></thead>
+      <tbody>
+        <tr class="fix">
+          <td>FIXED</td>
+          <td><b>The worst field to be wrong about said "awaiting approval."</b> <code>binding_constraint</code> is the first thing anyone reads, and on a day a crash cost 69 emails it named a human who owes a click. There is no such human: Casey gave Siege standing approval on 2026-09-30. The existing name for a stopped run, <code>push_killed</code>, could only ever be claimed by a push that had already sent something, so a run that failed having sent nothing could not name its own failure.</td>
+          <td>Two new names. <code>unit_died_before_push</code> when the unit failed, nothing sent, and no approval record exists, which means the push step never ran. <code>push_unit_failed</code> when the approval was recorded, so the push itself is what to read. Which step died is measured rather than guessed, off the approval file the step before the push writes. 13 regression assertions, including one holding Thursday's shape to its own separate name. <span class="muted">orchestrator <code>11fb8c6</code></span></td>
+        </tr>
+        <tr class="fix">
+          <td>FIXED</td>
+          <td><b>Nothing watched the send path hourly.</b> Every existing health check guards finding and enriching. Both failed sending days were therefore invisible until the debrief ran at 00:20 the next morning, about fourteen hours after the fact. Both runs had failed before 10:21Z, and Siege stops pushing at 12:00 ET, so on both days there was still time to act and no signal to act on.</td>
+          <td>The hourly check-in now reads the send unit and writes a <code>siege_send_day_failed</code> line naming which of the five steps died, inferred from which state files Siege managed to write. Free: two systemd reads and two file checks, no database and no network. Logged rather than escalated, because the repair is in automator and the fix-agent cannot edit it. Silent on weekends and never re-raises Friday's verdict on Saturday. 11 assertions. <span class="muted">orchestrator <code>acef372</code></span></td>
+        </tr>
+        <tr class="fix">
+          <td>FIXED</td>
+          <td><b>A cancelled provider's quota error killed whole leads.</b> The Supadata key pool was built in August when Supadata was the only transcript provider, so an exhausted pool really had no way forward and the code threw to surface it. Decodo replaced it six days later and the Supadata plan was cancelled, which turns that error into the permanent expected answer from a dead account. The throw outlived its reason and was failing leads over it.</td>
+          <td>An exhausted pool now degrades instead of halting. The video records <code>fetch_status=failed</code>, which the caller already handles exactly as it handles a video with no captions, and the lead finishes with thinner transcripts instead of dying. Latched for the rest of the run, so a cancelled plan is not asked once per video. Narrow on purpose: only the quota error degrades, config errors still throw. <span class="muted">quick-research <code>6ceb7c4</code></span></td>
+        </tr>
+        <tr>
+          <td style="color:var(--red);font-weight:650">NEEDS CASEY</td>
+          <td><b>The crash itself, and the reason it mattered.</b> <code>why_no_email()</code> in <code>automator/scripts/siege-plan.py</code> assumes every entry in a writer's <code>fails</code> list is a string. More importantly, a reporting step inside <code>siege-plan.service</code> can stop the push step from ever running.</td>
+          <td>Not shippable from here. automator is the send path and sits outside the five repos this loop may edit. Both pieces are in lever 1 below.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Recommended next — ranked</h2>
+  <ol class="recs">
+    <li><b>Make the sample and report steps unable to block the push.</b> This is the whole lesson of two lost days. Fix the immediate crash by coercing non-string entries before the join in <code>why_no_email()</code>, which is a one-line change. Then fix the structural problem: the push is the only step of those five that sends anything, and it currently sits behind two steps that do not. Either move it ahead of the sample and report steps, or run them as separate units, or let them fail without taking the unit down. Thursday's fault and Friday's fault were unrelated, which says the next one will be too, and all three cost the same thing.</li>
+    <li><b>Then the slot ceiling, which is the real limit on everything.</b> 2,090 people are waiting for a slot against a plan that could only fit 69. The 870-message ramp is irrelevant while <b>48 of 58 mailboxes are stopped</b>, and the fleet did not move once in twenty-four hours. Three of the held mailboxes are healthy and waiting out the recovery clock, the nearest 11 hours away, so they return for free. The other 45 do not. Nothing in the send path is worth tuning until this number changes, because even a perfect sending day reaches 69 people.</li>
+    <li><b>Monday will try again on its own, and the 69 are not lost.</b> Siege rebuilds the plan from scratch each morning, so Friday's 69 are still sitting on the shelf and will be planned again. No manual recovery is needed, and nothing should be re-pushed by hand. The cost of these two days was the delay, not the people.</li>
+    <li><b>The Apify allowance resets tomorrow.</b> The lane finished October with nothing spendable, sitting on its $10 reserve floor, so it ran no batches this cycle. The $100 calendar-month allowance refills on 1 November, which at the measured rate is roughly 700 recovered leads for about $90, plus the OpenRouter cost of enriching them. OpenRouter has $58.91 and is burning $1.56 a day, so that balance covers the lane's output but will want watching once it starts spending.</li>
+  </ol>
+
+  <div class="foot">
+    <b>Grounding.</b> Every number here comes from <code>logs/autopilot-debrief-2026-10-31.json</code> for the 24 hours to 2026-10-31T07:00Z, except the traceback and the step order, which come from <code>journalctl -u siege-plan.service</code> and the unit file, and the hourly fleet readings, which come from <code>automator/logs/inbox-health.log</code>. The cause of the crash, the step coupling and the enrichment failure were each confirmed against the live files rather than inferred. <b>Not verified:</b> whether Monday's run clears, and whether the enrichment fix lets that lead through, which the chain proves on its next poll of it.
+  </div>
+
+</div>
+
+<script>
+  // One bar per hourly band-gate reading, 07:05Z to 07:05Z. Height is mailboxes clear
+  // to send. Flat on purpose: this is what the day actually did.
+  var clear = [9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,10];
+  var max = 12; // Monday's peak, so a flat 9 reads as low rather than as full height
+  var strip = document.getElementById('strip');
+  clear.forEach(function (n, i) {
+    var b = document.createElement('div');
+    b.className = 'bar' + (i === clear.length - 1 ? '' : ' low');
+    b.style.height = Math.round((n / max) * 100) + '%';
+    b.title = n + ' mailboxes clear to send';
+    strip.appendChild(b);
+  });
+</script>
+</html>
