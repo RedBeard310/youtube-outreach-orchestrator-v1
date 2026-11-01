@@ -32,6 +32,14 @@ if ! flock -n 9; then
   exit 0
 fi
 
+# Transcript preflight, named `supadata_ok` until 2026-11-01 and now
+# `transcripts_ok`, because the provider it is named after has been the BACKUP since
+# 2026-08-13 and its plan has been cancelled since August, so it answers 429 for
+# every key, forever. That means this gate only ever holds when DECODO fails, and
+# every hold it has reported since then has been logged under the wrong provider:
+# measured on 2026-11-01, a live probe reads `decodo=http-401 supadata=429x2` when
+# Decodo is refused, and `200 decodo` when it is not. See the note in the probe.
+#
 # Supadata preflight (added 2026-08-07, fixed same day): enrichment dies at the
 # transcript stage when the Supadata plan quota is exhausted (the 2026-08-05
 # incident burned 187 leads' retry budget in ~70 min). Probe before every batch;
