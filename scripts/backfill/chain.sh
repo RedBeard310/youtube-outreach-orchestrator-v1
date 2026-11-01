@@ -45,7 +45,7 @@ fi
 # pool added that morning. It always reported "limited" even with a fresh key 2
 # sitting right there. Now it loads the real shared env file (same lookup order
 # as src/lib/load-env.ts) and succeeds if ANY configured key returns 200.
-supadata_ok() {
+transcripts_ok() {
   local code
   code=$(node -e '
 const { existsSync } = require("fs");
@@ -80,7 +80,17 @@ for (const [name, value] of Object.entries(process.env)) {
   if (name.toLowerCase() === "decodo_api_key" && (value || "").trim()) { decodoKey = value.trim(); break; }
 }
 
+// WHICH PROVIDER FAILED IS PART OF THE ANSWER (2026-11-01). This printed a bare
+// "200"/"ERR" and the caller logged "supadata limit still active" for every refusal,
+// so a DECODO outage was reported under the name of the provider Casey cancelled in
+// August. On 2026-10-31 the gate held the chain from 04:52Z to 08:02Z — three hours
+// of the only lane still producing while discovery is paused — and both the log line
+// and the hourly check-in that quotes it named Supadata. Decodo is probed first and
+// is the primary, so a refusal is far more likely to be the Decodo half, and "drop
+// Supadata" (the obvious reading) would not have fixed one minute of it.
+// NO APOSTROPHES BELOW THIS LINE: the whole script is one single-quoted bash string.
 (async () => {
+  let decodoWhy = decodoKey ? "no-answer" : "absent";
   if (decodoKey) {
     const auth = decodoKey.includes(":") ? `Basic ${Buffer.from(decodoKey).toString("base64")}` : `Basic ${decodoKey}`;
     for (let attempt = 0; attempt < 2; attempt++) {
@@ -93,21 +103,39 @@ for (const [name, value] of Object.entries(process.env)) {
         });
         if (r.status === 200) {
           const body = await r.json();
-          if (body?.results?.[0]?.content) { console.log("200"); return; }
+          if (body?.results?.[0]?.content) { console.log("200 decodo"); return; }
+          decodoWhy = "http-200-empty";
+        } else {
+          decodoWhy = `http-${r.status}`;
         }
-      } catch {}
+      } catch (e) {
+        decodoWhy = /timeout|abort/i.test(String(e)) ? "timeout" : "unreachable";
+      }
     }
   }
+  const supaCodes = [];
   for (const key of keys) {
     try {
       const r = await fetch("https://api.supadata.ai/v1/transcript?url=https://www.youtube.com/watch?v=dQw4w9WgXcQ", { headers: { "x-api-key": key } });
-      if (r.status === 200) { console.log("200"); return; }
-    } catch {}
+      if (r.status === 200) { console.log("200 supadata"); return; }
+      supaCodes.push(String(r.status));
+    } catch { supaCodes.push("unreachable"); }
   }
-  console.log(keys.length === 0 && !decodoKey ? "NOKEYS" : "ERR");
+  // Counted, not listed: the pool has run to several keys and one line per key would
+  // bury the Decodo half of the answer, which is the half that is usually the cause.
+  const tally = {};
+  for (const c of supaCodes) tally[c] = (tally[c] || 0) + 1;
+  const supa = keys.length === 0
+    ? "nokeys"
+    : Object.entries(tally).map(([c, n]) => `${c}x${n}`).join(",");
+  console.log(keys.length === 0 && !decodoKey
+    ? "NOKEYS"
+    : `DOWN decodo=${decodoWhy} supadata=${supa}`);
 })();
 ' 2>/dev/null)
-  [ "$code" = "200" ]
+  # Mirrors $OPENROUTER_STATE below: the caller logs the reason rather than assuming one.
+  TRANSCRIPT_STATE="${code:-unprobeable}"
+  case "$TRANSCRIPT_STATE" in 200*) return 0 ;; *) return 1 ;; esac
 }
 
 # OpenRouter credit preflight (added 2026-09-15 after the 09-14/15 burn).
@@ -260,13 +288,13 @@ while true; do
     done
   done
 
-  if ! supadata_ok; then
-    log "supadata limit still active — waiting (probe every 30m, silent until it clears)"
-    while ! supadata_ok; do
+  if ! transcripts_ok; then
+    log "transcripts unavailable ($TRANSCRIPT_STATE) — waiting (probe every 30m, silent until it clears)"
+    while ! transcripts_ok; do
       [ -f "$HALT" ] && { log "halt flag present — stopping"; exit 0; }
       sleep 1800
     done
-    log "supadata is back — resuming batches"
+    log "transcripts back ($TRANSCRIPT_STATE) — resuming batches"
   fi
 
   # Fail-open is the right rule for ENTERING the wait and the wrong rule for
