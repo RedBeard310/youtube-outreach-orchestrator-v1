@@ -24,7 +24,7 @@ import { summarizeToday, pacificDate } from './burn-ledger.js';
 import { countByReviewStatus } from '../../src/db.ts';
 // One reader for Siege's unit, shared with the debrief — see siegeUnitFacts(). Importing
 // this module is inert: its collection pass only runs when it is argv[1].
-import { siegeRunAlarm, siegeUnitFacts } from './debrief-data.ts';
+import { openRouterRunwayAlarm, siegeRunAlarm, siegeUnitFacts } from './debrief-data.ts';
 import {
   collectBookDepth,
   collectPassAttribution,
@@ -499,6 +499,34 @@ function countSharedYoutubeKeys(): number | null {
   return n;
 }
 
+/** What is left on the OpenRouter account, live. Free (no LLM call), and null on any
+ *  answer we cannot read, because an unanswered question is not an empty account.
+ *
+ *  ONE READER, SHARED (2026-11-01). The halt probe below and the runway alarm both need
+ *  this number, and two copies of a balance read is how two instruments come to disagree
+ *  about the same account. It deliberately does NOT touch
+ *  logs/openrouter-usage-samples.jsonl: the debrief diffs the newest sample older than
+ *  six hours to get its daily burn, so an hourly sample would hand it a six-hour spend
+ *  labelled as a cycle and understate the per-lead enrichment cost fourfold. */
+async function openRouterBalance(): Promise<number | null> {
+  const key = process.env.OPENROUTER_API_KEY?.trim();
+  if (!key) return null;
+  try {
+    const res = await fetch('https://openrouter.ai/api/v1/credits', {
+      headers: { authorization: `Bearer ${key}` },
+      signal: AbortSignal.timeout(20_000),
+    });
+    if (!res.ok) return null;
+    const body = (await res.json()) as { data?: { total_credits?: number; total_usage?: number } };
+    const granted = Number(body.data?.total_credits);
+    const used = Number(body.data?.total_usage);
+    if (!Number.isFinite(granted) || !Number.isFinite(used)) return null;
+    return granted - used;
+  } catch {
+    return null; // a probe we could not complete is not proof of anything
+  }
+}
+
 const HALT_RECOVERIES: HaltRecovery[] = [
   {
     // 2026-08-25: the OpenRouter account ran dry at 00:49Z and everything parked
@@ -506,23 +534,8 @@ const HALT_RECOVERIES: HaltRecovery[] = [
     kind: 'openrouter_credits',
     matches: (reason) => /OpenRouter account out of credits/i.test(reason),
     probe: async (day) => {
-      const key = process.env.OPENROUTER_API_KEY?.trim();
-      if (!key) return null;
-      let remaining: number;
-      try {
-        const res = await fetch('https://openrouter.ai/api/v1/credits', {
-          headers: { authorization: `Bearer ${key}` },
-          signal: AbortSignal.timeout(20_000),
-        });
-        if (!res.ok) return null;
-        const body = (await res.json()) as { data?: { total_credits?: number; total_usage?: number } };
-        const granted = Number(body.data?.total_credits);
-        const used = Number(body.data?.total_usage);
-        if (!Number.isFinite(granted) || !Number.isFinite(used)) return null;
-        remaining = granted - used;
-      } catch {
-        return null; // a probe we could not complete is not proof of anything
-      }
+      const remaining = await openRouterBalance();
+      if (remaining === null) return null;
       if (remaining < MIN_CREDIT_MARGIN_USD) {
         console.log(`[checkin ${day}] halt stands — OpenRouter still at $${remaining.toFixed(2)} (need $${MIN_CREDIT_MARGIN_USD})`);
         return null;
@@ -1650,6 +1663,68 @@ async function main(): Promise<void> {
       console.log(`[checkin ${day}] OBSERVATION siege_send_day_failed — died in the ${alarm.step} step (${unit.unit_last_result}) at ${alarm.run_key}`);
     }
   } catch { /* an unreadable unit must not be reported as a dead send day */ }
+
+  // --- 7f. THE MONEY THAT ENRICHMENT RUNS ON (2026-11-01) ---
+  //
+  // 7e above reports the chain AFTER it stalls, which for a spent OpenRouter account is
+  // several hours after enrichment stopped. Nothing watched the balance on the way down.
+  // The debrief publishes `days_of_runway` once a day, and that is too coarse for a
+  // number that moved tenfold in one cycle: the week to 2026-10-31 burned $1.50-1.60 a
+  // day and read 38 days of road, then the November Apify allowance opened, the recovery
+  // lane parked 250 people, the chain enriched 193 of them, and the day cost $15.77.
+  // Runway at the 11-01 reading was 2.7 days, so the next daily reading would have been
+  // the last one before the credit ran out.
+  //
+  // Costs one free HTTPS call to the credits endpoint. The burn rate is the debrief's own
+  // measured figure, read out of its newest snapshot rather than re-measured here, so
+  // there is one meter on this account and not two. See openRouterRunwayAlarm() for the
+  // tier ladder and why a stale or absent rate leaves the runway unknown rather than long.
+  try {
+    const snaps = readdirSync(LOGS)
+      .filter((f) => /^autopilot-debrief-\d{4}-\d{2}-\d{2}\.json$/.test(f))
+      .sort(); // the name carries the date, so lexical order is date order
+    const newest = snaps.at(-1);
+    let perDay: number | null = null;
+    let sampleHours: number | null = null;
+    let rateAgeHours: number | null = null;
+    let projectedEnrichUsd: number | null = null;
+    if (newest) {
+      const snap = JSON.parse(readFileSync(join(LOGS, newest), 'utf8')) as {
+        generated_at?: unknown;
+        openrouter_today?: { account_spend_per_day_usd?: unknown; account_sample_hours?: unknown };
+        recovery_budget?: { projection?: { openrouter_cost_of_projected_leads_usd?: unknown } };
+      };
+      const rate = snap.openrouter_today?.account_spend_per_day_usd;
+      if (typeof rate === 'number' && Number.isFinite(rate)) perDay = rate;
+      const win = snap.openrouter_today?.account_sample_hours;
+      if (typeof win === 'number' && Number.isFinite(win)) sampleHours = win;
+      const gen = typeof snap.generated_at === 'string' ? Date.parse(snap.generated_at) : NaN;
+      if (Number.isFinite(gen)) rateAgeHours = (Date.now() - gen) / 3_600_000;
+      const proj = snap.recovery_budget?.projection?.openrouter_cost_of_projected_leads_usd;
+      if (typeof proj === 'number' && Number.isFinite(proj)) projectedEnrichUsd = proj;
+    }
+    const alarm = openRouterRunwayAlarm({
+      balanceUsd: await openRouterBalance(),
+      perDayUsd: perDay,
+      sampleHours,
+      rateAgeHours,
+      marginUsd: MIN_CREDIT_MARGIN_USD,
+      today: day,
+      projectedEnrichUsd,
+    });
+    // Once a day per tier, so a steady shortfall says its piece once while a balance
+    // crossing the next line down still speaks the hour it crosses it.
+    if (alarm && !alreadyObserved('openrouter_runway_low', alarm.run_key)) {
+      appendFileSync(OBSERVATIONS, JSON.stringify({
+        ts: new Date().toISOString(), kind: 'openrouter_runway_low',
+        tier: alarm.tier, run_key: alarm.run_key, pass_key: alarm.run_key,
+        runway_days: alarm.runway_days, burn_per_day_usd: perDay,
+        rate_age_hours: rateAgeHours === null ? null : Number(rateAgeHours.toFixed(2)),
+        rate_from_snapshot: newest ?? null, parked, detail: alarm.detail,
+      }) + '\n');
+      console.log(`[checkin ${day}] OBSERVATION openrouter_runway_low — ${alarm.tier}, ${alarm.runway_days ?? '?'} day(s) of runway`);
+    }
+  } catch { /* an unreadable balance or snapshot must not be reported as a dry account */ }
 
   // Discovery is paused on Casey's instruction, so anything that only describes a
   // stopped lane is expected, not an anomaly. Everything else still escalates.

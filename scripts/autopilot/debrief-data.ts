@@ -3487,6 +3487,121 @@ export function priorAccountSpend(date: string, logsDir: string = LOGS): number 
   } catch { return null; }
 }
 
+/** A rate older than this cannot describe today's burn, so it is treated as unknown.
+ *  Two cycles, so one skipped debrief does not silence the alarm. */
+export const OPENROUTER_RATE_MAX_AGE_H = 48;
+/** Runway below this many days is worth saying out loud, while topping up is still
+ *  a calendar item rather than an outage. */
+export const OPENROUTER_RUNWAY_ALARM_DAYS = 3;
+
+/** Is the OpenRouter account about to stop the pipeline, and how soon? (2026-11-01)
+ *
+ *  WHY HOURLY, WHEN THE DEBRIEF ALREADY PUBLISHES `days_of_runway`. Because the number
+ *  moves by a factor of ten inside one cycle, and a daily reading cannot keep up with
+ *  that. Through the week to 2026-10-31 the account burned $1.50-1.60 a day and the
+ *  10-31 debrief read 38 days of runway, which is a calendar item. The next cycle the
+ *  November Apify allowance opened, the recovery lane parked 250 people, the backfill
+ *  chain enriched 193 of them, and the account spent $15.77 in 24 hours. Runway at the
+ *  2026-11-01 reading: 2.7 days. One more daily reading would have been the last one
+ *  before the credit ran out.
+ *
+ *  What running out costs. The chain has had an OpenRouter preflight since 2026-09-15,
+ *  so the money is no longer burned twice (the 09-14 shape: every lead paid for its
+ *  YouTube harvest and its Decodo transcripts and then died at the bank stage on HTTP
+ *  402, nine batches of `exit=0 done=0`, ~1,635 lead attempts, nobody told). But a gate
+ *  that waits is still a stopped pipeline: with discovery paused, enrichment is the only
+ *  thing turning a recovered address into a lead anybody can write to, and the Apify lane
+ *  keeps parking people regardless, because it spends a different budget.
+ *
+ *  ONE INSTRUMENT, NOT TWO. The burn rate is the debrief's own measured
+ *  `account_spend_per_day_usd`, read out of the newest snapshot rather than re-measured
+ *  here, because two meters on one account is how a snapshot and an alarm come to
+ *  disagree about the same morning. Only the balance is read live, which is the half that
+ *  actually moves. The caller must not write to the usage-sample file: the debrief diffs
+ *  the newest sample older than six hours, so an hourly sample would hand it a six-hour
+ *  spend labelled as a cycle and understate the per-lead cost by four.
+ *
+ *  Silent unless the shortfall is positively measured. A null balance is unknown and NOT
+ *  empty; a rate that is null, zero or stale leaves runway unknown, and then only a
+ *  balance beneath the chain's own preflight margin can speak, because that much needs no
+ *  rate. An OBSERVATION and never an exit-7 anomaly: the repair is a spend call only Casey
+ *  can make, so paying a model for it every hour would buy nothing.
+ *
+ *  `run_key` carries the tier and the day, so this says its piece once a day per tier
+ *  while a worsening balance still gets to speak the hour it crosses the next line. */
+export function openRouterRunwayAlarm(opts: {
+  balanceUsd: number | null;
+  perDayUsd: number | null;
+  /** How long ago the rate was READ. Not the window it was measured over: those are two
+   *  different hours and saying the wrong one is how "$15.77 a day" came out as
+   *  "measured over the last 0.1h" on the day this shipped. */
+  rateAgeHours: number | null;
+  /** How long a window the rate was measured over, from the snapshot's own
+   *  `account_sample_hours`. Optional: null drops the clause rather than guessing. */
+  sampleHours?: number | null;
+  marginUsd: number;
+  today: string;
+  alarmDays?: number;
+  projectedEnrichUsd?: number | null;
+}): { tier: 'depleted' | 'below_margin' | 'low'; run_key: string; runway_days: number | null; detail: string } | null {
+  const { balanceUsd, perDayUsd, rateAgeHours, marginUsd, today } = opts;
+  if (balanceUsd === null || !Number.isFinite(balanceUsd)) return null;
+  const alarmDays = opts.alarmDays ?? OPENROUTER_RUNWAY_ALARM_DAYS;
+
+  const rateUsable = perDayUsd !== null && perDayUsd > 0
+    && rateAgeHours !== null && rateAgeHours <= OPENROUTER_RATE_MAX_AGE_H;
+  // Compare the raw quotient and publish the rounded one, so the threshold means what it
+  // says. Rounding first moved the real firing line to 2.95 days.
+  const exact = rateUsable ? balanceUsd / perDayUsd! : null;
+  const runway = exact === null ? null : Number(exact.toFixed(1));
+
+  const tier = balanceUsd <= 0
+    ? 'depleted' as const
+    : balanceUsd < marginUsd
+      ? 'below_margin' as const
+      : exact !== null && exact < alarmDays
+        ? 'low' as const
+        : null;
+  if (tier === null) return null;
+
+  // Built inside the guard, with no assertion on a nullable. A sentence formatter that
+  // throws takes its whole caller with it, which is the 2026-10-30 lesson.
+  let rate = 'The daily burn could not be measured from the newest snapshot, so the runway is unknown rather than long';
+  if (rateUsable && perDayUsd !== null && rateAgeHours !== null) {
+    const window = opts.sampleHours && opts.sampleHours > 0
+      ? `measured over ${opts.sampleHours.toFixed(1)}h and read ${rateAgeHours.toFixed(1)}h ago`
+      : `read ${rateAgeHours.toFixed(1)}h ago`;
+    rate = `The account is spending $${perDayUsd.toFixed(2)} a day (${window})`;
+  }
+  const left = runway !== null ? `about ${runway} day(s) of credit left` : 'an unmeasurable amount of road left';
+  const where = {
+    depleted: `OpenRouter is out of credit ($${balanceUsd.toFixed(2)}). The backfill chain's preflight `
+      + 'holds every batch at its gate and enrichment has stopped; the chain resumes by itself and picks '
+      + 'the leads back up when credit returns, so nothing is lost but the days.',
+    below_margin: `OpenRouter is down to $${balanceUsd.toFixed(2)}, under the $${marginUsd} margin the backfill `
+      + "chain's preflight needs, so the chain will hold at its gate on its next poll and enrichment stops "
+      + 'within the hour.',
+    low: `OpenRouter has $${balanceUsd.toFixed(2)}. ${rate}, so enrichment has ${left}, against an alarm at `
+      + `${alarmDays} days.`,
+  }[tier];
+
+  const coupled = opts.projectedEnrichUsd !== null && opts.projectedEnrichUsd !== undefined
+    && opts.projectedEnrichUsd > balanceUsd
+    ? ` The unspent Apify allowance is projected to need $${opts.projectedEnrichUsd.toFixed(2)} of enrichment `
+      + `against a $${balanceUsd.toFixed(2)} balance, so the two budgets are already out of step: that lane will `
+      + 'keep parking people this one cannot turn into anything writable.'
+    : '';
+
+  return {
+    tier,
+    run_key: `${tier}:${today}`,
+    runway_days: runway,
+    detail: `${where}${coupled} With discovery paused, enrichment is the only thing that turns a recovered `
+      + 'address into a lead anybody can write to, and compose reads the on-disk bundle, so an unenriched '
+      + 'parked lead is not sendable. Adding credit is Casey\'s spend call, so this is logged and not escalated.',
+  };
+}
+
 /**
  * Convert the remaining Apify allowance into leads, and those leads into the
  * OpenRouter dollars enriching them will cost. Pure arithmetic on measured rates,

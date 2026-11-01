@@ -1,4 +1,4 @@
-import { bulkRewriteShape, bandGateFacts, fleetFacts, inboxGateFacts, apifyBatchFacts, apifyLedgerLine, NO_PUSH_OUTCOME, normalizePushReason, offerFromBatchId, siegeApprovedLeadIds, siegePlanLeadIds, siegePushOutcome, classifyKeyProbe, cyclePacificDay, costWindows, enrichmentChainFacts, isSendingDay, perEnrichedLeadCost, PER_LEAD_SAMPLE_FLOOR, projectRecoveryBudget, MAX_MISSING_DEBRIEFS, missingDebriefs, NO_UNIT, pushRunVerdict, siegeRunAlarm, unitStartedAt, sendPlanHealth, siegePlanFacts, summarizeSendLines, isVerifiedOrBeyond, laneYield, priorAdvanceSource, priorSeedsAdvanced, priorSeedsWalked, reconcileAdvanced, sessionSeedsAdvanced, sessionStartMs, walkRateTrend } from './debrief-data.ts';
+import { bulkRewriteShape, bandGateFacts, fleetFacts, inboxGateFacts, apifyBatchFacts, apifyLedgerLine, NO_PUSH_OUTCOME, normalizePushReason, offerFromBatchId, openRouterRunwayAlarm, OPENROUTER_RATE_MAX_AGE_H, siegeApprovedLeadIds, siegePlanLeadIds, siegePushOutcome, classifyKeyProbe, cyclePacificDay, costWindows, enrichmentChainFacts, isSendingDay, perEnrichedLeadCost, PER_LEAD_SAMPLE_FLOOR, projectRecoveryBudget, MAX_MISSING_DEBRIEFS, missingDebriefs, NO_UNIT, pushRunVerdict, siegeRunAlarm, unitStartedAt, sendPlanHealth, siegePlanFacts, summarizeSendLines, isVerifiedOrBeyond, laneYield, priorAdvanceSource, priorSeedsAdvanced, priorSeedsWalked, reconcileAdvanced, sessionSeedsAdvanced, sessionStartMs, walkRateTrend } from './debrief-data.ts';
 import { MAX_SHELF_STRANDED_IDS, recoveredTally, shelfTally, type ShelfRow } from '../../src/db.ts';
 
 let fail = 0;
@@ -539,6 +539,72 @@ ok('the 10-29 shape is reported against the push, not the sample step',
     startedPacificDay: '2026-10-29', today: '2026-10-29',
     samplesRecorded: true, approvalRecorded: true,
   })?.step, 'push_or_report');
+
+// --- the money enrichment runs on (2026-11-01) ---
+// The live 11-01 shape: $43.08 on the account against a burn that went from $1.56/day to
+// $15.77/day in one cycle when the November Apify allowance opened.
+const RUNWAY = {
+  balanceUsd: 43.08 as number | null,
+  perDayUsd: 15.77 as number | null,
+  rateAgeHours: 0.3 as number | null,
+  sampleHours: 24 as number | null,
+  marginUsd: 5,
+  today: '2026-11-01',
+  projectedEnrichUsd: 50.16 as number | null,
+};
+ok('11-01: 2.7 days of runway is a low tier with the days named',
+  (() => { const a = openRouterRunwayAlarm(RUNWAY);
+    return [a?.tier, a?.runway_days, a?.run_key]; })(),
+  ['low', 2.7, 'low:2026-11-01']);
+// The rate's age and the window it was measured over are different hours; saying the
+// wrong one printed "$15.77 a day, measured over the last 0.1h" the day this shipped.
+ok('the burn names its window and its age, not one as the other',
+  /\$15\.77 a day \(measured over 24\.0h and read 0\.3h ago\)/.test(openRouterRunwayAlarm(RUNWAY)?.detail ?? ''), true);
+ok('an unmeasured window still names when the rate was read',
+  /\$15\.77 a day \(read 0\.3h ago\)/.test(openRouterRunwayAlarm({ ...RUNWAY, sampleHours: null })?.detail ?? ''), true);
+ok('the Apify allowance outrunning the balance is named in the detail',
+  /two budgets are already out of step/.test(openRouterRunwayAlarm(RUNWAY)?.detail ?? ''), true);
+ok('a balance that covers the projection says nothing about it',
+  /out of step/.test(openRouterRunwayAlarm({ ...RUNWAY, projectedEnrichUsd: 10 })?.detail ?? ''), false);
+ok('an unmeasured projection says nothing about it',
+  /out of step/.test(openRouterRunwayAlarm({ ...RUNWAY, projectedEnrichUsd: null })?.detail ?? ''), false);
+// The tiers below the alarm: each needs no burn rate, because the balance alone decides.
+ok('under the chain\'s preflight margin is its own tier',
+  (() => { const a = openRouterRunwayAlarm({ ...RUNWAY, balanceUsd: 3.2, perDayUsd: null, rateAgeHours: null });
+    return [a?.tier, a?.runway_days]; })(),
+  ['below_margin', null]);
+// The formatter must survive every combination of missing inputs, because it runs before
+// the tier text and a throw here would take the whole hourly check-in down.
+ok('a window with no age still formats (the shape that threw on 11-01)',
+  openRouterRunwayAlarm({ ...RUNWAY, balanceUsd: 2, perDayUsd: null, rateAgeHours: null, sampleHours: 24 })?.tier,
+  'below_margin');
+ok('an empty account is depleted, not merely low',
+  openRouterRunwayAlarm({ ...RUNWAY, balanceUsd: 0 })?.tier, 'depleted');
+ok('a negative balance is still depleted',
+  openRouterRunwayAlarm({ ...RUNWAY, balanceUsd: -4.5 })?.tier, 'depleted');
+// Silence, every way. The alarm must never turn an unreadable number into a dry account.
+ok('a week of road is not an alarm',
+  openRouterRunwayAlarm({ ...RUNWAY, balanceUsd: 110 }), null);
+ok('the alarm fires exactly at the threshold, not above it',
+  (() => [
+    openRouterRunwayAlarm({ ...RUNWAY, balanceUsd: 47.3, perDayUsd: 15.77 })?.tier ?? null,
+    openRouterRunwayAlarm({ ...RUNWAY, balanceUsd: 47.4, perDayUsd: 15.77 })?.tier ?? null,
+  ])(),
+  ['low', null]);
+ok('an unreadable balance is unknown, NOT empty',
+  openRouterRunwayAlarm({ ...RUNWAY, balanceUsd: null }), null);
+ok('an idle account spending nothing has no runway problem',
+  openRouterRunwayAlarm({ ...RUNWAY, perDayUsd: 0 }), null);
+ok('an unmeasured burn leaves a healthy balance alone',
+  openRouterRunwayAlarm({ ...RUNWAY, perDayUsd: null, rateAgeHours: null }), null);
+// A rate measured two cycles ago cannot describe today's burn, and the 11-01 cycle is why:
+// one day's reading was 10x the week before it.
+ok('a stale rate leaves the runway unknown rather than long',
+  openRouterRunwayAlarm({ ...RUNWAY, rateAgeHours: OPENROUTER_RATE_MAX_AGE_H + 1 }), null);
+ok('a rate right at the age limit still counts',
+  openRouterRunwayAlarm({ ...RUNWAY, rateAgeHours: OPENROUTER_RATE_MAX_AGE_H })?.tier, 'low');
+ok('a stale rate does not silence a balance under the margin',
+  openRouterRunwayAlarm({ ...RUNWAY, balanceUsd: 1, rateAgeHours: 900 })?.tier, 'below_margin');
 
 // --- a plan that moved and lost nobody is not a shortfall (2026-10-24) ---
 // The live 10-23 shape: 150 planned, 148 sent, the two missing held for the next day by
