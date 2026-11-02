@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lead Run Debrief — 2026-11-02</title>
+<style>
+  :root {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+      --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+      --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+    --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+    --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 40px 22px 80px; }
+  .eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); font-weight: 600; }
+  h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.12; margin: 10px 0 6px; text-wrap: balance; letter-spacing: -.02em; }
+  h2 { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); margin: 44px 0 16px; font-weight: 700; }
+  h3 { font-size: 18px; margin: 0 0 6px; letter-spacing: -.01em; }
+  p { margin: 0 0 14px; }
+  .lede { font-size: 18px; color: var(--ink-soft); max-width: 68ch; }
+  .tag { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--amber-soft); color: var(--amber); letter-spacing: .02em; }
+  .tag.red { background: var(--red-soft); color: var(--red); }
+  .tag.good { background: var(--teal-soft); color: var(--teal); }
+  .grid { display: grid; gap: 14px; }
+  .stats { grid-template-columns: repeat(4, 1fr); margin-top: 26px; }
+  @media (max-width: 720px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; box-shadow: var(--shadow); }
+  .stat .n { font-size: 30px; font-weight: 750; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .stat .l { font-size: 12.5px; color: var(--ink-soft); margin-top: 3px; }
+  .stat .s { font-size: 12px; margin-top: 8px; font-weight: 600; }
+  .up { color: var(--good); } .down { color: var(--red); } .warn { color: var(--amber); }
+  .accent-red { border-left: 3px solid var(--red); }
+  .accent-teal { border-left: 3px solid var(--teal); }
+  .accent-amber { border-left: 3px solid var(--amber); }
+
+  .strip { display: flex; align-items: flex-end; gap: 3px; height: 130px; padding: 14px 14px 10px; overflow-x: auto; }
+  .bar { flex: 1 0 8px; min-width: 6px; border-radius: 2px 2px 0 0; background: var(--teal); opacity: .9; }
+  .bar.zero { background: var(--line); height: 4px !important; }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-soft); padding: 0 14px 14px; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+
+  .q { border-radius: 14px; padding: 20px 22px; margin-bottom: 14px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); }
+  .q .ask { font-size: 17px; font-weight: 700; color: var(--ink); margin-bottom: 10px; display: flex; gap: 10px; align-items: baseline; }
+  .q .ask .qn { color: var(--red); font-weight: 800; flex: 0 0 auto; }
+  .q p { color: var(--ink-soft); }
+  .q b { color: var(--ink); }
+  .pill { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink); background: var(--panel-2); padding: 1px 7px; border-radius: 6px; border: 1px solid var(--line); white-space: nowrap; }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; background: var(--panel-2); padding: 1px 5px; border-radius: 5px; border: 1px solid var(--line); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+  th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); }
+  td .num { font-variant-numeric: tabular-nums; font-weight: 650; }
+  .fix td:first-child { color: var(--good); font-weight: 650; }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); box-shadow: var(--shadow); margin-bottom: 14px; }
+  ol.recs { padding-left: 0; list-style: none; counter-reset: r; margin: 0; }
+  ol.recs li { counter-increment: r; position: relative; padding: 14px 16px 14px 52px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 10px; box-shadow: var(--shadow); }
+  ol.recs li::before { content: counter(r); position: absolute; left: 14px; top: 14px; width: 26px; height: 26px; border-radius: 8px; background: var(--teal-soft); color: var(--teal); font-weight: 800; font-size: 14px; display: grid; place-items: center; }
+  ol.recs b { color: var(--ink); }
+  .foot { margin-top: 46px; padding: 16px 18px; border-radius: 12px; background: var(--amber-soft); border: 1px solid var(--line); font-size: 14px; color: var(--ink-soft); }
+  .foot b { color: var(--ink); }
+  .muted { color: var(--ink-soft); font-size: 13.5px; }
+  pre { background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 14px; overflow-x: auto; font-size: 13px; line-height: 1.5; margin: 0 0 14px; }
+</style>
+
+<div class="wrap">
+
+  <div class="eyebrow">Lead Run Debrief · YouTube outreach</div>
+  <h1>2026-11-02 — a record 288 parked, then the paid lane ran out of people to look up</h1>
+  <p class="lede">Six paid batches parked <b>288 new people</b>, beating yesterday's record, and the enrichment chain turned <b>343 of them into finished bundles</b> with nothing failing. Then at 20:20Z the lane said it had nothing left to try, and said it again on five more ticks across twelve hours. <b>$31.34 of November's allowance is still sitting there, and it can't be spent.</b> The wall stopped being money. It's supply now.</p>
+  <div style="margin-top:14px"><span class="tag good">288 PARKED, A NEW RECORD</span> <span class="tag red">THE PAID BOOK IS FINISHED</span> <span class="tag">THE FLEET DOUBLED TO 118 MAILBOXES</span></div>
+
+  <div class="grid stats">
+    <div class="card stat accent-teal">
+      <div class="n">288</div>
+      <div class="l">people parked in approved_hold</div>
+      <div class="s up">7,077 → 7,365</div>
+    </div>
+    <div class="card stat accent-teal">
+      <div class="n">343</div>
+      <div class="l">leads enriched, none failed</div>
+      <div class="s up">shelf 5,341 → 5,684</div>
+    </div>
+    <div class="card stat accent-red">
+      <div class="n">12h</div>
+      <div class="l">with no candidate left to try</div>
+      <div class="s down">$21.34 spendable, unspendable</div>
+    </div>
+    <div class="card stat accent-amber">
+      <div class="n">67</div>
+      <div class="l">mailboxes clear to send</div>
+      <div class="s up">12 yesterday, fleet 58 → 118</div>
+    </div>
+  </div>
+
+  <h2>The shape of the day</h2>
+  <div class="card" style="padding:0">
+    <div class="strip" id="strip"></div>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--teal)"></span>six paid batches: 49, 50, 50, 45, 55, 37 people</span>
+      <span><span class="dot" style="background:var(--line)"></span>nothing left to look up, 12 hours</span>
+    </div>
+  </div>
+  <p class="muted">One bar per hour of the cycle, starting at <b>08:00Z</b>, and its height is how many people got parked in that hour. The first eleven hours did all the work. The last twelve did none, and not because anything broke: the lane had simply tried every qualified lead it had. The sixth batch is the tell. It asked for 100 channels and could only find <b>78</b>, which is what the bottom of a book looks like. Two hours later it found zero.</p>
+
+  <h2>The three questions</h2>
+
+  <div class="q accent-teal">
+    <div class="ask"><span class="qn">Q1</span><span>Where did 288 people come from, and why is that a record?</span></div>
+    <p><b>Six paid batches, and they reconcile exactly.</b> The lane scraped <b>578 already-known channels</b> for the business email YouTube publishes on the channel page, found <b>404 addresses</b>, ZeroBounce verified them, and flipped <b>286</b> into <code>approved_hold</code> for <b>$40.58</b>. The free half of the lane found the other <b>2</b>. That's 288, which is exactly what the lead table gained. Two independent instruments agreeing is worth noting, because a shelf drop and a park are easy to confuse.</p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Batch (UTC)</th><th>Channels</th><th>Addresses</th><th>Parked</th><th>Cost each</th></tr></thead>
+        <tbody>
+          <tr><td>08:20Z</td><td class="num">100</td><td class="num">74</td><td class="num">49</td><td class="num">$0.143</td></tr>
+          <tr><td>10:22Z</td><td class="num">100</td><td class="num">76</td><td class="num">50</td><td class="num">$0.140</td></tr>
+          <tr><td>12:22Z</td><td class="num">100</td><td class="num">64</td><td class="num">50</td><td class="num">$0.140</td></tr>
+          <tr><td>14:20Z</td><td class="num">100</td><td class="num">70</td><td class="num">45</td><td class="num">$0.156</td></tr>
+          <tr><td>16:20Z</td><td class="num">100</td><td class="num">71</td><td class="num">55</td><td class="num">$0.128</td></tr>
+          <tr><td>18:20Z</td><td class="num">78</td><td class="num">49</td><td class="num">37</td><td class="num">$0.148</td></tr>
+          <tr><td><b>total</b></td><td class="num"><b>578</b></td><td class="num"><b>404</b></td><td class="num"><b>286</b></td><td class="num"><b>$0.142 avg</b></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>Cost per person went <b>$0.112 to $0.142</b> against yesterday, which is the thinning the last debrief predicted. What it got wrong was the mechanism. It expected the lane's own price brake to stop things, two batches above $0.20 and it halts for the month. The brake never fired and the strike count is still <b>0</b>. The lane ran out of people first.</p>
+    <p>The free half found <b>2 people</b> out of 150 leads walked, on its <b>thirteenth lap</b> of an 1,813-lead book. Its own numbers say that's a picked-over book and not a fault: methods turned up <b>432 contact points of which 428 were already on file</b>, Brave refused <b>zero</b> searches, and the strict ownership gate threw out <b>47 of the 50</b> candidate websites it did find, which is the gate doing its job. Paid beat free <b>143 to 1</b>. Nobody should buy Brave credit or widen that batch on the strength of this.</p>
+  </div>
+
+  <div class="q accent-red">
+    <div class="ask"><span class="qn">Q2</span><span>There's $31 of allowance left. Why can't it be spent?</span></div>
+    <p><b>Because the lane has tried everybody.</b> Starting at <span class="pill">20:20Z</span> and on every tick after it, through <span class="pill">22:21Z</span>, <span class="pill">00:20Z</span>, <span class="pill">02:20Z</span>, <span class="pill">04:21Z</span> and <span class="pill">06:20Z</span>, the batch script answered the same sentence: <i>no qualified lead without an email that this lane has not already tried</i>. Six ticks, twelve hours, <b>$31.34 unspent</b> and <b>$21.34 spendable</b> after the reserve.</p>
+    <p>This flips yesterday's top recommendation on its head, so it's worth being blunt about. <b>Yesterday's debrief said to put $60 on OpenRouter because November's remaining allowance would deliver about 614 more people.</b> That number came from dividing dollars by price. It had no term for whether anybody was left to look up. There isn't. The honest projection is <b>0 more people</b> from that allowance until new leads arrive.</p>
+    <p>And the lane isn't dead, just finished. At <b>08:20Z this morning</b>, twenty minutes after the cycle closed, a batch found <b>2</b> new channels and parked both. So it now lives on new arrivals. With channel discovery paused since 2026-09-08, the only thing producing arrivals is the weekly sweep that re-scores channels crossing 3,000 subscribers. That sweep ran inside this cycle, at 06:48Z, and restamped <b>36,208 rows</b> while the population moved by <b>42</b>. A trickle, in other words.</p>
+    <p>One fix shipped for this and it's in the table below: the snapshot now publishes whether the lane stopped for want of candidates or for want of money, because those are opposite decisions and only one of them is answered by buying anything.</p>
+  </div>
+
+  <div class="q accent-amber">
+    <div class="ask"><span class="qn">Q3</span><span>Can the pipeline afford what's left, and what happens Monday?</span></div>
+    <p><b>The credit panic is smaller than it looks, and for a slightly uncomfortable reason.</b> OpenRouter is down to <b>$17.96</b> and the account spent <b>$24.17</b> over the last 25 hours, which reads as <b>0.7 days of runway</b>. The hourly alarm that shipped yesterday fired this morning saying 1.1 days, using a burn rate measured a day earlier.</p>
+    <p>But look at what that $24 bought. The chain enriched <b>343 leads at $0.064 each</b>, which is about <b>$22</b> of it. The burn <i>was</i> the record night. It doesn't continue on its own, because the pool is now <b>99.8% bundled</b>: roughly 15 of the 7,365 parked people still need enriching. At trickle rates, $17.96 buys about <b>280 more people</b>, and the lane can only supply a handful a day. So the credit lasts weeks rather than hours. Yesterday's $60 ask was sized for leads that aren't coming.</p>
+    <p><b>The fleet doubled, which is the biggest unflagged change in the snapshot.</b> InboxKit now reports <b>118 warmup mailboxes, all 118 of them SmartLead sending accounts</b>, where it reported 58 all last week. <b>64 mailboxes were handed a band on or after 11-01, and 58 of them landed clear.</b> Mailboxes clear to send went <b>12 to 67</b>. They aren't brand new either: each has <b>32 to 34 warmup emails</b> behind it, so they're past the fourteen-day warmup bar that pauses young inboxes.</p>
+    <p>On paper that's five times the sending capacity, and Monday is the first sending day since two consecutive zero-email weekdays. <b>The thing to watch is the exact fault that cost 10-29.</b> That day every mailbox in the plan came back with no campaign attached, because <code>list_campaigns()</code> returns an empty list for any failed SmartLead read with no retry and no error, and 62 approved people got no email. A mailbox that genuinely has no campaign yet picks up the same reason. Fifty-eight mailboxes nobody has planned with before is the highest-risk case for both shapes at once.</p>
+    <p><b>Neither send-path repair has shipped.</b> Checked directly this morning: <code>why_no_email()</code> still joins its <code>fails</code> list with no coercion, which is the TypeError that killed Friday, and <code>list_campaigns()</code> still swallows a failed read. Both live in <code>automator</code>, which this loop may not edit.</p>
+    <p>Quiet elsewhere. <b>No email sent, correctly</b>, because Sunday isn't a sending day and the snapshot says so instead of inventing a fault. <b>$0 of Anthropic spend, no fatal error signatures, no halt flag.</b> The stranded cohort holds at <b>4</b> people marked sent who were never emailed, down from 54 on 10-28. Discovery stayed at zero, which is Casey's standing instruction. The YouTube key pool reads 15 working of 66, expected and irrelevant while discovery is off.</p>
+  </div>
+
+  <h2>What broke → what's fixed</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Status</th><th>Problem</th><th>What changed</th></tr></thead>
+      <tbody>
+        <tr class="fix">
+          <td>FIXED</td>
+          <td><b>A lane with money left and nobody left to look up still promised 150 leads.</b> A tick that scrapes nothing still writes a run log, and the parser returned null for it, so all six of yesterday's idle ticks were invisible: they counted as no batch, and nothing published anywhere said whether the lane had stopped for want of candidates or for want of money. So the projection multiplied $21.34 of unspendable allowance into 303 channels and 150 people, and the new hourly alarm quoted that figure to argue the lane "will keep parking people this one cannot turn into anything writable", about a lane that had stopped parking anybody. Dollars divided by a price reads as a forecast.</td>
+          <td>The snapshot now carries <code>candidate_pool_dry</code>, <code>candidate_dry_streak</code>, <code>candidate_dry_since</code> and <code>idle_batches_in_cycle</code>, and a dry pool projects <b>0 leads</b> with <code>binding_constraint: candidate_supply</code>. That 0 is measured, not unknown, because the lane said so itself. One real scrape resets the streak, so this morning's 2-channel batch correctly clears it. The alarm needed no change: it reads the projection, so a $0 projected cost drops the false clause by itself. An unrecognised log shape stays null and never reads as dry. 11 new assertions, all selftests pass, typecheck clean. <span class="muted">orchestrator <code>4e93f53</code></span></td>
+        </tr>
+        <tr class="fix">
+          <td>HELD</td>
+          <td><b>Yesterday's two fixes both did their jobs.</b> The transcript gate had been naming a cancelled provider for a live provider's outage, and nothing watched the enrichment balance between midnights.</td>
+          <td>Nothing new shipped for either. The chain ran <b>10 batches and enriched 343 leads with zero failures</b> and no transcript gate holds at all, against 3 batches failing on one lead two days ago. The runway alarm fired on schedule at 08:11Z. <span class="muted">orchestrator <code>3b1902b</code>, <code>7ba82aa</code></span></td>
+        </tr>
+        <tr>
+          <td style="color:var(--amber);font-weight:650">WATCH</td>
+          <td><b>The runway alarm quotes a burn rate up to a day old.</b> It fired this morning reading 1.1 days off yesterday's measured $15.77, while this cycle's own fresher reading is $24.17 a day and 0.7 days. The gap is optimistic, which is the wrong direction for a warning.</td>
+          <td>Left alone on purpose. It's by design: the alarm deliberately reuses the debrief's measured rate rather than taking its own sample, because an hourly sample would corrupt the per-lead cost the whole budget projection runs on. The error is small and the tier was right. Worth revisiting only if a burn rate jumps like this again.</td>
+        </tr>
+        <tr>
+          <td style="color:var(--red);font-weight:650">NEEDS CASEY</td>
+          <td><b>Supply, and the two send-path repairs.</b> The paid lane has no candidates left and can't be restarted by spending. The 10-29 and 10-30 faults that cost two sending days are both still live in <code>automator</code>, and Monday runs against them with 58 mailboxes nobody has planned with before.</td>
+          <td>Neither is shippable from here. Restarting supply means lifting the discovery pause, which is Casey's call, and automator sits outside the five repos this loop may edit. Levers 1 and 2 below.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Recommended next — ranked</h2>
+  <ol class="recs">
+    <li><b>Decide about supply, because money can no longer buy leads.</b> This is the cycle's real finding and it replaces yesterday's top item. The paid lane has tried every qualified lead it has, $21.34 of allowance sits unspendable, and the only thing feeding it now is a weekly sweep that moved 42 rows. The two ways forward are lifting the discovery pause, which has been on since 2026-09-08 and is yours alone to lift, or accepting that the recovery lane is done for November and living off the 5,684 people already on the shelf. That shelf is the good news: at 200 emails a day it's about seven weeks of sending.</li>
+    <li><b>Watch Monday's plan for mailboxes with no campaign.</b> Fifty-eight warm mailboxes just arrived and clear capacity went 12 to 67, which is the first real chance to send at volume in two weeks. The risk is specific, not general: read <code>inboxes_only_no_campaign</code> in the morning's snapshot. If it's large, either SmartLead's campaign read failed again, the fault that cost 10-29, or the new mailboxes genuinely have no Siege campaign attached yet. The first is a code fix, the second is five minutes of setup, and they look identical in the plan.</li>
+    <li><b>Ship the two automator repairs.</b> Both are still exactly as they were on Friday. Coerce the non-string entries before the join in <code>why_no_email()</code>, guard the empty campaign list in <code>list_campaigns()</code> the way <code>list_accounts()</code> right below it already is, and stop the sample and report steps being able to block the push. Two unrelated faults inside 48 hours says the next one will be unrelated too, and all three cost a whole sending day.</li>
+    <li><b>Don't buy OpenRouter credit yet.</b> Yesterday's $60 was sized for 614 people who aren't coming. The pool is 99.8% bundled, so about 15 people still need enriching, and $17.96 covers roughly 280 at the measured $0.064 each. The $24-a-day burn was the record night and it stops with it. Revisit this the moment supply restarts, because then it becomes urgent fast, and the hourly alarm will say so.</li>
+  </ol>
+
+  <div class="foot">
+    <b>Grounding.</b> Numbers come from <code>logs/autopilot-debrief-2026-11-02.json</code> for the 24 hours to 2026-11-02T08:00Z, except: the per-batch figures and the six idle ticks, read from the <code>apify-endspec-*.log</code> run logs in youtube-email-outreach-v1; the fleet readings, from <code>automator/logs/inbox-health.log</code> and <code>state/inbox-health.json</code>; and the two unshipped repairs, read directly out of <code>automator/scripts/</code> this morning rather than inferred from the commit log. <b>One measurement gap worth knowing:</b> the clocks went back inside this cycle, so the window moved from 07:00Z to 08:00Z and the hour from 2026-11-01T07:00Z to 08:00Z belongs to neither this debrief nor yesterday's. No batch and no verify pass ran in it, so nothing measurable was lost. <b>Not verified:</b> whether the 58 new mailboxes have campaigns attached, which only Monday's plan answers, and whether the arrival trickle stays as thin as 2 a day.
+  </div>
+
+</div>
+
+<script>
+  // People parked per hour across the cycle, starting at 08:00Z. The six paid batches
+  // landed at 08:20, 10:22, 12:22, 14:20, 16:20 and 18:20 UTC. Every zero after the
+  // sixth bar is a real zero: the lane ran and found nobody left to try.
+  var parked = [49,0,50,0,50,0,45,0,55,0,37,0,0,0,0,0,0,0,0,0,0,0,0,0];
+  var max = 60;
+  var strip = document.getElementById('strip');
+  parked.forEach(function (n, i) {
+    var b = document.createElement('div');
+    b.className = 'bar' + (n === 0 ? ' zero' : '');
+    b.style.height = Math.round((n / max) * 100) + '%';
+    var h = (8 + i) % 24;
+    b.title = String(h).padStart(2, '0') + ':00Z — ' + n + ' parked';
+    strip.appendChild(b);
+  });
+</script>
+</html>
