@@ -1,4 +1,4 @@
-import { bulkRewriteShape, bandGateFacts, fleetFacts, inboxGateFacts, apifyBatchFacts, apifyLedgerLine, NO_PUSH_OUTCOME, normalizePushReason, offerFromBatchId, openRouterRunwayAlarm, OPENROUTER_RATE_MAX_AGE_H, siegeApprovedLeadIds, siegePlanLeadIds, siegePushOutcome, classifyKeyProbe, cyclePacificDay, costWindows, enrichmentChainFacts, isSendingDay, perEnrichedLeadCost, PER_LEAD_SAMPLE_FLOOR, projectRecoveryBudget, MAX_MISSING_DEBRIEFS, missingDebriefs, NO_UNIT, pushRunVerdict, siegeRunAlarm, unitStartedAt, sendPlanHealth, siegePlanFacts, summarizeSendLines, isVerifiedOrBeyond, laneYield, priorAdvanceSource, priorSeedsAdvanced, priorSeedsWalked, reconcileAdvanced, sessionSeedsAdvanced, sessionStartMs, walkRateTrend } from './debrief-data.ts';
+import { bulkRewriteShape, bandGateFacts, fleetFacts, inboxGateFacts, apifyBatchFacts, apifyIdleCause, apifyLedgerLine, NO_PUSH_OUTCOME, normalizePushReason, offerFromBatchId, openRouterRunwayAlarm, OPENROUTER_RATE_MAX_AGE_H, siegeApprovedLeadIds, siegePlanLeadIds, siegePushOutcome, classifyKeyProbe, cyclePacificDay, costWindows, enrichmentChainFacts, isSendingDay, perEnrichedLeadCost, PER_LEAD_SAMPLE_FLOOR, projectRecoveryBudget, MAX_MISSING_DEBRIEFS, missingDebriefs, NO_UNIT, pushRunVerdict, siegeRunAlarm, unitStartedAt, sendPlanHealth, siegePlanFacts, summarizeSendLines, isVerifiedOrBeyond, laneYield, priorAdvanceSource, priorSeedsAdvanced, priorSeedsWalked, reconcileAdvanced, sessionSeedsAdvanced, sessionStartMs, walkRateTrend } from './debrief-data.ts';
 import { MAX_SHELF_STRANDED_IDS, recoveredTally, shelfTally, type ShelfRow } from '../../src/db.ts';
 
 let fail = 0;
@@ -796,7 +796,8 @@ ok('remaining allowance priced in leads and then in OpenRouter dollars',
     recoveredInCycle: 244, channelsInCycle: 400,
     perLead: PER_LEAD_133, balanceUsd: 165.28,
   }),
-  { channels_affordable: 882, recovered_per_channel: 0.61, projected_leads: 538,
+  { channels_affordable: 882, binding_constraint: 'allowance', supply_bound: false,
+    recovered_per_channel: 0.61, projected_leads: 538,
     openrouter_usd_per_enriched_lead: 0.1468, per_lead_window_days: 1,
     per_lead_sample_leads: 133, per_lead_sample_spend_usd: 19.5239,
     per_lead_sample_floor: PER_LEAD_SAMPLE_FLOOR, per_lead_unmeasured: null,
@@ -828,8 +829,55 @@ ok('a drained allowance affords nothing and prices nothing',
   (() => { const p = projectRecoveryBudget({
     spendableUsd: -3.89, pricePerRun: 0.0702, recoveredInCycle: 244, channelsInCycle: 400,
     perLead: PER_LEAD_133, balanceUsd: 165.28,
-  }); return [p.channels_affordable, p.projected_leads, p.openrouter_cost_of_projected_leads_usd]; })(),
-  [0, 0, 0]);
+  }); return [p.channels_affordable, p.projected_leads, p.openrouter_cost_of_projected_leads_usd,
+    p.binding_constraint]; })(),
+  [0, 0, 0, 'allowance_spent']);
+
+// THE 2026-11-02 FAULT: money left, nothing left to spend it on. The lane finished
+// its book and answered `no_candidates` for twelve hours while this projected 150
+// leads off $21.34 of unspendable allowance, and the runway alarm quoted the figure
+// to argue the lane would keep parking people it had in fact stopped parking.
+ok('a finished book projects no leads however much allowance is left',
+  (() => { const p = projectRecoveryBudget({
+    spendableUsd: 21.34, pricePerRun: 0.0702, recoveredInCycle: 286, channelsInCycle: 578,
+    perLead: PER_LEAD_133, balanceUsd: 17.96, candidatePoolDry: true,
+  }); return [p.channels_affordable, p.projected_leads, p.openrouter_cost_of_projected_leads_usd,
+    p.binding_constraint, p.supply_bound, p.balance_covers_projected]; })(),
+  // The dollars stay honest (303 channels really are affordable); the leads do not.
+  // 0 is MEASURED, so the cost is $0 and the balance genuinely covers it.
+  [303, 0, 0, 'candidate_supply', true, true]);
+ok('a lane with candidates still projects off the allowance',
+  (() => { const p = projectRecoveryBudget({
+    spendableUsd: 21.34, pricePerRun: 0.0702, recoveredInCycle: 286, channelsInCycle: 578,
+    perLead: PER_LEAD_133, balanceUsd: 17.96, candidatePoolDry: false,
+  }); return [p.projected_leads, p.binding_constraint, p.supply_bound]; })(),
+  [150, 'allowance', false]);
+// An unmeasurable rate is unknown; a dry pool is measured. Dry must win, because the
+// lane itself said so and null would re-open the "unknown reads as long runway" hole.
+ok('a dry pool beats an unmeasurable recovery rate',
+  (() => { const p = projectRecoveryBudget({
+    spendableUsd: 61.92, pricePerRun: 0.0702, recoveredInCycle: null, channelsInCycle: 0,
+    perLead: PER_LEAD_133, balanceUsd: 165.28, candidatePoolDry: true,
+  }); return [p.recovered_per_channel, p.projected_leads, p.binding_constraint]; })(),
+  [null, 0, 'candidate_supply']);
+
+// apifyIdleCause — the two reasons a tick does nothing are opposite decisions.
+ok('the batch script refusing for want of candidates',
+  apifyIdleCause('Apify: plan STARTER, month $68.66 of $100.00 used, $31.34 left (cycle ends 2026-11-30)\n'
+    + 'This batch needs about $7.02 for 100 channels.\n'
+    + 'Nothing left to run: no qualified lead without an email that this lane has not already tried.\n'),
+  'no_candidates');
+ok('the loop resting on budget is not a dry book',
+  apifyIdleCause('resting: $10.00 left, $10 reserved, $0.00 spendable buys 0 channels'
+    + ' — under the 20 floor ($1.40) — waiting for the cycle to reset\n'),
+  'resting');
+ok('a real batch is neither idle shape',
+  apifyIdleCause('Scrape done: 74 found, 26 no email, 0 failed. Estimated Apify charge $7.02.\n'
+    + 'Recovered: 49 of 74 scraped addresses now in approved_hold (49 flipped here, 0 already parked).\n'),
+  null);
+// An unrecognised shape must never read as a dry pool: that would zero the projection
+// on a lane that is fine, which is the opposite of the fault above.
+ok('an unseen shape is unknown, not dry', apifyIdleCause('some new message nobody has seen\n'), null);
 
 // siegePushOutcome — `partial_push` has to say what it dropped and why (2026-10-06).
 const PUSH_LOG = [

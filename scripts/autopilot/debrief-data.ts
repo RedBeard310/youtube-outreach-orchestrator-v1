@@ -3291,6 +3291,37 @@ export function apifyLedgerLine(log: string): { used: number; cap: number; left:
 }
 
 /**
+ * Why an endspec tick did no work, when it did none.
+ *
+ * WHY (2026-11-02). A tick that scrapes nothing still writes a run log, and
+ * `apifyBatchFacts` returns null for it, so it was invisible: it did not count as a
+ * batch and nothing anywhere said the lane had stopped for want of candidates
+ * rather than for want of money. The two look identical in every published field
+ * and they are opposite decisions — one is answered by buying allowance, the other
+ * cannot be answered by buying anything.
+ *
+ * That mattered the morning this was written. The paid lane answered `no_candidates`
+ * on six consecutive ticks across twelve hours, having finished its book, with
+ * $31.34 of the November allowance unspent and unspendable. The projection below
+ * multiplied those dollars into 303 channels and 150 leads anyway, and the hourly
+ * runway alarm quoted that figure to argue the lane "will keep parking people this
+ * one cannot turn into anything writable" — about a lane that had stopped parking
+ * anybody. Dollars arithmetic with no supply term reads as a forecast.
+ *
+ * `no_candidates` is the batch script's own refusal (apify-endspec-batch.ts, empty
+ * cohort): every qualified lead without an email has already been tried, so the
+ * book is finished and only new arrivals can restart it. `resting` is the loop
+ * refusing on budget (apify-endspec-loop.sh), which the allowance fields already
+ * describe. Null means the log is neither: a real batch, or a shape not seen yet,
+ * and an unrecognised shape must never read as a dry pool.
+ */
+export function apifyIdleCause(log: string): 'no_candidates' | 'resting' | null {
+  if (/^Nothing left to run: no qualified lead without an email/m.test(log)) return 'no_candidates';
+  if (/^resting: \$.* waiting for the cycle to reset/m.test(log)) return 'resting';
+  return null;
+}
+
+/**
  * What one endspec batch scraped and what it actually recovered.
  *
  * `recovered` prefers the `Recovered:` line, which counts lead state and so
@@ -3614,20 +3645,29 @@ export function projectRecoveryBudget(input: {
   channelsInCycle: number;
   perLead: PerLeadCost;
   balanceUsd: number | null;
+  /** The lane's newest tick found no candidate left to try. Allowance it cannot
+   *  spend buys nothing, so the projection must not promise leads off it. */
+  candidatePoolDry?: boolean;
 }): Record<string, unknown> {
   const { spendableUsd, pricePerRun, recoveredInCycle, channelsInCycle, perLead } = input;
+  const dry = input.candidatePoolDry === true;
   const channels = spendableUsd !== null && spendableUsd > 0
     ? Math.floor(spendableUsd / pricePerRun)
     : 0;
   const perChannel = recoveredInCycle !== null && channelsInCycle > 0
     ? Number((recoveredInCycle / channelsInCycle).toFixed(4))
     : null;
-  const projectedLeads = perChannel !== null ? Math.round(channels * perChannel) : null;
+  // Supply, not money, when the book is finished: 0 is MEASURED (the lane said so
+  // itself on its newest tick), which is why it is 0 and not null. channels_affordable
+  // stays honest about the dollars; `binding_constraint` says which one is the wall.
+  const projectedLeads = dry ? 0 : perChannel !== null ? Math.round(channels * perChannel) : null;
   const enrichCost = projectedLeads !== null && perLead.usd !== null
     ? Number((projectedLeads * perLead.usd).toFixed(2))
     : null;
   return {
     channels_affordable: channels,
+    binding_constraint: dry ? 'candidate_supply' : channels > 0 ? 'allowance' : 'allowance_spent',
+    supply_bound: dry,
     recovered_per_channel: perChannel,
     projected_leads: projectedLeads,
     // Still an upper bound: ALL account spend in the window is charged to
@@ -3664,6 +3704,13 @@ function recoveryBudgetHealth(
   let recovered: number | null = null;
   let ledger: ReturnType<typeof apifyLedgerLine> = null;
   let ledgerAt: string | null = null;
+  let idleInCycle = 0;
+  // The trailing run of ticks that found no candidates, counted newest-backwards and
+  // deliberately NOT windowed: whether the book is finished is a question about the
+  // lane now, not about the cycle. Any tick that scraped ends the run.
+  let dryStreak = 0;
+  let drySince: string | null = null;
+  let dryNewest = false;
   const emailLogs = join(EMAIL_REPO, 'logs');
   if (existsSync(emailLogs)) {
     const names = readdirSync(emailLogs)
@@ -3679,13 +3726,21 @@ function recoveryBudgetHealth(
       // lane resting all month still has a real remaining balance worth reporting.
       const led = apifyLedgerLine(text);
       if (led) { ledger = led; ledgerAt = iso; }
-      if (iso < sinceISO || iso >= untilISO) continue;
       const f = apifyBatchFacts(text);
-      if (!f) continue;
+      if (f) {
+        // A tick that really scraped resets the run, so one new arrival cannot leave
+        // a twelve-hour streak standing behind it.
+        dryStreak = 0; drySince = null; dryNewest = false;
+      } else if (apifyIdleCause(text) === 'no_candidates') {
+        dryStreak++; drySince = drySince ?? iso; dryNewest = true;
+      }
+      if (iso < sinceISO || iso >= untilISO) continue;
+      if (!f) { if (apifyIdleCause(text) === 'no_candidates') idleInCycle++; continue; }
       batches++; channels += f.scraped; found += f.found;
       if (f.recovered !== null) recovered = (recovered ?? 0) + f.recovered;
     }
   }
+  const poolDry = dryNewest && dryStreak > 0;
 
   let chain = { batches: 0, leads_done: 0, leads_failed: 0, in_flight: 0 };
   let chainText = '';
@@ -3760,6 +3815,10 @@ function recoveryBudgetHealth(
       spendable_usd: spendable,
       halted,
       price_strikes: strikes,
+      idle_batches_in_cycle: idleInCycle,
+      candidate_pool_dry: poolDry,
+      candidate_dry_streak: dryStreak,
+      candidate_dry_since: drySince,
     },
     enrichment: chain,
     projection: projectRecoveryBudget({
@@ -3769,8 +3828,9 @@ function recoveryBudgetHealth(
       channelsInCycle: channels,
       perLead,
       balanceUsd: typeof openrouter.balance_usd === 'number' ? openrouter.balance_usd : null,
+      candidatePoolDry: poolDry,
     }),
-    note: 'Apify allowance read off the newest endspec run log (no token, no network) — `budget_read_at` is its age. `projection` turns the unspent allowance into leads at the cycle\'s measured recovery rate, then into the OpenRouter dollars those leads will cost to enrich, so the two budgets are decided together. `openrouter_usd_per_enriched_lead` charges ALL account spend to enrichment, so it is an upper bound, and it is the TIGHTEST bound of several trailing windows, each needing at least `per_lead_sample_floor` enriched leads and a real spend reading every day — read `per_lead_window_days` and `per_lead_sample_leads` with it. A single idle cycle cannot set it any more (one cycle enriching 1 lead priced it at $1.49 on 2026-10-26 and $3.74 on 10-10). Null plus `per_lead_unmeasured` means no window could carry a rate, which is unknown, NOT free. `halted`/`price_strikes` are the lane\'s own brake: 2 strikes stops it for the month.',
+    note: 'Apify allowance read off the newest endspec run log (no token, no network) — `budget_read_at` is its age. `projection` turns the unspent allowance into leads at the cycle\'s measured recovery rate, then into the OpenRouter dollars those leads will cost to enrich, so the two budgets are decided together. `openrouter_usd_per_enriched_lead` charges ALL account spend to enrichment, so it is an upper bound, and it is the TIGHTEST bound of several trailing windows, each needing at least `per_lead_sample_floor` enriched leads and a real spend reading every day — read `per_lead_window_days` and `per_lead_sample_leads` with it. A single idle cycle cannot set it any more (one cycle enriching 1 lead priced it at $1.49 on 2026-10-26 and $3.74 on 10-10). Null plus `per_lead_unmeasured` means no window could carry a rate, which is unknown, NOT free. `halted`/`price_strikes` are the lane\'s own brake: 2 strikes stops it for the month. READ `candidate_pool_dry` BEFORE READING `projection` AS A FORECAST (2026-11-02): a tick that scrapes nothing still writes a run log, and until this date one was invisible — it counted as no batch and nothing said whether the lane had stopped for want of candidates or for want of money. Those are opposite decisions and only one is answered by buying allowance. On 2026-11-02 the lane answered `no_candidates` on SIX consecutive ticks across twelve hours, having finished its book, with $31.34 of the November allowance unspent and unspendable, and this block projected 303 channels and 150 leads off those dollars anyway; the hourly runway alarm then quoted that figure to argue the lane "will keep parking people this one cannot turn into anything writable", about a lane that had stopped parking anybody. `candidate_pool_dry` is the newest tick refusing for want of candidates, `candidate_dry_streak` is how many consecutive ticks have done so (one is a flicker as the weekly floor sweep trickles arrivals in, six is a finished book), `candidate_dry_since` is when the run began, and `idle_batches_in_cycle` counts the ticks inside the window that did nothing. When the pool is dry `projection.projected_leads` is 0 and `projection.binding_constraint` reads `candidate_supply`: that 0 is MEASURED, not unknown, because the lane said so itself. A dry lane restarts only on new arrivals, so the lever is upstream supply and never more Apify money.',
   };
 }
 
