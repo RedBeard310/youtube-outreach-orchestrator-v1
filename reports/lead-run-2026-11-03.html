@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lead Run Debrief — 2026-11-03</title>
+<style>
+  :root {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+      --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+      --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+    --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+    --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 40px 22px 80px; }
+  .eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); font-weight: 600; }
+  h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.12; margin: 10px 0 6px; text-wrap: balance; letter-spacing: -.02em; }
+  h2 { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); margin: 44px 0 16px; font-weight: 700; }
+  h3 { font-size: 18px; margin: 0 0 6px; letter-spacing: -.01em; }
+  p { margin: 0 0 14px; }
+  .lede { font-size: 18px; color: var(--ink-soft); max-width: 68ch; }
+  .tag { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--amber-soft); color: var(--amber); letter-spacing: .02em; }
+  .tag.red { background: var(--red-soft); color: var(--red); }
+  .tag.good { background: var(--teal-soft); color: var(--teal); }
+  .grid { display: grid; gap: 14px; }
+  .stats { grid-template-columns: repeat(4, 1fr); margin-top: 26px; }
+  @media (max-width: 720px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; box-shadow: var(--shadow); }
+  .stat .n { font-size: 30px; font-weight: 750; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .stat .l { font-size: 12.5px; color: var(--ink-soft); margin-top: 3px; }
+  .stat .s { font-size: 12px; margin-top: 8px; font-weight: 600; }
+  .up { color: var(--good); } .down { color: var(--red); } .warn { color: var(--amber); }
+  .accent-red { border-left: 3px solid var(--red); }
+  .accent-teal { border-left: 3px solid var(--teal); }
+  .accent-amber { border-left: 3px solid var(--amber); }
+
+  .strip { display: flex; align-items: flex-end; gap: 3px; height: 130px; padding: 14px 14px 10px; overflow-x: auto; }
+  .bar { flex: 1 0 8px; min-width: 6px; border-radius: 2px 2px 0 0; background: var(--teal); opacity: .9; }
+  .bar.zero { background: var(--line); height: 4px !important; }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-soft); padding: 0 14px 14px; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+
+  .q { border-radius: 14px; padding: 20px 22px; margin-bottom: 14px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); }
+  .q .ask { font-size: 17px; font-weight: 700; color: var(--ink); margin-bottom: 10px; display: flex; gap: 10px; align-items: baseline; }
+  .q .ask .qn { color: var(--red); font-weight: 800; flex: 0 0 auto; }
+  .q p { color: var(--ink-soft); }
+  .q b { color: var(--ink); }
+  .pill { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink); background: var(--panel-2); padding: 1px 7px; border-radius: 6px; border: 1px solid var(--line); white-space: nowrap; }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; background: var(--panel-2); padding: 1px 5px; border-radius: 5px; border: 1px solid var(--line); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+  th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); }
+  td .num { font-variant-numeric: tabular-nums; font-weight: 650; }
+  .fix td:first-child { color: var(--good); font-weight: 650; }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); box-shadow: var(--shadow); margin-bottom: 14px; }
+  ol.recs { padding-left: 0; list-style: none; counter-reset: r; margin: 0; }
+  ol.recs li { counter-increment: r; position: relative; padding: 14px 16px 14px 52px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 10px; box-shadow: var(--shadow); }
+  ol.recs li::before { content: counter(r); position: absolute; left: 14px; top: 14px; width: 26px; height: 26px; border-radius: 8px; background: var(--teal-soft); color: var(--teal); font-weight: 800; font-size: 14px; display: grid; place-items: center; }
+  ol.recs b { color: var(--ink); }
+  .foot { margin-top: 46px; padding: 16px 18px; border-radius: 12px; background: var(--amber-soft); border: 1px solid var(--line); font-size: 14px; color: var(--ink-soft); }
+  .foot b { color: var(--ink); }
+  .muted { color: var(--ink-soft); font-size: 13.5px; }
+  pre { background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 14px; overflow-x: auto; font-size: 13px; line-height: 1.5; margin: 0 0 14px; }
+</style>
+
+<div class="wrap">
+
+  <div class="eyebrow">Lead Run Debrief · YouTube outreach</div>
+  <h1>2026-11-03 — 107 people heard from us for the first time ever, after a week that reached two</h1>
+  <p class="lede">The shelf has held about 5,500 researched, written-up people for weeks and almost none of them were getting emailed: the whole week before this cycle reached <b>two</b> new people. On Monday the send path handed <b>123 slots to people who had never heard from us</b>, and <b>107</b> of them got an email. <b>The starvation was never about supply.</b> Also: the push log lost a whole batch, and the snapshot called six people lost who had already been written to.</p>
+  <div style="margin-top:14px"><span class="tag good">107 NEW PEOPLE REACHED</span> <span class="tag red">THE PUSH LOG LOST A BATCH</span> <span class="tag">124 MAILBOXES, 12 OF THEM LIVE</span></div>
+
+  <div class="grid stats">
+    <div class="card stat accent-teal">
+      <div class="n">107</div>
+      <div class="l">people emailed for the first time</div>
+      <div class="s up">2 across the whole prior week</div>
+    </div>
+    <div class="card stat accent-teal">
+      <div class="n">116</div>
+      <div class="l">emails sent of 123 planned</div>
+      <div class="s up">5 people lost, not 11</div>
+    </div>
+    <div class="card stat accent-amber">
+      <div class="n">12</div>
+      <div class="l">mailboxes live, of 124 in the fleet</div>
+      <div class="s warn">36 on a day-12 warmup clock</div>
+    </div>
+    <div class="card stat accent-red">
+      <div class="n">5</div>
+      <div class="l">people parked in approved_hold</div>
+      <div class="s down">paid lane dry 11 ticks running</div>
+    </div>
+  </div>
+
+  <h2>The shape of the day</h2>
+  <div class="card" style="padding:0">
+    <div class="strip" id="strip"></div>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--teal)"></span>emails the send ledger recorded: 94, then 21</span>
+      <span><span class="dot" style="background:var(--line)"></span>the other 22 hours of the cycle</span>
+    </div>
+  </div>
+  <p class="muted">One bar per hour of the cycle, starting at <b>08:00Z</b>, and its height is how many emails the send ledger recorded in that hour. The whole day happened in <b>75 minutes</b>, between 11:37Z and 12:03Z. That is not a fault, it is what one Siege push looks like. But it means the day's whole outcome rests on one run, and a step that dies inside that run costs everything. That is exactly what happened on 10-29 and again on 10-30.</p>
+
+  <h2>The three questions</h2>
+
+  <div class="q accent-teal">
+    <div class="ask"><span class="qn">Q1</span><span>Did we actually reach new people, or is this another backlog finally flying?</span></div>
+    <p><b>New people. All 107 of them.</b> This matters because the two look identical in the raw count, and in the 10-28 cycle 50 of 51 "first touches" were stranded leads from two weeks earlier being re-sent. Not here: <code>first_touch_recovered</code> is <span class="pill">0</span>, so nobody in this group had ever been planned before, and <code>shelf_first_touch</code> is <span class="pill">107</span>, so every one came off <code>approved_hold</code>, which is the only thing that drains the shelf.</p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th></th><th>Prior 7 days</th><th>This cycle</th></tr></thead>
+        <tbody>
+          <tr><td>People emailed</td><td class="num">253</td><td class="num">115</td></tr>
+          <tr><td>First touches</td><td class="num">61</td><td class="num">107</td></tr>
+          <tr><td><b>Genuinely new people</b></td><td class="num">2</td><td class="num"><b>107</b></td></tr>
+          <tr><td>First-touch share</td><td class="num">24.1%</td><td class="num">93%</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>For scale: the eight days ending 10-29 reached <b>five</b> new people in total. <b>What changed isn't in this repo.</b> Siege hands slots out by tier, and since 10-13 the top tier's re-offer queue had taken every one of them. On Monday the slots went to never-emailed people instead. The queue is not drained. <span class="pill">2,259</span> ready people still waited, 982 of them in that top tier. But it moved.</p>
+  </div>
+
+  <div class="q accent-red">
+    <div class="ask"><span class="qn">Q2</span><span>The snapshot said 11 people were lost. Were they?</span></div>
+    <p><b>Five were. The other six had already been emailed, and the push log simply never said so.</b></p>
+    <p>The field that answers "who was planned and got nothing" works by joining Siege's plan against Siege's <b>log</b>, and a log is narration, not a record. On 11-02 it lost a whole block: the push batch that ran at <b>11:37:55Z</b> printed its working lines, no header, and no <code>SENT</code> lines at all. Two of the people it emailed appear <b>nowhere in the file</b>.</p>
+    <p>Six leads in total had a real row in the send ledger, with the sending mailbox, offer and batch id all matching the plan, and no <code>SENT</code> line anywhere. So the join called every one of them lost.</p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th></th><th>Published yesterday</th><th>Real</th></tr></thead>
+        <tbody>
+          <tr><td>People emailed</td><td class="num">110</td><td class="num"><b>116</b></td></tr>
+          <tr><td>People lost</td><td class="num">11</td><td class="num"><b>5</b></td></tr>
+          <tr><td>…SmartLead refused them</td><td class="num">3</td><td class="num">3</td></tr>
+          <tr><td>…we declined to send</td><td class="num">3</td><td class="num">0</td></tr>
+          <tr><td>…nothing was said about them</td><td class="num">5</td><td class="num">2</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>Three of the six wore a disguise this pipeline has met before: a later batch bumped into them and printed <code>SKIP … is absent from this batch's Siege manifest</code>. That is exactly what a skip-after-send looks like, except the <code>SENT</code> line that normally cancels it was the missing one, so they were filed as drafts we turned down.</p>
+    <p><b>Two independent instruments now agree.</b> Siege's own database rows for the day read 116 pushed, 3 failed, 2 dropped. And every email in the cycle that wasn't this repo's own send reads <span class="pill">116</span> against <span class="pill">116</span> emailed. The old arithmetic could produce neither number.</p>
+  </div>
+
+  <div class="q accent-amber">
+    <div class="ask"><span class="qn">Q3</span><span>The fleet doubled to 124 mailboxes. Why did 12 do the sending?</span></div>
+    <p>Yesterday's second recommendation was to check one field on Monday, because 58 brand-new mailboxes with no campaign attached and a failed SmartLead read look identical in the plan. It answered: <span class="pill">23</span> mailboxes were otherwise fit to send and sat out purely for want of a Siege campaign. That's the harmless version: about twenty minutes of setup, not a code fault.</p>
+    <p>But 23 doesn't explain 112 mailboxes sitting out, and nothing published the rest. The plan had it all along:</p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Mailboxes</th><th>Why they couldn't send</th></tr></thead>
+        <tbody>
+          <tr><td class="num">77</td><td>suspended in SmartLead</td></tr>
+          <tr><td class="num">60</td><td>no Siege campaign yet</td></tr>
+          <tr><td class="num"><b>36</b></td><td><b>on warmup day 8, and the floor is day 12</b></td></tr>
+          <tr><td class="num">6</td><td>not in the InboxKit warmup list, so their age is unknown</td></tr>
+          <tr><td class="num">6</td><td>on hold until a date years out</td></tr>
+          <tr><td class="num">5</td><td>health watch, follow-ups only, waiting out the 48-hour recovery clock</td></tr>
+          <tr><td class="num">2</td><td>health stop, scores of 37 and 37.8 against a floor of 80</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="muted">A mailbox can carry more than one reason, so these add up to more than the 112 that sat out.</p>
+    <p><b>The 36 are a timer, four days from lifting themselves.</b> They also settle a contradiction in this morning's numbers: the health gate reads <b>63 clear mailboxes</b> and the plan reads <b>12 live</b>. Those are two different gates measuring two different things. One bands on deliverability, the other suspends on age. <b>So "63 clear" is not sending capacity</b>, and yesterday's "roughly five times the capacity" read it as if it were.</p>
+    <p>Real capacity this cycle was <b>180 messages a day</b> against an 870 ramp, with 104 follow-ups already owed. The ceiling was 123 slots, and the push used every one.</p>
+  </div>
+
+  <h2>What broke, and what's fixed</h2>
+  <div class="tablewrap">
+    <table class="fix">
+      <thead><tr><th>Status</th><th>What</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>FIXED</td>
+          <td><b>The push's loss is now joined against the send ledger.</b> A lead with a real send row was emailed, whatever the log printed, and a new field names how many the log never mentioned, because that is a logging fault in the send path, not a lead problem. Deliberately one-way: the ledger can only move somebody <em>out</em> of the loss, never into it, so a partial read can't invent one. Orchestrator <code>99d48ed</code>.</td>
+        </tr>
+        <tr>
+          <td>FIXED</td>
+          <td><b>The plan now says which gate held each idle mailbox.</b> Every reason in the plan's own mailbox list, biggest first, with the per-mailbox numbers stripped out so one fact about the fleet is one row instead of four. Same commit.</td>
+        </tr>
+        <tr>
+          <td>OPEN</td>
+          <td><b>Something made <code>siege.log</code> drop a batch's lines.</b> Two people were emailed with no trace in the file at all. The debrief is immune to it now, but that log is the only record of what was sent to each person, and a silent gap there is worse than a miscounted loss. Lives in <code>automator</code>, which this loop may not edit. Likely suspect, unproven: concurrent push batches writing one file.</td>
+        </tr>
+        <tr>
+          <td>OPEN</td>
+          <td><b>Six people are stamped as sent and have never been emailed</b> (up from 4). The two newcomers were stamped on 10-23, have no send row, and have been planned <b>five times</b> since 10-07, including Monday, where the approval gate correctly held them for the next day. That corrects a note this report has carried since 10-28: a stamped lead is <em>not</em> invisible to Siege's planner. These keep getting planned; they just never make the approved list. Recovering them means reverting a stamp, which belongs to the send path.</td>
+        </tr>
+        <tr>
+          <td>OPEN</td>
+          <td><b>The two <code>automator</code> repairs are still unshipped</b>: the coercion that cost Friday 10-30 its whole sending day, and the empty-campaign-list guard that cost 10-29. Unchanged for four days.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>What else the cycle did</h2>
+  <div class="tablewrap">
+    <table>
+      <tbody>
+        <tr>
+          <td><b>5 people parked.</b> <code>approved_hold</code> went 7,365 to 7,370. The paid Apify lane has now answered <em>no candidates left to try</em> on <b>11 consecutive ticks</b>, with <b>$31.20 of November's $100 unspent</b> and unspendable. Yesterday's fix reports this correctly rather than projecting leads off the money: 0 projected, cause named as supply. One real batch ran, scraped 2 channels and recovered both at $0.07 each.</td>
+        </tr>
+        <tr>
+          <td><b>The free recovery lane is picked over, not broken.</b> Lap 14 of an 1,807-lead book; 4 people gained an address. The pass found 473 contact points and <b>470 were already on file</b>. 37 Brave searches with <b>zero refusals</b>, so nothing was refused for want of credit, and the strict ownership gate threw out all 29 candidate websites it found. That gate is deliberate and no amount of search credit changes it.</td>
+        </tr>
+        <tr>
+          <td><b>Enrichment is essentially finished:</b> 3 batches, 4 leads, 0 failures, because <b>99.8% of the pool is already bundled</b>. That is why the OpenRouter burn collapsed from $24.17 a day to <b>$1.98</b>, and the $15.99 balance now reads as <b>8.1 days</b> of runway instead of 0.7. Yesterday's "don't buy credit yet" held exactly.</td>
+        </tr>
+        <tr>
+          <td><b>Quiet elsewhere.</b> $0 Anthropic spend, no fatal errors, no halt flag. Discovery stayed at zero, which is Casey's standing instruction since 2026-09-08. The YouTube key pool reads 15 working of 66, which is expected and irrelevant while discovery is off.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>What to do next</h2>
+  <ol class="recs">
+    <li><b>Attach Siege campaigns to the 23 idle-but-fit mailboxes.</b> They were ready to send and sent nothing. It's setup, not code, and it's the only capacity available before Friday.</li>
+    <li><b>Wait four days for the 36 warmup mailboxes, and stop reading the health gate's "clear" count as capacity.</b> They cross the day-12 floor around 11-06 and lift themselves. Nothing to spend, nothing to fix.</li>
+    <li><b>Find out why the push log dropped a batch's lines.</b> Two people were emailed with no record of what they were sent. The counting is safe now; the audit trail isn't.</li>
+    <li><b>Decide about supply.</b> Unchanged from yesterday and now a week old: the paid lane has tried every qualified lead it has, $21.20 sits unspendable, and the only feed left is the weekly 3,000-subscriber sweep. Either lift the discovery pause, which is Casey's call alone, or live off the shelf, which at Monday's pace is about <b>seven weeks</b> of first touches.</li>
+    <li><b>Ship the two <code>automator</code> repairs.</b> Three different single-step failures have each cost a whole sending day in the last six days. The next one will be unrelated too.</li>
+  </ol>
+
+  <div class="foot">
+    <b>Grounding.</b> Numbers come from <code>logs/autopilot-debrief-2026-11-03.json</code> for the 24 hours to 2026-11-03T08:00Z, regenerated after this morning's fix so the push figures are the corrected ones. Read directly rather than inferred: the per-mailbox reasons, from <code>automator/state/siege/2026-11-02/plan.json</code>; the six unlogged sends and the stranded pair, from <code>leads.outreach_sends</code> and <code>leads.siege_plan</code> by hand; and the missing push-batch block, from <code>automator/logs/siege.log</code>. <b>Not verified:</b> why the log lost that block (concurrent batches writing one file is the obvious suspect, and it is unproven); whether the 36 warmup mailboxes clear on schedule; and whether Monday's tier behaviour repeats, which is what decides whether 107 was a turn or a one-off.
+  </div>
+
+</div>
+
+<script>
+  // Emails the send ledger recorded per hour across the cycle, starting at 08:00Z.
+  // The whole day was one Siege push: 94 rows in the 11:00Z hour, 21 in the 12:00Z hour.
+  // Every other bar is a real zero.
+  var sends = [0,0,0,94,21,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];
+  var max = 100;
+  var strip = document.getElementById('strip');
+  sends.forEach(function (n, i) {
+    var b = document.createElement('div');
+    b.className = 'bar' + (n === 0 ? ' zero' : '');
+    b.style.height = Math.round((n / max) * 100) + '%';
+    var h = (8 + i) % 24;
+    b.title = String(h).padStart(2, '0') + ':00Z — ' + n + ' emails';
+    strip.appendChild(b);
+  });
+</script>
+</html>
