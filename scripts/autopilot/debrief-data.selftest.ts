@@ -1,4 +1,4 @@
-import { bulkRewriteShape, bandGateFacts, fleetFacts, inboxGateFacts, apifyBatchFacts, apifyIdleCause, apifyLedgerLine, NO_PUSH_OUTCOME, normalizePushReason, offerFromBatchId, openRouterRunwayAlarm, OPENROUTER_RATE_MAX_AGE_H, siegeApprovedLeadIds, siegePlanLeadIds, siegePushOutcome, classifyKeyProbe, cyclePacificDay, costWindows, enrichmentChainFacts, isSendingDay, perEnrichedLeadCost, PER_LEAD_SAMPLE_FLOOR, projectRecoveryBudget, MAX_MISSING_DEBRIEFS, missingDebriefs, NO_UNIT, pushRunVerdict, siegeRunAlarm, unitStartedAt, sendPlanHealth, siegePlanFacts, summarizeSendLines, isVerifiedOrBeyond, laneYield, priorAdvanceSource, priorSeedsAdvanced, priorSeedsWalked, reconcileAdvanced, sessionSeedsAdvanced, sessionStartMs, walkRateTrend } from './debrief-data.ts';
+import { bulkRewriteShape, bandGateFacts, condenseInboxReason, notLiveReasonTally, fleetFacts, inboxGateFacts, apifyBatchFacts, apifyIdleCause, apifyLedgerLine, NO_PUSH_OUTCOME, normalizePushReason, offerFromBatchId, openRouterRunwayAlarm, OPENROUTER_RATE_MAX_AGE_H, siegeApprovedLeadIds, siegePlanLeadIds, siegePushOutcome, classifyKeyProbe, cyclePacificDay, costWindows, enrichmentChainFacts, isSendingDay, perEnrichedLeadCost, PER_LEAD_SAMPLE_FLOOR, projectRecoveryBudget, MAX_MISSING_DEBRIEFS, missingDebriefs, NO_UNIT, pushRunVerdict, siegeRunAlarm, unitStartedAt, sendPlanHealth, siegePlanFacts, summarizeSendLines, isVerifiedOrBeyond, laneYield, priorAdvanceSource, priorSeedsAdvanced, priorSeedsWalked, reconcileAdvanced, sessionSeedsAdvanced, sessionStartMs, walkRateTrend } from './debrief-data.ts';
 import { MAX_SHELF_STRANDED_IDS, recoveredTally, shelfTally, type ShelfRow } from '../../src/db.ts';
 
 let fail = 0;
@@ -237,6 +237,9 @@ ok('plan facts read off the real shape',
     mailbox_capacity: 30, followups_due: 14, inboxes_full: 0,
     waiting_for_a_slot: null, waiting_by_tier: null,
     inboxes_total: 3, inboxes_no_campaign: 0, inboxes_only_no_campaign: 0,
+    inboxes_not_live: 1, not_live_reasons: [{ count: 1, reason: 'no reason given' }],
+    not_live_top_reason: 'no reason given', not_live_top_reason_count: 1,
+    not_live_top_reason_pct: 100,
     plan_generated_at: null });
 ok('blocked offers count as an array too',
   siegePlanFacts({ summary: { offer_problems: [{ offer: 'a' }] } }).offers_blocked, 1);
@@ -249,6 +252,9 @@ ok('a dead inbox owes no follow-ups we can act on either',
     mailbox_capacity: 0, followups_due: 0, inboxes_full: 0,
     waiting_for_a_slot: null, waiting_by_tier: null,
     inboxes_total: 1, inboxes_no_campaign: 0, inboxes_only_no_campaign: 0,
+    inboxes_not_live: 1, not_live_reasons: [{ count: 1, reason: 'no reason given' }],
+    not_live_top_reason: 'no reason given', not_live_top_reason_count: 1,
+    not_live_top_reason_pct: 100,
     plan_generated_at: null });
 // THE 2026-10-12 SHAPE: the healthiest fleet of the week and the worst new-person
 // volume of the week, because follow-ups outran the whole allowance. The slot count
@@ -270,6 +276,9 @@ ok('follow-ups eating the fleet is readable, not just the small slot count',
     mailbox_capacity: 45, followups_due: 55, inboxes_full: 2,
     waiting_for_a_slot: null, waiting_by_tier: null,
     inboxes_total: 3, inboxes_no_campaign: 0, inboxes_only_no_campaign: 0,
+    inboxes_not_live: 0, not_live_reasons: [],
+    not_live_top_reason: null, not_live_top_reason_count: null,
+    not_live_top_reason_pct: null,
     plan_generated_at: null });
 ok('a renamed key costs one null, not the block',
   siegePlanFacts({ summary: { day_cap: 'oops' }, assignments: [1] }),
@@ -278,6 +287,9 @@ ok('a renamed key costs one null, not the block',
     mailbox_capacity: null, followups_due: null, inboxes_full: null,
     waiting_for_a_slot: null, waiting_by_tier: null,
     inboxes_total: null, inboxes_no_campaign: null, inboxes_only_no_campaign: null,
+    inboxes_not_live: null, not_live_reasons: null,
+    not_live_top_reason: null, not_live_top_reason_count: null,
+    not_live_top_reason_pct: null,
     plan_generated_at: null });
 // THE 2026-10-16 SHAPE: every slot went to the tier that had already heard from us,
 // and 949 ready people below it waited. The plan carried that all along.
@@ -305,6 +317,61 @@ ok('a plan with no waiting block costs nulls, not the plan',
     return [f.waiting_for_a_slot, f.waiting_by_tier, f.plan_found];
   })(),
   [null, null, true]);
+// THE 2026-11-03 SHAPE: the fleet doubled to 124 mailboxes, 12 were live, and the only
+// published reason looked for one cause. The plan's own inbox list held all of them, and
+// the biggest was a timer. Reasons verbatim from automator's 11-02 plan.
+const NOT_LIVE_PLAN = {
+  summary: {
+    day: '2026-11-02',
+    inboxes: [
+      { live: true, free_before_fill: 10, message_per_day: 15, followups_due: 5 },
+      { live: false, why_not: 'suspended in SmartLead; on warmup day 8, and the floor is day 12' },
+      { live: false, why_not: 'suspended in SmartLead; on warmup day 9, and the floor is day 12' },
+      { live: false, why_not: 'suspended in SmartLead; no Siege campaign yet' },
+      { live: false, why_not: 'no Siege campaign yet' },
+      { live: false, why_not: 'health watch: follow-ups only (recovering: clean reading, 3h of 48h at 90+)' },
+      { live: false, why_not: 'health watch: follow-ups only (recovering: clean reading, 5h of 48h at 90+)' },
+    ],
+  },
+};
+ok('every reason a mailbox sat out is rolled up, largest first, numbers condensed out',
+  (() => {
+    const f = siegePlanFacts(NOT_LIVE_PLAN);
+    return [f.inboxes_total, f.live_inboxes, f.inboxes_not_live, f.not_live_reasons];
+  })(),
+  [7, 1, 6, [
+    { count: 3, reason: 'suspended in SmartLead' },
+    { count: 2, reason: 'health watch: follow-ups only (recovering: clean reading, Nh of Nh at N+)' },
+    { count: 2, reason: 'no Siege campaign yet' },
+    { count: 2, reason: 'on warmup day N, and the floor is day N' },
+  ]]);
+ok('the largest reason carries its share of the mailboxes that could not send',
+  (() => {
+    const f = siegePlanFacts(NOT_LIVE_PLAN);
+    return [f.not_live_top_reason, f.not_live_top_reason_count, f.not_live_top_reason_pct];
+  })(),
+  ['suspended in SmartLead', 3, 50]);
+// The 10-12 rule one level over: a key that keeps a per-mailbox number splits one fact
+// about the fleet into a row per mailbox, and each row then looks too small to chase.
+ok('condensing is what makes 36 warmup mailboxes one row instead of four',
+  condenseInboxReason('on warmup day 8, and the floor is day 12'),
+  'on warmup day N, and the floor is day N');
+ok('a mailbox disqualified with no reason is still counted, or the rows stop adding up',
+  (() => {
+    const f = siegePlanFacts({ summary: { inboxes: [{ live: false }, { live: false, why_not: '' }] } });
+    return [f.inboxes_not_live, f.not_live_reasons];
+  })(),
+  [2, [{ count: 2, reason: 'no reason given' }]]);
+ok('no inbox list reads as unknown, never as a fleet with nothing wrong',
+  (() => {
+    const f = siegePlanFacts({ summary: { day: '2026-11-02' } });
+    return [f.inboxes_not_live, f.not_live_reasons, f.not_live_top_reason_pct];
+  })(),
+  [null, null, null]);
+ok('a mailbox carrying two reasons is counted under both, so the rows sum above the fleet',
+  notLiveReasonTally([{ live: false, why_not: 'a; b' }]),
+  { notLive: 1, reasons: [{ count: 1, reason: 'a' }, { count: 1, reason: 'b' }],
+    top: 'a', topCount: 1, topPct: 100 });
 ok('garbage is no plan', siegePlanFacts('nope').plan_found, false);
 ok('null is no plan', siegePlanFacts(null).plan_found, false);
 
@@ -1064,6 +1131,50 @@ ok('a lead planned into two batches is one person, counted once',
 ok('NO_PUSH_OUTCOME carries the join as unmeasured too',
   [NO_PUSH_OUTCOME.planned_leads, NO_PUSH_OUTCOME.people_lost, NO_PUSH_OUTCOME.lost_ids],
   [null, null, []]);
+
+// 2026-11-03: the log is the push's narration, not its record. On 11-02 a whole
+// push-batch block printed no header and no SENT lines, and six people with real send
+// rows were published as lost. Two of those shapes, verbatim: one the log never mentioned
+// at all, and one it mentioned only as a later batch's manifest SKIP.
+const LEDGER_LOG = [
+  '[2026-11-02T11:37:08Z]   |   SENT  recLOGGED1AAAAAAA    a@b.com  smartlead_lead=1',
+  // recUNLOGGED2 was emailed in the batch whose block lost its lines. No line here.
+  // recSKIPONLY3 was emailed too, then re-encountered by a later batch.
+  '[2026-11-02T12:02:54Z]   |   SKIP  recSKIPONLY3CCCCC    is absent from this batch\'s Siege manifest',
+  // recGONE4 really was lost: SmartLead refused it and no send row exists.
+  '[2026-11-02T11:40:00Z]   |   FAIL  recGONE4DDDDDDDDD    SmartLead did not add the lead (bounce_count=1)',
+].join('\n');
+const LEDGER_PLANNED = ['recLOGGED1AAAAAAA', 'recUNLOGGED2BBBBB', 'recSKIPONLY3CCCCC', 'recGONE4DDDDDDDDD'];
+const LEDGER_SENT = ['recLOGGED1AAAAAAA', 'recUNLOGGED2BBBBB', 'recSKIPONLY3CCCCC'];
+const LEDGERED = siegePushOutcome(LEDGER_LOG, '2026-11-02T08:00:00.000Z', '2026-11-03T08:00:00.000Z',
+  LEDGER_PLANNED, null, LEDGER_SENT);
+ok('a send row is an email however little the log said about it',
+  [LEDGERED.planned_leads, LEDGERED.people_emailed, LEDGERED.people_lost, LEDGERED.lost_ids],
+  [4, 3, 1, ['recGONE4DDDDDDDDD']]);
+ok('what the log dropped is named, because that is a fault in the send path\'s logging',
+  [LEDGERED.emailed_unlogged, LEDGERED.emailed_unlogged_ids],
+  [2, ['recUNLOGGED2BBBBB', 'recSKIPONLY3CCCCC']]);
+ok('a skip after a send whose SENT line went missing still cost a draft, not a person',
+  [LEDGERED.skipped, LEDGERED.skipped_then_sent, LEDGERED.lost_to_skip],
+  [1, 1, 0]);
+// The exact overstatement: the same log and plan with no ledger is what shipped before.
+ok('without the ledger this is the old log-only join, and it says so with a null',
+  (() => { const p = siegePushOutcome(LEDGER_LOG, '2026-11-02T08:00:00.000Z',
+    '2026-11-03T08:00:00.000Z', LEDGER_PLANNED);
+    return [p.people_lost, p.lost_silently, p.lost_to_skip, p.emailed_unlogged]; })(),
+  [3, 1, 1, null]);
+// Additive on purpose: a ledger reading can only ever move somebody out of the loss.
+ok('a ledger that knows nothing about the plan cannot invent a loss',
+  (() => { const p = siegePushOutcome(LEDGER_LOG, '2026-11-02T08:00:00.000Z',
+    '2026-11-03T08:00:00.000Z', LEDGER_PLANNED, null, []);
+    return [p.people_lost, p.emailed_unlogged]; })(),
+  [3, 0]);
+ok('the ledger does not re-credit somebody the approval held for tomorrow',
+  (() => { const p = siegePushOutcome(LEDGER_LOG, '2026-11-02T08:00:00.000Z',
+    '2026-11-03T08:00:00.000Z', LEDGER_PLANNED, ['recLOGGED1AAAAAAA', 'recGONE4DDDDDDDDD'],
+    LEDGER_SENT);
+    return [p.approved_leads, p.deferred_unapproved, p.people_lost, p.emailed_unlogged]; })(),
+  [2, 2, 1, 0]);
 
 // 2026-10-22: the approval trim. The push run rebuilds the plan, so plan.json can hold
 // people the morning's approval never covered; Siege holds those for tomorrow and they

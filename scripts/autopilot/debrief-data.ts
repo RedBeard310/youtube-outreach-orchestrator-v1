@@ -17,6 +17,7 @@ import {
   bulkStatusWriteRollup,
   reviewStatusPopulation,
   countShelf,
+  sentLeadIdsBetween,
   getLeadsDiscoveredSince,
   type BulkRewriteRoll,
   type BulkStatusWrite,
@@ -84,6 +85,18 @@ export type SiegePlanFacts = {
   /** Mailboxes whose ONLY disqualification was the missing campaign — they were
    *  otherwise fit to send and sent nothing. See campaignGapTally(). */
   inboxes_only_no_campaign: number | null;
+  /** Mailboxes in the plan that could not send at all. `inboxes_total` minus
+   *  `live_inboxes`. See notLiveReasonTally() for why the count alone argues nothing. */
+  inboxes_not_live: number | null;
+  /** Why they could not, largest first, with the per-mailbox numbers condensed out so one
+   *  reason is one row. A mailbox can carry several, so these sum above
+   *  `inboxes_not_live`. Capped at 10 rows. */
+  not_live_reasons: Array<{ count: number; reason: string }> | null;
+  /** The largest row above, and its share of `inboxes_not_live`, so a fleet held by one
+   *  thing reads differently from one held by a dozen. */
+  not_live_top_reason: string | null;
+  not_live_top_reason_count: number | null;
+  not_live_top_reason_pct: number | null;
   /** When Siege wrote the plan file we just read. NOT the start of the day: the file is
    *  overwritten in place, so a re-plan late at night replaces the morning's fleet
    *  snapshot and every number above describes the fleet AT THIS STAMP. See the
@@ -108,6 +121,11 @@ const NO_PLAN: SiegePlanFacts = {
   inboxes_total: null,
   inboxes_no_campaign: null,
   inboxes_only_no_campaign: null,
+  inboxes_not_live: null,
+  not_live_reasons: null,
+  not_live_top_reason: null,
+  not_live_top_reason_count: null,
+  not_live_top_reason_pct: null,
   plan_generated_at: null,
 };
 
@@ -161,6 +179,82 @@ export function campaignGapTally(
     if (i.live !== true && parts.length === 1) only += 1;
   }
   return { total: inboxes.length, noCampaign, only };
+}
+
+/** How many rows the not-live roll-up publishes. Same cap-and-name rule as everywhere. */
+export const MAX_NOT_LIVE_REASONS = 10;
+
+/** WHY 124 MAILBOXES SENT FROM 12 AND NOTHING SAID WHICH GATE HELD THE REST (2026-11-03).
+ *
+ *  The fleet doubled over the weekend — 58 mailboxes to 124 — and the 11-02 debrief read
+ *  the band gate's 67 clear mailboxes as "roughly five times the sending capacity,
+ *  arriving the day before the first sending day in two weeks". Monday's plan carried
+ *  **12 live inboxes**. The 11-02 lever said to read `inboxes_only_no_campaign`, which
+ *  answered one part (23 mailboxes sat out for want of a Siege campaign and nothing else)
+ *  and could not answer the rest, because that field only ever looks for one reason.
+ *
+ *  The plan has the whole answer and no field published it: 77 suspended in SmartLead, 60
+ *  with no Siege campaign, and **36 "on warmup day 8, and the floor is day 12"** — a timer,
+ *  four days from lifting itself, which is why the band gate and the plan disagreed. The
+ *  band gate bands on health; the old warmup gate in youtube-email-outreach-v1 suspends on
+ *  age. `band_normal` is therefore not sendable capacity, and reading it as capacity is the
+ *  2026-10-18 lesson (two instruments, one subtraction) in a new place.
+ *
+ *  Condense the per-mailbox numbers out, for the reason the 10-12 method-cause fix exists:
+ *  a key that keeps a per-row token splits one cause into many small rows. "on warmup day
+ *  8, and the floor is day 12" and "...day 9..." are one fact about the fleet. Digits
+ *  collapse to N, so these arrive as a single row of 36 rather than four rows of nine.
+ *
+ *  A mailbox can carry several reasons, so the rows sum above `inboxes_not_live` — stated
+ *  in the field doc, because a reader who adds them up must not think the fleet is bigger
+ *  than it is. Null, not empty, when the plan carries no inbox list. */
+export function notLiveReasonTally(
+  inboxes: Array<Record<string, unknown>> | null,
+): {
+  notLive: number | null;
+  reasons: Array<{ count: number; reason: string }> | null;
+  top: string | null;
+  topCount: number | null;
+  topPct: number | null;
+} {
+  if (inboxes === null) return { notLive: null, reasons: null, top: null, topCount: null, topPct: null };
+  const notLive = inboxes.filter((i) => i.live !== true);
+  const counts = new Map<string, number>();
+  for (const i of notLive) {
+    const why = typeof i.why_not === 'string' ? i.why_not : '';
+    const parts = why.split('; ').map((p) => p.trim()).filter(Boolean);
+    // A mailbox the plan disqualified without saying why still has to be countable, or
+    // the rows silently stop adding up to the fleet.
+    if (parts.length === 0) parts.push('no reason given');
+    for (const p of new Set(parts.map(condenseInboxReason))) {
+      counts.set(p, (counts.get(p) ?? 0) + 1);
+    }
+  }
+  const rows = [...counts.entries()]
+    .map(([reason, count]) => ({ count, reason }))
+    .sort((a, b) => b.count - a.count || a.reason.localeCompare(b.reason));
+  const top = rows[0] ?? null;
+  return {
+    notLive: notLive.length,
+    reasons: rows.slice(0, MAX_NOT_LIVE_REASONS),
+    top: top?.reason ?? null,
+    topCount: top?.count ?? null,
+    topPct: top && notLive.length > 0 ? Math.round((top.count / notLive.length) * 100) : null,
+  };
+}
+
+/** Drop the per-mailbox tokens so one reason is one row: warmup days, health scores,
+ *  recovery hours, hold dates. Same rule as the method-cause condenser in the email repo,
+ *  and the same 120-character cap every reason string here carries. */
+export function condenseInboxReason(raw: string): string {
+  return raw
+    // A separator only disappears INSIDE a number (a date, a score), never after one:
+    // swallowing the comma in "on warmup day 8, and the floor is day 12" rewrote the
+    // sentence as well as condensing it.
+    .replace(/\d+(?:[.,:/-]\d+)*/g, 'N')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 120);
 }
 
 // Pure so the selftest can feed it a hand-built plan. Every field is optional on the
@@ -246,6 +340,13 @@ export function siegePlanFacts(raw: unknown): SiegePlanFacts {
     inboxes_total: campaignGapTally(inboxes).total,
     inboxes_no_campaign: campaignGapTally(inboxes).noCampaign,
     inboxes_only_no_campaign: campaignGapTally(inboxes).only,
+    // And every OTHER reason a mailbox sat out, which the field above cannot carry and
+    // which is what the 11-02 fleet question turned on. See notLiveReasonTally().
+    inboxes_not_live: notLiveReasonTally(inboxes).notLive,
+    not_live_reasons: notLiveReasonTally(inboxes).reasons,
+    not_live_top_reason: notLiveReasonTally(inboxes).top,
+    not_live_top_reason_count: notLiveReasonTally(inboxes).topCount,
+    not_live_top_reason_pct: notLiveReasonTally(inboxes).topPct,
     plan_generated_at: typeof s.generated_at === 'string' ? s.generated_at : null,
   };
 }
@@ -945,8 +1046,17 @@ export type SiegePushOutcome = {
   lost_to_fail: number | null;
   /** ...of which we declined to offer them (a SKIP and no SENT anywhere). */
   lost_to_skip: number | null;
-  /** ...of which the log said NOTHING about at all. No SENT, no FAIL, no SKIP. */
+  /** ...of which the log said NOTHING about at all. No SENT, no FAIL, no SKIP, and no
+   *  send row in the ledger either. */
   lost_silently: number | null;
+  /** People the log never printed a SENT for and the send ledger says were emailed
+   *  anyway. These are NOT lost, and the count is how much of the push's own narration
+   *  went missing. Null when the ledger could not be read, which is the log-only join
+   *  that shipped before 2026-11-03 — see sentLeadIdsBetween() in src/db.ts. */
+  emailed_unlogged: number | null;
+  /** Those people, named, capped at 12. A nonzero count is a logging fault in the send
+   *  path, not a lead problem: check the batch's block in automator/logs/siege.log. */
+  emailed_unlogged_ids: string[];
   /** Those people, named, so the morning is one grep and not a hand-written join.
    *  Capped at 12. */
   lost_ids: string[];
@@ -989,6 +1099,8 @@ export const NO_PUSH_OUTCOME: SiegePushOutcome = {
   lost_to_fail: null,
   lost_to_skip: null,
   lost_silently: null,
+  emailed_unlogged: null,
+  emailed_unlogged_ids: [],
   lost_ids: [],
   skipped_then_sent: null,
   skipped_unplanned: null,
@@ -1255,7 +1367,21 @@ export function sendPlanHealth(
       'inboxes_only_no_campaign, NOT inboxes_no_campaign: a mailbox already suspended ' +
       'picks the reason up too when the list blanks and proves nothing, while one ' +
       'carrying it alone is a slot the day really lost. All three are null, not 0, when ' +
-      'the plan has no inbox list. DO NOT READ band_stop AS THE CAUSE ON SUCH A DAY: on ' +
+      'the plan has no inbox list. AND READ not_live_reasons FOR EVERY OTHER REASON A ' +
+      'MAILBOX SAT OUT (2026-11-03): the two campaign fields look for one reason, so a ' +
+      'fleet held by something else reads as a mystery. The fleet doubled to 124 mailboxes ' +
+      'over the 11-01 weekend and the 11-02 debrief read the band gate\'s 67 clear ones as ' +
+      '"roughly five times the sending capacity"; Monday\'s plan carried 12 live inboxes. ' +
+      'The plan held the answer all along — 77 suspended in SmartLead, 60 with no Siege ' +
+      'campaign, and 36 "on warmup day N, and the floor is day N", a timer four days from ' +
+      'lifting itself. So band_normal is NOT sendable capacity: the band gate bands on ' +
+      'health and the older warmup gate in youtube-email-outreach-v1 suspends on age, and ' +
+      'reading one as the other is the 10-18 two-instruments lesson in a new place. The ' +
+      'rows condense per-mailbox numbers to N so one fact is one row (the 10-12 rule), ' +
+      'largest first, capped at 10, and a mailbox can carry several so they sum ABOVE ' +
+      'inboxes_not_live. not_live_top_reason_pct is the largest row\'s share, which is how ' +
+      'a fleet held by one thing reads differently from one held by a dozen. Null, not ' +
+      'empty, when the plan has no inbox list. DO NOT READ band_stop AS THE CAUSE ON SUCH A DAY: on ' +
       '10-29 it read 48 stopped and looked like a sick fleet, and the twelve mailboxes ' +
       'that could have sent were nowhere in it. ' +
       'binding_constraint:nothing_lost means the plan moved and the push\'s own ' +
@@ -1333,6 +1459,23 @@ export function sendPlanHealth(
       'figure, and deferred_logged is Siege\'s own count of them so the files and the run ' +
       'cannot silently disagree. Null, not zero, when the approval files are missing or the ' +
       'approval is for another day or another sample: the trim is unknowable then. ' +
+      'AND THE PUSH LOG IS NARRATION, NOT A RECORD — emailed_unlogged IS WHAT IT DROPPED ' +
+      '(2026-11-03): every counter in push_outcome reads log lines, and on 2026-11-02 the ' +
+      'log lost a whole batch. The push-batch block at 11:37:55Z printed its spin and fix ' +
+      'lines with no header and no SENT lines at all, and two of the people it emailed ' +
+      'appear nowhere in the file. Six leads had a real leads.outreach_sends row — sending ' +
+      'inbox, offer and batch id all matching the plan — and no SENT, so the join called ' +
+      'them lost: people_lost read 11 on a cycle that lost 5, and lost_ids named six people ' +
+      'to chase who had already been written to. Three of them wore the 10-20 disguise, ' +
+      'printing a later SKIP for being absent from another batch\'s manifest, which is what ' +
+      'a skip-after-send looks like when the SENT that cancels it is the missing line. The ' +
+      'join now also reads the send ledger, which the code path that really posts to ' +
+      'SmartLead writes and siege_live.py deletes on a withdrawal, so it is true in both ' +
+      'directions. emailed_unlogged is how many people the log never mentioned and the ' +
+      'ledger did, which is a LOGGING fault in the send path and not a lead problem: read ' +
+      'that batch\'s block in automator/logs/siege.log. It is additive on purpose — the ' +
+      'ledger can only move somebody out of the loss, never into it — and null when the ' +
+      'ledger cannot be read, which is the log-only join that shipped before this date. ' +
       'AND READ send_plan.fleet BEFORE READING ANY OF THE ABOVE AS A SHORTFALL (2026-10-15): ' +
       'it carries the fleet\'s day-over-day move, which nothing did until then. Over the ' +
       'three cycles after the record 782-email push the plan read 57 live inboxes and an ' +
@@ -1505,13 +1648,36 @@ export function sendPlanHealth(
  *  excluded from every `lost_*` figure, and `deferred_logged` carries Siege's own count of
  *  them so the file read and the run cannot silently disagree. Null, not zero, when the
  *  approval files are missing or stale — then the trim's size is unknown and the old
- *  arithmetic is all there is. */
+ *  arithmetic is all there is.
+ *
+ *  AND THE LOG IS THE PUSH'S NARRATION, NOT ITS RECORD (2026-11-03). Every counter above
+ *  reads lines, and on 2026-11-02 the log lost a batch. The push-batch block at 11:37:55Z
+ *  printed its `spin` and `fix` lines with no header and no `SENT` lines at all, and two
+ *  of the people it emailed appear nowhere in the whole file. Six leads had a real
+ *  `leads.outreach_sends` row — sending inbox, offer and batch id all matching the plan —
+ *  and no `SENT`, so this join called every one of them lost. It published
+ *  `people_lost: 11` for a cycle that lost 5, and `lost_ids` named six people to chase
+ *  who had already been written to.
+ *
+ *  It wore the 10-20 disguise too: three of the six were re-encountered by a later batch
+ *  and printed `SKIP ... is absent from this batch's Siege manifest`, which is exactly
+ *  what a skip-after-send looks like — except the SENT line that normally cancels it was
+ *  the missing one, so `skipped_then_sent` could not see them and they counted as
+ *  `lost_to_skip`.
+ *
+ *  So join the ledger as well. A lead with a send row inside the window was emailed,
+ *  whatever the log printed, and `emailed_unlogged` is how many of those the log never
+ *  mentioned — a logging fault in the send path, worth seeing on its own. Deliberately
+ *  additive: the ledger can only ever move somebody OUT of the loss, never into it, so a
+ *  partial read cannot invent a loss. Null when it cannot be read at all, and then this is
+ *  the log-only join that shipped before. */
 export function siegePushOutcome(
   log: string,
   sinceISO: string,
   untilISO: string,
   plannedIds: string[] | null = null,
   approvedIds: string[] | null = null,
+  ledgerSentIds: string[] | null = null,
 ): SiegePushOutcome {
   const since = Date.parse(sinceISO);
   const until = Date.parse(untilISO);
@@ -1619,11 +1785,19 @@ export function siegePushOutcome(
   const asked = planned === null
     ? null
     : deferred === null ? planned : planned.filter((id) => !deferred.includes(id));
-  const lost = asked === null ? null : asked.filter((id) => !sentIds.has(id));
+  // The send ledger, which cannot lose a line the way the log can. Additive only: it
+  // moves people out of the loss, never into it.
+  const ledger = ledgerSentIds === null ? null : new Set(ledgerSentIds);
+  const wasEmailed = (id: string) => sentIds.has(id) || (ledger?.has(id) ?? false);
+  const lost = asked === null ? null : asked.filter((id) => !wasEmailed(id));
+  const unlogged = asked === null || ledger === null
+    ? null
+    : asked.filter((id) => !sentIds.has(id) && ledger.has(id));
   const join = planned === null || asked === null || lost === null
     ? {
       planned_leads: null, people_emailed: null, people_lost: null,
       lost_to_fail: null, lost_to_skip: null, lost_silently: null,
+      emailed_unlogged: null, emailed_unlogged_ids: [],
       lost_ids: [], skipped_then_sent: null, skipped_unplanned: null,
       approved_leads: approved === null ? null : approved.size,
       deferred_unapproved: null, deferred_ids: [],
@@ -1638,10 +1812,14 @@ export function siegePushOutcome(
       lost_to_fail: lost.filter((id) => failedIds.has(id)).length,
       lost_to_skip: lost.filter((id) => !failedIds.has(id) && skippedIds.has(id)).length,
       lost_silently: lost.filter((id) => !failedIds.has(id) && !skippedIds.has(id)).length,
+      emailed_unlogged: unlogged === null ? null : unlogged.length,
+      emailed_unlogged_ids: (unlogged ?? []).slice(0, 12),
       // Named, because the loss is usually one or two people and a name is actionable
       // where a count is not. Capped for the same reason everything else here is.
       lost_ids: lost.slice(0, 12),
-      skipped_then_sent: [...skippedIds].filter((id) => sentIds.has(id)).length,
+      // Ledger-aware for the same reason the loss is: a skip after a send whose SENT line
+      // went missing is still a skip that cost a draft and not a person.
+      skipped_then_sent: [...skippedIds].filter((id) => wasEmailed(id)).length,
       skipped_unplanned: (() => {
         const inPlan = new Set(planned);
         return [...skippedIds].filter((id) => !inPlan.has(id)).length;
@@ -1846,6 +2024,7 @@ function readSiegePushOutcome(
   untilISO: string,
   plannedIds: string[] | null = null,
   approvedIds: string[] | null = null,
+  ledgerSentIds: string[] | null = null,
 ): SiegePushOutcome {
   const f = join(AUTOMATOR_REPO, 'logs', 'siege.log');
   if (!existsSync(f)) return NO_PUSH_OUTCOME;
@@ -1853,7 +2032,7 @@ function readSiegePushOutcome(
     const whole = readFileSync(f, 'utf8');
     const lines = whole.split('\n');
     const tail = lines.slice(Math.max(0, lines.length - 20000)).join('\n');
-    return siegePushOutcome(tail, sinceISO, untilISO, plannedIds, approvedIds);
+    return siegePushOutcome(tail, sinceISO, untilISO, plannedIds, approvedIds, ledgerSentIds);
   } catch {
     return NO_PUSH_OUTCOME;
   }
@@ -4025,6 +4204,10 @@ async function main(): Promise<void> {
   // countFirstTouchBetween() for the two cycles that printed a lossless push beside a
   // shelf that had not moved one person, and said nothing.
   const firstTouch = await countFirstTouchBetween(sinceISO, untilISO).catch(() => null);
+  // Who the send ledger says really got an email, for the push's per-person join. Same
+  // fail-soft rule: without it the join falls back to reading the push log alone, which
+  // is what it did until 2026-11-03 and what overstated that cycle's loss by six people.
+  const ledgerSentIds = await sentLeadIdsBetween(sinceISO, untilISO).catch(() => null);
   // A NOTE THAT SAYS "THIS CYCLE" MUST MEAN THIS CYCLE (2026-10-23). The sentence below
   // teaching how to read the pair froze 2026-10-17's own figures into its wording and
   // re-stated them every cycle after as "1.3% this cycle against 68.7% over the prior
@@ -4295,6 +4478,10 @@ async function main(): Promise<void> {
       untilISO,
       readSiegePlanLeadIds(cycleDay),
       readSiegeApprovedLeadIds(cycleDay),
+      // And the send ledger, because the log can lose a batch's SENT lines and did on
+      // 2026-11-02. Fail-soft: without it the join is log-only, which is what shipped
+      // before. See sentLeadIdsBetween() in src/db.ts.
+      ledgerSentIds,
     ),
     // Which step of the oneshot died, when one did — see the binding ladder.
     readSiegeApprovalRecorded(cycleDay),

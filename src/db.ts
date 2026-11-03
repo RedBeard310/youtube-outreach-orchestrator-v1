@@ -725,6 +725,43 @@ export async function countShelf(): Promise<ShelfTally> {
   }
 }
 
+/**
+ * Every lead the send ledger says got an email inside the window.
+ *
+ * WHY THIS EXISTS (2026-11-03). `push_outcome` joins Siege's plan against Siege's LOG,
+ * and the log is the push's narration rather than its record. On 2026-11-02 it lost a
+ * whole push-batch block: the batch at 11:37:55Z printed its `spin` and `fix` lines and
+ * no header and no `SENT` lines at all, and two of the leads it emailed
+ * (`recIpRyMfqQuZyuZL`, `recKmOXpQYaGoYHBA`) appear NOWHERE in the file. Six people in
+ * total had a real `leads.outreach_sends` row — with a sending inbox, an offer and a
+ * batch id matching the plan — and no `SENT` line, so the join called them lost. The
+ * snapshot published `people_lost: 11` on a cycle that lost 5, and named six leads to
+ * chase who had already been emailed. Three of the six had been re-encountered by a later
+ * batch and printed a `SKIP ... absent from this batch's Siege manifest`, which is the
+ * 10-20 shape wearing a different hat: a skip AFTER a send that the send's own line was
+ * missing to cancel.
+ *
+ * The ledger cannot have this failure mode. A row here is written by the code path that
+ * really posted the lead to SmartLead, and `siege_live.py` deletes the row when it
+ * withdraws somebody, so it stays true in both directions (see countShelf above, which
+ * already grounds `emailed` on it for the same reason).
+ *
+ * Window, not lifetime: a lead emailed last week and planned again today must still be
+ * able to count as lost today. Returns ids and never counts, because the join needs
+ * membership. One statement, no model, fail-soft at the call site — a throw here costs
+ * the cross-check and leaves the log-only join standing, which is what shipped before.
+ */
+export async function sentLeadIdsBetween(sinceISO: string, untilISO: string): Promise<string[]> {
+  const rows = await query<{ lead_id: string }>(
+    `SELECT DISTINCT s.lead_id
+       FROM leads.outreach_sends s
+      WHERE s.sent_at >= $1 AND s.sent_at < $2
+        AND s.lead_id IS NOT NULL`,
+    [sinceISO, untilISO],
+  );
+  return rows.map((r) => r.lead_id);
+}
+
 export type BulkStatusWrite = {
   /** The second every row in the cluster shares, which is what makes it one statement. */
   at: string;
