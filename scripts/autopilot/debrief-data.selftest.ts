@@ -1,4 +1,4 @@
-import { bulkRewriteShape, bandGateFacts, condenseInboxReason, notLiveReasonTally, fleetFacts, inboxGateFacts, apifyBatchFacts, apifyIdleCause, apifyLedgerLine, NO_PUSH_OUTCOME, normalizePushReason, offerFromBatchId, openRouterRunwayAlarm, OPENROUTER_RATE_MAX_AGE_H, siegeApprovedLeadIds, siegePlanLeadIds, siegePushOutcome, classifyKeyProbe, cyclePacificDay, costWindows, enrichmentChainFacts, isSendingDay, perEnrichedLeadCost, PER_LEAD_SAMPLE_FLOOR, projectRecoveryBudget, MAX_MISSING_DEBRIEFS, missingDebriefs, NO_UNIT, pushRunVerdict, siegeRunAlarm, unitStartedAt, sendPlanHealth, siegePlanFacts, summarizeSendLines, isVerifiedOrBeyond, laneYield, priorAdvanceSource, priorSeedsAdvanced, priorSeedsWalked, reconcileAdvanced, sessionSeedsAdvanced, sessionStartMs, walkRateTrend } from './debrief-data.ts';
+import { bulkRewriteShape, bandGateFacts, condenseInboxReason, notLiveReasonMoves, notLiveReasonTally, splitInboxReasons, fleetFacts, inboxGateFacts, apifyBatchFacts, apifyIdleCause, apifyLedgerLine, NO_PUSH_OUTCOME, normalizePushReason, offerFromBatchId, openRouterRunwayAlarm, OPENROUTER_RATE_MAX_AGE_H, siegeApprovedLeadIds, siegePlanLeadIds, siegePushOutcome, classifyKeyProbe, cyclePacificDay, costWindows, enrichmentChainFacts, isSendingDay, perEnrichedLeadCost, PER_LEAD_SAMPLE_FLOOR, projectRecoveryBudget, MAX_MISSING_DEBRIEFS, missingDebriefs, NO_UNIT, pushRunVerdict, siegeRunAlarm, unitStartedAt, sendPlanHealth, siegePlanFacts, summarizeSendLines, isVerifiedOrBeyond, laneYield, priorAdvanceSource, priorSeedsAdvanced, priorSeedsWalked, reconcileAdvanced, sessionSeedsAdvanced, sessionStartMs, walkRateTrend } from './debrief-data.ts';
 import { MAX_SHELF_STRANDED_IDS, recoveredTally, shelfTally, type ShelfRow } from '../../src/db.ts';
 
 let fail = 0;
@@ -237,7 +237,7 @@ ok('plan facts read off the real shape',
     mailbox_capacity: 30, followups_due: 14, inboxes_full: 0,
     waiting_for_a_slot: null, waiting_by_tier: null,
     inboxes_total: 3, inboxes_no_campaign: 0, inboxes_only_no_campaign: 0,
-    inboxes_not_live: 1, not_live_reasons: [{ count: 1, reason: 'no reason given' }],
+    inboxes_not_live: 1, not_live_reasons: [{ count: 1, reason: 'no reason given', example: 'no reason given' }],
     not_live_top_reason: 'no reason given', not_live_top_reason_count: 1,
     not_live_top_reason_pct: 100,
     plan_generated_at: null });
@@ -252,7 +252,7 @@ ok('a dead inbox owes no follow-ups we can act on either',
     mailbox_capacity: 0, followups_due: 0, inboxes_full: 0,
     waiting_for_a_slot: null, waiting_by_tier: null,
     inboxes_total: 1, inboxes_no_campaign: 0, inboxes_only_no_campaign: 0,
-    inboxes_not_live: 1, not_live_reasons: [{ count: 1, reason: 'no reason given' }],
+    inboxes_not_live: 1, not_live_reasons: [{ count: 1, reason: 'no reason given', example: 'no reason given' }],
     not_live_top_reason: 'no reason given', not_live_top_reason_count: 1,
     not_live_top_reason_pct: 100,
     plan_generated_at: null });
@@ -340,11 +340,61 @@ ok('every reason a mailbox sat out is rolled up, largest first, numbers condense
     return [f.inboxes_total, f.live_inboxes, f.inboxes_not_live, f.not_live_reasons];
   })(),
   [7, 1, 6, [
-    { count: 3, reason: 'suspended in SmartLead' },
-    { count: 2, reason: 'health watch: follow-ups only (recovering: clean reading, Nh of Nh at N+)' },
-    { count: 2, reason: 'no Siege campaign yet' },
-    { count: 2, reason: 'on warmup day N, and the floor is day N' },
+    { count: 3, reason: 'suspended in SmartLead', example: 'suspended in SmartLead' },
+    { count: 2, reason: 'health watch: follow-ups only (recovering: clean reading, Nh of Nh at N+)',
+      example: 'health watch: follow-ups only (recovering: clean reading, 3h of 48h at 90+)' },
+    { count: 2, reason: 'no Siege campaign yet', example: 'no Siege campaign yet' },
+    { count: 2, reason: 'on warmup day N, and the floor is day N',
+      example: 'on warmup day 8, and the floor is day 12' },
   ]]);
+// WHY THE example MATTERS (2026-11-04): the condensed row is identical on both mornings,
+// and the raw strings are five days apart on the floor Casey raised 12 -> 14 on 11-02.
+// The 11-03 debrief read the row and published the wrong clearing date off it.
+ok('a condensed row keeps one raw example, so the wait is still readable',
+  notLiveReasonTally([
+    { live: false, why_not: 'on warmup day 9, and the floor is day 14' },
+    { live: false, why_not: 'on warmup day 9, and the floor is day 14' },
+  ]).reasons,
+  [{ count: 2, reason: 'on warmup day N, and the floor is day N',
+     example: 'on warmup day 9, and the floor is day 14' }]);
+// A REASON LIST MUST NOT SPLIT INSIDE A PARENTHESIS (2026-11-04). Verbatim from the 11-02
+// plan: the health gate's own reason carries a second "; " inside its brackets, and the
+// 11-03 snapshot published the tail of it as its own row of 2 naming no gate at all.
+ok('a semicolon inside a parenthetical stays inside its reason',
+  splitInboxReasons(
+    'health stop: suspended by inbox-health.py (score 37.8 under 80; 7 of 11 warmup emails in spam in 3 days); SmartLead did not say'),
+  ['health stop: suspended by inbox-health.py (score 37.8 under 80; 7 of 11 warmup emails in spam in 3 days)',
+   'SmartLead did not say']);
+ok('so that mailbox is counted under two reasons, not three',
+  notLiveReasonTally([{ live: false,
+    why_not: 'health stop: suspended by inbox-health.py (score 37.8 under 80; 7 of 11 warmup emails in spam in 3 days); SmartLead did not say' }])
+    .reasons?.map((r) => [r.count, r.reason]),
+  [[1, 'health stop: suspended by inbox-health.py (score N under N; N of N warmup emails in spam in N days)'],
+   [1, 'SmartLead did not say']]);
+ok('an unclosed bracket still splits at the end rather than swallowing the rest',
+  splitInboxReasons('health stop (score 37 under 80; a; b'),
+  ['health stop (score 37 under 80; a; b']);
+// WHICH GATE MOVED (2026-11-04). The real 11-02 -> 11-03 move: the fleet lost 2 live
+// inboxes and 30 messages a day, and the totals cannot say that 24 mailboxes fell out of
+// the InboxKit warmup list while SmartLead suspended 13 more.
+ok('only the reasons that moved are published, largest move first',
+  notLiveReasonMoves(
+    [{ count: 90, reason: 'suspended in SmartLead' },
+     { count: 30, reason: 'not in the InboxKit warmup list, so its age is unknown' },
+     { count: 36, reason: 'on warmup day N, and the floor is day N' }],
+    [{ count: 77, reason: 'suspended in SmartLead' },
+     { count: 6, reason: 'not in the InboxKit warmup list, so its age is unknown' },
+     { count: 36, reason: 'on warmup day N, and the floor is day N' },
+     { count: 2, reason: 'SmartLead did not say' }],
+    true),
+  [{ reason: 'not in the InboxKit warmup list, so its age is unknown', count: 30, prev: 6, change: 24 },
+   { reason: 'suspended in SmartLead', count: 90, prev: 77, change: 13 },
+   { reason: 'SmartLead did not say', count: 0, prev: 2, change: -2 }]);
+ok('an incomparable pair of snapshots reads as unknown, never as no change',
+  [notLiveReasonMoves([{ count: 1, reason: 'a' }], [{ count: 9, reason: 'a' }], false),
+   notLiveReasonMoves([{ count: 1, reason: 'a' }], [{ count: 9, reason: 'a' }], null),
+   notLiveReasonMoves([{ count: 1, reason: 'a' }], null, true)],
+  [null, null, null]);
 ok('the largest reason carries its share of the mailboxes that could not send',
   (() => {
     const f = siegePlanFacts(NOT_LIVE_PLAN);
@@ -361,7 +411,7 @@ ok('a mailbox disqualified with no reason is still counted, or the rows stop add
     const f = siegePlanFacts({ summary: { inboxes: [{ live: false }, { live: false, why_not: '' }] } });
     return [f.inboxes_not_live, f.not_live_reasons];
   })(),
-  [2, [{ count: 2, reason: 'no reason given' }]]);
+  [2, [{ count: 2, reason: 'no reason given', example: 'no reason given' }]]);
 ok('no inbox list reads as unknown, never as a fleet with nothing wrong',
   (() => {
     const f = siegePlanFacts({ summary: { day: '2026-11-02' } });
@@ -370,7 +420,7 @@ ok('no inbox list reads as unknown, never as a fleet with nothing wrong',
   [null, null, null]);
 ok('a mailbox carrying two reasons is counted under both, so the rows sum above the fleet',
   notLiveReasonTally([{ live: false, why_not: 'a; b' }]),
-  { notLive: 1, reasons: [{ count: 1, reason: 'a' }, { count: 1, reason: 'b' }],
+  { notLive: 1, reasons: [{ count: 1, reason: 'a', example: 'a' }, { count: 1, reason: 'b', example: 'b' }],
     top: 'a', topCount: 1, topPct: 100 });
 ok('garbage is no plan', siegePlanFacts('nope').plan_found, false);
 ok('null is no plan', siegePlanFacts(null).plan_found, false);

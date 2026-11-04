@@ -90,8 +90,10 @@ export type SiegePlanFacts = {
   inboxes_not_live: number | null;
   /** Why they could not, largest first, with the per-mailbox numbers condensed out so one
    *  reason is one row. A mailbox can carry several, so these sum above
-   *  `inboxes_not_live`. Capped at 10 rows. */
-  not_live_reasons: Array<{ count: number; reason: string }> | null;
+   *  `inboxes_not_live`. Capped at 10 rows. `example` is one of the raw reason strings the
+   *  row condensed, kept because the numbers the condenser drops are what say whether a
+   *  hold is a timer and when it lifts — see notLiveReasonTally(). */
+  not_live_reasons: Array<{ count: number; reason: string; example: string }> | null;
   /** The largest row above, and its share of `inboxes_not_live`, so a fleet held by one
    *  thing reads differently from one held by a dozen. */
   not_live_top_reason: string | null;
@@ -207,31 +209,48 @@ export const MAX_NOT_LIVE_REASONS = 10;
  *
  *  A mailbox can carry several reasons, so the rows sum above `inboxes_not_live` — stated
  *  in the field doc, because a reader who adds them up must not think the fleet is bigger
- *  than it is. Null, not empty, when the plan carries no inbox list. */
+ *  than it is. Null, not empty, when the plan carries no inbox list.
+ *
+ *  AND EACH ROW CARRIES ONE RAW EXAMPLE, BECAUSE THE NUMBERS THE CONDENSER DROPS ARE THE
+ *  DECISION (2026-11-04). The 11-03 debrief read "36 on warmup day N, and the floor is
+ *  day N" and told Casey to wait four days because they would "lift themselves around
+ *  11-06". The raw string that morning was "on warmup day 9, and the floor is day 14" —
+ *  five days to go, clearing 11-08, which is a Sunday, so the first send is 11-09. The day
+ *  before it had read day 8 against a floor of 12, and the two published rows were
+ *  identical, so a floor Casey himself raised from 12 to 14 on 11-02 (siege.json
+ *  warmup_wait.min_day) was invisible and the published date was wrong. Condensing is
+ *  still right — one fact about the fleet is one row — but a reader deciding whether to
+ *  wait or to act needs the magnitude, so one untouched example rides along. */
 export function notLiveReasonTally(
   inboxes: Array<Record<string, unknown>> | null,
 ): {
   notLive: number | null;
-  reasons: Array<{ count: number; reason: string }> | null;
+  reasons: Array<{ count: number; reason: string; example: string }> | null;
   top: string | null;
   topCount: number | null;
   topPct: number | null;
 } {
   if (inboxes === null) return { notLive: null, reasons: null, top: null, topCount: null, topPct: null };
   const notLive = inboxes.filter((i) => i.live !== true);
-  const counts = new Map<string, number>();
+  const counts = new Map<string, { count: number; example: string }>();
   for (const i of notLive) {
     const why = typeof i.why_not === 'string' ? i.why_not : '';
-    const parts = why.split('; ').map((p) => p.trim()).filter(Boolean);
+    const parts = splitInboxReasons(why);
     // A mailbox the plan disqualified without saying why still has to be countable, or
     // the rows silently stop adding up to the fleet.
     if (parts.length === 0) parts.push('no reason given');
-    for (const p of new Set(parts.map(condenseInboxReason))) {
-      counts.set(p, (counts.get(p) ?? 0) + 1);
+    const seen = new Set<string>();
+    for (const raw of parts) {
+      const key = condenseInboxReason(raw);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const row = counts.get(key);
+      if (row) row.count += 1;
+      else counts.set(key, { count: 1, example: raw.slice(0, 120) });
     }
   }
   const rows = [...counts.entries()]
-    .map(([reason, count]) => ({ count, reason }))
+    .map(([reason, r]) => ({ count: r.count, reason, example: r.example }))
     .sort((a, b) => b.count - a.count || a.reason.localeCompare(b.reason));
   const top = rows[0] ?? null;
   return {
@@ -243,9 +262,36 @@ export function notLiveReasonTally(
   };
 }
 
+/** One mailbox's `why_not` into its separate reasons.
+ *
+ *  A REASON LIST SPLIT INSIDE A PARENTHESIS PUBLISHES A FRAGMENT THAT NAMES NO GATE
+ *  (2026-11-04). automator joins a mailbox's reasons with "; " and the health gate's own
+ *  reason carries a second "; " INSIDE its parenthetical: "health stop: suspended by
+ *  inbox-health.py (score 37.8 under 80; 7 of 11 warmup emails in spam in 3 days);
+ *  SmartLead did not say". A plain split made that three reasons instead of two, one of
+ *  them "N of N warmup emails in spam in N days)", which the 11-03 snapshot published as
+ *  its own row of 2 and the debrief had to merge back by hand. It also double-counts that
+ *  mailbox in the roll-up and spends a row of the cap on a fragment. Split only at depth
+ *  zero, so a nested separator stays inside the reason it belongs to. */
+export function splitInboxReasons(why: string): string[] {
+  const out: string[] = [];
+  let buf = '';
+  let depth = 0;
+  for (let i = 0; i < why.length; i += 1) {
+    const c = why[i];
+    if (c === '(' || c === '[') depth += 1;
+    else if (c === ')' || c === ']') depth = Math.max(0, depth - 1);
+    if (c === ';' && depth === 0) { out.push(buf); buf = ''; continue; }
+    buf += c;
+  }
+  out.push(buf);
+  return out.map((p) => p.trim()).filter(Boolean);
+}
+
 /** Drop the per-mailbox tokens so one reason is one row: warmup days, health scores,
  *  recovery hours, hold dates. Same rule as the method-cause condenser in the email repo,
- *  and the same 120-character cap every reason string here carries. */
+ *  and the same 120-character cap every reason string here carries. The row keeps one raw
+ *  example beside it, because this throws away the numbers a reader decides on. */
 export function condenseInboxReason(raw: string): string {
   return raw
     // A separator only disappears INSIDE a number (a date, a score), never after one:
@@ -255,6 +301,39 @@ export function condenseInboxReason(raw: string): string {
     .replace(/\s+/g, ' ')
     .trim()
     .slice(0, 120);
+}
+
+/** Which gate's grip on the fleet grew or eased since yesterday's plan.
+ *
+ *  WHY (2026-11-04): `live_inboxes_change` and `mailbox_capacity_change` say the fleet
+ *  shrank and cannot say which gate did it. Between 11-02 and 11-03 the sendable fleet
+ *  went 12 to 10 and capacity 180 to 150, while underneath it "suspended in SmartLead"
+ *  went 77 to 90 and "not in the InboxKit warmup list, so its age is unknown" went 6 to
+ *  30 — a mailbox dropping out of the warmup snapshot is a different repair from one
+ *  SmartLead suspended, and reading either one took opening two plan files by hand.
+ *
+ *  Keyed on the condensed reason, so it is the same row the reader is looking at. Only
+ *  rows that MOVED are listed, largest move first, because a stable reason argues for
+ *  nothing. Null — not empty — unless the two snapshots are comparable: this is the
+ *  2026-10-16 rule, that plan.json is overwritten in place, so a delta across two
+ *  incomparable hours must read as unknown rather than as steady. */
+export function notLiveReasonMoves(
+  now: Array<{ count: number; reason: string }> | null,
+  prev: Array<{ count: number; reason: string }> | null,
+  comparable: boolean | null,
+): Array<{ reason: string; count: number; prev: number; change: number }> | null {
+  if (comparable !== true || now === null || prev === null) return null;
+  const before = new Map(prev.map((r) => [r.reason, r.count]));
+  const after = new Map(now.map((r) => [r.reason, r.count]));
+  const moves: Array<{ reason: string; count: number; prev: number; change: number }> = [];
+  for (const reason of new Set([...after.keys(), ...before.keys()])) {
+    const c = after.get(reason) ?? 0;
+    const p = before.get(reason) ?? 0;
+    if (c !== p) moves.push({ reason, count: c, prev: p, change: c - p });
+  }
+  return moves
+    .sort((a, b) => Math.abs(b.change) - Math.abs(a.change) || a.reason.localeCompare(b.reason))
+    .slice(0, MAX_NOT_LIVE_REASONS);
 }
 
 // Pure so the selftest can feed it a hand-built plan. Every field is optional on the
@@ -439,6 +518,10 @@ export type FleetFacts = {
    *  not a day apart or the newer one post-dates the push, so the delta is real
    *  arithmetic on two different measurements. null means a stamp was missing. */
   delta_comparable: boolean | null;
+  /** Which reason for sitting out grew or eased since yesterday's plan, largest move
+   *  first, keyed on the same condensed reason `not_live_reasons` publishes. Only rows
+   *  that moved appear. Null unless `delta_comparable`. See notLiveReasonMoves(). */
+  not_live_reasons_change: Array<{ reason: string; count: number; prev: number; change: number }> | null;
   /** When the inbox health gate last ran. It is staleness-gated to once per 24h. */
   gate_last_run: string | null;
   gate_paused: number | null;
@@ -534,6 +617,7 @@ const NO_FLEET: FleetFacts = {
   mailbox_capacity_change: null,
   plan_generated_at: null,
   plan_generated_at_prev: null,
+  not_live_reasons_change: null,
   snapshot_gap_hours: null,
   replanned_after_push: null,
   delta_comparable: null,
@@ -870,6 +954,7 @@ export function fleetFacts(
     live_inboxes?: number | null;
     mailbox_capacity?: number | null;
     plan_generated_at?: string | null;
+    not_live_reasons?: Array<{ count: number; reason: string }> | null;
   } | null,
   gateState: unknown,
   bandState: unknown = null,
@@ -886,6 +971,9 @@ export function fleetFacts(
   const planMs = plan.plan_generated_at ? Date.parse(plan.plan_generated_at) : NaN;
   const afterPush = Number.isFinite(pushMs) && Number.isFinite(planMs) ? planMs > pushMs : null;
   const band = bandGateFacts(bandState, bandWindow);
+  // Same window rule as every other delta here: 12 to 36 hours apart, and not taken
+  // after the push. Computed once so the moves cannot disagree with delta_comparable.
+  const comparable = gap === null ? null : (gap >= 12 && gap <= 36 && afterPush !== true);
   return {
     ...NO_FLEET,
     live_inboxes_prev: livePrev,
@@ -900,9 +988,13 @@ export function fleetFacts(
     replanned_after_push: afterPush,
     // 12 to 36 hours apart is a day-over-day move read at a comparable hour. Outside
     // that, or taken after the push, it is arithmetic across two different measurements.
-    delta_comparable: gap === null
-      ? null
-      : (gap >= 12 && gap <= 36 && afterPush !== true),
+    delta_comparable: comparable,
+    // Which gate's grip moved, which the two totals above cannot say.
+    not_live_reasons_change: notLiveReasonMoves(
+      plan.not_live_reasons,
+      prior?.not_live_reasons ?? null,
+      comparable,
+    ),
     ...inboxGateFacts(gateState, band.reasons),
     band_gate_run_at: band.band_gate_run_at,
     band_normal: band.band_normal,
@@ -1381,7 +1473,32 @@ export function sendPlanHealth(
       'largest first, capped at 10, and a mailbox can carry several so they sum ABOVE ' +
       'inboxes_not_live. not_live_top_reason_pct is the largest row\'s share, which is how ' +
       'a fleet held by one thing reads differently from one held by a dozen. Null, not ' +
-      'empty, when the plan has no inbox list. DO NOT READ band_stop AS THE CAUSE ON SUCH A DAY: on ' +
+      'empty, when the plan has no inbox list. AND READ THE ROW\'S example, NOT THE ' +
+      'CONDENSED reason, BEFORE DECIDING TO WAIT (2026-11-04): the condenser drops the ' +
+      'numbers a reader decides on. The 11-03 debrief read "36 on warmup day N, and the ' +
+      'floor is day N" and told Casey to wait four days because they would lift themselves ' +
+      '"around 11-06". The raw string that morning was "on warmup day 9, and the floor is ' +
+      'day 14" — FIVE days to go, clearing 11-08, a Sunday, so the first send is Monday ' +
+      '11-09. The day before had read day 8 against a floor of 12 and published an ' +
+      'identical row, so a floor Casey himself raised from 12 to 14 on 11-02 ' +
+      '(automator/config/siege.json warmup_wait.min_day) was invisible and the date in the ' +
+      'debrief was wrong. Every row now carries one untouched example beside the condensed ' +
+      'key. The split that builds these rows also stopped breaking a parenthetical in half: ' +
+      'automator joins reasons with "; " and the health gate puts another one INSIDE its ' +
+      'brackets, so "health stop: ... (score 37.8 under 80; 7 of 11 warmup emails in spam ' +
+      'in 3 days); SmartLead did not say" published three rows instead of two, one of them ' +
+      'the fragment "N of N warmup emails in spam in N days)" naming no gate at all, and ' +
+      'double-counted that mailbox. AND READ not_live_reasons_change FOR WHICH GATE MOVED ' +
+      '(2026-11-04): live_inboxes_change and mailbox_capacity_change say the fleet shrank ' +
+      'and cannot say what shrank it. Between 11-02 and 11-03 the fleet went 12 live to 10 ' +
+      'and 180 messages to 150 while underneath it "suspended in SmartLead" went 77 to 90 ' +
+      'and "not in the InboxKit warmup list, so its age is unknown" went 6 to 30 — a ' +
+      'mailbox that fell out of the warmup snapshot is a different repair from one ' +
+      'SmartLead suspended, and reading either took opening two plan files by hand. Only ' +
+      'rows that MOVED are listed, largest move first, and the whole field is null unless ' +
+      'fleet.delta_comparable is true, which is the 10-16 rule: plan.json is overwritten ' +
+      'in place, so a delta across two incomparable hours is unknown and NOT steady. ' +
+      'DO NOT READ band_stop AS THE CAUSE ON SUCH A DAY: on ' +
       '10-29 it read 48 stopped and looked like a sick fleet, and the twelve mailboxes ' +
       'that could have sent were nowhere in it. ' +
       'binding_constraint:nothing_lost means the plan moved and the push\'s own ' +
@@ -2417,12 +2534,16 @@ export function priorSendPlan(
   live_inboxes: number | null;
   mailbox_capacity: number | null;
   plan_generated_at: string | null;
+  not_live_reasons: Array<{ count: number; reason: string }> | null;
 } | null {
   const p = join(logsDir, `autopilot-debrief-${priorDate}.json`);
   if (!existsSync(p)) return null;
   try {
     const prior = JSON.parse(readFileSync(p, 'utf8')) as {
-      send_plan?: { live_inboxes?: unknown; mailbox_capacity?: unknown; plan_generated_at?: unknown };
+      send_plan?: {
+        live_inboxes?: unknown; mailbox_capacity?: unknown; plan_generated_at?: unknown;
+        not_live_reasons?: unknown;
+      };
     };
     const s = prior.send_plan;
     if (!s || typeof s !== 'object') return null;
@@ -2432,6 +2553,13 @@ export function priorSendPlan(
       // Written since 2026-10-16. Older snapshots report null, which makes the gap
       // unknown rather than assumed comparable.
       plan_generated_at: typeof s.plan_generated_at === 'string' ? s.plan_generated_at : null,
+      // Written since 2026-11-03. A snapshot from before it reports null, so the moves
+      // read as unknown rather than as every reason arriving today.
+      not_live_reasons: Array.isArray(s.not_live_reasons)
+        ? (s.not_live_reasons as Array<Record<string, unknown>>)
+            .map((r) => ({ count: num(r.count) ?? 0, reason: typeof r.reason === 'string' ? r.reason : '' }))
+            .filter((r) => r.reason !== '')
+        : null,
     };
   } catch { return null; }
 }
