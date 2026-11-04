@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lead Run Debrief — 2026-11-04</title>
+<style>
+  :root {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+      --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+      --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+    --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+    --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 40px 22px 80px; }
+  .eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); font-weight: 600; }
+  h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.12; margin: 10px 0 6px; text-wrap: balance; letter-spacing: -.02em; }
+  h2 { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); margin: 44px 0 16px; font-weight: 700; }
+  h3 { font-size: 18px; margin: 0 0 6px; letter-spacing: -.01em; }
+  p { margin: 0 0 14px; }
+  .lede { font-size: 18px; color: var(--ink-soft); max-width: 68ch; }
+  .tag { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--amber-soft); color: var(--amber); letter-spacing: .02em; }
+  .tag.red { background: var(--red-soft); color: var(--red); }
+  .tag.good { background: var(--teal-soft); color: var(--teal); }
+  .grid { display: grid; gap: 14px; }
+  .stats { grid-template-columns: repeat(4, 1fr); margin-top: 26px; }
+  @media (max-width: 720px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; box-shadow: var(--shadow); }
+  .stat .n { font-size: 30px; font-weight: 750; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .stat .l { font-size: 12.5px; color: var(--ink-soft); margin-top: 3px; }
+  .stat .s { font-size: 12px; margin-top: 8px; font-weight: 600; }
+  .up { color: var(--good); } .down { color: var(--red); } .warn { color: var(--amber); }
+  .accent-red { border-left: 3px solid var(--red); }
+  .accent-teal { border-left: 3px solid var(--teal); }
+  .accent-amber { border-left: 3px solid var(--amber); }
+
+  .strip { display: flex; align-items: flex-end; gap: 3px; height: 130px; padding: 14px 14px 10px; overflow-x: auto; }
+  .bar { flex: 1 0 8px; min-width: 6px; border-radius: 2px 2px 0 0; background: var(--teal); opacity: .9; }
+  .bar.zero { background: var(--line); height: 4px !important; }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-soft); padding: 0 14px 14px; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+
+  .q { border-radius: 14px; padding: 20px 22px; margin-bottom: 14px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); }
+  .q .ask { font-size: 17px; font-weight: 700; color: var(--ink); margin-bottom: 10px; display: flex; gap: 10px; align-items: baseline; }
+  .q .ask .qn { color: var(--red); font-weight: 800; flex: 0 0 auto; }
+  .q p { color: var(--ink-soft); }
+  .q b { color: var(--ink); }
+  .pill { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink); background: var(--panel-2); padding: 1px 7px; border-radius: 6px; border: 1px solid var(--line); white-space: nowrap; }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; background: var(--panel-2); padding: 1px 5px; border-radius: 5px; border: 1px solid var(--line); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+  th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); }
+  td .num { font-variant-numeric: tabular-nums; font-weight: 650; }
+  .fix td:first-child { color: var(--good); font-weight: 650; }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); box-shadow: var(--shadow); margin-bottom: 14px; }
+  ol.recs { padding-left: 0; list-style: none; counter-reset: r; margin: 0; }
+  ol.recs li { counter-increment: r; position: relative; padding: 14px 16px 14px 52px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 10px; box-shadow: var(--shadow); }
+  ol.recs li::before { content: counter(r); position: absolute; left: 14px; top: 14px; width: 26px; height: 26px; border-radius: 8px; background: var(--teal-soft); color: var(--teal); font-weight: 800; font-size: 14px; display: grid; place-items: center; }
+  ol.recs b { color: var(--ink); }
+  .foot { margin-top: 46px; padding: 16px 18px; border-radius: 12px; background: var(--amber-soft); border: 1px solid var(--line); font-size: 14px; color: var(--ink-soft); }
+  .foot b { color: var(--ink); }
+  .muted { color: var(--ink-soft); font-size: 13.5px; }
+  pre { background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 14px; overflow-x: auto; font-size: 13px; line-height: 1.5; margin: 0 0 14px; }
+</style>
+
+<div class="wrap">
+
+  <div class="eyebrow">Lead Run Debrief · YouTube outreach</div>
+  <h1>2026-11-04 — Monday's turn did not hold, and the fleet is the reason</h1>
+  <p class="lede">Monday reached <b>107</b> people who had never heard from us. Tuesday reached <b>nine</b>. Nothing about the shelf changed, and nothing broke: the number of slots the fleet could offer fell from 123 to 67, and the tier queue went back to spending them on people we had already written to. Yesterday's advice to wait four days for 36 warmup mailboxes was also wrong, and this report caused that: the floor they have to clear is day 14, not day 12, so they clear on a Sunday and first send on <b>Monday 2026-11-09</b>.</p>
+  <div style="margin-top:14px"><span class="tag red">9 NEW PEOPLE, DOWN FROM 107</span> <span class="tag">67 SLOTS, DOWN FROM 123</span> <span class="tag good">5 STRANDED LEADS FLEW BY THEMSELVES</span></div>
+
+  <div class="grid stats">
+    <div class="card stat accent-red">
+      <div class="n">9</div>
+      <div class="l">people emailed for the first time ever</div>
+      <div class="s down">107 the day before</div>
+    </div>
+    <div class="card stat accent-amber">
+      <div class="n">55</div>
+      <div class="l">emails sent, of 67 planned</div>
+      <div class="s warn">5 people lost, 40 were repeat offers</div>
+    </div>
+    <div class="card stat accent-red">
+      <div class="n">10</div>
+      <div class="l">mailboxes live, of 124 in the fleet</div>
+      <div class="s down">24 more fell out of the warmup list</div>
+    </div>
+    <div class="card stat accent-teal">
+      <div class="n">5</div>
+      <div class="l">stranded leads recovered, 1 left of 6</div>
+      <div class="s up">no stamp had to be reverted</div>
+    </div>
+  </div>
+
+  <h2>The shape of the day</h2>
+  <div class="card" style="padding:0">
+    <div class="strip" id="strip"></div>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--teal)"></span>emails the send ledger recorded: 54, all in one hour</span>
+      <span><span class="dot" style="background:var(--line)"></span>the other 23 hours of the cycle</span>
+    </div>
+  </div>
+  <p class="muted">One bar per hour of the cycle, starting at <b>08:00Z</b>, and its height is how many emails the send ledger recorded in that hour. Every send happened in eight minutes, between <b>11:21Z and 11:29Z</b>. That is one Siege push, which is the normal shape, and it is also the whole day's outcome resting on fourteen minutes of one run.</p>
+
+  <h2>The three questions</h2>
+
+  <div class="q accent-red">
+    <div class="ask"><span class="qn">Q1</span><span>Monday reached 107 new people. Did it hold?</span></div>
+    <p><b>No. Nine.</b> The shelf is unchanged, the research is unchanged, and nobody broke anything. Two things each took about half of Monday's reach away.</p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th></th><th>Mon 11-02</th><th>Tue 11-03</th></tr></thead>
+        <tbody>
+          <tr><td>Slots the fleet could offer</td><td class="num">123</td><td class="num">67</td></tr>
+          <tr><td>People emailed</td><td class="num">115</td><td class="num">54</td></tr>
+          <tr><td>First touches</td><td class="num">107</td><td class="num">14</td></tr>
+          <tr><td><b>Genuinely new people</b></td><td class="num">107</td><td class="num"><b>9</b></td></tr>
+          <tr><td>Repeat offers</td><td class="num">8</td><td class="num">40</td></tr>
+          <tr><td>First-touch share</td><td class="num">93%</td><td class="num">25.9%</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p><b>Half of it is capacity.</b> There were 67 slots instead of 123, and the push used every one it was allowed. <b>The other half is the queue.</b> Siege hands slots out by tier, and 40 of the 54 people emailed were repeat offers to people we had already written to. That is deliberate since 10-07, and it is not free: <span class="pill">2,370</span> ready people waited for a slot, 983 of them in the top tier. Monday was the first day in three weeks that queue let new people through at scale. Tuesday it mostly stopped again.</p>
+    <p>So the honest reading of the pair of days is <b>116 new people in two days</b> after a week that reached two, with no evidence yet that the first number is the normal one.</p>
+  </div>
+
+  <div class="q accent-amber">
+    <div class="ask"><span class="qn">Q2</span><span>Why did the slots halve, and when does the capacity come back?</span></div>
+    <p>The fleet lost 2 live mailboxes and 30 messages a day of allowance. Those two numbers have been published since 10-15 and they cannot say what caused it. The reasons underneath them moved a lot more:</p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Mailboxes</th><th>Why they could not send</th><th>Day before</th></tr></thead>
+        <tbody>
+          <tr><td class="num">90</td><td>suspended in SmartLead</td><td class="num">77</td></tr>
+          <tr><td class="num">60</td><td>no Siege campaign yet</td><td class="num">60</td></tr>
+          <tr><td class="num">36</td><td>on warmup day 9, and the floor is day 14</td><td class="num">36</td></tr>
+          <tr><td class="num"><b>30</b></td><td><b>not in the InboxKit warmup list, so its age is unknown</b></td><td class="num">6</td></tr>
+          <tr><td class="num">6</td><td>health watch, follow-ups only, 27 of 48 hours clean</td><td class="num">5</td></tr>
+          <tr><td class="num">6</td><td>on hold until 2036-09-17</td><td class="num">6</td></tr>
+          <tr><td class="num">2</td><td>health watch, follow-ups only, score 83.8 against a floor of 90</td><td class="num">0</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="muted">A mailbox can carry several reasons, so these add up to more than the 114 that sat out.</p>
+    <p><b>The fastest-moving number is the fourth row.</b> Twenty-four mailboxes dropped out of the InboxKit warmup list in a single day. A mailbox whose age cannot be read is refused on purpose, because not knowing how warm something is, is not a reason to send from it. So that row is 24 slots the day lost to a missing record rather than to a sick mailbox, and it is the only line in the table that changed for a reason nobody chose.</p>
+    <p><b>And the warmup timer is further out than this report said yesterday.</b> Yesterday's number two recommendation was to wait four days, because the 36 would clear "around 11-06" and lift themselves. The real reading is <b>day 9 against a floor of day 14</b>. They clear on <b>2026-11-08</b>, which is a Sunday, and SmartLead sends Monday to Thursday, so the first email they can carry goes out on <b>Monday 2026-11-09</b>.</p>
+    <p>Casey raised that floor himself on 11-02, from day 12 to day 14, after the 36 mailboxes arrived: "only the ones that have been warmed up for at least 14 days." Nothing is broken. <b>The reason the published date was wrong is this report's own instrument</b>, and that is fixed below.</p>
+  </div>
+
+  <div class="q accent-teal">
+    <div class="ask"><span class="qn">Q3</span><span>Six people were stamped as emailed and had never been emailed. What happened to them?</span></div>
+    <p><b>Five of the six were emailed in this cycle, between 11:24Z and 11:28Z.</b> No stamp was reverted, no script was written, and nothing had to be built. They were planned, approved, and pushed like anybody else.</p>
+    <p>This closes something that has been open since 10-28, when 54 leads were found carrying a <code>sent_to_smartlead</code> stamp with no send behind it: SmartLead accepted them into a campaign on 10-13, the ICP audit paused those sequences that afternoon, and the acceptance was credited while no email ever went out. The published note said nothing would ever reach them. That was wrong twice over. Yesterday's report corrected the first half, that Siege does keep planning them. This cycle settles the second half: they can be sent to.</p>
+    <p>Two independent counters agree on the day's first touches, which is worth more than either on its own:</p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Counter</th><th>Move</th><th>What it means</th></tr></thead>
+        <tbody>
+          <tr><td>people with a send row</td><td class="num">1,769 to 1,783</td><td>14 people were written to for the first time</td></tr>
+          <tr><td>people carrying the sent stamp</td><td class="num">1,775 to 1,784</td><td>9 of the 14 had never been stamped either, which is <code>first_touch_new</code></td></tr>
+          <tr><td>stamped but never emailed</td><td class="num">6 to 1</td><td>the other 5 were the stranded cohort</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>One is left, <code>recPSkSNP2HeR6CCV</code>, stamped on 2026-10-07. It has a verified address and finished research, and at this rate it will fly on its own.</p>
+  </div>
+
+  <h2>What broke, and what's fixed</h2>
+  <div class="tablewrap">
+    <table class="fix">
+      <thead><tr><th>Status</th><th>What</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>FIXED</td>
+          <td><b>A condensed fleet reason now carries one raw example, because the numbers it drops are the decision.</b> Yesterday's row read "36 on warmup day N, and the floor is day N" and the day before published an identical row, so a floor that moved from 12 to 14 was invisible and this report named the wrong clearing date off it. The condenser is still right, one fact about the fleet should be one row, but a reader deciding whether to wait or to act needs the magnitude. Orchestrator <code>140c61f</code>.</td>
+        </tr>
+        <tr>
+          <td>FIXED</td>
+          <td><b>A reason list no longer splits inside a parenthesis.</b> The send path joins a mailbox's reasons with a semicolon, and the health gate puts another semicolon inside its own brackets. That published three reasons where there were two, one of them the fragment "N of N warmup emails in spam in N days)", which names no gate at all and had its own row of 2 in yesterday's snapshot. It also counted that mailbox twice and spent a row of the display cap on a fragment. Same commit.</td>
+        </tr>
+        <tr>
+          <td>FIXED</td>
+          <td><b>The snapshot now names which gate's grip moved.</b> Only the reasons that changed, biggest move first, and only when the two plan files are a comparable day apart. The 77-to-90 and 6-to-30 moves in Q2 took opening two plan files by hand this morning. Same commit.</td>
+        </tr>
+        <tr>
+          <td>WORKED</td>
+          <td><b>Yesterday's send-ledger join earned its keep on day one.</b> The push log dropped a line again, and one person it emailed appears nowhere in the file. The ledger caught them, so the loss reads 5 instead of 6 and the id is named as a logging fault rather than as a person to chase.</td>
+        </tr>
+        <tr>
+          <td>OPEN</td>
+          <td><b>The push log is still losing lines.</b> Two cycles running. The counting is safe now; the audit trail is not, and that log is the only record of what each person was actually sent. It lives in <code>automator</code>, which this loop may not edit.</td>
+        </tr>
+        <tr>
+          <td>OPEN</td>
+          <td><b>Three people were refused by SmartLead for a bounce already on file</b> (<code>bounce_count=1</code>), the whole of the day's real loss besides two people the log said nothing about. Twelve more were skipped for being absent from another batch's manifest and <b>all twelve were written again and sent in the same run</b>, so they cost nobody.</td>
+        </tr>
+        <tr>
+          <td>OPEN</td>
+          <td><b>The two <code>automator</code> repairs are still unshipped</b>, now five days: the coercion that cost Friday 10-30 its whole sending day, and the empty-campaign-list guard that cost 10-29.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>What else the cycle did</h2>
+  <div class="tablewrap">
+    <table>
+      <tbody>
+        <tr>
+          <td><b>One person parked.</b> <code>approved_hold</code> went 7,370 to 7,371. The paid Apify lane has now answered <em>no candidates left to try</em> on <b>24 consecutive ticks</b> since 11-02, with <b>$31.20 of November's $100 unspent</b> and only $21.20 of that spendable. It scraped nothing and cost nothing. More allowance buys nothing here; the lane has tried every qualified lead it has.</td>
+        </tr>
+        <tr>
+          <td><b>The free recovery lane is picked over, not broken.</b> Lap 14 of an 1,804-lead book. 6 email points across 3 people, against 22 points for the whole prior week, so it is actually running slightly warm. The newest full pass found <b>579 contact points and all 579 were already on file</b>, which is what a complete re-walk looks like. One lead in 150 had no website, Brave refused nothing, and the cause reads <code>resolution_ok</code>. The largest fault left is "cross-domain redirect", 70 of 157 method errors, which is the web being the web.</td>
+        </tr>
+        <tr>
+          <td><b>Enrichment is finished in all but name:</b> 2 batches, 2 leads, 0 failures, because <b>99.8% of the pool is already bundled</b>. OpenRouter is burning <b>$1.72 a day</b> against a $14.26 balance, which is <b>8.3 days</b> of runway at a cost of 9 cents per enriched lead. Still no reason to buy credit.</td>
+        </tr>
+        <tr>
+          <td><b>The health gate moved six mailboxes the wrong way.</b> Clear went 63 to 56, watch 8 to 14, stopped 23 to 24, and nothing came back. Nine held mailboxes are healthy enough to return, seven of them just waiting out the 48-hour clock with the closest one due now, and two held only because other addresses on their domain are sick.</td>
+        </tr>
+        <tr>
+          <td><b>Quiet elsewhere.</b> $0 Anthropic spend, no fatal errors, no halt flag. Discovery stayed at zero, which is Casey's standing instruction since 2026-09-08. The YouTube key pool reads 15 working of 66, which is expected and irrelevant while discovery is off.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>What to do next</h2>
+  <ol class="recs">
+    <li><b>Find out why 24 mailboxes fell out of the InboxKit warmup list in one day.</b> It is the fastest-moving number in the fleet and the only one that moved for a reason nobody chose. Each one is refused by design, so it is 24 slots gone until their age can be read again. Start with <code>automator/scripts/inbox-warmup-sync.py</code> and whether InboxKit answered it in full.</li>
+    <li><b>Attach Siege campaigns to the 22 mailboxes that are otherwise fit to send.</b> Unchanged from yesterday, and one less than yesterday. It is about twenty minutes of setup, not code, and it is the only capacity available this week.</li>
+    <li><b>Expect the 36 warmup mailboxes on Monday 2026-11-09, not Friday.</b> They reach day 14 on Sunday 11-08 and lift themselves. Nothing to spend and nothing to fix, but do not plan around Friday.</li>
+    <li><b>Decide whether a 9-new-people day or a 107 day is the one to plan for.</b> It is the same question as the tier queue: 2,370 ready people are waiting for a slot and 40 of 54 slots went to repeat offers. If repeat offers are worth that, the shelf lasts months. If they are not, the tier order is the lever and it lives in the send path.</li>
+    <li><b>Ship the two <code>automator</code> repairs.</b> Four different single-step failures have each cost real sending inside the last week. The next one will be unrelated to all four.</li>
+  </ol>
+
+  <div class="foot">
+    <b>Grounding.</b> Numbers come from <code>logs/autopilot-debrief-2026-11-04.json</code> for the 24 hours to 2026-11-04T08:00Z, regenerated after this morning's fix so the fleet figures are the corrected ones. Read directly rather than inferred: the warmup floor and its history, from <code>automator/config/siege.json</code> and the 11-02 and 11-03 plan files; the five recovered leads, from <code>leads.outreach_sends</code> by hand, which puts all five between 11:24:00Z and 11:28:14Z inside a push that ran 11:21:14Z to 11:28:29Z; and the hourly send shape, from the same table. <b>Not verified:</b> why 24 mailboxes left the InboxKit warmup list, which is the top recommendation precisely because it is unexplained; why the push log keeps dropping lines; and whether the tier queue behaves like Monday or like Tuesday next week, which is the whole question about reach.
+  </div>
+
+</div>
+
+<script>
+  // Emails the send ledger recorded per hour across the cycle, starting at 08:00Z.
+  // The whole day was one Siege push: 54 rows in the 11:00Z hour, every send between
+  // 11:21:14Z and 11:28:29Z. Every other bar is a real zero.
+  var sends = [0,0,0,54,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];
+  var max = 60;
+  var strip = document.getElementById('strip');
+  sends.forEach(function (n, i) {
+    var b = document.createElement('div');
+    b.className = 'bar' + (n === 0 ? ' zero' : '');
+    b.style.height = Math.round((n / max) * 100) + '%';
+    var h = (8 + i) % 24;
+    b.title = String(h).padStart(2, '0') + ':00Z, ' + n + ' emails';
+    strip.appendChild(b);
+  });
+</script>
+</html>
