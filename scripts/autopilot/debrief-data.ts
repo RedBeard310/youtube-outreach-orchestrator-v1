@@ -93,12 +93,19 @@ export type SiegePlanFacts = {
    *  `inboxes_not_live`. Capped at 10 rows. `example` is one of the raw reason strings the
    *  row condensed, kept because the numbers the condenser drops are what say whether a
    *  hold is a timer and when it lifts — see notLiveReasonTally(). */
-  not_live_reasons: Array<{ count: number; reason: string; example: string }> | null;
+  not_live_reasons: Array<{ count: number; only: number; reason: string; example: string }> | null;
   /** The largest row above, and its share of `inboxes_not_live`, so a fleet held by one
    *  thing reads differently from one held by a dozen. */
   not_live_top_reason: string | null;
   not_live_top_reason_count: number | null;
   not_live_top_reason_pct: number | null;
+  /** The row with the largest `only` — the reason holding the most mailboxes that nothing
+   *  else is holding, so clearing it really frees that many slots. READ THIS, NOT
+   *  `not_live_top_reason`, WHEN DECIDING WHAT TO FIX: on 2026-11-05 the most common
+   *  reason was carried by 90 mailboxes and the recoverable one by 24. See
+   *  notLiveReasonTally(). Null when no mailbox carries any reason alone. */
+  not_live_only_top_reason: string | null;
+  not_live_only_top_reason_count: number | null;
   /** When Siege wrote the plan file we just read. NOT the start of the day: the file is
    *  overwritten in place, so a re-plan late at night replaces the morning's fleet
    *  snapshot and every number above describes the fleet AT THIS STAMP. See the
@@ -128,6 +135,8 @@ const NO_PLAN: SiegePlanFacts = {
   not_live_top_reason: null,
   not_live_top_reason_count: null,
   not_live_top_reason_pct: null,
+  not_live_only_top_reason: null,
+  not_live_only_top_reason_count: null,
   plan_generated_at: null,
 };
 
@@ -220,19 +229,38 @@ export const MAX_NOT_LIVE_REASONS = 10;
  *  identical, so a floor Casey himself raised from 12 to 14 on 11-02 (siege.json
  *  warmup_wait.min_day) was invisible and the published date was wrong. Condensing is
  *  still right — one fact about the fleet is one row — but a reader deciding whether to
- *  wait or to act needs the magnitude, so one untouched example rides along. */
+ *  wait or to act needs the magnitude, so one untouched example rides along.
+ *
+ *  AND EACH ROW CARRIES `only`, BECAUSE A ROW'S COUNT IS NOT SLOTS (2026-11-05). This is
+ *  the 10-29 rule — read `inboxes_only_no_campaign`, never `inboxes_no_campaign`, because
+ *  a mailbox already suspended picks the reason up too and proves nothing — and when these
+ *  rows replaced those two fields on 11-03 the rule did not come with them. It cost the
+ *  11-04 debrief its number-one recommendation: the row "not in the InboxKit warmup list,
+ *  so its age is unknown" went 6 to 30 in a day, the report called that "24 slots the day
+ *  lost to a missing record" and sent Casey after the warmup sync, and on 11-05 all 30 of
+ *  those mailboxes were blocked by something else as well, 24 of them suspended in
+ *  SmartLead. Fixing the warmup list would have freed nobody. `only` is how many mailboxes
+ *  carry that reason ALONE, which is the slots the row really costs, and `only_top` is the
+ *  largest of those — the row to act on, where `top` is merely the most common. */
 export function notLiveReasonTally(
   inboxes: Array<Record<string, unknown>> | null,
 ): {
   notLive: number | null;
-  reasons: Array<{ count: number; reason: string; example: string }> | null;
+  reasons: Array<{ count: number; only: number; reason: string; example: string }> | null;
   top: string | null;
   topCount: number | null;
   topPct: number | null;
+  onlyTop: string | null;
+  onlyTopCount: number | null;
 } {
-  if (inboxes === null) return { notLive: null, reasons: null, top: null, topCount: null, topPct: null };
+  if (inboxes === null) {
+    return {
+      notLive: null, reasons: null, top: null, topCount: null, topPct: null,
+      onlyTop: null, onlyTopCount: null,
+    };
+  }
   const notLive = inboxes.filter((i) => i.live !== true);
-  const counts = new Map<string, { count: number; example: string }>();
+  const counts = new Map<string, { count: number; only: number; example: string }>();
   for (const i of notLive) {
     const why = typeof i.why_not === 'string' ? i.why_not : '';
     const parts = splitInboxReasons(why);
@@ -246,19 +274,32 @@ export function notLiveReasonTally(
       seen.add(key);
       const row = counts.get(key);
       if (row) row.count += 1;
-      else counts.set(key, { count: 1, example: raw.slice(0, 120) });
+      else counts.set(key, { count: 1, only: 0, example: raw.slice(0, 120) });
+    }
+    // Sole-reason counted AFTER the de-duplication, so a mailbox naming the same condensed
+    // reason twice (the shape the 11-04 bracket fix was about) still counts as carrying
+    // one reason alone rather than being denied its `only`.
+    if (seen.size === 1) {
+      const sole = counts.get([...seen][0]!);
+      if (sole) sole.only += 1;
     }
   }
   const rows = [...counts.entries()]
-    .map(([reason, r]) => ({ count: r.count, reason, example: r.example }))
+    .map(([reason, r]) => ({ count: r.count, only: r.only, reason, example: r.example }))
     .sort((a, b) => b.count - a.count || a.reason.localeCompare(b.reason));
   const top = rows[0] ?? null;
+  // Ranked by `only` across EVERY row, not just the published ones, so a row that falls
+  // off the display cap cannot hide the fleet's one recoverable block.
+  const onlyTop = [...rows].filter((r) => r.only > 0)
+    .sort((a, b) => b.only - a.only || a.reason.localeCompare(b.reason))[0] ?? null;
   return {
     notLive: notLive.length,
     reasons: rows.slice(0, MAX_NOT_LIVE_REASONS),
     top: top?.reason ?? null,
     topCount: top?.count ?? null,
     topPct: top && notLive.length > 0 ? Math.round((top.count / notLive.length) * 100) : null,
+    onlyTop: onlyTop?.reason ?? null,
+    onlyTopCount: onlyTop?.only ?? null,
   };
 }
 
@@ -426,6 +467,8 @@ export function siegePlanFacts(raw: unknown): SiegePlanFacts {
     not_live_top_reason: notLiveReasonTally(inboxes).top,
     not_live_top_reason_count: notLiveReasonTally(inboxes).topCount,
     not_live_top_reason_pct: notLiveReasonTally(inboxes).topPct,
+    not_live_only_top_reason: notLiveReasonTally(inboxes).onlyTop,
+    not_live_only_top_reason_count: notLiveReasonTally(inboxes).onlyTopCount,
     plan_generated_at: typeof s.generated_at === 'string' ? s.generated_at : null,
   };
 }
@@ -1489,7 +1532,24 @@ export function sendPlanHealth(
       'largest first, capped at 10, and a mailbox can carry several so they sum ABOVE ' +
       'inboxes_not_live. not_live_top_reason_pct is the largest row\'s share, which is how ' +
       'a fleet held by one thing reads differently from one held by a dozen. Null, not ' +
-      'empty, when the plan has no inbox list. AND READ THE ROW\'S example, NOT THE ' +
+      'empty, when the plan has no inbox list. ' +
+      'AND READ THE ROW\'S only, NOT ITS count, AS SLOTS (2026-11-05): a row\'s count is ' +
+      'how many mailboxes NAME that reason, and a mailbox already blocked by something ' +
+      'else picks it up too and proves nothing. This is the 10-29 rule — read ' +
+      'inboxes_only_no_campaign, never inboxes_no_campaign — which did not come with these ' +
+      'rows when they replaced those two fields on 11-03, and it cost the 11-04 debrief ' +
+      'its number-one recommendation: the row "not in the InboxKit warmup list, so its age ' +
+      'is unknown" went 6 to 30 in a day, the report called that "24 slots the day lost to ' +
+      'a missing record" and sent Casey after the warmup sync, and the next morning ALL 30 ' +
+      'of those mailboxes were blocked by something else as well, 24 of them suspended in ' +
+      'SmartLead. Repairing the warmup list would have freed nobody. only is how many ' +
+      'mailboxes carry that reason ALONE, which is the slots the row really costs, and ' +
+      'not_live_only_top_reason / _count is the largest of those across EVERY row and not ' +
+      'just the ten published ones. READ THAT WHEN DECIDING WHAT TO FIX: on 2026-11-05 the ' +
+      'most common reason was carried by 90 mailboxes and the only recoverable one by 24, ' +
+      'and the two were different reasons. A row with a big count and only:0 is a ' +
+      'passenger, not a lever. Null when no mailbox carries any reason by itself. ' +
+      'AND READ THE ROW\'S example, NOT THE ' +
       'CONDENSED reason, BEFORE DECIDING TO WAIT (2026-11-04): the condenser drops the ' +
       'numbers a reader decides on. The 11-03 debrief read "36 on warmup day N, and the ' +
       'floor is day N" and told Casey to wait four days because they would lift themselves ' +

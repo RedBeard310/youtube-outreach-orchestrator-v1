@@ -237,9 +237,11 @@ ok('plan facts read off the real shape',
     mailbox_capacity: 30, followups_due: 14, inboxes_full: 0,
     waiting_for_a_slot: null, waiting_by_tier: null,
     inboxes_total: 3, inboxes_no_campaign: 0, inboxes_only_no_campaign: 0,
-    inboxes_not_live: 1, not_live_reasons: [{ count: 1, reason: 'no reason given', example: 'no reason given' }],
+    inboxes_not_live: 1,
+    not_live_reasons: [{ count: 1, only: 1, reason: 'no reason given', example: 'no reason given' }],
     not_live_top_reason: 'no reason given', not_live_top_reason_count: 1,
     not_live_top_reason_pct: 100,
+    not_live_only_top_reason: 'no reason given', not_live_only_top_reason_count: 1,
     plan_generated_at: null });
 ok('blocked offers count as an array too',
   siegePlanFacts({ summary: { offer_problems: [{ offer: 'a' }] } }).offers_blocked, 1);
@@ -252,9 +254,11 @@ ok('a dead inbox owes no follow-ups we can act on either',
     mailbox_capacity: 0, followups_due: 0, inboxes_full: 0,
     waiting_for_a_slot: null, waiting_by_tier: null,
     inboxes_total: 1, inboxes_no_campaign: 0, inboxes_only_no_campaign: 0,
-    inboxes_not_live: 1, not_live_reasons: [{ count: 1, reason: 'no reason given', example: 'no reason given' }],
+    inboxes_not_live: 1,
+    not_live_reasons: [{ count: 1, only: 1, reason: 'no reason given', example: 'no reason given' }],
     not_live_top_reason: 'no reason given', not_live_top_reason_count: 1,
     not_live_top_reason_pct: 100,
+    not_live_only_top_reason: 'no reason given', not_live_only_top_reason_count: 1,
     plan_generated_at: null });
 // THE 2026-10-12 SHAPE: the healthiest fleet of the week and the worst new-person
 // volume of the week, because follow-ups outran the whole allowance. The slot count
@@ -279,6 +283,7 @@ ok('follow-ups eating the fleet is readable, not just the small slot count',
     inboxes_not_live: 0, not_live_reasons: [],
     not_live_top_reason: null, not_live_top_reason_count: null,
     not_live_top_reason_pct: null,
+    not_live_only_top_reason: null, not_live_only_top_reason_count: null,
     plan_generated_at: null });
 ok('a renamed key costs one null, not the block',
   siegePlanFacts({ summary: { day_cap: 'oops' }, assignments: [1] }),
@@ -290,6 +295,7 @@ ok('a renamed key costs one null, not the block',
     inboxes_not_live: null, not_live_reasons: null,
     not_live_top_reason: null, not_live_top_reason_count: null,
     not_live_top_reason_pct: null,
+    not_live_only_top_reason: null, not_live_only_top_reason_count: null,
     plan_generated_at: null });
 // THE 2026-10-16 SHAPE: every slot went to the tier that had already heard from us,
 // and 949 ready people below it waited. The plan carried that all along.
@@ -340,13 +346,52 @@ ok('every reason a mailbox sat out is rolled up, largest first, numbers condense
     return [f.inboxes_total, f.live_inboxes, f.inboxes_not_live, f.not_live_reasons];
   })(),
   [7, 1, 6, [
-    { count: 3, reason: 'suspended in SmartLead', example: 'suspended in SmartLead' },
-    { count: 2, reason: 'health watch: follow-ups only (recovering: clean reading, Nh of Nh at N+)',
+    { count: 3, only: 0, reason: 'suspended in SmartLead', example: 'suspended in SmartLead' },
+    { count: 2, only: 2, reason: 'health watch: follow-ups only (recovering: clean reading, Nh of Nh at N+)',
       example: 'health watch: follow-ups only (recovering: clean reading, 3h of 48h at 90+)' },
-    { count: 2, reason: 'no Siege campaign yet', example: 'no Siege campaign yet' },
-    { count: 2, reason: 'on warmup day N, and the floor is day N',
+    { count: 2, only: 1, reason: 'no Siege campaign yet', example: 'no Siege campaign yet' },
+    { count: 2, only: 0, reason: 'on warmup day N, and the floor is day N',
       example: 'on warmup day 8, and the floor is day 12' },
   ]]);
+// A ROW'S count IS NOT SLOTS (2026-11-05). The 10-29 rule (inboxes_only_no_campaign, never
+// inboxes_no_campaign) did not come with these rows when they replaced those two fields,
+// and it cost the 11-04 debrief its #1 recommendation. In the fixture above the most common
+// reason frees nobody on its own and the health watch frees two.
+ok('the row to act on is the one holding mailboxes nothing else is holding',
+  (() => {
+    const f = siegePlanFacts(NOT_LIVE_PLAN);
+    return [f.not_live_top_reason, f.not_live_top_reason_count,
+      f.not_live_only_top_reason, f.not_live_only_top_reason_count];
+  })(),
+  ['suspended in SmartLead', 3,
+    'health watch: follow-ups only (recovering: clean reading, Nh of Nh at N+)', 2]);
+// The live 11-04 shape at its real sizes: 30 mailboxes named the InboxKit row and not one
+// of them was held by it alone, so repairing the warmup list would have freed nobody.
+ok('a reason every mailbox shares with another block is a passenger, not a lever',
+  (() => {
+    const t = notLiveReasonTally([
+      // The 30 that named the InboxKit row, every one of them held by a timer as well.
+      ...Array.from({ length: 30 }, () => ({ live: false,
+        why_not: 'on warmup day 10, and the floor is day 14; not in the InboxKit warmup list, so its age is unknown' })),
+      // The 24 SmartLead suspended with nothing else against them: the real lever.
+      ...Array.from({ length: 24 }, () => ({ live: false, why_not: 'suspended in SmartLead' })),
+    ]);
+    return [t.reasons?.map((r) => [r.count, r.only, r.reason]), t.onlyTop, t.onlyTopCount];
+  })(),
+  [[[30, 0, 'not in the InboxKit warmup list, so its age is unknown'],
+    [30, 0, 'on warmup day N, and the floor is day N'],
+    [24, 24, 'suspended in SmartLead']],
+    'suspended in SmartLead', 24]);
+ok('a mailbox naming one condensed reason twice still counts as held by it alone',
+  notLiveReasonTally([{ live: false,
+    why_not: 'on warmup day 10, and the floor is day 14; on warmup day 11, and the floor is day 14' }])
+    .reasons?.map((r) => [r.count, r.only]),
+  [[1, 1]]);
+ok('a fleet with nothing held by one reason alone says so with a null',
+  (() => { const t = notLiveReasonTally([{ live: false,
+    why_not: 'suspended in SmartLead; no Siege campaign yet' }]);
+    return [t.onlyTop, t.onlyTopCount]; })(),
+  [null, null]);
 // WHY THE example MATTERS (2026-11-04): the condensed row is identical on both mornings,
 // and the raw strings are five days apart on the floor Casey raised 12 -> 14 on 11-02.
 // The 11-03 debrief read the row and published the wrong clearing date off it.
@@ -355,7 +400,7 @@ ok('a condensed row keeps one raw example, so the wait is still readable',
     { live: false, why_not: 'on warmup day 9, and the floor is day 14' },
     { live: false, why_not: 'on warmup day 9, and the floor is day 14' },
   ]).reasons,
-  [{ count: 2, reason: 'on warmup day N, and the floor is day N',
+  [{ count: 2, only: 2, reason: 'on warmup day N, and the floor is day N',
      example: 'on warmup day 9, and the floor is day 14' }]);
 // A REASON LIST MUST NOT SPLIT INSIDE A PARENTHESIS (2026-11-04). Verbatim from the 11-02
 // plan: the health gate's own reason carries a second "; " inside its brackets, and the
@@ -411,7 +456,7 @@ ok('a mailbox disqualified with no reason is still counted, or the rows stop add
     const f = siegePlanFacts({ summary: { inboxes: [{ live: false }, { live: false, why_not: '' }] } });
     return [f.inboxes_not_live, f.not_live_reasons];
   })(),
-  [2, [{ count: 2, reason: 'no reason given', example: 'no reason given' }]]);
+  [2, [{ count: 2, only: 2, reason: 'no reason given', example: 'no reason given' }]]);
 ok('no inbox list reads as unknown, never as a fleet with nothing wrong',
   (() => {
     const f = siegePlanFacts({ summary: { day: '2026-11-02' } });
@@ -420,8 +465,9 @@ ok('no inbox list reads as unknown, never as a fleet with nothing wrong',
   [null, null, null]);
 ok('a mailbox carrying two reasons is counted under both, so the rows sum above the fleet',
   notLiveReasonTally([{ live: false, why_not: 'a; b' }]),
-  { notLive: 1, reasons: [{ count: 1, reason: 'a', example: 'a' }, { count: 1, reason: 'b', example: 'b' }],
-    top: 'a', topCount: 1, topPct: 100 });
+  { notLive: 1,
+    reasons: [{ count: 1, only: 0, reason: 'a', example: 'a' }, { count: 1, only: 0, reason: 'b', example: 'b' }],
+    top: 'a', topCount: 1, topPct: 100, onlyTop: null, onlyTopCount: null });
 ok('garbage is no plan', siegePlanFacts('nope').plan_found, false);
 ok('null is no plan', siegePlanFacts(null).plan_found, false);
 
