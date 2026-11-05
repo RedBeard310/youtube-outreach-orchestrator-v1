@@ -1015,8 +1015,8 @@ ok('a batch that escalated having pushed nothing is counted apart from the leads
   [PUSH.batches_failed_before_first_lead, PUSH.escalations], [1, 2]);
 ok('identical refusals collapse to one counted reason, campaign id generalised',
   PUSH.reasons,
-  [{ reason: 'SmartLead did not add the lead (no reason given)', leads: 2 },
-   { reason: 'SmartLead add-lead 429 Too Many Requests on campaign <id>: Account rate limit exceeded.', leads: 1 }]);
+  [{ reason: 'SmartLead did not add the lead (no reason given)', leads: 2, lost: null },
+   { reason: 'SmartLead add-lead 429 Too Many Requests on campaign <id>: Account rate limit exceeded.', leads: 1, lost: null }]);
 ok('a lead id inside a reason is not kept',
   normalizePushReason('could not roll back send row recLvxmU118ICzpjS'),
   'could not roll back send row <lead>');
@@ -1063,8 +1063,8 @@ ok('a skipped lead is counted apart from a SmartLead refusal',
   [SKIPS.sent, SKIPS.failed, SKIPS.skipped], [1, 1, 2]);
 ok('a skip carries its reason alongside the refusals',
   SKIPS.reasons,
-  [{ reason: 'batch report marked it failed', leads: 2 },
-   { reason: 'SmartLead did not add the lead (already_added_to_campaign=1)', leads: 1 }]);
+  [{ reason: 'batch report marked it failed', leads: 2, lost: null },
+   { reason: 'SmartLead did not add the lead (already_added_to_campaign=1)', leads: 1, lost: null }]);
 ok('a writer\'s own gate line is still not a push loss (no lead id on it)',
   (() => { const p = siegePushOutcome(
     '[2026-10-08T11:43:40Z]   | BiggerPockets Money        FAIL  ethos 125  fails 1->1->1\n'
@@ -1092,8 +1092,8 @@ const GATE_LOG = [
 const GATED = siegePushOutcome(GATE_LOG, '2026-10-09T07:00:00.000Z', '2026-10-10T07:00:00.000Z');
 ok('a skip reports the rule the writer\'s gate broke, not the push\'s placeholder',
   GATED.reasons,
-  [{ reason: 'quality gate: em dash — 1 em dash(es) outside the sign-off', leads: 1 },
-   { reason: 'quality gate: say-the-action — consultant abstraction "Streamline": name what actually happens', leads: 1 }]);
+  [{ reason: 'quality gate: em dash — 1 em dash(es) outside the sign-off', leads: 1, lost: null },
+   { reason: 'quality gate: say-the-action — consultant abstraction "Streamline": name what actually happens', leads: 1, lost: null }]);
 ok('a skip is attributed to the offer whose writer made the draft',
   GATED.skipped_by_offer,
   [{ offer: 'attack-enemy-propose-5-ideas', leads: 1 }, { offer: 'joke-ai-slop', leads: 1 }]);
@@ -1105,7 +1105,7 @@ ok('a skip with no writer verdict in the log keeps the push\'s own string',
     + '[2026-10-09T10:24:46Z]   |   SKIP  recIUDe7gmSe4yYZ7    batch report marked it failed',
     '2026-10-09T07:00:00.000Z', '2026-10-10T07:00:00.000Z');
     return p.reasons; })(),
-  [{ reason: 'batch report marked it failed', leads: 1 }]);
+  [{ reason: 'batch report marked it failed', leads: 1, lost: null }]);
 ok('a second skip in one batch takes the second verdict, not the first again',
   (() => { const p = siegePushOutcome([
     '[2026-10-09T11:28:35Z] $ node /x/scripts/run-batch.mjs --leads /s/siege-2026-10-09-23650470-attack-enemy-propose-5-ideas-e8e54c/leads.json',
@@ -1219,6 +1219,44 @@ ok('a ledger that knows nothing about the plan cannot invent a loss',
     '2026-11-03T08:00:00.000Z', LEDGER_PLANNED, null, []);
     return [p.people_lost, p.emailed_unlogged]; })(),
   [3, 0]);
+// 2026-11-05: the reasons list was ranked by log lines, so on 11-04 a 25-lead reason that
+// cost nobody (every one re-sent in the same run) outranked a 3-lead reason that cost 3
+// people. Charge each reason with the people it really cost and rank by that.
+ok('a reason is charged with the people it cost, not the lines it printed',
+  LEDGERED.reasons,
+  [
+    { reason: 'SmartLead did not add the lead (bounce_count=1)', leads: 1, lost: 1 },
+    { reason: 'is absent from this batch\'s Siege manifest', leads: 1, lost: 0 },
+  ]);
+// The live 11-04 shape at its real sizes: the small row must still come first.
+ok('a reason that cancelled itself sinks below one that cost somebody, however few lines',
+  (() => {
+    const log = [
+      '[2026-11-04T11:20:00Z] push batch_id = siege-aaaa-voice-objection-proof',
+      // Three people SmartLead refused outright.
+      ...['recFAILAAAAAAAAA1', 'recFAILBBBBBBBBB2', 'recFAILCCCCCCCCC3'].map((id) =>
+        `[2026-11-04T11:21:00Z]   |   FAIL  ${id}    SmartLead did not add the lead (bounce_count=1)`),
+      // Five skipped by a manifest gate, then all five written again and sent.
+      ...['recSKIPAAAAAAAA1', 'recSKIPBBBBBBBB2', 'recSKIPCCCCCCCC3', 'recSKIPDDDDDDDD4',
+        'recSKIPEEEEEEEE5'].map((id) =>
+        `[2026-11-04T11:22:00Z]   |   SKIP  ${id}    is absent from this batch's Siege manifest`),
+      ...['recSKIPAAAAAAAA1', 'recSKIPBBBBBBBB2', 'recSKIPCCCCCCCC3', 'recSKIPDDDDDDDD4',
+        'recSKIPEEEEEEEE5'].map((id) =>
+        `[2026-11-04T11:30:00Z]   |   SENT  ${id}    a@b.com  smartlead_lead=1`),
+    ].join('\n');
+    const planned = ['recFAILAAAAAAAAA1', 'recFAILBBBBBBBBB2', 'recFAILCCCCCCCCC3',
+      'recSKIPAAAAAAAA1', 'recSKIPBBBBBBBB2', 'recSKIPCCCCCCCC3', 'recSKIPDDDDDDDD4',
+      'recSKIPEEEEEEEE5'];
+    const p = siegePushOutcome(log, '2026-11-04T08:00:00.000Z', '2026-11-05T08:00:00.000Z',
+      planned, planned, []);
+    return [p.people_lost, p.skipped, p.skipped_then_sent, p.reasons.map((r) => [r.leads, r.lost])];
+  })(),
+  [3, 5, 5, [[3, 3], [5, 0]]]);
+ok('with no plan the loss per reason is unknown and the old line-count order stands',
+  (() => { const p = siegePushOutcome(LEDGER_LOG, '2026-11-02T08:00:00.000Z',
+    '2026-11-03T08:00:00.000Z');
+    return p.reasons.map((r) => [r.leads, r.lost]); })(),
+  [[1, null], [1, null]]);
 ok('the ledger does not re-credit somebody the approval held for tomorrow',
   (() => { const p = siegePushOutcome(LEDGER_LOG, '2026-11-02T08:00:00.000Z',
     '2026-11-03T08:00:00.000Z', LEDGER_PLANNED, ['recLOGGED1AAAAAAA', 'recGONE4DDDDDDDDD'],
@@ -1288,7 +1326,7 @@ ok('a reason is still the reason now the lead id is its own capture group',
     '[2026-10-20T10:30:18Z]   |   FAIL  recREFUSED3CCCCCC    SmartLead did not add the lead (bounce_count=1)',
     '2026-10-20T07:00:00.000Z', '2026-10-21T07:00:00.000Z', null);
     return p.reasons; })(),
-  [{ reason: 'SmartLead did not add the lead (bounce_count=1)', leads: 1 }]);
+  [{ reason: 'SmartLead did not add the lead (bounce_count=1)', leads: 1, lost: null }]);
 
 ok('a batch id of an unreadable shape names no offer rather than guessing one',
   [offerFromBatchId('siege-2026-10-09-23650563-joke-ai-slop-1484cc'),

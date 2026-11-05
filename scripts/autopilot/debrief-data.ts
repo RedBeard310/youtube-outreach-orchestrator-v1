@@ -1107,8 +1107,20 @@ export function isSendingDay(calendar: string | null, pacificDay: string): boole
  *  batches died at the top, which are different faults with different fixes.
  *
  *  `reasons` is the refusal text SmartLead or the push gave, trimmed to its shape and
- *  counted, most common first. It carries no addresses: the push prints the reason after
- *  the lead id, and only the reason is kept. */
+ *  counted. It carries no addresses: the push prints the reason after the lead id, and
+ *  only the reason is kept.
+ *
+ *  THE RANKING (2026-11-05). `reasons` used to be ordered by how many log lines named
+ *  each one, which is the 10-21 fault ("every counter beside people_lost counts log
+ *  lines") sitting in the one field a reader opens to decide what to fix. On 2026-11-04
+ *  the top row was "is absent from this batch's Siege manifest" at 25 leads and the
+ *  second was "SmartLead did not add the lead (bounce_count=1)" at 3 — and all 25 of the
+ *  first were written again and sent in the same run, so it cost nobody, while all 3 of
+ *  the second were people who got no email. The row to chase was ranked last. So each
+ *  reason now also carries `lost`, the people it named who really ended the run with no
+ *  email, and the rows are ordered by that first. It is the same per-person join the
+ *  counters use, so it is ledger-aware: a dropped SENT line cannot charge a reason with
+ *  a loss that did not happen. */
 export type SiegePushOutcome = {
   log_found: boolean;
   sent: number | null;
@@ -1120,7 +1132,11 @@ export type SiegePushOutcome = {
   /** Batches that exited non-zero having pushed nothing, so their leads were never tried. */
   batches_failed_before_first_lead: number | null;
   escalations: number | null;
-  reasons: Array<{ reason: string; leads: number }>;
+  /** Why planned emails did not go, `leads` being the log lines that named that reason and
+   *  `lost` being how many of those people really ended the run with no email. Ranked by
+   *  `lost`, so a reason that cancelled itself cannot outrank one that cost somebody.
+   *  `lost` is null when the plan could not be read. See siegePushOutcome(). */
+  reasons: Array<{ reason: string; leads: number; lost: number | null }>;
   /** Which offer's writer produced the skipped drafts, so the fix has an address.
    *  Empty when nothing was skipped. See siegePushOutcome(). */
   skipped_by_offer: Array<{ offer: string; leads: number }>;
@@ -1540,6 +1556,19 @@ export function sendPlanHealth(
       'reason. Their reasons were in the log all along (an em dash outside the sign-off ' +
       'twice, bare-title format, opener shape, a rank superlative). `reasons` now covers ' +
       'failed and skipped together, because the question is why a planned email did not go. ' +
+      'AND EVERY `reasons` ROW NOW CARRIES `lost` AND IS RANKED BY IT (2026-11-05): the ' +
+      'rows used to be ordered by how many log lines named each reason, which is the 10-21 ' +
+      'lesson below sitting in the one field a reader opens to decide what to fix. On ' +
+      '2026-11-04 the top row was "is absent from this batch\'s Siege manifest" at 25 ' +
+      'leads and the second was "SmartLead did not add the lead (bounce_count=1)" at 3, ' +
+      'and all 25 of the first were written again and sent in the same run so it cost ' +
+      'nobody, while all 3 of the second were people who got no email: the row to chase ' +
+      'was ranked last. `lost` is the people that reason named who really ended the run ' +
+      'with no email, read off the same ledger-aware per-person join the counters use, so ' +
+      'a dropped SENT line cannot charge a reason with a loss that did not happen. A row ' +
+      'with a large `leads` and `lost: 0` is wasted writer time and not a shortfall. It is ' +
+      'null, not 0, when the plan could not be read, and the rows then keep the old ' +
+      'line-count order because that is all there is. ' +
       'AND READ people_lost, NOT sent AGAINST planned, FOR THE SHORTFALL (2026-10-21): every ' +
       'counter beside it counts log lines, and one planned person can collect several of ' +
       'them or none. On 10-20, 12 skips cost 2 people, because ten of the twelve were ' +
@@ -1804,6 +1833,9 @@ export function siegePushOutcome(
   let deadBatches = 0;
   let escalations = 0;
   const reasons = new Map<string, number>();
+  // Who each reason was said about, so a reason can be charged with the people it really
+  // cost rather than the log lines it printed. See the ranking block below.
+  const reasonIds = new Map<string, Set<string>>();
   const skippedByOffer = new Map<string, number>();
   // Writer verdicts waiting to be claimed by a SKIP, keyed by batch id. Filled from the
   // writer's `still broken:` lines; drained in order by that batch's SKIP lines.
@@ -1852,6 +1884,7 @@ export function siegePushOutcome(
       failedIds.add(fail[1]!);
       const reason = normalizePushReason(fail[2]!);
       reasons.set(reason, (reasons.get(reason) ?? 0) + 1);
+      (reasonIds.get(reason) ?? reasonIds.set(reason, new Set()).get(reason)!).add(fail[1]!);
       continue;
     }
     const skip = /\bSKIP\s+(rec[A-Za-z0-9]{8,})\s+(.*)$/.exec(line);
@@ -1870,6 +1903,7 @@ export function siegePushOutcome(
       const raw = i < queue.length ? `quality gate: ${queue[i]!}` : skip[2]!;
       const reason = normalizePushReason(raw);
       reasons.set(reason, (reasons.get(reason) ?? 0) + 1);
+      (reasonIds.get(reason) ?? reasonIds.set(reason, new Set()).get(reason)!).add(skip[1]!);
       continue;
     }
     // Siege's own count of the approval trim, as a cross-check on reading the files.
@@ -1907,6 +1941,7 @@ export function siegePushOutcome(
   const ledger = ledgerSentIds === null ? null : new Set(ledgerSentIds);
   const wasEmailed = (id: string) => sentIds.has(id) || (ledger?.has(id) ?? false);
   const lost = asked === null ? null : asked.filter((id) => !wasEmailed(id));
+  const lostSet = lost === null ? null : new Set(lost);
   const unlogged = asked === null || ledger === null
     ? null
     : asked.filter((id) => !sentIds.has(id) && ledger.has(id));
@@ -1952,9 +1987,22 @@ export function siegePushOutcome(
     escalations,
     ...join,
     deferred_logged: deferredLogged,
+    // Ranked by the people each reason really cost, not by the lines it printed. A reason
+    // whose leads were all written again and sent reads 0 and sinks below one that cost
+    // somebody, however few lines it printed. `lost` is null when the plan could not be
+    // read, because the loss is unknowable then and the old line-count order is all there
+    // is. See the ranking block on this function.
     reasons: [...reasons.entries()]
-      .map(([reason, leads]) => ({ reason, leads }))
-      .sort((a, b) => b.leads - a.leads || a.reason.localeCompare(b.reason))
+      .map(([reason, leads]) => ({
+        reason,
+        leads,
+        lost: lost === null
+          ? null
+          : [...(reasonIds.get(reason) ?? [])].filter((id) => lostSet!.has(id)).length,
+      }))
+      .sort((a, b) => (b.lost ?? -1) - (a.lost ?? -1)
+        || b.leads - a.leads
+        || a.reason.localeCompare(b.reason))
       // Enough to see the shape of a bad day without pasting a log into the snapshot.
       .slice(0, 6),
     skipped_by_offer: [...skippedByOffer.entries()]
