@@ -354,26 +354,65 @@ export function condenseInboxReason(raw: string): string {
  *  SmartLead suspended, and reading either one took opening two plan files by hand.
  *
  *  Keyed on the condensed reason, so it is the same row the reader is looking at. Only
- *  rows that MOVED are listed, largest move first, because a stable reason argues for
- *  nothing. Null — not empty — unless the two snapshots are comparable: this is the
- *  2026-10-16 rule, that plan.json is overwritten in place, so a delta across two
- *  incomparable hours must read as unknown rather than as steady. */
+ *  rows that MOVED are listed, because a stable reason argues for nothing. Null — not
+ *  empty — unless the two snapshots are comparable: this is the 2026-10-16 rule, that
+ *  plan.json is overwritten in place, so a delta across two incomparable hours must read
+ *  as unknown rather than as steady.
+ *
+ *  AND A MOVE IN `count` IS NOT A MOVE IN SLOTS (2026-11-06). These rows shipped on
+ *  11-04 carrying `count` only, one day before `only` was added to the rows they are
+ *  built from — so the field a reader opens to see which gate moved re-introduced the
+ *  exact fault `only` exists to close, which is the 10-29 rule (read how many mailboxes
+ *  carry a reason ALONE, never how many name it) one level up. On 2026-11-05 the two
+ *  largest moves published here were "SmartLead did not return its suspension status"
+ *  +7 and "suspended in SmartLead" -7, which reads as seven mailboxes coming off
+ *  suspension. Not one of the 90 mailboxes suspended the day before was live: six of the
+ *  seven had simply been relabelled into the unreadable-status row and the seventh into a
+ *  health stop, so the recoverable block went 24 mailboxes to 23 while the published rows
+ *  said ±7. Every row now carries `only`, `only_prev` and `only_change`, and the ranking
+ *  prefers the move in `only` whenever any row can supply one. A NEGATIVE `change` BESIDE
+ *  A FLAT `only_change` IS A RELABELLING, NOT A RECOVERY — read `live_inboxes_change`
+ *  beside it before calling it freed capacity. `only_prev` is null, not 0, for a row a
+ *  pre-11-06 snapshot wrote without it (unknown, not measured-as-nothing), while a row
+ *  absent from a snapshot held nobody alone and is a real 0. */
 export function notLiveReasonMoves(
-  now: Array<{ count: number; reason: string }> | null,
-  prev: Array<{ count: number; reason: string }> | null,
+  now: Array<{ count: number; only?: number | null; reason: string }> | null,
+  prev: Array<{ count: number; only?: number | null; reason: string }> | null,
   comparable: boolean | null,
-): Array<{ reason: string; count: number; prev: number; change: number }> | null {
+): Array<{
+  reason: string; count: number; prev: number; change: number;
+  only: number | null; only_prev: number | null; only_change: number | null;
+}> | null {
   if (comparable !== true || now === null || prev === null) return null;
-  const before = new Map(prev.map((r) => [r.reason, r.count]));
-  const after = new Map(now.map((r) => [r.reason, r.count]));
-  const moves: Array<{ reason: string; count: number; prev: number; change: number }> = [];
+  const before = new Map(prev.map((r) => [r.reason, r]));
+  const after = new Map(now.map((r) => [r.reason, r]));
+  const moves: Array<{
+    reason: string; count: number; prev: number; change: number;
+    only: number | null; only_prev: number | null; only_change: number | null;
+  }> = [];
   for (const reason of new Set([...after.keys(), ...before.keys()])) {
-    const c = after.get(reason) ?? 0;
-    const p = before.get(reason) ?? 0;
-    if (c !== p) moves.push({ reason, count: c, prev: p, change: c - p });
+    const a = after.get(reason);
+    const b = before.get(reason);
+    const c = a?.count ?? 0;
+    const p = b?.count ?? 0;
+    // Absent from a snapshot means it held nobody alone there, which is measured. Present
+    // but written without the field means unknown, and must never read as zero.
+    const only = a ? (typeof a.only === 'number' ? a.only : null) : 0;
+    const onlyPrev = b ? (typeof b.only === 'number' ? b.only : null) : 0;
+    const onlyChange = only !== null && onlyPrev !== null ? only - onlyPrev : null;
+    // A row whose count held steady while the mailboxes it holds ALONE moved is a real
+    // move in slots, so it is published too.
+    if (c === p && !onlyChange) continue;
+    moves.push({ reason, count: c, prev: p, change: c - p, only, only_prev: onlyPrev, only_change: onlyChange });
   }
+  // Rank by the move in slots, and fall back to the move in mailboxes only when no row
+  // can supply one — never mix the two, or a known small slot move sorts under an
+  // unknown large count move and the ranking means nothing.
+  const bySlots = moves.some((m) => m.only_change !== null && m.only_change !== 0);
   return moves
-    .sort((a, b) => Math.abs(b.change) - Math.abs(a.change) || a.reason.localeCompare(b.reason))
+    .sort((a, b) => (bySlots ? Math.abs(b.only_change ?? 0) - Math.abs(a.only_change ?? 0) : 0)
+      || Math.abs(b.change) - Math.abs(a.change)
+      || a.reason.localeCompare(b.reason))
     .slice(0, MAX_NOT_LIVE_REASONS);
 }
 
@@ -561,10 +600,14 @@ export type FleetFacts = {
    *  not a day apart or the newer one post-dates the push, so the delta is real
    *  arithmetic on two different measurements. null means a stamp was missing. */
   delta_comparable: boolean | null;
-  /** Which reason for sitting out grew or eased since yesterday's plan, largest move
-   *  first, keyed on the same condensed reason `not_live_reasons` publishes. Only rows
-   *  that moved appear. Null unless `delta_comparable`. See notLiveReasonMoves(). */
-  not_live_reasons_change: Array<{ reason: string; count: number; prev: number; change: number }> | null;
+  /** Which reason for sitting out grew or eased since yesterday's plan, keyed on the same
+   *  condensed reason `not_live_reasons` publishes. Only rows that moved appear, ranked by
+   *  the move in `only` when that is readable and by the move in `count` otherwise. Null
+   *  unless `delta_comparable`. See notLiveReasonMoves(). */
+  not_live_reasons_change: Array<{
+    reason: string; count: number; prev: number; change: number;
+    only: number | null; only_prev: number | null; only_change: number | null;
+  }> | null;
   /** When the inbox health gate last ran. It is staleness-gated to once per 24h. */
   gate_last_run: string | null;
   gate_paused: number | null;
@@ -997,7 +1040,7 @@ export function fleetFacts(
     live_inboxes?: number | null;
     mailbox_capacity?: number | null;
     plan_generated_at?: string | null;
-    not_live_reasons?: Array<{ count: number; reason: string }> | null;
+    not_live_reasons?: Array<{ count: number; only?: number | null; reason: string }> | null;
   } | null,
   gateState: unknown,
   bandState: unknown = null,
@@ -1571,9 +1614,27 @@ export function sendPlanHealth(
       'and "not in the InboxKit warmup list, so its age is unknown" went 6 to 30 — a ' +
       'mailbox that fell out of the warmup snapshot is a different repair from one ' +
       'SmartLead suspended, and reading either took opening two plan files by hand. Only ' +
-      'rows that MOVED are listed, largest move first, and the whole field is null unless ' +
+      'rows that MOVED are listed, and the whole field is null unless ' +
       'fleet.delta_comparable is true, which is the 10-16 rule: plan.json is overwritten ' +
       'in place, so a delta across two incomparable hours is unknown and NOT steady. ' +
+      'AND READ THE ROW\'S only_change, NOT ITS change, AS A MOVE IN SLOTS (2026-11-06): ' +
+      'these rows shipped on 11-04 carrying count alone, one day before `only` was added ' +
+      'to the rows they are built from, so the field a reader opens to see WHICH GATE ' +
+      'MOVED re-introduced the exact fault `only` exists to close — the 10-29 rule one ' +
+      'level up. On 2026-11-05 the two largest moves published here were "SmartLead did ' +
+      'not return its suspension status" +7 and "suspended in SmartLead" -7, which reads ' +
+      'as seven mailboxes coming off suspension on the morning after the biggest reach ' +
+      'day the pipeline has had. NOT ONE of the 90 mailboxes suspended the day before was ' +
+      'live: six of the seven had been relabelled into the unreadable-status row and the ' +
+      'seventh into a health stop, and the recoverable block went 24 mailboxes to 23 while ' +
+      'the rows said plus and minus seven. Every row now carries only / only_prev / ' +
+      'only_change and the ranking prefers the move in only whenever ANY row can supply ' +
+      'one, falling back to count otherwise rather than mixing the two. A NEGATIVE change ' +
+      'BESIDE A FLAT only_change IS A RELABELLING, NOT A RECOVERY — read ' +
+      'live_inboxes_change beside it before calling it freed capacity. only_prev is null, ' +
+      'not 0, for a row a pre-11-06 snapshot wrote without it (so the first comparable ' +
+      'pair is 11-06 against 11-07), while a row absent from a snapshot held nobody alone ' +
+      'there and is a real 0. ' +
       'DO NOT READ band_stop AS THE CAUSE ON SUCH A DAY: on ' +
       '10-29 it read 48 stopped and looked like a sick fleet, and the twelve mailboxes ' +
       'that could have sent were nowhere in it. ' +
@@ -2642,7 +2703,7 @@ export function priorSendPlan(
   live_inboxes: number | null;
   mailbox_capacity: number | null;
   plan_generated_at: string | null;
-  not_live_reasons: Array<{ count: number; reason: string }> | null;
+  not_live_reasons: Array<{ count: number; only: number | null; reason: string }> | null;
 } | null {
   const p = join(logsDir, `autopilot-debrief-${priorDate}.json`);
   if (!existsSync(p)) return null;
@@ -2662,10 +2723,16 @@ export function priorSendPlan(
       // unknown rather than assumed comparable.
       plan_generated_at: typeof s.plan_generated_at === 'string' ? s.plan_generated_at : null,
       // Written since 2026-11-03. A snapshot from before it reports null, so the moves
-      // read as unknown rather than as every reason arriving today.
+      // read as unknown rather than as every reason arriving today. `only` only joined
+      // the rows on 2026-11-06, so it stays null for an older row — unknown, which is
+      // what keeps a slot move from being invented out of a missing field.
       not_live_reasons: Array.isArray(s.not_live_reasons)
         ? (s.not_live_reasons as Array<Record<string, unknown>>)
-            .map((r) => ({ count: num(r.count) ?? 0, reason: typeof r.reason === 'string' ? r.reason : '' }))
+            .map((r) => ({
+              count: num(r.count) ?? 0,
+              only: num(r.only),
+              reason: typeof r.reason === 'string' ? r.reason : '',
+            }))
             .filter((r) => r.reason !== '')
         : null,
     };

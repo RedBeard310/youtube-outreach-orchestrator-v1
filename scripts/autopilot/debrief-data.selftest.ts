@@ -432,9 +432,37 @@ ok('only the reasons that moved are published, largest move first',
      { count: 36, reason: 'on warmup day N, and the floor is day N' },
      { count: 2, reason: 'SmartLead did not say' }],
     true),
-  [{ reason: 'not in the InboxKit warmup list, so its age is unknown', count: 30, prev: 6, change: 24 },
-   { reason: 'suspended in SmartLead', count: 90, prev: 77, change: 13 },
-   { reason: 'SmartLead did not say', count: 0, prev: 2, change: -2 }]);
+  [{ reason: 'not in the InboxKit warmup list, so its age is unknown', count: 30, prev: 6, change: 24, only: null, only_prev: null, only_change: null },
+   { reason: 'suspended in SmartLead', count: 90, prev: 77, change: 13, only: null, only_prev: null, only_change: null },
+   { reason: 'SmartLead did not say', count: 0, prev: 2, change: -2, only: 0, only_prev: null, only_change: null }]);
+// A MOVE IN count IS NOT A MOVE IN SLOTS (2026-11-06). The real 11-04 -> 11-05 move: the
+// rows said suspension eased by 7 and the unreadable-status row grew by 7, and not one of
+// the 90 suspended mailboxes was live — 6 were relabelled into the new row and 1 into a
+// health stop, so the block that can actually be recovered went 24 to 23.
+ok('a relabelling ranks under the one slot it really moved',
+  notLiveReasonMoves(
+    [{ count: 83, only: 23, reason: 'suspended in SmartLead' },
+     { count: 7, only: 1, reason: 'SmartLead did not return its suspension status' },
+     { count: 36, only: 0, reason: 'on warmup day N, and the floor is day N' }],
+    [{ count: 90, only: 24, reason: 'suspended in SmartLead' },
+     { count: 36, only: 0, reason: 'on warmup day N, and the floor is day N' }],
+    true),
+  [{ reason: 'SmartLead did not return its suspension status', count: 7, prev: 0, change: 7, only: 1, only_prev: 0, only_change: 1 },
+   { reason: 'suspended in SmartLead', count: 83, prev: 90, change: -7, only: 23, only_prev: 24, only_change: -1 }]);
+ok('a row holding steady while the slots it costs move is still published',
+  notLiveReasonMoves(
+    [{ count: 12, only: 5, reason: 'suspended in SmartLead' }],
+    [{ count: 12, only: 0, reason: 'suspended in SmartLead' }],
+    true),
+  [{ reason: 'suspended in SmartLead', count: 12, prev: 12, change: 0, only: 5, only_prev: 0, only_change: 5 }]);
+ok('an unreadable only cannot invent a slot move, and keeps the count ranking',
+  notLiveReasonMoves(
+    [{ count: 30, reason: 'not in the InboxKit warmup list, so its age is unknown' },
+     { count: 7, only: 2, reason: 'suspended in SmartLead' }],
+    [{ count: 6, reason: 'not in the InboxKit warmup list, so its age is unknown' },
+     { count: 7, only: 2, reason: 'suspended in SmartLead' }],
+    true),
+  [{ reason: 'not in the InboxKit warmup list, so its age is unknown', count: 30, prev: 6, change: 24, only: null, only_prev: null, only_change: null }]);
 ok('an incomparable pair of snapshots reads as unknown, never as no change',
   [notLiveReasonMoves([{ count: 1, reason: 'a' }], [{ count: 9, reason: 'a' }], false),
    notLiveReasonMoves([{ count: 1, reason: 'a' }], [{ count: 9, reason: 'a' }], null),
