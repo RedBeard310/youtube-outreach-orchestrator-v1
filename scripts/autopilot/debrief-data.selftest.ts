@@ -1,5 +1,9 @@
 import { bulkRewriteShape, bandGateFacts, condenseInboxReason, notLiveReasonMoves, notLiveReasonTally, splitInboxReasons, fleetFacts, inboxGateFacts, apifyBatchFacts, apifyIdleCause, apifyLedgerLine, NO_PUSH_OUTCOME, normalizePushReason, offerFromBatchId, openRouterRunwayAlarm, OPENROUTER_RATE_MAX_AGE_H, siegeApprovedLeadIds, siegePlanLeadIds, siegePushOutcome, classifyKeyProbe, cyclePacificDay, costWindows, enrichmentChainFacts, isSendingDay, perEnrichedLeadCost, PER_LEAD_SAMPLE_FLOOR, projectRecoveryBudget, MAX_MISSING_DEBRIEFS, missingDebriefs, NO_UNIT, pushRunVerdict, siegeRunAlarm, unitStartedAt, sendPlanHealth, siegePlanFacts, summarizeSendLines, isVerifiedOrBeyond, laneYield, priorAdvanceSource, priorSeedsAdvanced, priorSeedsWalked, reconcileAdvanced, sessionSeedsAdvanced, sessionStartMs, walkRateTrend } from './debrief-data.ts';
+import { lostCohort } from './debrief-data.ts';
 import { MAX_SHELF_STRANDED_IDS, recoveredTally, shelfTally, type ShelfRow } from '../../src/db.ts';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join as joinPath } from 'node:path';
 
 let fail = 0;
 const ok = (name: string, got: unknown, want: unknown) => {
@@ -1875,6 +1879,49 @@ ok('a cycle with no first touches is zero, not unknown',
     return [t.recovered, t.fresh, t.oldestDay];
   })(),
   [0, 0, null]);
+
+// lostCohort — 2026-11-07. The live shape: people_lost read 5, 5, 8, 9, 9 across the five
+// sending cycles from 11-03 and it was one cohort of nine, five of them lost every day.
+const COHORT_DIR = mkdtempSync(joinPath(tmpdir(), 'lost-cohort-'));
+const writeSnap = (date: string, lostIds: string[] | null) =>
+  writeFileSync(
+    joinPath(COHORT_DIR, `autopilot-debrief-${date}.json`),
+    JSON.stringify({ send_plan: { push_outcome: lostIds === null ? {} : { lost_ids: lostIds } } }),
+  );
+const FIVE = ['recA', 'recB', 'recC', 'recD', 'recE'];
+writeSnap('2026-11-03', FIVE);
+writeSnap('2026-11-04', FIVE);
+writeSnap('2026-11-05', [...FIVE, 'recF', 'recG', 'recH']);
+writeSnap('2026-11-06', [...FIVE, 'recF', 'recG', 'recH', 'recI']);
+// Newest first, which is the order the caller passes and the order the streak walk needs.
+const PRIOR = ['2026-11-06', '2026-11-05', '2026-11-04', '2026-11-03'];
+ok('nine losses that have all been lost before are a standing cohort, not a fresh loss',
+  (() => { const c = lostCohort([...FIVE, 'recF', 'recG', 'recH', 'recI'], PRIOR, COHORT_DIR);
+    return [c.lost_recurring, c.lost_new, c.lost_longest_streak]; })(),
+  [9, 0, 5]);
+ok('a person lost for the first time today is the day\'s own damage',
+  (() => { const c = lostCohort(['recA', 'recNEW'], PRIOR, COHORT_DIR);
+    return [c.lost_recurring, c.lost_new, c.lost_longest_streak, c.lost_recurring_ids]; })(),
+  [1, 1, 5, ['recA']]);
+ok('a streak counts consecutive days, so a gap in the middle ends it',
+  lostCohort(['recI'], PRIOR, COHORT_DIR).lost_longest_streak, 2);
+// A weekend has no push, so it has no loss list. Stepping over it must not break a streak.
+writeSnap('2026-11-07', null);
+// 5 = today plus the four days that do carry a list. Breaking the streak there would be 1.
+ok('a snapshot with no loss list is stepped over, not read as a clear day',
+  lostCohort(FIVE, ['2026-11-07', ...PRIOR], COHORT_DIR).lost_longest_streak, 5);
+ok('no readable prior snapshot is unknown, not a cohort of new people',
+  lostCohort(FIVE, ['2026-10-01'], COHORT_DIR),
+  { lost_recurring: null, lost_new: null, lost_longest_streak: null, lost_recurring_ids: [] });
+ok('a day that lost nobody is a real zero with no streak',
+  (() => { const c = lostCohort([], PRIOR, COHORT_DIR);
+    return [c.lost_recurring, c.lost_new, c.lost_longest_streak]; })(),
+  [0, 0, 0]);
+rmSync(COHORT_DIR, { recursive: true, force: true });
+// The parser itself must stay a pure read: the cohort is the caller's to fill in.
+ok('the push parser leaves the cohort unknown for the caller',
+  [NO_PUSH_OUTCOME.lost_recurring, PREPUSHED.lost_recurring, PREPUSHED.lost_longest_streak],
+  [null, null, null]);
 
 console.log(fail === 0 ? '\nALL PASS' : `\n${fail} FAILED`);
 process.exit(fail === 0 ? 0 : 1);

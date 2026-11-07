@@ -1260,6 +1260,19 @@ export type SiegePushOutcome = {
   /** Those people, named, so the morning is one grep and not a hand-written join.
    *  Capped at 12. */
   lost_ids: string[];
+  /** How many of the people named in `lost_ids` an earlier snapshot already named. A
+   *  standing cohort and a fresh loss read identically in `people_lost`, and five debriefs
+   *  running read one as the other — see the cohort block on lostCohort(). */
+  lost_recurring: number | null;
+  /** ...and how many had never been lost before. This is the day's new damage. */
+  lost_new: number | null;
+  /** The most consecutive snapshot days any one of them has been lost, today included. 1
+   *  means nobody has been lost twice in a row; a figure climbing by one a day is a person
+   *  the plan will keep re-planning and the push will keep refusing. */
+  lost_longest_streak: number | null;
+  /** The recurring ones, named, capped at 12, so the standing cohort can be worked on
+   *  rather than re-counted. */
+  lost_recurring_ids: string[];
   /** Skips that cost a draft and not a person: a SKIP in one batch, a SENT in another,
    *  same run. This is why `skipped` can exceed `people_lost` and must not be read as
    *  a loss on its own. */
@@ -1303,6 +1316,10 @@ export const NO_PUSH_OUTCOME: SiegePushOutcome = {
   emailed_unlogged: null,
   emailed_unlogged_ids: [],
   lost_ids: [],
+  lost_recurring: null,
+  lost_new: null,
+  lost_longest_streak: null,
+  lost_recurring_ids: [],
   skipped_then_sent: null,
   skipped_unplanned: null,
   approved_leads: null,
@@ -1731,6 +1748,21 @@ export function sendPlanHealth(
       'skill\'s, and lost_before_push is the bundle or the writer. Those lines are read ' +
       'only for people the join already found lost, and never into failed or skipped, so ' +
       'this can only move somebody out of the silent group. ' +
+      'AND READ lost_new, NOT people_lost, AS THE DAY\'S OWN DAMAGE (2026-11-07): the ' +
+      'counter cannot say whether the people it counts are new, and across the five sending ' +
+      'cycles from 11-03 it read 5, 5, 8, 9, 9, which reads as a small leak growing. It was ' +
+      'ONE cohort of nine. Every id named on 11-03 was named again on 11-07, five have now ' +
+      'been lost on five consecutive sending days, and the distinct count across the whole ' +
+      'run never passed nine — so five debriefs reported a fresh loss each morning about ' +
+      'the same nine people, who were taking about 9% of a 101-slot day. lost_recurring is ' +
+      'how many an earlier snapshot already named, lost_new is the day\'s new damage, ' +
+      'lost_longest_streak is the most consecutive snapshot days any of them has been lost, ' +
+      'and lost_recurring_ids names them. A streak climbing by one a morning is somebody no ' +
+      'push will ever send: two of these nine have channels that no longer exist on YouTube ' +
+      'and five carry a bounce already on SmartLead\'s file, so the repair is to stop ' +
+      'planning them, not to re-count them. Measured over lost_ids, which is capped at 12, ' +
+      'so a day losing more than that reports a lower bound. Null, not 0, when no earlier ' +
+      'snapshot carries a readable list: unknown, and NOT a cohort of new people. ' +
       'AND READ approved_leads, NOT planned_leads, AS WHAT THE PUSH WAS ASKED FOR ' +
       '(2026-10-22): plan.json is not the push\'s instruction. Siege runs twice each ' +
       'morning — a sample run records the people it covers, then the push run rebuilds the ' +
@@ -2203,6 +2235,13 @@ export function siegePushOutcome(
     batches_failed_before_first_lead: deadBatches,
     escalations,
     ...join,
+    // Filled in by the caller out of the snapshots this script wrote on earlier days — see
+    // lostCohort(). Null here so this function stays a pure read of one log and one plan,
+    // which is what the selftests exercise.
+    lost_recurring: null,
+    lost_new: null,
+    lost_longest_streak: null,
+    lost_recurring_ids: [],
     deferred_logged: deferredLogged,
     // Ranked by the people each reason really cost, not by the lines it printed. A reason
     // whose leads were all written again and sent reads 0 and sinks below one that cost
@@ -2833,6 +2872,79 @@ export function priorSendPlan(
         : null,
     };
   } catch { return null; }
+}
+
+/** Is today's loss a fresh one, or the same people again?
+ *
+ *  WHY (2026-11-07). `people_lost` counts the people a push ended without emailing, and it
+ *  cannot say whether they are new. Across the five sending cycles from 2026-11-03 it read
+ *  5, 5, 8, 9, 9 — which reads as a small leak growing, and five debriefs reported it that
+ *  way. It was ONE cohort of nine people. Every id named on 11-03 was named again on 11-07,
+ *  five of them have now been lost on five consecutive sending days, and the distinct count
+ *  across the whole run never exceeded nine. Nothing is fixed by a day's arithmetic there:
+ *  the plan re-plans them, the writers write them again, and SmartLead refuses them again.
+ *  Two of the nine have channels that no longer exist on YouTube, five carry a bounce
+ *  already on SmartLead's file, and together they were costing about 9% of a 101-slot day.
+ *
+ *  So join today's named losses against the snapshots this script wrote on earlier days.
+ *  `lost_recurring` is how many were already lost at least once, `lost_new` is the day's
+ *  own damage, and `lost_longest_streak` counts consecutive snapshot days — a figure that
+ *  climbs by one every morning names a person no push will ever send, which is a reason to
+ *  stop planning them rather than to re-count them.
+ *
+ *  Measured over `lost_ids`, which is capped at 12, so on a day that lost more than that
+ *  these are a lower bound and their denominator is that list, not `people_lost`. Null when
+ *  no prior snapshot carries a readable `lost_ids`: unknown, and NOT a cohort of new
+ *  people. A day that lost nobody is a real zero with a streak of 0. */
+export function lostCohort(
+  lostIds: string[],
+  priorDates: string[],
+  logsDir: string = LOGS,
+): {
+  lost_recurring: number | null;
+  lost_new: number | null;
+  lost_longest_streak: number | null;
+  lost_recurring_ids: string[];
+} {
+  const unknown = {
+    lost_recurring: null, lost_new: null, lost_longest_streak: null,
+    lost_recurring_ids: [] as string[],
+  };
+  // Newest first, so the streak walk below runs backwards in time from today.
+  const history: Array<Set<string>> = [];
+  for (const d of priorDates) {
+    const p = join(logsDir, `autopilot-debrief-${d}.json`);
+    if (!existsSync(p)) continue;
+    try {
+      const prior = JSON.parse(readFileSync(p, 'utf8')) as {
+        send_plan?: { push_outcome?: { lost_ids?: unknown } };
+      };
+      const ids = prior.send_plan?.push_outcome?.lost_ids;
+      // A snapshot with no readable list says nothing either way, and a gap must not break
+      // a streak: a weekend has no push, so it has no losses and no list. Skipped over,
+      // never counted as a day the cohort was clear.
+      if (!Array.isArray(ids)) continue;
+      history.push(new Set(ids.filter((x): x is string => typeof x === 'string')));
+    } catch { /* a snapshot we cannot read is not a day on which nobody was lost */ }
+  }
+  if (history.length === 0) return unknown;
+  const today = [...new Set(lostIds)];
+  const recurring = today.filter((id) => history.some((h) => h.has(id)));
+  let longest = today.length === 0 ? 0 : 1;
+  for (const id of today) {
+    let run = 1;
+    for (const h of history) {
+      if (!h.has(id)) break;
+      run += 1;
+    }
+    if (run > longest) longest = run;
+  }
+  return {
+    lost_recurring: recurring.length,
+    lost_new: today.length - recurring.length,
+    lost_longest_streak: longest,
+    lost_recurring_ids: recurring.slice(0, 12),
+  };
 }
 
 /** Last cycle's population per `review_status`, out of the snapshot this script wrote 24h
@@ -4884,6 +4996,16 @@ async function main(): Promise<void> {
     ),
     // Which step of the oneshot died, when one did — see the binding ladder.
     readSiegeApprovalRecorded(cycleDay),
+  );
+  // Whether the day's named losses are new people or the same cohort again. Read out of
+  // the snapshots this script wrote on the previous 14 days, newest first, so weekends and
+  // missed cycles are stepped over rather than counted as clear days. See lostCohort().
+  Object.assign(
+    sendPlan.push_outcome,
+    lostCohort(
+      sendPlan.push_outcome.lost_ids,
+      Array.from({ length: 14 }, (_, i) => pacificDate(new Date(sinceMs - i * 86_400_000))),
+    ),
   );
   // The fleet's own day-over-day move, which no snapshot carried until 2026-10-15 —
   // see FleetFacts. Both reads are filesystem-only and degrade to nulls.
