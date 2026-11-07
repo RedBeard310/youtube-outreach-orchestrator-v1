@@ -5000,13 +5000,20 @@ async function main(): Promise<void> {
   // Whether the day's named losses are new people or the same cohort again. Read out of
   // the snapshots this script wrote on the previous 14 days, newest first, so weekends and
   // missed cycles are stepped over rather than counted as clear days. See lostCohort().
-  Object.assign(
-    sendPlan.push_outcome,
-    lostCohort(
-      sendPlan.push_outcome.lost_ids,
-      Array.from({ length: 14 }, (_, i) => pacificDate(new Date(sinceMs - i * 86_400_000))),
-    ),
-  );
+  //
+  // A cycle with no push log carries the shared NO_PUSH_OUTCOME object, whose loss list is
+  // empty — so this must neither mutate it (it would leak into every later read in the
+  // process) nor answer 0 for a day whose loss is simply unknown. Replaced, not assigned
+  // into, and only when there is a log to have lost anybody.
+  if (sendPlan.push_outcome.log_found) {
+    sendPlan.push_outcome = {
+      ...sendPlan.push_outcome,
+      ...lostCohort(
+        sendPlan.push_outcome.lost_ids,
+        Array.from({ length: 14 }, (_, i) => pacificDate(new Date(sinceMs - i * 86_400_000))),
+      ),
+    };
+  }
   // The fleet's own day-over-day move, which no snapshot carried until 2026-10-15 —
   // see FleetFacts. Both reads are filesystem-only and degrade to nulls.
   const fleet = fleetFacts(
