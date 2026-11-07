@@ -1240,8 +1240,14 @@ export type SiegePushOutcome = {
   lost_to_fail: number | null;
   /** ...of which we declined to offer them (a SKIP and no SENT anywhere). */
   lost_to_skip: number | null;
-  /** ...of which the log said NOTHING about at all. No SENT, no FAIL, no SKIP, and no
-   *  send row in the ledger either. */
+  /** ...of which never got as far as an offer at all: the research stage could not build
+   *  their bundle, or the writer produced no draft, so SmartLead was never handed anything
+   *  to refuse. Those lines carry neither FAIL nor SKIP, so until 2026-11-07 they fell into
+   *  `lost_silently` and read as people the log said nothing about. A different repair from
+   *  either neighbour: the bundle or the skill is what to fix, not the push. */
+  lost_before_push: number | null;
+  /** ...of which the log said NOTHING about at all. No SENT, no FAIL, no SKIP, no research
+   *  or writer verdict, and no send row in the ledger either. */
   lost_silently: number | null;
   /** People the log never printed a SENT for and the send ledger says were emailed
    *  anyway. These are NOT lost, and the count is how much of the push's own narration
@@ -1292,6 +1298,7 @@ export const NO_PUSH_OUTCOME: SiegePushOutcome = {
   people_lost: null,
   lost_to_fail: null,
   lost_to_skip: null,
+  lost_before_push: null,
   lost_silently: null,
   emailed_unlogged: null,
   emailed_unlogged_ids: [],
@@ -1707,6 +1714,23 @@ export function sendPlanHealth(
       'in the plan (skipped_unplanned), and that cycle\'s three real losses were planned ' +
       'drafts the writer\'s quality gate rejected (lost_to_skip). All of it is null when the ' +
       'plan cannot be read, which is unknown and NOT a clean push. ' +
+      'AND READ lost_before_push BEFORE READING lost_silently AS A MYSTERY (2026-11-07): ' +
+      'every counter in the split reads the push\'s own verdicts, so a person the push was ' +
+      'never handed printed nothing any of them matches and fell into the one field whose ' +
+      'whole meaning is "the log said nothing about them at all". It said plenty about ' +
+      'three of the four silent losses on 2026-11-06. Two were research-stage failures, ' +
+      '"[FAILED ] <channel> -> <id>__<channel>.md", both leads sitting at outreach_status ' +
+      'failed because their channels are gone from YouTube ("No channel found for id=..."), ' +
+      'and one was a writer that produced no draft at all — short-save-time found no clean ' +
+      'job title, the voice-objection retry put an em dash outside the sign-off, and both ' +
+      'attempts logged a lowercase "failed <reason>" the FAIL matcher cannot see. That is ' +
+      'the 10-09 lesson (a reason sitting in the log with no counter able to read it) one ' +
+      'stage earlier. lost_before_push is that group and each of them now earns a row in ' +
+      'reasons; lost_silently is what is left, which is a person the whole file never ' +
+      'mentions. The repair differs: lost_to_fail is SmartLead\'s, lost_to_skip is the ' +
+      'skill\'s, and lost_before_push is the bundle or the writer. Those lines are read ' +
+      'only for people the join already found lost, and never into failed or skipped, so ' +
+      'this can only move somebody out of the silent group. ' +
       'AND READ approved_leads, NOT planned_leads, AS WHAT THE PUSH WAS ASKED FOR ' +
       '(2026-10-22): plan.json is not the push\'s instruction. Siege runs twice each ' +
       'morning — a sample run records the people it covers, then the push run rebuilds the ' +
@@ -1937,7 +1961,19 @@ export function sendPlanHealth(
  *  mentioned — a logging fault in the send path, worth seeing on its own. Deliberately
  *  additive: the ledger can only ever move somebody OUT of the loss, never into it, so a
  *  partial read cannot invent a loss. Null when it cannot be read at all, and then this is
- *  the log-only join that shipped before. */
+ *  the log-only join that shipped before.
+ *
+ *  AND SOME PEOPLE ARE LOST BEFORE THE PUSH EVER SEES THEM (2026-11-07). Every verdict
+ *  above is the push's, so a planned person who never got as far as an offer printed
+ *  nothing any of them matches and counted as `lost_silently` — a field that is supposed to
+ *  mean the log never mentioned them. On 2026-11-06 it held four people and the log named
+ *  three: two whose research stage could not build a bundle (`[FAILED ] <channel> ->
+ *  <id>__...md`, both with channels that no longer exist on YouTube) and one the writers
+ *  gave up on twice, each attempt logging a lowercase `failed <reason>` that the `FAIL`
+ *  matcher cannot see. `lost_before_push` is that group, each of them earns a row in
+ *  `reasons`, and `lost_silently` goes back to meaning what it says. Read only for people
+ *  the join already found lost and never into `failed` or `skipped`, so like the ledger it
+ *  can only move somebody out of a worse answer. */
 export function siegePushOutcome(
   log: string,
   sinceISO: string,
@@ -1962,6 +1998,11 @@ export function siegePushOutcome(
   // writer's `still broken:` lines; drained in order by that batch's SKIP lines.
   const gateReasons = new Map<string, string[]>();
   const gateUsed = new Map<string, number>();
+  // Why a planned person never reached SmartLead at all, keyed by lead id. Two shapes, see
+  // the pre-push block in the loop. Claimed in the join below ONLY for people it finds lost
+  // and only when nothing else spoke for them, so this can move somebody OUT of
+  // `lost_silently` and can never invent a loss or disturb the line counters.
+  const prePushReason = new Map<string, string>();
   // Who the push said what about, for the per-person join below. A lead can appear in
   // more than one of these — that is the whole point of keeping them apart.
   const sentIds = new Set<string>();
@@ -2027,6 +2068,40 @@ export function siegePushOutcome(
       (reasonIds.get(reason) ?? reasonIds.set(reason, new Set()).get(reason)!).add(skip[1]!);
       continue;
     }
+    // THE TWO SHAPES THAT COME BEFORE THE PUSH (2026-11-07). Everything above reads the
+    // push's own verdicts, so a person the push was never handed printed nothing it
+    // matches and landed in `lost_silently` — a field whose whole meaning is "the log said
+    // nothing about them at all". On 2026-11-06 it said plenty about three of the four:
+    //
+    //   | [FAILED            ] GET CUT WITH GLASS → recYIzI1wmtvWAfyc__GET_CUT_WITH_GLASS.md
+    //   |   recYZCjHSZnKslfkq        failed   em-dash: em or en dash outside the sign-off
+    //
+    // The first is the research stage giving up on a bundle (both leads it named sit at
+    // `outreach_status = failed`, their channels gone from YouTube); the second is a writer
+    // that produced no draft, which is the 10-09 SKIP lesson in a new place — a reason
+    // sitting in the log with no counter able to read it.
+    //
+    // Deliberately NOT added to `failed` or `skipped`. Those count the push's lines, and a
+    // lead the push never saw must not inflate them: the 10-05 comment above keeps writer
+    // FAILs out of the push's tally for exactly that reason, and this keeps the same rule.
+    // The first reason per lead wins, so one lost person charges one row however many
+    // offers were tried for them.
+    const research = /\[FAILED\s*\].*?\b(rec[A-Za-z0-9]{8,})__/.exec(line);
+    if (research) {
+      if (!prePushReason.has(research[1]!)) {
+        prePushReason.set(research[1]!, 'the research stage could not build a bundle');
+      }
+      continue;
+    }
+    // Lowercase `failed`, which is the writers' own wording; `FAIL` is the push's and is
+    // matched above. The reason is whatever the skill's quality gate said.
+    const wrote = /\|\s+(rec[A-Za-z0-9]{8,})\s+failed\s+(\S.*)$/.exec(line);
+    if (wrote) {
+      if (!prePushReason.has(wrote[1]!)) {
+        prePushReason.set(wrote[1]!, `no draft was written: ${wrote[2]!.trim()}`);
+      }
+      continue;
+    }
     // Siege's own count of the approval trim, as a cross-check on reading the files.
     // Worded by approval_is_current() in automator/scripts/siege-plan.py.
     const deferLine = /(\d+)\s+planned today were not in the approved list/.exec(line);
@@ -2063,6 +2138,14 @@ export function siegePushOutcome(
   const wasEmailed = (id: string) => sentIds.has(id) || (ledger?.has(id) ?? false);
   const lost = asked === null ? null : asked.filter((id) => !wasEmailed(id));
   const lostSet = lost === null ? null : new Set(lost);
+  // Lost people the log explained before the push ever ran. Last in the order of
+  // precedence: a FAIL is SmartLead's refusal and a SKIP is our own, and either outranks a
+  // doomed earlier attempt for the same person.
+  const preIds = new Set(
+    (lost ?? []).filter(
+      (id) => prePushReason.has(id) && !failedIds.has(id) && !skippedIds.has(id),
+    ),
+  );
   const unlogged = asked === null || ledger === null
     ? null
     : asked.filter((id) => !sentIds.has(id) && ledger.has(id));
@@ -2084,7 +2167,10 @@ export function siegePushOutcome(
       people_lost: lost.length,
       lost_to_fail: lost.filter((id) => failedIds.has(id)).length,
       lost_to_skip: lost.filter((id) => !failedIds.has(id) && skippedIds.has(id)).length,
-      lost_silently: lost.filter((id) => !failedIds.has(id) && !skippedIds.has(id)).length,
+      lost_before_push: preIds.size,
+      lost_silently: lost.filter(
+        (id) => !failedIds.has(id) && !skippedIds.has(id) && !preIds.has(id),
+      ).length,
       emailed_unlogged: unlogged === null ? null : unlogged.length,
       emailed_unlogged_ids: (unlogged ?? []).slice(0, 12),
       // Named, because the loss is usually one or two people and a name is actionable
@@ -2098,6 +2184,16 @@ export function siegePushOutcome(
         return [...skippedIds].filter((id) => !inPlan.has(id)).length;
       })(),
     };
+
+  // A pre-push cause earns a row in `reasons` for the same stated purpose the SKIP rows
+  // have had since 10-09: the question is why a planned email did not go, and a loss with
+  // no reason is the one shape nobody can act on. Added after the join because only the
+  // join knows who was really lost.
+  for (const id of preIds) {
+    const reason = normalizePushReason(prePushReason.get(id)!);
+    reasons.set(reason, (reasons.get(reason) ?? 0) + 1);
+    (reasonIds.get(reason) ?? reasonIds.set(reason, new Set()).get(reason)!).add(id);
+  }
 
   return {
     log_found: true,

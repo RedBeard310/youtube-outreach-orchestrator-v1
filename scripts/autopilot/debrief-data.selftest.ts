@@ -1338,6 +1338,50 @@ ok('the ledger does not re-credit somebody the approval held for tomorrow',
     return [p.approved_leads, p.deferred_unapproved, p.people_lost, p.emailed_unlogged]; })(),
   [2, 2, 1, 0]);
 
+// 2026-11-07: three of the four "silent" losses on 11-06 had a reason in the log, in two
+// shapes no counter could read. The live lines, verbatim but for the ids.
+const PREPUSH_LOG = [
+  '[2026-11-06T11:30:14Z]   | [11:29:43] [Afyc1 GONE CHANNEL] FAILED: Enrichment exited with code 1. Last stderr:',
+  '[2026-11-06T11:30:14Z]   | Error: No channel found for id=UCxqnDDWY7fzzx5ypqZW2PKg',
+  '[2026-11-06T11:30:14Z]   | [FAILED            ] GONE CHANNEL → recNOBUNDLE1AAAAA__GONE_CHANNEL.md',
+  '[2026-11-06T11:30:14Z]   | [FAILED            ] ALSO GONE → recNOBUNDLE2BBBBB__ALSO_GONE.md',
+  // The writers gave up on this one twice, each attempt a lowercase `failed`.
+  '[2026-11-06T11:21:05Z]   |   recNODRAFT3CCCCCC            failed   business owner  (no clean job title exists)',
+  '[2026-11-06T11:27:29Z]   recNODRAFT3CCCCCC: short-save-time wrote nothing; trying voice-objection-proof instead',
+  '[2026-11-06T11:27:29Z]   |   recNODRAFT3CCCCCC        failed   em-dash: em or en dash outside the sign-off',
+  // SmartLead refused this one, which outranks anything said earlier about it.
+  '[2026-11-06T11:20:00Z]   |   recBOTH4DDDDDDDD            failed   em-dash: em or en dash outside the sign-off',
+  '[2026-11-06T11:54:12Z]   |   FAIL  recBOTH4DDDDDDDD    SmartLead did not add the lead (bounce_count=1)',
+  // And this one the file really never mentions.
+].join('\n');
+const PREPUSH_PLANNED = ['recNOBUNDLE1AAAAA', 'recNOBUNDLE2BBBBB', 'recNODRAFT3CCCCCC',
+  'recBOTH4DDDDDDDD', 'recTRULYSILENT5EE'];
+const PREPUSHED = siegePushOutcome(PREPUSH_LOG, '2026-11-06T08:00:00.000Z',
+  '2026-11-07T08:00:00.000Z', PREPUSH_PLANNED, PREPUSH_PLANNED, []);
+ok('a loss the log explained before the push is not a silent one',
+  [PREPUSHED.people_lost, PREPUSHED.lost_to_fail, PREPUSHED.lost_to_skip,
+    PREPUSHED.lost_before_push, PREPUSHED.lost_silently],
+  [5, 1, 0, 3, 1]);
+ok('a pre-push cause earns a row charged with the people it cost',
+  PREPUSHED.reasons.map((r) => [r.reason, r.leads, r.lost]),
+  [
+    ['the research stage could not build a bundle', 2, 2],
+    // Tied on people and lines, so the existing tiebreak is the reason text.
+    ['no draft was written: business owner (no clean job title exists)', 1, 1],
+    ['SmartLead did not add the lead (bounce_count=1)', 1, 1],
+  ]);
+// The whole point of reading them after the join: these lines must not become push events.
+ok('a doomed earlier attempt is not a push refusal and not a skip',
+  [PREPUSHED.failed, PREPUSHED.skipped, PREPUSHED.sent],
+  [1, 0, 0]);
+// A lead the push got to is untouched by anything said about an earlier attempt.
+ok('a person who was emailed in the end is not charged with the draft that failed first',
+  (() => { const p = siegePushOutcome(
+    PREPUSH_LOG + '\n[2026-11-06T12:00:00Z]   |   SENT  recNODRAFT3CCCCCC    a@b.com  smartlead_lead=9',
+    '2026-11-06T08:00:00.000Z', '2026-11-07T08:00:00.000Z', PREPUSH_PLANNED, PREPUSH_PLANNED, []);
+    return [p.people_emailed, p.people_lost, p.lost_before_push]; })(),
+  [1, 4, 2]);
+
 // 2026-10-22: the approval trim. The push run rebuilds the plan, so plan.json can hold
 // people the morning's approval never covered; Siege holds those for tomorrow and they
 // print no line at all, which read as lost_silently. Live 10-21 shape: 149 on disk, 131
