@@ -923,12 +923,35 @@ export function bandGateFacts(
     const a = Date.parse(window.sinceISO);
     const b = Date.parse(window.untilISO);
     if (Number.isFinite(a) && Number.isFinite(b)) {
+      // THE MOVES START AFTER THE PRIOR READING, NOT AT THE CYCLE BOUNDARY (2026-11-08).
+      //
+      // `band_normal_prev` is read off the run at `band_prev_at`, and that run's counts
+      // ALREADY include the moves it made itself. Counting those moves again here left
+      // the two numbers a reader subtracts describing different spans, so they could not
+      // be reconciled — the 2026-10-16 fault (two instruments read at different hours)
+      // inside one block.
+      //
+      // Measured on 2026-11-08. The prior reading was the 11-07T08:05:26Z run, whose own
+      // `to_normal` held three mailboxes, and the gate's hourly counts walked
+      // 50 → 51 → 52 → 53 → 52 → 50 → 48 from there. So the real moves after it were 3 to
+      // normal and 5 to watch, closing exactly on `band_normal_change: -2`. The published
+      // figures were 6 and 5, which reconcile to +1 against a fleet that lost two, and
+      // `band_returned` named three mailboxes that had already been credited to the prior
+      // day's count.
+      //
+      // The peak still spans the whole cycle, deliberately: it answers "how high did the
+      // fleet get today", which has nothing to do with where the comparison starts.
+      const prevMs = prev && typeof prev.at === 'string' ? Date.parse(prev.at) : NaN;
+      const movesAfter = Number.isFinite(prevMs) && prevMs >= a && prevMs < b ? prevMs : null;
       toNormal = 0; toWatch = 0; toStop = 0;
       const fellBack = new Set<string>();
       for (const r of runs) {
         if (typeof r?.at !== 'string') continue;
         const ms = Date.parse(r.at);
         if (!Number.isFinite(ms) || ms < a || ms >= b) continue;
+        const nrm = num((r.counts && typeof r.counts === 'object' ? r.counts : {}).normal);
+        if (nrm !== null && (peak === null || nrm > peak)) { peak = nrm; peakAt = r.at; }
+        if (movesAfter !== null && ms <= movesAfter) continue;
         const n = Array.isArray(r.to_normal) ? r.to_normal.map(String) : [];
         const w = Array.isArray(r.to_watch) ? r.to_watch.map(String) : [];
         const st = Array.isArray(r.to_stop) ? r.to_stop.map(String) : [];
@@ -942,8 +965,6 @@ export function bandGateFacts(
         // Ordered walk, so a demotion only counts against a mailbox that had already
         // been handed `normal` earlier in this same cycle.
         for (const e of [...w, ...st]) if (cameBack.has(e)) fellBack.add(e);
-        const nrm = num((r.counts && typeof r.counts === 'object' ? r.counts : {}).normal);
-        if (nrm !== null && (peak === null || nrm > peak)) { peak = nrm; peakAt = r.at; }
       }
       roundTrips = fellBack.size;
       for (const e of fellBack) if (roundTripIds.length < 12) roundTripIds.push(e);
@@ -1852,6 +1873,19 @@ export function sendPlanHealth(
       'before the gate\'s own first run, so the first cohort aged out together. They are ' +
       'null, not 0, on a snapshot written without a window: unknown and measured-as-nothing ' +
       'differ. band_returned names them, capped at 12. ' +
+      'THE MOVES SPAN band_prev_at TO THE END OF THE CYCLE, NOT THE WHOLE CYCLE ' +
+      '(2026-11-08): band_normal_prev is read off the run at band_prev_at and that run\'s ' +
+      'counts already include the moves it made itself, so counting them here again left ' +
+      'the move figures and band_normal_change describing different spans — the 2026-10-16 ' +
+      'fault (two instruments read at different hours) inside one block. On 2026-11-08 the ' +
+      'prior reading was the 11-07T08:05:26Z run, whose own to_normal held three ' +
+      'mailboxes, and the gate walked 50 to 53 to 48 from there: the real moves after it ' +
+      'were 3 to normal and 5 to watch, which closes exactly on band_normal_change -2, ' +
+      'while the published pair was 6 and 5 and reconciled to +1 on a fleet that lost two. ' +
+      'band_returned also named three mailboxes already credited to the prior day. So the ' +
+      'move counts and the band change can now be subtracted against each other, and ' +
+      'band_peak_normal still spans the whole cycle because how high the fleet got has ' +
+      'nothing to do with where the comparison starts. ' +
       'AND READ band_round_trips AND band_returned_still_normal BEFORE READING ' +
       'band_moved_to_normal AS A RECOVERY (2026-10-27): a move count says a mailbox was ' +
       'handed a band, not that it kept it. That morning the block read ' +

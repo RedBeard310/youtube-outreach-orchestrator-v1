@@ -1682,6 +1682,47 @@ ok('no window: the moves and the round trips are unknown, but the held-but-well 
     return [b.band_peak_normal, b.band_round_trips, b.band_returned_still_normal, b.band_held_but_healthy];
   })(),
   [null, null, null, 3]);
+// The 2026-11-08 fault: the prior reading's OWN moves were counted again as moves inside
+// the cycle, so band_moved_to_normal (6) and band_moved_to_watch (5) reconciled to +1
+// against a band_normal_change of -2. Shape and numbers are the real gate history: the
+// 11-07T08:05:26Z run handed three mailboxes the clear band and its own count of 50
+// already included them.
+const BAND_PREV_OWN_MOVES = {
+  generated_at: '2026-11-08T08:05:02Z',
+  owned: {},
+  runs: [
+    { at: '2026-11-07T07:05:12Z', counts: { normal: 47, watch: 12, stop: 35 }, to_normal: [], to_watch: [], to_stop: [] },
+    // The baseline, and it moved three mailboxes itself.
+    { at: '2026-11-07T08:05:26Z', counts: { normal: 50, watch: 10, stop: 34 }, to_normal: ['old.a@x.com', 'old.b@x.com', 'old.c@x.com'], to_watch: [], to_stop: [] },
+    { at: '2026-11-07T10:05:07Z', counts: { normal: 51, watch: 9, stop: 34 }, to_normal: ['new.a@x.com'], to_watch: [], to_stop: [] },
+    { at: '2026-11-07T11:05:20Z', counts: { normal: 52, watch: 8, stop: 34 }, to_normal: ['new.b@x.com'], to_watch: [], to_stop: [] },
+    { at: '2026-11-07T13:05:12Z', counts: { normal: 53, watch: 7, stop: 34 }, to_normal: ['new.c@x.com'], to_watch: [], to_stop: [] },
+    { at: '2026-11-07T23:05:22Z', counts: { normal: 52, watch: 8, stop: 34 }, to_normal: [], to_watch: ['w1@x.com'], to_stop: [] },
+    { at: '2026-11-08T03:05:11Z', counts: { normal: 50, watch: 10, stop: 34 }, to_normal: [], to_watch: ['w2@x.com', 'w3@x.com'], to_stop: [] },
+    { at: '2026-11-08T05:05:15Z', counts: { normal: 48, watch: 12, stop: 34 }, to_normal: [], to_watch: ['w4@x.com', 'w5@x.com'], to_stop: [] },
+    { at: '2026-11-08T08:05:02Z', counts: { normal: 48, watch: 12, stop: 34 }, to_normal: [], to_watch: [], to_stop: [] },
+  ],
+};
+const POM_WINDOW = { sinceISO: '2026-11-07T08:00:00.000Z', untilISO: '2026-11-08T08:00:00.000Z' };
+ok('the move counts and the band change can be subtracted against each other',
+  (() => {
+    const b = bandGateFacts(BAND_PREV_OWN_MOVES, POM_WINDOW);
+    const closes = (b.band_normal_prev ?? 0) + (b.band_moved_to_normal ?? 0) - (b.band_moved_to_watch ?? 0)
+      - (b.band_moved_to_stop ?? 0) === b.band_normal;
+    return [b.band_normal_prev, b.band_normal, b.band_normal_change,
+      b.band_moved_to_normal, b.band_moved_to_watch, b.band_moved_to_stop, closes];
+  })(),
+  [50, 48, -2, 3, 5, 0, true]);
+ok('a mailbox the baseline run itself handed normal is not a returner this cycle',
+  bandGateFacts(BAND_PREV_OWN_MOVES, POM_WINDOW).band_returned,
+  ['new.a@x.com', 'new.b@x.com', 'new.c@x.com']);
+ok('the peak still spans the whole cycle, baseline run included',
+  (() => {
+    const b = bandGateFacts(BAND_PREV_OWN_MOVES, POM_WINDOW);
+    return [b.band_peak_normal, b.band_peak_normal_at, b.band_round_trips];
+  })(),
+  [53, '2026-11-07T13:05:12Z', 0]);
+
 ok('no per-mailbox map costs the outcome fields, not the move counts (the 10-18 shape)',
   (() => {
     const b = bandGateFacts(BAND_HISTORY, { sinceISO: '2026-10-17T07:00:00.000Z', untilISO: '2026-10-18T07:00:00.000Z' });
