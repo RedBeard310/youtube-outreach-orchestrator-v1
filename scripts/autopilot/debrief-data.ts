@@ -942,14 +942,31 @@ export function bandGateFacts(
       //
       // The peak still spans the whole cycle, deliberately: it answers "how high did the
       // fleet get today", which has nothing to do with where the comparison starts.
+      //
+      // AND THEY END AT THE READING band_normal COMES FROM, NOT AT THE CYCLE BOUNDARY
+      // (2026-11-09). That fix closed the START of the span and left the END open, and
+      // the gap is structural rather than occasional: the gate runs hourly at about :05,
+      // the debrief fires at 00:20 PT (08:20Z), so the run `band_normal` is read off is
+      // ALWAYS the ~08:05Z one, five minutes PAST the cycle end, while the moves stopped
+      // at 08:00Z. On 2026-11-08 that run moved nobody and the arithmetic closed by luck.
+      // On 2026-11-09 it moved two mailboxes back to normal, and the published figures
+      // were 48 + 7 − 3 = 52 against a `band_normal` of 54. So the walk runs to the
+      // newest reading inclusive, which is exactly the span `band_normal_change`
+      // describes, and the subtraction closes on every day instead of most of them. The
+      // peak comes with it for the same reason: a peak that stopped at the boundary could
+      // print BELOW the `band_normal` published beside it.
       const prevMs = prev && typeof prev.at === 'string' ? Date.parse(prev.at) : NaN;
       const movesAfter = Number.isFinite(prevMs) && prevMs >= a && prevMs < b ? prevMs : null;
       toNormal = 0; toWatch = 0; toStop = 0;
       const fellBack = new Set<string>();
+      // The upper bound is the newest reading, which is `lastMs` when it is readable and
+      // the cycle end when it is not. `last` IS the newest run, so this can never reach
+      // past it however many runs the state file holds.
+      const endMs = Number.isFinite(lastMs) ? Math.max(lastMs, b - 1) : b - 1;
       for (const r of runs) {
         if (typeof r?.at !== 'string') continue;
         const ms = Date.parse(r.at);
-        if (!Number.isFinite(ms) || ms < a || ms >= b) continue;
+        if (!Number.isFinite(ms) || ms < a || ms > endMs) continue;
         const nrm = num((r.counts && typeof r.counts === 'object' ? r.counts : {}).normal);
         if (nrm !== null && (peak === null || nrm > peak)) { peak = nrm; peakAt = r.at; }
         if (movesAfter !== null && ms <= movesAfter) continue;
@@ -1884,9 +1901,18 @@ export function sendPlanHealth(
       'were 3 to normal and 5 to watch, which closes exactly on band_normal_change -2, ' +
       'while the published pair was 6 and 5 and reconciled to +1 on a fleet that lost two. ' +
       'band_returned also named three mailboxes already credited to the prior day. So the ' +
-      'move counts and the band change can now be subtracted against each other, and ' +
-      'band_peak_normal still spans the whole cycle because how high the fleet got has ' +
-      'nothing to do with where the comparison starts. ' +
+      'move counts and the band change can now be subtracted against each other. ' +
+      'AND THEY END AT THE READING band_normal COMES FROM, NOT AT THE CYCLE BOUNDARY ' +
+      '(2026-11-09): that fix closed the START of the span and left the END open, and the ' +
+      'gap is structural, not occasional. The gate runs hourly at about :05 and the ' +
+      'debrief fires at 00:20 PT, so the run band_normal is read off is ALWAYS the ~08:05Z ' +
+      'one, five minutes PAST the cycle end, while the moves stopped at 08:00Z. On ' +
+      '2026-11-08 that run moved nobody and the arithmetic closed by luck; on 2026-11-09 ' +
+      'it moved two mailboxes back to normal and the figures published were 48 + 7 - 3 = ' +
+      '52 against a band_normal of 54. The move walk and band_peak_normal now both run to ' +
+      'the newest reading inclusive, which is the span band_normal_change describes, so ' +
+      'the subtraction closes every day instead of most days — and a peak that stopped at ' +
+      'the boundary could otherwise print BELOW the band_normal beside it. ' +
       'AND READ band_round_trips AND band_returned_still_normal BEFORE READING ' +
       'band_moved_to_normal AS A RECOVERY (2026-10-27): a move count says a mailbox was ' +
       'handed a band, not that it kept it. That morning the block read ' +

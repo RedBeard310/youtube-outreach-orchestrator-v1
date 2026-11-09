@@ -1724,6 +1724,49 @@ ok('the peak still spans the whole cycle, baseline run included',
   })(),
   [53, '2026-11-07T13:05:12Z', 0]);
 
+// The 2026-11-09 fault: the fix above closed the START of the span and left the END open.
+// The gate runs hourly at ~:05 and the cycle ends at 08:00Z, so the run band_normal is
+// read off is always PAST the boundary — and on this day it moved two mailboxes back to
+// normal, so 48 + 7 - 3 printed 52 beside a band_normal of 54. Numbers are the real
+// 11-08/11-09 gate history, trimmed to the runs that moved.
+const BAND_TRAILING_RUN = {
+  generated_at: '2026-11-09T08:05:27Z',
+  owned: {},
+  mailboxes: { 'late.a@x.com': { band: 'normal', score: 96.7, reasons: [] } },
+  runs: [
+    { at: '2026-11-08T08:05:02Z', counts: { normal: 48, watch: 12, stop: 34 }, to_normal: [], to_watch: [], to_stop: [] },
+    { at: '2026-11-08T09:06:04Z', counts: { normal: 51, watch: 10, stop: 33 }, to_normal: ['a@x.com', 'b@x.com', 'c@x.com'], to_watch: [], to_stop: [] },
+    { at: '2026-11-08T10:06:03Z', counts: { normal: 52, watch: 9, stop: 33 }, to_normal: ['d@x.com'], to_watch: [], to_stop: [] },
+    { at: '2026-11-08T12:06:01Z', counts: { normal: 54, watch: 7, stop: 33 }, to_normal: ['e@x.com', 'f@x.com', 'g@x.com'], to_watch: ['w1@x.com'], to_stop: [] },
+    { at: '2026-11-08T14:05:50Z', counts: { normal: 53, watch: 8, stop: 33 }, to_normal: [], to_watch: ['w2@x.com'], to_stop: [] },
+    { at: '2026-11-09T00:05:58Z', counts: { normal: 52, watch: 9, stop: 33 }, to_normal: [], to_watch: ['w3@x.com'], to_stop: [] },
+    // Five minutes past the cycle end, and it is where band_normal comes from.
+    { at: '2026-11-09T08:05:27Z', counts: { normal: 54, watch: 9, stop: 31 }, to_normal: ['late.a@x.com', 'late.b@x.com'], to_watch: [], to_stop: [] },
+  ],
+};
+const TRAIL_WINDOW = { sinceISO: '2026-11-08T08:00:00.000Z', untilISO: '2026-11-09T08:00:00.000Z' };
+ok('the trailing reading band_normal comes from is counted, so the subtraction closes',
+  (() => {
+    const b = bandGateFacts(BAND_TRAILING_RUN, TRAIL_WINDOW);
+    const closes = (b.band_normal_prev ?? 0) + (b.band_moved_to_normal ?? 0) - (b.band_moved_to_watch ?? 0)
+      - (b.band_moved_to_stop ?? 0) === b.band_normal;
+    return [b.band_normal_prev, b.band_normal, b.band_normal_change,
+      b.band_moved_to_normal, b.band_moved_to_watch, closes];
+  })(),
+  [48, 54, 6, 9, 3, true]);
+ok('a mailbox the trailing run returned is named and its band read',
+  (() => {
+    const b = bandGateFacts(BAND_TRAILING_RUN, TRAIL_WINDOW);
+    return [b.band_returned.includes('late.a@x.com'), b.band_returned_still_normal, b.band_round_trips];
+  })(),
+  [true, 1, 0]);
+ok('the peak comes with it, so it can never print below the band_normal beside it',
+  (() => {
+    const b = bandGateFacts(BAND_TRAILING_RUN, TRAIL_WINDOW);
+    return [b.band_peak_normal, (b.band_peak_normal ?? 0) >= (b.band_normal ?? 0)];
+  })(),
+  [54, true]);
+
 ok('no per-mailbox map costs the outcome fields, not the move counts (the 10-18 shape)',
   (() => {
     const b = bandGateFacts(BAND_HISTORY, { sinceISO: '2026-10-17T07:00:00.000Z', untilISO: '2026-10-18T07:00:00.000Z' });
