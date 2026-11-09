@@ -1,5 +1,6 @@
 import { bulkRewriteShape, bandGateFacts, condenseInboxReason, notLiveReasonMoves, notLiveReasonTally, splitInboxReasons, fleetFacts, inboxGateFacts, apifyBatchFacts, apifyIdleCause, apifyLedgerLine, NO_PUSH_OUTCOME, normalizePushReason, offerFromBatchId, openRouterRunwayAlarm, OPENROUTER_RATE_MAX_AGE_H, siegeApprovedLeadIds, siegePlanLeadIds, siegePushOutcome, classifyKeyProbe, cyclePacificDay, costWindows, enrichmentChainFacts, isSendingDay, perEnrichedLeadCost, PER_LEAD_SAMPLE_FLOOR, projectRecoveryBudget, MAX_MISSING_DEBRIEFS, missingDebriefs, NO_UNIT, pushRunVerdict, siegeRunAlarm, unitStartedAt, sendPlanHealth, siegePlanFacts, summarizeSendLines, isVerifiedOrBeyond, laneYield, priorAdvanceSource, priorSeedsAdvanced, priorSeedsWalked, reconcileAdvanced, sessionSeedsAdvanced, sessionStartMs, walkRateTrend } from './debrief-data.ts';
 import { lostCohort } from './debrief-data.ts';
+import { aggregateCollectPasses, collectPasses } from '../../src/recovery/bloodhound-lane.ts';
 import { MAX_SHELF_STRANDED_IDS, recoveredTally, shelfTally, type ShelfRow } from '../../src/db.ts';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -1963,6 +1964,52 @@ rmSync(COHORT_DIR, { recursive: true, force: true });
 ok('the push parser leaves the cohort unknown for the caller',
   [NO_PUSH_OUTCOME.lost_recurring, PREPUSHED.lost_recurring, PREPUSHED.lost_longest_streak],
   [null, null, null]);
+
+// aggregateCollectPasses — the cycle, not the newest pass (2026-11-09). Built on the
+// shape of the four real passes in the 2026-11-08 cycle, where the published figure
+// (33) was the smallest of 44, 85, 75, 33 and read as yesterday's fix converting.
+const COLLECT_LOG = [
+  'Bloodhound: 150 leads (needs_contact), 13 methods, concurrency=8, dryRun=false, no paid calls',
+  'Collected 10 contact points from 2/150 leads.',
+  '[bloodhound] Methods found 634 point(s) on 130/150 leads; 624 were already on file.',
+  '[bloodhound] Method errors: 114 across 16 shape(s) — 28x 28-sitemap: cross-domain redirect',
+  '[bloodhound] Method error causes: 114 across 16 cause(s), top 25% — 28x 28-sitemap: cross-domain redirect | 17x 14-external-links: cross-domain redirect | 14x 02-subpages: cross-domain redirect | 13x 01-mailto: cross-domain redirect | 13x 16-jsonld: cross-domain redirect | 7x 28-sitemap: fetch failed; and 10 rarer cause(s)',
+  'Bloodhound: 150 leads (needs_contact), 13 methods, concurrency=8, dryRun=false, no paid calls',
+  'Collected 0 contact points from 0/150 leads.',
+  '[bloodhound] Methods found 445 point(s) on 127/150 leads; 445 were already on file.',
+  '[bloodhound] Method errors: 121 across 68 shape(s) — 19x 34-channel-page: page rendered with no outbound links',
+  '[bloodhound] Method error causes: 121 across 18 cause(s), top 16% — 19x 34-channel-page: page rendered with no outbound links | 18x 28-sitemap: fetch failed | 12x 02-subpages: cross-domain redirect | 12x 28-sitemap: cross-domain redirect | 9x 14-external-links: cross-domain redirect | 9x 28-sitemap: non-HTML content-type; and 12 rarer cause(s)',
+].join('\n');
+const twoPasses = collectPasses(COLLECT_LOG);
+ok('both passes parse', twoPasses.length, 2);
+// 85 in the older pass, 33 in the newer: the condition the newest pass alone understates.
+ok('the newest pass alone reads the smaller figure',
+  [twoPasses[1]!.topFaultCondition, twoPasses[1]!.topFaultConditionCount],
+  ['cross-domain redirect', 33]);
+const cycleAgg = aggregateCollectPasses(twoPasses)!;
+ok('the cycle sums the condition across every pass',
+  [cycleAgg.top_fault_condition, cycleAgg.top_fault_condition_count, cycleAgg.top_fault_condition_pct],
+  ['cross-domain redirect', 118, 50]);
+ok('each pass keeps its own count, oldest first', cycleAgg.top_fault_condition_by_pass, [85, 33]);
+ok('the newest pass says what share of the cycle it covers',
+  cycleAgg.newest_pass_error_share_pct, 51);
+ok('leads, points and errors are the cycle, not the pass',
+  [cycleAgg.passes_measured, cycleAgg.leads, cycleAgg.points, cycleAgg.leads_with_points, cycleAgg.method_errors],
+  [2, 300, 10, 2, 235]);
+ok('the re-walk is the cycle too', [cycleAgg.methods_found, cycleAgg.already_on_file], [1079, 1069]);
+// A content outcome never becomes the fault, however large: the 2026-10-15 rule, kept.
+ok('a benign condition is not the cycle fault even when it leads one pass',
+  cycleAgg.condition_list?.some((c) => c.condition === 'page rendered with no outbound links'), true);
+// A pass the found-line predates must not let a partial sum read as the whole cycle.
+ok('a pass missing the found line makes the re-walk unknown, not smaller',
+  aggregateCollectPasses([{ ...twoPasses[0]!, found: null, alreadyOnFile: null }, twoPasses[1]!])!.methods_found,
+  null);
+ok('no pass is unknown, not zero', aggregateCollectPasses([]), null);
+// One pass must still aggregate to itself, so a cycle with a single pass is readable.
+ok('a one-pass cycle reads as that pass',
+  (() => { const a = aggregateCollectPasses([twoPasses[1]!])!;
+    return [a.passes_measured, a.top_fault_condition_count, a.newest_pass_error_share_pct]; })(),
+  [1, 33, 100]);
 
 console.log(fail === 0 ? '\nALL PASS' : `\n${fail} FAILED`);
 process.exit(fail === 0 ? 0 : 1);

@@ -1642,6 +1642,114 @@ export function collectPasses(logText: string, minSample = 30): CollectPass[] {
   return out;
 }
 
+/** Every collect pass inside one cycle, summed. */
+export type CollectCycle = {
+  /** How many passes this aggregate covers. */
+  passes_measured: number;
+  leads: number;
+  points: number;
+  leads_with_points: number;
+  /** Null unless EVERY measured pass carried the line, because a partial sum of
+   *  a line some passes predate understates it silently. */
+  methods_found: number | null;
+  already_on_file: number | null;
+  method_errors: number | null;
+  condition_list: { condition: string; count: number }[] | null;
+  top_fault_condition: string | null;
+  top_fault_condition_count: number | null;
+  top_fault_condition_pct: number | null;
+  /** That condition's count in each measured pass, OLDEST FIRST, so a reader can
+   *  see whether the passes agree. Null entries are passes that named no causes
+   *  at all (the line predates them); a pass that named causes and not this one
+   *  is a real 0. */
+  top_fault_condition_by_pass: (number | null)[] | null;
+  /** What share of the cycle's method errors the newest pass holds, which is the
+   *  share of the cycle every per-pass field published beside this one describes. */
+  newest_pass_error_share_pct: number | null;
+};
+
+/**
+ * Sum a cycle's collect passes into one reading.
+ *
+ * WHY THIS EXISTS (2026-11-09). Every method-fault figure in `site_resolution`
+ * is read off ONE pass — `passes[passes.length - 1]` — and the lane runs a pass
+ * every six hours, so the block a reader opens to decide what to fix in the only
+ * lane still parking anybody describes a quarter of the cycle and is labelled as
+ * the cycle. This is the 2026-10-16 fault (two instruments read at different
+ * hours) and the 2026-11-08 one (moves and change spanning different windows) in
+ * the recovery lane's own block.
+ *
+ * It had already set a lever wrong. The 11-08 debrief read `cross-domain
+ * redirect` at 83 of 150 faults (55%) off one pass and shipped a fix for it
+ * (youtube-email-outreach-v1 09a5d097b); the next morning the same field read 33
+ * (27%) off one pass, which reads as the fix converting by half. The four passes
+ * that cycle read 44, 85, 75 and 33 — the published figure was the SMALLEST of
+ * the four, both passes after the fix deployed sat inside the range of the two
+ * before it, and the cycle really logged 237 of 575 errors (41%). The condition
+ * swings two-fold pass to pass because it depends on which slice of the book the
+ * cursor is on, so no single pass can carry a day-over-day comparison at all.
+ *
+ * It also hid a whole fault. `19-github: The operation was aborted due to
+ * timeout` was 62 errors in one of those passes, 30% of it, and appeared in no
+ * published field because that pass was not the newest — in a cycle where
+ * `19-github` was already one of the three methods that had produced nothing for
+ * three weeks.
+ *
+ * The per-pass fields stay exactly as they are: the alarm reads them, a pass is
+ * the right unit for "is the lane working right now", and `newest_pass_error_
+ * share_pct` says how much of the cycle they cover. This is the unit for "what
+ * is worth fixing".
+ *
+ * Returns null for an empty list. Pass the passes OLDEST FIRST, the order
+ * `collectPasses` returns.
+ */
+export function aggregateCollectPasses(passes: CollectPass[]): CollectCycle | null {
+  if (passes.length === 0) return null;
+  const withCauses = passes.filter((p) => p.causeList !== null);
+  const merged = new Map<string, number>();
+  for (const p of withCauses) {
+    for (const e of p.causeList ?? []) merged.set(e.cause, (merged.get(e.cause) ?? 0) + e.count);
+  }
+  const conditions = merged.size > 0
+    ? rollUpConditions([...merged].map(([cause, count]) => ({ cause, count })))
+    : [];
+  const fault = conditions.find((c) => !c.benign) ?? null;
+  const errorsKnown = passes.every((p) => p.methodErrors !== null);
+  const errors = errorsKnown ? passes.reduce((s, p) => s + (p.methodErrors ?? 0), 0) : null;
+  const newestErrors = passes[passes.length - 1]!.methodErrors;
+  return {
+    passes_measured: passes.length,
+    leads: passes.reduce((s, p) => s + p.of, 0),
+    points: passes.reduce((s, p) => s + p.points, 0),
+    leads_with_points: passes.reduce((s, p) => s + p.hit, 0),
+    methods_found: passes.every((p) => p.found !== null)
+      ? passes.reduce((s, p) => s + (p.found ?? 0), 0)
+      : null,
+    already_on_file: passes.every((p) => p.alreadyOnFile !== null)
+      ? passes.reduce((s, p) => s + (p.alreadyOnFile ?? 0), 0)
+      : null,
+    method_errors: errors,
+    condition_list: conditions.length > 0
+      ? conditions.slice(0, 6).map(({ condition, count }) => ({ condition, count }))
+      : null,
+    top_fault_condition: fault?.condition ?? null,
+    top_fault_condition_count: fault?.count ?? null,
+    // Against the cycle's whole error count, the same denominator the per-pass
+    // percentage uses, so the two are comparable.
+    top_fault_condition_pct: fault && errors !== null && errors > 0
+      ? Math.round((fault.count / errors) * 100)
+      : null,
+    top_fault_condition_by_pass: fault
+      ? passes.map((p) => p.conditionList === null
+        ? null
+        : (p.conditionList.find((c) => c.condition === fault.condition)?.count ?? 0))
+      : null,
+    newest_pass_error_share_pct: errors !== null && errors > 0 && newestErrors !== null
+      ? Math.round((newestErrors / errors) * 100)
+      : null,
+  };
+}
+
 /**
  * How far the newest completed collect pass has fallen below the lane's own
  * normal hit rate, and how confident that comparison is.

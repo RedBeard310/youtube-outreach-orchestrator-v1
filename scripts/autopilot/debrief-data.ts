@@ -25,6 +25,7 @@ import {
 } from '../../src/db.ts';
 import { discoveryReportKey } from '../../src/discovery-method.ts';
 import {
+  aggregateCollectPasses,
   collectBookDepth,
   collectPassAttribution,
   collectPasses,
@@ -4930,6 +4931,40 @@ async function main(): Promise<void> {
         condition_coverage_pct: passes.length > 0
           ? passes[passes.length - 1]!.conditionCoveragePct : null,
         methods_dead: passes.length > 0 ? passes[passes.length - 1]!.deadMethods : null,
+        // AND EVERY FIELD ABOVE DESCRIBES ONE PASS OF THE FOUR THIS CYCLE RAN (2026-11-09).
+        // The lane collects every six hours. The whole block is read off
+        // `passes[passes.length - 1]`, which is right for "is the lane working right now"
+        // and is what the alarm needs, and it is the wrong unit for "what is worth
+        // fixing" — a quarter of the cycle, published under the cycle's date. That is the
+        // 2026-10-16 fault (two instruments read at different hours) and the 11-08 one
+        // (moves and a change spanning different windows) inside the recovery lane's own
+        // block, and it had already set a lever wrong: the 11-08 debrief read
+        // `cross-domain redirect` at 83 of 150 faults (55%) and shipped a fix for it, then
+        // this field read 33 (27%) the next morning, which reads as the fix converting by
+        // half. The cycle's four passes read 44, 85, 75, 33 — the published figure was the
+        // SMALLEST, both passes after the fix deployed sat inside the range of the two
+        // before it, and the cycle logged 237 of 575 errors (41%). It also hid a whole
+        // fault: `19-github: The operation was aborted due to timeout` was 62 errors, 30%
+        // of one pass, in no field at all, in a cycle where `19-github` had produced
+        // nothing for three weeks.
+        //
+        // READ `cycle` FOR A DAY-OVER-DAY COMPARISON AND NEVER A PER-PASS FIGURE:
+        // `top_fault_condition_by_pass` is the same condition in each pass, oldest first,
+        // and these swing two-fold on which slice of the book the cursor sits on.
+        // `newest_pass_error_share_pct` is how much of the cycle the fields above cover.
+        // `passes_dispatched` is what the lane's own dispatch log recorded in the window
+        // and `passes_measured` is how many of those the collect log could supply, so a
+        // pass that died or ran under the 30-lead floor shows up as a gap between them
+        // rather than silently shrinking the window. Null is an unreadable log, which is
+        // unknown and NOT a quiet lane.
+        cycle: (() => {
+          if (passes.length === 0) return null;
+          const dispatched = cycleCampaignEvents(sinceISO, untilISO)
+            .filter((e) => e.event === 'bloodhound_collect').length;
+          const want = Math.max(1, Math.min(dispatched || 1, passes.length));
+          const agg = aggregateCollectPasses(passes.slice(-want));
+          return agg === null ? null : { passes_dispatched: dispatched, ...agg };
+        })(),
       };
     } catch {
       return null;
@@ -5392,6 +5427,31 @@ async function main(): Promise<void> {
         'unreadable: both error condensers collapse digits to N, so every bare HTTP status ' +
         'in the lane now carries a word beside it (httpReason() in the email repo) and a ' +
         'future "iTunes N" reads "iTunes N rate-limited". ' +
+        'AND READ site_resolution.cycle, NEVER A PER-PASS FIGURE, FOR A DAY-OVER-DAY ' +
+        'COMPARISON (2026-11-09): every field above describes ONE pass of the four this ' +
+        'cycle ran, because the lane collects every six hours and the whole block is read ' +
+        'off the newest pass. That is the right unit for "is the lane working right now" ' +
+        'and it is what the alarm reads; it is the wrong unit for "what is worth fixing", ' +
+        'and it is published under the cycle\'s date. It had already set a lever wrong. The ' +
+        '11-08 debrief read "cross-domain redirect" at 83 of 150 faults, 55%, shipped a fix ' +
+        'for it, and the next morning this field read 33 of 121, 27% — which reads as the ' +
+        'fix converting by half. The cycle\'s four passes read 44, 85, 75 and 33: the ' +
+        'published figure was the SMALLEST of the four, both passes after the fix deployed ' +
+        'sat inside the range of the two before it, and the cycle really logged 237 of 575 ' +
+        'errors, 41%. These counts swing two-fold pass to pass on which slice of the book ' +
+        'the cursor sits on, so no single pass can carry the comparison. The single-pass ' +
+        'window also hid a whole fault: "19-github: The operation was aborted due to ' +
+        'timeout" was 62 errors, 30% of one pass, in no published field at all, in a cycle ' +
+        'where 19-github was already one of the three methods that had produced nothing for ' +
+        'three weeks. cycle.top_fault_condition_by_pass is the same condition in each pass, ' +
+        'OLDEST FIRST, so disagreement between passes is visible; ' +
+        'cycle.newest_pass_error_share_pct is how much of the cycle the fields above cover; ' +
+        'passes_dispatched is what the lane\'s dispatch log recorded in the window against ' +
+        'passes_measured the collect log could supply, so a pass that died or ran under the ' +
+        '30-lead floor reads as a gap between the two instead of silently shrinking the ' +
+        'window. cycle.methods_found and already_on_file are null unless EVERY measured ' +
+        'pass carried the line, because a partial sum understates it silently. The whole ' +
+        'block is null on an unreadable log: unknown, NOT a quiet lane. ' +
         'A climbing collect_book_stranded is the real fault ' +
         'signal (a selector gap has reopened). Emails here are unverified: the verify pass ' +
         'decides which ones flip to approved_hold.',
