@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lead Run Debrief — 2026-11-09</title>
+<style>
+  :root {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+      --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+      --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+    --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+    --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 40px 22px 80px; }
+  .eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); font-weight: 600; }
+  h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.12; margin: 10px 0 6px; text-wrap: balance; letter-spacing: -.02em; }
+  h2 { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); margin: 44px 0 16px; font-weight: 700; }
+  h3 { font-size: 18px; margin: 0 0 6px; letter-spacing: -.01em; }
+  p { margin: 0 0 14px; }
+  .lede { font-size: 18px; color: var(--ink-soft); max-width: 68ch; }
+  .tag { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--amber-soft); color: var(--amber); letter-spacing: .02em; }
+  .tag.red { background: var(--red-soft); color: var(--red); }
+  .tag.good { background: var(--teal-soft); color: var(--teal); }
+  .grid { display: grid; gap: 14px; }
+  .stats { grid-template-columns: repeat(4, 1fr); margin-top: 26px; }
+  @media (max-width: 720px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; box-shadow: var(--shadow); }
+  .stat .n { font-size: 30px; font-weight: 750; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .stat .l { font-size: 12.5px; color: var(--ink-soft); margin-top: 3px; }
+  .stat .s { font-size: 12px; margin-top: 8px; font-weight: 600; }
+  .up { color: var(--good); } .down { color: var(--red); } .warn { color: var(--amber); }
+  .accent-red { border-left: 3px solid var(--red); }
+  .accent-teal { border-left: 3px solid var(--teal); }
+  .accent-amber { border-left: 3px solid var(--amber); }
+
+  .strip { display: flex; align-items: flex-end; gap: 3px; height: 130px; padding: 14px 14px 10px; overflow-x: auto; }
+  .bar { flex: 1 0 8px; min-width: 6px; border-radius: 2px 2px 0 0; background: var(--teal); opacity: .9; }
+  .bar.zero { background: var(--line); height: 4px !important; }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-soft); padding: 0 14px 14px; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+
+  .q { border-radius: 14px; padding: 20px 22px; margin-bottom: 14px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); }
+  .q .ask { font-size: 17px; font-weight: 700; color: var(--ink); margin-bottom: 10px; display: flex; gap: 10px; align-items: baseline; }
+  .q .ask .qn { color: var(--red); font-weight: 800; flex: 0 0 auto; }
+  .q p { color: var(--ink-soft); }
+  .q b { color: var(--ink); }
+  .pill { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink); background: var(--panel-2); padding: 1px 7px; border-radius: 6px; border: 1px solid var(--line); white-space: nowrap; }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; background: var(--panel-2); padding: 1px 5px; border-radius: 5px; border: 1px solid var(--line); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+  th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); }
+  td .num { font-variant-numeric: tabular-nums; font-weight: 650; }
+  tr.total td { background: var(--panel-2); font-weight: 700; }
+  .fix td:first-child { color: var(--good); font-weight: 650; }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); box-shadow: var(--shadow); margin-bottom: 14px; }
+  ol.recs { padding-left: 0; list-style: none; counter-reset: r; margin: 0; }
+  ol.recs li { counter-increment: r; position: relative; padding: 14px 16px 14px 52px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 10px; box-shadow: var(--shadow); }
+  ol.recs li::before { content: counter(r); position: absolute; left: 14px; top: 14px; width: 26px; height: 26px; border-radius: 8px; background: var(--teal-soft); color: var(--teal); font-weight: 800; font-size: 14px; display: grid; place-items: center; }
+  ol.recs b { color: var(--ink); }
+  .foot { margin-top: 46px; padding: 16px 18px; border-radius: 12px; background: var(--amber-soft); border: 1px solid var(--line); font-size: 14px; color: var(--ink-soft); }
+  .foot b { color: var(--ink); }
+  .muted { color: var(--ink-soft); font-size: 13.5px; }
+  pre { background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 14px; overflow-x: auto; font-size: 13px; line-height: 1.5; margin: 0 0 14px; }
+</style>
+
+<div class="wrap">
+
+
+  <div class="eyebrow">Lead Run Debrief · YouTube outreach</div>
+  <h1>2026-11-09 — the fleet is at its best in five days, and the snapshot has been reading a quarter of the recovery lane</h1>
+  <p class="lede">Sunday, so nothing was emailed and nothing was supposed to be. What moved is the sending fleet: <b>54 mailboxes in the clear band</b>, up from 48, the best reading since 11-04, nine came back and all nine held. Two people were parked. The news that changes a decision is that yesterday's fix for the recovery lane's biggest fault has followed exactly <b>one</b> redirect, and the field that said otherwise describes one of the cycle's <b>four</b> collect passes. Both fixes below come out of that. One number still has a date on it: OpenRouter has <b>3.9 days</b> of credit, today is a sending day, and the cold-email writer runs on it.</p>
+  <div style="margin-top:14px"><span class="tag good">FLEET 48 → 54 CLEAR</span> <span class="tag good">2 PARKED</span> <span class="tag">0 EMAILS, NOT A SENDING DAY</span> <span class="tag red">OPENROUTER 3.9 DAYS LEFT</span></div>
+
+  <div class="grid stats">
+    <div class="card stat accent-teal">
+      <div class="n">54</div>
+      <div class="l">mailboxes the health gate calls clear</div>
+      <div class="s up">48 yesterday, 9 back, 0 round trips</div>
+    </div>
+    <div class="card stat accent-teal">
+      <div class="n">2</div>
+      <div class="l">people parked into <code>approved_hold</code></div>
+      <div class="s up">from 3 addresses the free lane found</div>
+    </div>
+    <div class="card stat accent-amber">
+      <div class="n">21%</div>
+      <div class="l">of the lane's day the published fault figures covered</div>
+      <div class="s warn">1 pass of 4, now fixed</div>
+    </div>
+    <div class="card stat accent-red">
+      <div class="n">$6.19</div>
+      <div class="l">OpenRouter balance, 3.9 days of runway</div>
+      <div class="s down">$7.77 yesterday, burn flat at $1.58 a day</div>
+    </div>
+  </div>
+
+  <h2>The shape of the day</h2>
+  <div class="card" style="padding:0">
+    <div class="strip" id="strip"></div>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--teal)"></span>mailboxes in the clear band, hour by hour</span>
+      <span><span class="dot" style="background:var(--line)"></span>no reading</span>
+    </div>
+  </div>
+  <p class="muted">Nothing was emailed, so the only instrument that ran all cycle is the health gate: 25 hourly readings, starting at <b>08:05Z</b>. The clear band climbed 48 to 51 at 09:06Z, 52 at 10:06Z and a <b>peak of 54 at 12:05Z</b>, held 53 through the afternoon and evening, eased to 52 overnight, and came back to 54 at the final reading. <b>Nothing was stopped all cycle and no mailbox did a round trip.</b> The bars start at 44 rather than 0, so a five-mailbox move is visible.</p>
+
+  <h2>The three questions</h2>
+
+  <div class="q accent-teal">
+    <div class="ask"><span class="qn">Q1</span><span>Two people were parked. What found them, and is that normal?</span></div>
+    <p><b>The free recovery lane, running at about its own weekly rate.</b> 18 contact points and 3 addresses, against 64 and 22 across the prior seven days, which is about 9 and 3 a day. Two people got a first usable address and both parked. The paid lane found nothing and enrichment has nothing left to do.</p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th></th><th>This cycle</th><th>Prior 7 days</th></tr></thead>
+        <tbody>
+          <tr><td>Parked into <code>approved_hold</code></td><td class="num"><b>2</b></td><td class="num">4 on 11-08, 0 on 11-06 and 11-07</td></tr>
+          <tr><td>Free lane contact points</td><td class="num"><b>18</b></td><td class="num">64, about 9 a day</td></tr>
+          <tr><td>Free lane addresses</td><td class="num"><b>3</b></td><td class="num">22, about 3 a day</td></tr>
+          <tr><td>Free lane people with a new address</td><td class="num"><b>2</b></td><td class="num">—</td></tr>
+          <tr><td>Paid Apify batches</td><td class="num">0</td><td class="num">0 since 11-02</td></tr>
+          <tr><td>Enrichment leads done</td><td class="num">3</td><td class="num">3 on 11-08, 343 on 11-02</td></tr>
+          <tr><td>Emails sent</td><td class="num"><b>0</b></td><td class="num">0 Saturday, 92 Friday, 199 Thursday</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>Read the <code>free_*</code> figures and not the totals: the totals also carry the paid Apify lane, which writes into the same table and has found nobody since 11-02. Two methods paid for the day: <code>28-sitemap</code> 2 addresses on 1 person, <code>18-rdap</code> 1 on 1. <code>16-jsonld</code> found 8 points on 1 lead, <code>02-subpages</code> 4 on 3 and <code>34-channel-page</code> 3 on 3, and not one of those was an address.</p>
+    <p class="muted">The shelf agrees with itself to the person. <code>ready_to_write</code> went 5,052 to <b>5,054</b>, up exactly the 2 parked, with nobody emailed to draw it down. People with a real send row held flat at <b>2,310</b>, and <code>marked_sent_never_emailed</code> is still <b>1</b>, which is <code>recPSkSNP2HeR6CCV</code>, unchanged.</p>
+    <p><b>The paid lane is out of people, and money still does not fix it.</b> Dry on <b>83 consecutive ticks</b> since 2026-11-02T10:22:57Z, with 12 idle batches this cycle, <code>$31.20</code> of November's allowance unspent and <code>$21.20</code> spendable to 11-30. <code>projected_leads</code> is a measured <b>0</b> and the binding constraint reads <code>candidate_supply</code>. The lane restarts only on new arrivals.</p>
+  </div>
+
+  <div class="q accent-red">
+    <div class="ask"><span class="qn">Q2</span><span>Yesterday's fix was for the lane's biggest fault. Did it work?</span></div>
+    <p><b>No, and the field a reader checks said it had.</b> That field went from 83 of 150 method faults (55%) yesterday to 33 of 121 (27%) this morning, which reads as the fix converting by half. It is an artefact of the measurement. <b>The field describes ONE collect pass. The cycle ran FOUR, every one of them with the fix already deployed.</b></p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Collect pass</th><th>Method errors</th><th><code>cross-domain redirect</code></th></tr></thead>
+        <tbody>
+          <tr><td>11:01Z</td><td class="num">209</td><td class="num">44</td></tr>
+          <tr><td>18:00Z</td><td class="num">114</td><td class="num">85</td></tr>
+          <tr><td>00:01Z</td><td class="num">131</td><td class="num">75</td></tr>
+          <tr><td>07:00Z <span class="muted">(the one published)</span></td><td class="num">121</td><td class="num"><b>33</b></td></tr>
+          <tr class="total"><td>The cycle</td><td class="num">575</td><td class="num">237, 41%</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>The published figure was the <b>smallest of the four</b>. The condition swings two-fold from pass to pass because it depends on which slice of the book the cursor is sitting on, so no single pass can carry a day-over-day comparison at all. That is the 2026-10-16 lesson (two instruments read at different hours) and yesterday's own (moves and a change spanning different windows) sitting in the one block a reader opens to decide what to fix in the only lane still parking anybody.</p>
+    <p><b>Across the whole collect log the fix has followed one hop:</b> <code>www.satyahairsolutions.com → satyahairsolution.com</code>, a creator whose two domains differ by a single letter. The cases the 11-08 debrief named by hand are still refused, including <code>ltrp.xyz → linguatrip.com</code>. The gate asks two things of a destination: the domain must read like the creator's name, and the rendered page must name them. The plausible reading is that a branded shortener points at the creator's <b>company</b>, whose name is not their channel name, so the first test refuses it. <span class="muted">Which of the two tests does the refusing was not isolated per lead, so that is a measurement to take rather than a conclusion.</span></p>
+    <p><b>The single-pass window also hid a whole fault.</b> <code>19-github: The operation was aborted due to timeout</code> was <b>62 errors, 30% of the 11:01Z pass</b>, and it appears in no published field, in a cycle where <code>19-github</code> is already one of the three methods that has produced nothing for three weeks.</p>
+  </div>
+
+  <div class="q accent-amber">
+    <div class="ask"><span class="qn">Q3</span><span>So what is really holding the lane back?</span></div>
+    <p><b>The book is nearly picked over, and past that it is the ownership gate, not a redirect and not money.</b> Over the cycle's 600 lead-walks the methods found <b>2,218</b> contact methods and <b>2,200 of them were already on file, 99.2%</b>. That yielded 18 points, 8 leads, 3 addresses and 2 parks. The lane is on <b>lap 15</b> of a 1,796-lead book, and <code>stranded</code> is 3 and flat, so no selector gap has reopened.</p>
+    <p><b>Website resolution is healthy.</b> On the newest pass, one of four, so read it as a sample: 45 of 150 leads had no site on file (30%), <b>zero</b> Brave refusals, zero Brave errors, and <code>cause</code> is <code>resolution_ok</code>. <b>No reason to buy Brave credit.</b></p>
+    <p>What the same pass says underneath is larger than the redirect. Brave ran <b>48</b> searches and returned a candidate site for <b>42</b> of them. The ownership gate accepted <b>3</b> and refused <b>39</b>, which is 93%. Those 39 leads end the pass with no website, and <b>nine of the lane's thirteen methods start from one</b>. That is roughly a quarter of the pass against the redirect's tenth, and it is the same kind of decision: how much evidence ties a site to a creator. The 2026-10-10 note already settled that this shape is not buyable.</p>
+    <p class="muted">Three methods are quiet and have been for a while: <code>04-holehe</code> 82 days, <code>19-github</code> 22, <code>26-instagram</code> 18.</p>
+  </div>
+
+  <h2>The fleet, as far as a Sunday can read it</h2>
+  <p>No plan on disk, so <code>live_inboxes</code>, <code>mailbox_slots</code> and Friday's sole-reason rows are all null and cannot be re-measured. Only the band gate ran.</p>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th></th><th>11-08 08:05Z</th><th>11-09 08:05Z</th></tr></thead>
+      <tbody>
+        <tr><td>clear (<code>band_normal</code>)</td><td class="num">48</td><td class="num"><b>54</b></td></tr>
+        <tr><td>watch</td><td class="num">12</td><td class="num">9</td></tr>
+        <tr><td>stop</td><td class="num">34</td><td class="num">31</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p><b>Nine mailboxes moved to clear, three to watch, nothing was stopped, and all nine returners still hold the clear band.</b> That is the opposite of 10-27, when six came back and five were re-stopped within hours. <code>band_delta_comparable</code> is true at 24.0h apart. <code>band_held_but_healthy</code> is <b>7</b>: six waiting out the 48-hour clean clock with the closest due in <b>4 hours</b>, one held only because a sibling on its domain is sick. So about seven more return for free. The older warmup gate in the email repo paused <b>2</b> on health and resumed none.</p>
+  <p><b>54 clear is not 54 able to send.</b> The band gate bands on health; the warmup floor and SmartLead's own suspensions are separate instruments, and reading one as the other is the 11-03 lesson. Friday's plan read <b>12</b> live inboxes against 77 suspended in SmartLead and 36 on "warmup day 12, and the floor is day 14". That floor clears Sunday, so those 36 can first carry an email <b>today</b>, and today's plan is the first readable measure of capacity since Friday. Two days without sending also means the follow-ups owed today will be the highest of the run.</p>
+
+  <h2>Money and quiet</h2>
+  <div class="tablewrap">
+    <table>
+      <tbody>
+        <tr><td><b>OpenRouter</b></td><td>Balance <b>$6.19</b>, <b>3.9 days</b> of runway. Account burn $1.58 a day and flat whatever the pipeline does. The finder's own log accounts for $0.20 of it across 450 <code>qwen3.7-flash</code> calls, and three enriched leads at the measured $0.110 each for about $0.33. What spends the rest was not established, same as yesterday.</td></tr>
+        <tr><td><b>Anthropic</b></td><td><b>$0</b>, against a $75 soft ceiling.</td></tr>
+        <tr><td><b>Faults</b></td><td><b>0</b> fatal error signatures, no halt flag, no escalations.</td></tr>
+        <tr><td><b>YouTube keys</b></td><td><b>15</b> working of 66 probed, 50 still quota-exhausted after the midnight reset. Settled since 2026-09-16, and irrelevant while discovery is off.</td></tr>
+        <tr><td><b>Discovery</b></td><td><b>0</b> new channels, Casey's standing order of 2026-09-08. Every sweep idle by design, the campaign block all zeros.</td></tr>
+        <tr><td><b>A 35,380-row write</b></td><td>A <code>below_threshold</code> sweep rewrote 35,380 rows in <b>153 seconds</b> at 06:40Z across 147 clusters. The population moved 130,009 to 129,964, a net 45, and <code>moved</code> reads <code>restamp</code> with <b>0</b> of them already emailed. That is the weekly 3,000-subscriber floor sweep re-stamping, not a demotion.</td></tr>
+        <tr><td><b>Four emails outside Siege</b></td><td>The session-start send fired at <b>08:20:32Z</b>, twenty minutes after the cycle closed, and all four leads reached SmartLead: Sai CPA Services, WA Building Guide, Southern California Apartment Group, Longyu Machinery Manufacturer. They land in tomorrow's numbers, and they are sending that did not come from Siege.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Fixes shipped this cycle</h2>
+  <div class="tablewrap">
+    <table class="fix">
+      <thead><tr><th>Commit</th><th>What changed and why</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code>cdb6e4e</code><br><span class="muted">orchestrator</span></td>
+          <td><b>The recovery lane's fault figures describe the whole cycle, not one of its four passes.</b> <code>aggregateCollectPasses()</code> sums every pass inside the cycle and <code>site_resolution.cycle</code> publishes it. The per-pass fields are untouched on purpose: the hourly alarm reads them, a pass is the right unit for "is the lane working right now", and the new <code>newest_pass_error_share_pct</code> says how much of the cycle they cover. It read <b>21%</b> this morning. <code>top_fault_condition_by_pass</code> carries the same condition in each pass, oldest first, so two passes disagreeing is visible instead of invisible. <code>passes_dispatched</code> is what the lane's own dispatch log recorded against <code>passes_measured</code> the collect log could supply, so a pass that died or ran under the 30-lead floor shows as a gap between the two rather than silently shrinking the window, and <code>methods_found</code> is null unless every measured pass carried the line, because a partial sum understates a re-walk without saying so. <span class="muted">Verified: typecheck clean, 340 selftest assertions pass with 11 new ones built on the real pass shapes, and run against the live log it returns 4 passes, 600 leads, 2,218 found against 2,200 on file, 575 errors, <code>cross-domain redirect</code> 237 at 41%, by-pass 44, 85, 75, 33, and the newest pass holding 21% of the cycle.</span></td>
+        </tr>
+        <tr>
+          <td><code>05f2dab</code><br><span class="muted">orchestrator</span></td>
+          <td><b>The band moves end at the reading <code>band_normal</code> comes from, so the subtraction closes every day.</b> Yesterday's fix closed the start of that span and left the end open, and the gap is structural rather than occasional. The gate runs hourly at about :05 and the debrief fires at 00:20 PT, so the run <code>band_normal</code> is read off is always the 08:05Z one, five minutes past the cycle end, while the moves stopped at 08:00Z. On 11-08 that run moved nobody and the arithmetic closed by luck. This morning it moved two mailboxes back to clear, and the published figures were 48 + 7 − 3 = 52 beside a <code>band_normal</code> of <b>54</b>. The move walk and <code>band_peak_normal</code> now both run to the newest reading inclusive, which is exactly the span <code>band_normal_change</code> describes, and the peak comes along for a second reason: one that stopped at the boundary could print below the <code>band_normal</code> published next to it. <span class="muted">Verified: typecheck clean, 340 assertions pass with 3 new ones on the real 11-08 and 11-09 gate history, and re-run against the live state file it returns 9 to clear, 3 to watch, 0 to stop, peak 54, nine named returners all still clear, and 48 + 9 − 3 = 54.</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>What to do next</h2>
+  <ol class="recs">
+    <li><b>Put $10 to $20 on OpenRouter today.</b> Balance $6.19, 3.9 days, today is a sending day and the cold-email writer runs on that account. A dry balance does not announce itself: the 2026-09-14 lesson is that a 402 shows up as exit 0 and done 0. Cheapest item on this list and the only one with a date on it.</li>
+    <li><b>Read today's plan for what the fleet can actually send, and do not read 54 clear as the answer.</b> The band gate bands on health. The 36 mailboxes on Friday's warmup floor clear today and are worth roughly 540 messages a day, and two days without sending means today's owed follow-ups will be the highest of the run. Today's plan is the first readable capacity measure since Friday.</li>
+    <li><b>Measure which half of the redirect gate refuses a creator's own site.</b> Either the evidence rule loosens for a destination the creator's own declared link points at, which is Casey's ownership call, or the condition stops being named as the lane's biggest fault. It is currently both deployed and inert.</li>
+    <li><b>Then decide the same question about Brave's website guesses.</b> The gate refuses 93% of them, which leaves roughly a quarter of each pass with no website and so no access to nine of thirteen methods. Larger than the redirect, and not a money problem.</li>
+    <li><b>Find out why SmartLead suspends whole domains.</b> Unchanged, and still the largest block on Friday's reading, with every one of them arriving as a complete domain.</li>
+    <li><b>Fix SMTP or IMAP on <code>tubegrowthagency.com</code>, <code>ytgrowthagency.com</code> and <code>contentgetsleads.com</code> before un-suspending anything there.</b> Nine mailboxes would come off suspension and still not send.</li>
+    <li><b>Stop planning the five bounced people, and ship the two <code>automator</code> repairs.</b> Ten days now, and each repair has already cost a whole sending day.</li>
+  </ol>
+
+  <div class="foot">
+    <b>Grounding.</b> Numbers come from <code>logs/autopilot-debrief-2026-11-09.json</code> for the 24 hours to 2026-11-09T08:00Z. Read directly rather than inferred: the four collect passes and their per-pass error and condition counts, by parsing the whole of <code>logs/bloodhound-collect.log</code> with the lane's own pass parser, which is also how the cycle totals were checked; the four dispatch times, from the <code>bloodhound_collect</code> events in <code>logs/campaign-2026-11-08.jsonl</code> and <code>-11-09.jsonl</code>; the single followed redirect, by grepping the whole collect log for the fix's own log line; the hourly clear-band shape, from the 25 <code>bands:</code> lines in <code>automator/logs/inbox-health.log</code> and the per-run move lists in <code>automator/state/inbox-health.json</code>, which is what showed the published move count missing the trailing run's two returners; the four leads sent at 08:20Z, from this repo's own send output and <code>logs/orchestrator-2026-11-09.jsonl</code>; and both fixes, by running the selftests and re-running each changed function against the live log and state file. <b>Not verified:</b> which half of the redirect ownership gate refuses each blocked destination, which is recommendation 3 and is stated as a plausible reading, not a finding; what spends the $1.25 of daily OpenRouter credit that three enriched leads and the finder's log do not account for; today's warmup clearing date, carried from Friday's raw plan string because a weekend writes none; the current state of the fleet's suspensions and the two <code>automator</code> repairs, neither re-read this morning; and why SmartLead suspends whole domains, which stays on the list precisely because it is unexplained.
+  </div>
+
+</div>
+
+<script>
+  // Mailboxes in the clear band, one reading an hour across the cycle, starting 08:05Z, with
+  // the 11-09T08:05Z reading band_normal is read from as the last bar. Read off the `bands:`
+  // lines in automator/logs/inbox-health.log. Nothing was emailed, so this is the only
+  // instrument that moved all day. The axis starts at 44, not 0, so a five-mailbox swing is
+  // legible.
+  var clear = [48,51,52,52,54,54,53,53,53,53,53,53,53,53,53,53,52,52,52,52,52,52,52,52,54];
+  var floor = 44, top = 55;
+  var strip = document.getElementById('strip');
+  clear.forEach(function (n, i) {
+    var b = document.createElement('div');
+    b.className = 'bar';
+    b.style.height = Math.round(((n - floor) / (top - floor)) * 100) + '%';
+    var h = (8 + i) % 24;
+    b.title = String(h).padStart(2, '0') + ':05Z, ' + n + ' mailboxes clear';
+    strip.appendChild(b);
+  });
+</script>
+</html>
