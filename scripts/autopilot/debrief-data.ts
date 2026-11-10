@@ -654,6 +654,33 @@ export type FleetFacts = {
   band_moved_to_normal: number | null;
   band_moved_to_watch: number | null;
   band_moved_to_stop: number | null;
+  /** --- AND A GATE RUN THAT READ A SHORT FLEET INVENTS MOVES (2026-11-10) ---
+   *
+   *  The move figures are the gate's own per-run lists summed, and the gate bands whatever
+   *  SmartLead hands it. When that read comes back short, every missing mailbox is simply
+   *  absent from the bands — and then the NEXT run finds them again and records each one as
+   *  a mailbox that just moved. Nothing moved. It is the 2026-10-29 shape (one failed
+   *  SmartLead read that blanked a whole fleet's campaigns) inside the move counts.
+   *
+   *  Measured on 2026-11-10. The 16:05:22Z run read 80 mailboxes of the 94 every other run
+   *  that cycle read, and its stopped band printed 20 against 31 an hour earlier. The
+   *  17:05:26Z run read all 94 again and recorded ELEVEN mailboxes moving to stop, which
+   *  put the stopped band back at exactly the 31 it had held at 15:05Z. So the cycle
+   *  published `band_moved_to_stop: 13` on a day whose stopped band moved 31 to 33, and the
+   *  debrief's own #1 fleet reading was eleven mailboxes that never went anywhere.
+   *
+   *  The giveaway is the subtraction the 2026-11-09 fix installed: 54 + 2 − 8 − 13 = 35
+   *  against a `band_normal` of 49. Which of the catch-up entries are real cannot be
+   *  recovered from this file (it keeps counts and move lists, never the roster), so this
+   *  says so rather than guessing. `band_short_readings` is how many runs inside the move
+   *  span read a smaller fleet than the run before them, `band_short_reading_at` is the
+   *  newest of them, and `band_moves_comparable` is false when any of them sits in the
+   *  span — which means the move counts carry catch-up and the band counts are the honest
+   *  reading of the day. A short run is also barred from setting `band_peak_normal`: a
+   *  partial inventory is not a measurement of the fleet. */
+  band_short_readings: number | null;
+  band_short_reading_at: string | null;
+  band_moves_comparable: boolean | null;
   /** Who came back, capped. A batch returning in one hour is worth seeing by name. */
   band_returned: string[];
   /** --- AND A MOVE COUNT CANNOT SAY WHERE THE MAILBOX ENDED UP (2026-10-27) ---
@@ -733,6 +760,9 @@ const NO_FLEET: FleetFacts = {
   band_moved_to_normal: null,
   band_moved_to_watch: null,
   band_moved_to_stop: null,
+  band_short_readings: null,
+  band_short_reading_at: null,
+  band_moves_comparable: null,
   band_returned: [],
   band_peak_normal: null,
   band_peak_normal_at: null,
@@ -832,6 +862,7 @@ export function bandGateFacts(
   | 'band_prev_at' | 'band_normal_prev' | 'band_watch_prev' | 'band_stop_prev'
   | 'band_normal_change' | 'band_stop_change' | 'band_gap_hours' | 'band_delta_comparable'
   | 'band_moved_to_normal' | 'band_moved_to_watch' | 'band_moved_to_stop' | 'band_returned'
+  | 'band_short_readings' | 'band_short_reading_at' | 'band_moves_comparable'
   | 'band_peak_normal' | 'band_peak_normal_at' | 'band_returned_still_normal'
   | 'band_round_trips' | 'band_round_trip_ids'
   | 'band_held_but_healthy' | 'band_held_but_healthy_on_clock'
@@ -844,6 +875,7 @@ export function bandGateFacts(
     band_normal_change: null, band_stop_change: null,
     band_gap_hours: null, band_delta_comparable: null,
     band_moved_to_normal: null, band_moved_to_watch: null, band_moved_to_stop: null,
+    band_short_readings: null, band_short_reading_at: null, band_moves_comparable: null,
     band_returned: [],
     band_peak_normal: null, band_peak_normal_at: null,
     band_returned_still_normal: null, band_round_trips: null, band_round_trip_ids: [],
@@ -920,6 +952,31 @@ export function bandGateFacts(
   let roundTrips: number | null = null;
   const roundTripIds: string[] = [];
   const cameBack = new Set<string>();
+  // Which runs read a smaller fleet than the run before them — see the short-reading block
+  // on FleetFacts. Walked over every run in the file, not just the windowed ones, so a
+  // short read sitting on the window's edge is still seen. Keyed by `at` because that is
+  // the only identifier a run carries.
+  const fleetSize = (r: Run | null | undefined): number | null => {
+    const c = r?.counts && typeof r.counts === 'object' ? r.counts : null;
+    if (!c) return null;
+    const parts = [num(c.normal), num(c.watch), num(c.stop)];
+    if (parts.some((p) => p === null)) return null;
+    return (parts as number[]).reduce((t, p) => t + p, 0);
+  };
+  const shortRuns = new Set<string>();
+  {
+    let prevSize: number | null = null;
+    for (const r of runs) {
+      if (typeof r?.at !== 'string') continue;
+      const size = fleetSize(r);
+      if (size === null) continue;
+      if (prevSize !== null && size < prevSize) shortRuns.add(r.at);
+      prevSize = size;
+    }
+  }
+  let shortInSpan: number | null = null;
+  let shortAt: string | null = null;
+  let movesComparable: boolean | null = null;
   if (window) {
     const a = Date.parse(window.sinceISO);
     const b = Date.parse(window.untilISO);
@@ -958,6 +1015,7 @@ export function bandGateFacts(
       const prevMs = prev && typeof prev.at === 'string' ? Date.parse(prev.at) : NaN;
       const movesAfter = Number.isFinite(prevMs) && prevMs >= a && prevMs < b ? prevMs : null;
       toNormal = 0; toWatch = 0; toStop = 0;
+      shortInSpan = 0;
       const fellBack = new Set<string>();
       // The upper bound is the newest reading, which is `lastMs` when it is readable and
       // the cycle end when it is not. `last` IS the newest run, so this can never reach
@@ -967,9 +1025,15 @@ export function bandGateFacts(
         if (typeof r?.at !== 'string') continue;
         const ms = Date.parse(r.at);
         if (!Number.isFinite(ms) || ms < a || ms > endMs) continue;
+        const short = shortRuns.has(r.at);
         const nrm = num((r.counts && typeof r.counts === 'object' ? r.counts : {}).normal);
-        if (nrm !== null && (peak === null || nrm > peak)) { peak = nrm; peakAt = r.at; }
+        // A partial inventory cannot set the day's high-water mark.
+        if (!short && nrm !== null && (peak === null || nrm > peak)) { peak = nrm; peakAt = r.at; }
         if (movesAfter !== null && ms <= movesAfter) continue;
+        if (short) {
+          shortInSpan = (shortInSpan ?? 0) + 1;
+          if (shortAt === null || r.at > shortAt) shortAt = r.at;
+        }
         const n = Array.isArray(r.to_normal) ? r.to_normal.map(String) : [];
         const w = Array.isArray(r.to_watch) ? r.to_watch.map(String) : [];
         const st = Array.isArray(r.to_stop) ? r.to_stop.map(String) : [];
@@ -986,6 +1050,7 @@ export function bandGateFacts(
       }
       roundTrips = fellBack.size;
       for (const e of fellBack) if (roundTripIds.length < 12) roundTripIds.push(e);
+      movesComparable = (shortInSpan ?? 0) === 0;
     }
   }
 
@@ -1045,6 +1110,9 @@ export function bandGateFacts(
     band_moved_to_normal: toNormal,
     band_moved_to_watch: toWatch,
     band_moved_to_stop: toStop,
+    band_short_readings: shortInSpan,
+    band_short_reading_at: shortAt,
+    band_moves_comparable: movesComparable,
     band_returned: returned,
     band_peak_normal: peak,
     band_peak_normal_at: peakAt,
@@ -1137,6 +1205,9 @@ export function fleetFacts(
     band_moved_to_normal: band.band_moved_to_normal,
     band_moved_to_watch: band.band_moved_to_watch,
     band_moved_to_stop: band.band_moved_to_stop,
+    band_short_readings: band.band_short_readings,
+    band_short_reading_at: band.band_short_reading_at,
+    band_moves_comparable: band.band_moves_comparable,
     band_returned: band.band_returned,
     band_peak_normal: band.band_peak_normal,
     band_peak_normal_at: band.band_peak_normal_at,
@@ -1938,7 +2009,25 @@ export function sendPlanHealth(
       'deliverability being charged to a well mailbox; band_held_healthy_soonest_hours is ' +
       'what the closest one still owes, read off the gate\'s own "Nh of Mh" wording. All ' +
       'of these are null, not 0, when the gate\'s per-mailbox map is absent or no window ' +
-      'was supplied.',
+      'was supplied. AND READ band_moves_comparable BEFORE READING ANY MOVE COUNT AS A ' +
+      'FLEET THAT MOVED (2026-11-10): the counts are the gate\'s own per-run lists summed, ' +
+      'the gate bands whatever SmartLead hands it, and a short read drops every missing ' +
+      'mailbox out of the bands — then the NEXT run finds them again and records each one ' +
+      'as a mailbox that just moved, when nothing moved. That is the 10-29 shape (one ' +
+      'failed SmartLead read) inside the move counts. On 2026-11-10 the 16:05:22Z run read ' +
+      '80 mailboxes of the 94 every other run that cycle read and printed 20 stopped ' +
+      'against 31 an hour earlier; the 17:05:26Z run read all 94 and recorded ELEVEN ' +
+      'moving to stop, putting the stopped band back at exactly the 31 it held at 15:05Z. ' +
+      'So band_moved_to_stop published 13 on a day whose stopped band moved 31 to 33, and ' +
+      'the subtraction the 11-09 fix installed said so: 54 + 2 - 8 - 13 = 35 against a ' +
+      'band_normal of 49. Which catch-up entries are real cannot be recovered from this ' +
+      'file (it keeps counts and move lists, never the roster), so the fields say so ' +
+      'instead of guessing: band_short_readings is how many runs inside the move span read ' +
+      'a smaller fleet than the run before them, band_short_reading_at is the newest, and ' +
+      'band_moves_comparable is false when any sits in the span — then the band counts and ' +
+      'band_normal_change are the honest reading of the day and the move counts are not. A ' +
+      'short run also cannot set band_peak_normal: a partial inventory is not a ' +
+      'measurement of the fleet. Null when no window was supplied.',
   };
 }
 

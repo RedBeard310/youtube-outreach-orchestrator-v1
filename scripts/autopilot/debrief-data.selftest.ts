@@ -1767,6 +1767,68 @@ ok('the peak comes with it, so it can never print below the band_normal beside i
   })(),
   [54, true]);
 
+// The 2026-11-10 fault: one gate run read a short fleet and the NEXT run recorded every
+// mailbox it found again as a fresh move. Numbers are the real 11-09/11-10 history: the
+// 16:05:22Z run read 80 of 94 with 20 stopped, the 17:05:26Z run read all 94 and recorded
+// 11 to stop, and the stopped band landed back on the 31 it held at 15:05Z.
+const BAND_SHORT_READING = {
+  generated_at: '2026-11-10T08:05:17Z',
+  owned: {},
+  runs: [
+    { at: '2026-11-09T08:06:19Z', counts: { normal: 54, watch: 9, stop: 31 }, to_normal: [], to_watch: [], to_stop: [] },
+    { at: '2026-11-09T15:05:03Z', counts: { normal: 53, watch: 10, stop: 31 }, to_normal: [], to_watch: ['w1@x.com'], to_stop: [] },
+    // 80 of 94. Eleven stopped mailboxes simply absent from the bands.
+    { at: '2026-11-09T16:05:22Z', counts: { normal: 50, watch: 10, stop: 20 }, to_normal: [], to_watch: [], to_stop: [] },
+    // ...and found again, each recorded as a move that never happened.
+    { at: '2026-11-09T17:05:26Z', counts: { normal: 52, watch: 11, stop: 31 }, to_normal: [], to_watch: ['w2@x.com', 'w3@x.com'], to_stop: ['s1@x.com', 's2@x.com', 's3@x.com', 's4@x.com', 's5@x.com', 's6@x.com', 's7@x.com', 's8@x.com', 's9@x.com', 's10@x.com', 's11@x.com'] },
+    { at: '2026-11-10T08:05:17Z', counts: { normal: 49, watch: 12, stop: 33 }, to_normal: [], to_watch: ['w4@x.com'], to_stop: [] },
+  ],
+};
+const SHORT_WINDOW = { sinceISO: '2026-11-09T08:00:00.000Z', untilISO: '2026-11-10T08:00:00.000Z' };
+ok('a short gate reading is named, and the move counts say they cannot be subtracted',
+  (() => {
+    const b = bandGateFacts(BAND_SHORT_READING, SHORT_WINDOW);
+    const closes = (b.band_normal_prev ?? 0) + (b.band_moved_to_normal ?? 0) - (b.band_moved_to_watch ?? 0)
+      - (b.band_moved_to_stop ?? 0) === b.band_normal;
+    return [b.band_short_readings, b.band_short_reading_at, b.band_moves_comparable,
+      b.band_moved_to_stop, b.band_normal, b.band_normal_change, closes];
+  })(),
+  [1, '2026-11-09T16:05:22Z', false, 11, 49, -5, false]);
+ok('the peak is the best FULL reading, so a short run cannot set it',
+  (() => {
+    const b = bandGateFacts(BAND_SHORT_READING, SHORT_WINDOW);
+    return [b.band_peak_normal, b.band_peak_normal_at];
+  })(),
+  [54, '2026-11-09T08:06:19Z']);
+// A short read normally shrinks every band, so it rarely tops the clear count — but the
+// gate bands whatever it is handed, and a partial inventory is not a measurement either way.
+ok('...even when the short run carries the highest clear count',
+  (() => {
+    const b = bandGateFacts({
+      generated_at: '2026-11-10T08:05:17Z',
+      owned: {},
+      runs: [
+        { at: '2026-11-09T08:06:19Z', counts: { normal: 40, watch: 10, stop: 44 }, to_normal: [], to_watch: [], to_stop: [] },
+        { at: '2026-11-09T16:05:22Z', counts: { normal: 60, watch: 2, stop: 8 }, to_normal: [], to_watch: [], to_stop: [] },
+        { at: '2026-11-10T08:05:17Z', counts: { normal: 42, watch: 10, stop: 42 }, to_normal: [], to_watch: [], to_stop: [] },
+      ],
+    }, SHORT_WINDOW);
+    return [b.band_peak_normal, b.band_peak_normal_at, b.band_short_readings];
+  })(),
+  [42, '2026-11-10T08:05:17Z', 1]);
+ok('a cycle whose every run read the whole fleet is comparable',
+  (() => {
+    const b = bandGateFacts(BAND_TRAILING_RUN, TRAIL_WINDOW);
+    return [b.band_short_readings, b.band_short_reading_at, b.band_moves_comparable];
+  })(),
+  [0, null, true]);
+ok('no window leaves the short-reading fields unknown, not zero',
+  (() => {
+    const b = bandGateFacts(BAND_SHORT_READING, null);
+    return [b.band_short_readings, b.band_short_reading_at, b.band_moves_comparable];
+  })(),
+  [null, null, null]);
+
 ok('no per-mailbox map costs the outcome fields, not the move counts (the 10-18 shape)',
   (() => {
     const b = bandGateFacts(BAND_HISTORY, { sinceISO: '2026-10-17T07:00:00.000Z', untilISO: '2026-10-18T07:00:00.000Z' });
