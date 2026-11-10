@@ -1971,7 +1971,23 @@ const COHORT_DIR = mkdtempSync(joinPath(tmpdir(), 'lost-cohort-'));
 const writeSnap = (date: string, lostIds: string[] | null) =>
   writeFileSync(
     joinPath(COHORT_DIR, `autopilot-debrief-${date}.json`),
-    JSON.stringify({ send_plan: { push_outcome: lostIds === null ? {} : { lost_ids: lostIds } } }),
+    JSON.stringify({
+      send_plan: {
+        push_outcome: lostIds === null
+          ? {}
+          : { lost_ids: lostIds, people_lost: lostIds.length },
+      },
+    }),
+  );
+// The real no-push shape, which is NOT an absent list: the shared no-push object carries an
+// empty `lost_ids` beside a null `people_lost`. That passed the array check and read as a
+// clear day, and it is what a weekend writes (2026-11-10).
+const writeNoPushSnap = (date: string) =>
+  writeFileSync(
+    joinPath(COHORT_DIR, `autopilot-debrief-${date}.json`),
+    JSON.stringify({
+      send_plan: { push_outcome: { log_found: true, lost_ids: [], people_lost: null } },
+    }),
   );
 const FIVE = ['recA', 'recB', 'recC', 'recD', 'recE'];
 writeSnap('2026-11-03', FIVE);
@@ -1995,6 +2011,20 @@ writeSnap('2026-11-07', null);
 // 5 = today plus the four days that do carry a list. Breaking the streak there would be 1.
 ok('a snapshot with no loss list is stepped over, not read as a clear day',
   lostCohort(FIVE, ['2026-11-07', ...PRIOR], COHORT_DIR).lost_longest_streak, 5);
+// ...and the shape a weekend REALLY writes: an empty list beside an unknown loss. This read
+// as a clear day and published a streak of 1 on 2026-11-10 against nine recurring losses.
+writeNoPushSnap('2026-11-08');
+ok('an empty loss list beside an unknown loss is a weekend, not a clear day',
+  lostCohort(FIVE, ['2026-11-08', ...PRIOR], COHORT_DIR).lost_longest_streak, 5);
+ok('...and it does not make the whole cohort look new',
+  (() => { const c = lostCohort(FIVE, ['2026-11-08', ...PRIOR], COHORT_DIR);
+    return [c.lost_recurring, c.lost_new]; })(),
+  [5, 0]);
+// A push that really ran and lost nobody still ends a streak. That is the day the field is
+// there to tell apart from a weekend.
+writeSnap('2026-11-08', []);
+ok('a push that ran and lost nobody is a clear day and ends the streak',
+  lostCohort(FIVE, ['2026-11-08', ...PRIOR], COHORT_DIR).lost_longest_streak, 1);
 ok('no readable prior snapshot is unknown, not a cohort of new people',
   lostCohort(FIVE, ['2026-10-01'], COHORT_DIR),
   { lost_recurring: null, lost_new: null, lost_longest_streak: null, lost_recurring_ids: [] });

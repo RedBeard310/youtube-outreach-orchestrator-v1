@@ -2956,7 +2956,22 @@ export function priorSendPlan(
  *  Measured over `lost_ids`, which is capped at 12, so on a day that lost more than that
  *  these are a lower bound and their denominator is that list, not `people_lost`. Null when
  *  no prior snapshot carries a readable `lost_ids`: unknown, and NOT a cohort of new
- *  people. A day that lost nobody is a real zero with a streak of 0. */
+ *  people. A day that lost nobody is a real zero with a streak of 0.
+ *
+ *  A SNAPSHOT WITH NO PUSH IS STEPPED OVER ON `people_lost`, NOT ON `lost_ids` (2026-11-10).
+ *  The streak walk was already written to step over a day with no push, and it looked for
+ *  one by its loss list being unreadable. A weekend snapshot does not have that shape: it
+ *  carries the shared no-push object, whose `lost_ids` is an EMPTY ARRAY beside a null
+ *  `people_lost`, so it passed the array check and entered the history as a day on which
+ *  nobody was lost — which ends every streak. On 2026-11-10 this field read 1 beside 9
+ *  recurring losses, i.e. "nobody has been lost twice in a row", about a cohort the 11-07
+ *  debrief had already published at a streak of 5. One of those eleven people has now been
+ *  refused on NINE consecutive pushes and four more on six. And it is structural, not
+ *  occasional: siege-plan.timer is Mon-Fri, so every Monday cycle has a weekend behind it
+ *  and would have reset the figure to 1 whatever the cohort was doing. The discriminator is
+ *  the per-person join's own verdict — `people_lost` is a number only when there was a push
+ *  to lose anybody on, and null is unknown, which is the 10-22 rule everywhere else in this
+ *  file. So a prior day counts as clear only when it says so. */
 export function lostCohort(
   lostIds: string[],
   priorDates: string[],
@@ -2978,13 +2993,18 @@ export function lostCohort(
     if (!existsSync(p)) continue;
     try {
       const prior = JSON.parse(readFileSync(p, 'utf8')) as {
-        send_plan?: { push_outcome?: { lost_ids?: unknown } };
+        send_plan?: { push_outcome?: { lost_ids?: unknown; people_lost?: unknown } };
       };
       const ids = prior.send_plan?.push_outcome?.lost_ids;
+      const lost = prior.send_plan?.push_outcome?.people_lost;
       // A snapshot with no readable list says nothing either way, and a gap must not break
       // a streak: a weekend has no push, so it has no losses and no list. Skipped over,
       // never counted as a day the cohort was clear.
       if (!Array.isArray(ids)) continue;
+      // Nor does an EMPTY list beside an unknown loss count. That is the no-push shape — a
+      // weekend, or a run that died before the push — and it is the one this walk kept
+      // reading as a clear day. `people_lost` is a number only when the join really ran.
+      if (typeof lost !== 'number') continue;
       history.push(new Set(ids.filter((x): x is string => typeof x === 'string')));
     } catch { /* a snapshot we cannot read is not a day on which nobody was lost */ }
   }
