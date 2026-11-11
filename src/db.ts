@@ -637,12 +637,37 @@ export async function countFirstTouchBetween(
 // number. The ledger fields are null, not 0, when the ledger cannot be read: unknown and
 // measured-as-nothing differ, and this repo only counts (see CLAUDE.md "No business logic
 // here") — recovering these leads means reverting a stamp, which belongs to the send path.
+// AND A STRANDED LEAD IS NOT ALWAYS A LOST ONE — SPLIT IT BY THE AGE OF THE STAMP
+// (2026-11-11). The paragraph above ends "nobody has ever emailed them, and nothing
+// will", which the next two cycles falsified. The count went 1 to 6 on 2026-11-10 and
+// 6 to 7 on 2026-11-11, and nothing in the reading said whether a newly stranded person
+// flies tomorrow or never flies:
+//
+//   - the five who joined on 11-10 were all stamped THAT cycle, and all five were
+//     emailed for real inside the next one. They are this cycle's five
+//     `first_touch_recovered`: a stamp that ran ahead of its send by one day.
+//   - the six who joined on 11-11 were stamped on 2026-11-02, nine days earlier, and
+//     had send rows yesterday (the gap was 6, and none of these six was in it). Those
+//     rows were deleted inside the cycle, which is `siege_live.py` withdrawing them.
+//     The same cycle's push planned all six again and the approval gate held them for
+//     the next day, so the send path is already re-driving them.
+//   - `recPSkSNP2HeR6CCV` has carried the stamp since 2026-10-07 with no send row and
+//     no plan. That one is the shape the paragraph above describes.
+//
+// Three different futures inside one number. The stamp date separates them for free, so
+// `_stamped_in_cycle` is the fresh event worth watching once, `_standing` is the stamp
+// that has outlived the cycle it was written in, and `_oldest_stamp_day` says how long
+// the worst of them has stood. Null, not 0, when the ledger is unreadable or a stranded
+// lead carries no stamp date: unknown and measured-as-nothing differ.
 export type ShelfRow = {
   id: string;
   outreach_status: string | null;
   bundled: boolean;
   /** Has a row in `leads.outreach_sends`. `null` = the ledger could not be read. */
   emailed: boolean | null;
+  /** When the push stamped this lead `sent_to_smartlead` (`outreach_processed_at`).
+   *  `null` = never stamped, or the column held nothing. */
+  stamped_at?: string | null;
 };
 
 export type ShelfTally = {
@@ -652,22 +677,44 @@ export type ShelfTally = {
   already_sent: number;
   /** The send ledger. People this pipeline really emailed. Null if unreadable. */
   emailed: number | null;
-  /** Stamped `sent_to_smartlead` with no send row: nobody emailed them, nothing will. */
+  /** Stamped `sent_to_smartlead` with no send row. READ THE SPLIT BELOW BEFORE CALLING
+   *  THEM LOST: on 2026-11-10 every one of them was emailed inside the next cycle. */
   marked_sent_never_emailed: number | null;
   marked_sent_never_emailed_ids: string[] | null;
+  /** Of those, the ones stamped inside this cycle — a stamp running ahead of its send,
+   *  which has resolved itself in a day. Null when no cycle start was supplied, or a
+   *  stranded lead carries no stamp date. */
+  marked_sent_never_emailed_stamped_in_cycle: number | null;
+  /** The ones whose stamp predates this cycle and still has no send behind it. These are
+   *  the ones worth chasing. Same null rule. */
+  marked_sent_never_emailed_standing: number | null;
+  /** The oldest stamp among them, as a YYYY-MM-DD day, so the age is readable without
+   *  opening the database. Null when none is stamped or no stamp date was supplied. */
+  marked_sent_never_emailed_oldest_stamp_day: string | null;
   total: number;
 };
 
 /** How many stranded ids a snapshot names, same cap the fleet and push blocks use. */
 export const MAX_SHELF_STRANDED_IDS = 12;
 
-/** Pure, so the shape can be asserted against a live snapshot without a database. */
-export function shelfTally(rows: ShelfRow[]): ShelfTally {
+/** Postgres renders a whole-hour offset as `+00`, which `Date.parse` rejects outright —
+ *  so the first draft of the stranded split returned "unknown" for every lead on a
+ *  perfectly readable stamp, and only the selftest fixtures built from the live column
+ *  caught it. Widen a bare two-digit offset to `+00:00` before parsing. */
+function parseStamp(s: string): number {
+  return Date.parse(/[+-]\d\d$/.test(s) ? `${s}:00` : s);
+}
+
+/** Pure, so the shape can be asserted against a live snapshot without a database.
+ *  `cycleStartISO` splits the stranded cohort by the age of its stamp; omit it and that
+ *  split reports null rather than guessing. */
+export function shelfTally(rows: ShelfRow[], cycleStartISO?: string | null): ShelfTally {
   let ready = 0;
   let bundled = 0;
   let sent = 0;
   let emailed = 0;
   const stranded: string[] = [];
+  const strandedStamps: Array<string | null | undefined> = [];
   // One unreadable row makes the whole ledger reading unknown. A partial count here would
   // be a smaller gap than the real one, which is the failure this field exists to stop.
   let ledgerReadable = true;
@@ -681,8 +728,21 @@ export function shelfTally(rows: ShelfRow[]): ShelfTally {
       continue;
     }
     if (r.emailed) emailed += 1;
-    else if (status === 'sent_to_smartlead') stranded.push(r.id);
+    else if (status === 'sent_to_smartlead') {
+      stranded.push(r.id);
+      strandedStamps.push(r.stamped_at);
+    }
   }
+  // One stranded lead with no stamp date makes the whole split unknown, for the same
+  // reason an unreadable ledger makes the gap unknown: a partial split would read as a
+  // complete one and understate whichever side the missing lead belonged to.
+  const startMs = cycleStartISO ? parseStamp(cycleStartISO) : NaN;
+  const stampMs = strandedStamps.map((s) => (s ? parseStamp(s) : NaN));
+  const splitKnown = ledgerReadable
+    && Number.isFinite(startMs)
+    && stampMs.every((ms) => Number.isFinite(ms));
+  const freshCount = splitKnown ? stampMs.filter((ms) => ms >= startMs).length : null;
+  const oldestMs = splitKnown && stampMs.length ? Math.min(...stampMs) : null;
   return {
     ready_to_write: ready,
     bundled,
@@ -690,22 +750,33 @@ export function shelfTally(rows: ShelfRow[]): ShelfTally {
     emailed: ledgerReadable ? emailed : null,
     marked_sent_never_emailed: ledgerReadable ? stranded.length : null,
     marked_sent_never_emailed_ids: ledgerReadable ? stranded.slice(0, MAX_SHELF_STRANDED_IDS) : null,
+    marked_sent_never_emailed_stamped_in_cycle: freshCount,
+    marked_sent_never_emailed_standing: freshCount === null ? null : stranded.length - freshCount,
+    marked_sent_never_emailed_oldest_stamp_day:
+      oldestMs === null ? null : new Date(oldestMs).toISOString().slice(0, 10),
     total: rows.length,
   };
 }
 
-export async function countShelf(): Promise<ShelfTally> {
+export async function countShelf(cycleStartISO?: string | null): Promise<ShelfTally> {
   // One query, both instruments, so they cannot be read at two different moments.
   try {
-    const rows = await query<{ id: string; outreach_status: string | null; bundled: boolean; emailed: boolean }>(
+    const rows = await query<{
+      id: string;
+      outreach_status: string | null;
+      bundled: boolean;
+      emailed: boolean;
+      stamped_at: string | null;
+    }>(
       `SELECT lc.id,
               lc.outreach_status,
               (lc.enrichment_bundle_path IS NOT NULL AND btrim(lc.enrichment_bundle_path) <> '') AS bundled,
-              EXISTS (SELECT 1 FROM leads.outreach_sends s WHERE s.lead_id = lc.id)              AS emailed
+              EXISTS (SELECT 1 FROM leads.outreach_sends s WHERE s.lead_id = lc.id)              AS emailed,
+              to_char(lc.outreach_processed_at, 'YYYY-MM-DD"T"HH24:MI:SSOF')                     AS stamped_at
          FROM leads.lead_candidates lc
         WHERE lc.review_status = 'approved_hold'`,
     );
-    return shelfTally(rows);
+    return shelfTally(rows, cycleStartISO);
   } catch {
     // The ledger join is the only new dependency, so lose it rather than the whole block.
     const base = getBase();
@@ -721,7 +792,7 @@ export async function countShelf(): Promise<ShelfTally> {
       outreach_status: (r.get('outreach_status') as string | undefined) ?? null,
       bundled: Boolean((r.get('enrichment_bundle_path') as string | undefined)?.trim()),
       emailed: null,
-    })));
+    })), cycleStartISO);
   }
 }
 

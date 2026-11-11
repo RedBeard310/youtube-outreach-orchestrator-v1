@@ -4879,7 +4879,10 @@ async function main(): Promise<void> {
   // Both fail soft: a debrief missing its send numbers is bad, one that crashes and
   // writes nothing is worse (that is how 09-17/18/19 went unwritten).
   const sent = await countSentBetween(sinceISO, untilISO).catch(() => null);
-  const shelf = await countShelf().catch(() => null);
+  // The cycle start splits the stranded cohort by the age of its stamp — a stamp written
+  // this cycle has resolved itself inside a day, one older than the cycle has not. See
+  // the stranded block comment on shelfTally() in src/db.ts.
+  const shelf = await countShelf(sinceISO).catch(() => null);
 
   // How many of those emails reached somebody new. Same fail-soft rule. See
   // countFirstTouchBetween() for the two cycles that printed a lossless push beside a
@@ -5639,6 +5642,16 @@ async function main(): Promise<void> {
       emailed: shelf?.emailed ?? null,
       marked_sent_never_emailed: shelf?.marked_sent_never_emailed ?? null,
       marked_sent_never_emailed_ids: shelf?.marked_sent_never_emailed_ids ?? null,
+      // NOT EVERY STRANDED LEAD IS A LOST ONE (2026-11-11). The five who joined this
+      // count on 11-10 were all stamped that cycle and all five were really emailed
+      // inside the next one. The six who joined on 11-11 were stamped nine days earlier
+      // and had their send rows deleted by a withdrawal. One has stood since 10-07.
+      // The stamp's age separates the three. See shelfTally() in src/db.ts.
+      marked_sent_never_emailed_stamped_in_cycle:
+        shelf?.marked_sent_never_emailed_stamped_in_cycle ?? null,
+      marked_sent_never_emailed_standing: shelf?.marked_sent_never_emailed_standing ?? null,
+      marked_sent_never_emailed_oldest_stamp_day:
+        shelf?.marked_sent_never_emailed_oldest_stamp_day ?? null,
       approved_hold_total: shelf?.total ?? null,
       bundled_pct: shelf && shelf.total > 0 ? Math.round((1000 * shelf.bundled) / shelf.total) / 10 : null,
       note:
@@ -5671,7 +5684,23 @@ async function main(): Promise<void> {
         'those six were stamped before they were ever sent to. emailed and ' +
         'marked_sent_never_emailed are null, not 0, when the send ledger cannot be read, ' +
         'which is unknown and NOT a clean shelf. Recovering the stranded leads means ' +
-        'reverting a stamp, which is the send path\'s call and not this repo\'s.',
+        'reverting a stamp, which is the send path\'s call and not this repo\'s. ' +
+        'AND READ marked_sent_never_emailed_standing, NOT THE COUNT, AS PEOPLE NOBODY ' +
+        'WILL EMAIL (2026-11-11): "nothing will email them" is true of some of them and ' +
+        'the next two cycles proved it false of the rest. The five who joined the count ' +
+        'on 2026-11-10 were all stamped inside that cycle and all five were really ' +
+        'emailed inside the next one — they are the 11-11 cycle\'s five ' +
+        'first_touch_recovered, a stamp that ran one day ahead of its send. The six who ' +
+        'joined on 11-11 were stamped on 2026-11-02 and were NOT in the gap the morning ' +
+        'before, so their send rows were deleted inside the cycle, which is ' +
+        'siege_live.py withdrawing them; that same cycle\'s push planned all six again ' +
+        'and the approval gate held them for the next day. recPSkSNP2HeR6CCV has carried ' +
+        'the stamp since 2026-10-07 with no send row and no plan, and is the only one of ' +
+        'the seven the original paragraph describes. _stamped_in_cycle is the fresh ' +
+        'event, worth one look; _standing is the stamp that outlived the cycle that ' +
+        'wrote it; _oldest_stamp_day is how old the worst of them is. All three are ' +
+        'null, not 0, when the ledger is unreadable or a stranded lead carries no stamp ' +
+        'date, because a partial split reads as a complete one.',
     },
     discovered_today: {
       total: discovered.length,

@@ -1993,6 +1993,75 @@ ok('an empty shelf is zero, not unknown',
   })(),
   [0, 0, 0]);
 
+// The stranded split. The live 2026-11-11 shape: six stamped on 11-02 and withdrawn
+// inside the cycle, one standing since 10-07, none stamped this cycle — against the
+// 11-10 shape, where all five were stamped that cycle and all five flew the next day.
+const CYCLE_START = '2026-11-10T08:00:00.000Z';
+const strandedRow = (id: string, stamped_at: string | null) =>
+  shelfRow({ id, outreach_status: 'sent_to_smartlead', emailed: false, stamped_at });
+ok('a stamp older than the cycle is standing, one inside it is not',
+  (() => {
+    const t = shelfTally([
+      strandedRow('old', '2026-10-07T10:43:42+00'),
+      strandedRow('nine-days', '2026-11-02T11:49:10+00'),
+      strandedRow('fresh', '2026-11-10T12:38:46+00'),
+      shelfRow({ id: 'sent', outreach_status: 'sent_to_smartlead', emailed: true, stamped_at: '2026-11-10T12:00:00+00' }),
+    ], CYCLE_START);
+    return [t.marked_sent_never_emailed, t.marked_sent_never_emailed_stamped_in_cycle,
+      t.marked_sent_never_emailed_standing, t.marked_sent_never_emailed_oldest_stamp_day];
+  })(),
+  [3, 1, 2, '2026-10-07']);
+ok('the live 11-11 shape: 7 stranded, none of them fresh, oldest 2026-10-07',
+  (() => {
+    const rows = [strandedRow('recPSkSNP2HeR6CCV', '2026-10-07T10:43:42+00')];
+    for (let i = 0; i < 6; i++) rows.push(strandedRow(`r${i}`, '2026-11-02T11:49:10+00'));
+    const t = shelfTally(rows, CYCLE_START);
+    return [t.marked_sent_never_emailed, t.marked_sent_never_emailed_stamped_in_cycle,
+      t.marked_sent_never_emailed_standing, t.marked_sent_never_emailed_oldest_stamp_day];
+  })(),
+  [7, 0, 7, '2026-10-07']);
+ok('the live 11-10 shape: 5 of 6 stamped that cycle, and they all flew the next day',
+  (() => {
+    const rows = [strandedRow('recPSkSNP2HeR6CCV', '2026-10-07T10:43:42+00')];
+    for (let i = 0; i < 5; i++) rows.push(strandedRow(`r${i}`, '2026-11-10T12:38:46+00'));
+    const t = shelfTally(rows, CYCLE_START);
+    return [t.marked_sent_never_emailed_stamped_in_cycle, t.marked_sent_never_emailed_standing];
+  })(),
+  [5, 1]);
+ok('no cycle start means the split is unknown, not zero',
+  (() => {
+    const t = shelfTally([strandedRow('a', '2026-11-02T11:49:10+00')]);
+    return [t.marked_sent_never_emailed, t.marked_sent_never_emailed_stamped_in_cycle,
+      t.marked_sent_never_emailed_standing, t.marked_sent_never_emailed_oldest_stamp_day];
+  })(),
+  [1, null, null, null]);
+ok('one stranded lead with no stamp date makes the whole split unknown',
+  (() => {
+    const t = shelfTally([
+      strandedRow('a', '2026-11-02T11:49:10+00'),
+      strandedRow('b', null),
+    ], CYCLE_START);
+    return [t.marked_sent_never_emailed, t.marked_sent_never_emailed_standing,
+      t.marked_sent_never_emailed_oldest_stamp_day];
+  })(),
+  [2, null, null]);
+ok('an unreadable ledger leaves the split unknown too',
+  (() => {
+    const t = shelfTally([
+      shelfRow({ id: 'a', outreach_status: 'sent_to_smartlead', emailed: null, stamped_at: '2026-11-02T11:49:10+00' }),
+      strandedRow('b', '2026-11-02T11:49:10+00'),
+    ], CYCLE_START);
+    return [t.marked_sent_never_emailed, t.marked_sent_never_emailed_standing];
+  })(),
+  [null, null]);
+ok('no stranded leads is a measured zero with no oldest day',
+  (() => {
+    const t = shelfTally([shelfRow({ id: 'a', outreach_status: 'sent_to_smartlead', emailed: true })], CYCLE_START);
+    return [t.marked_sent_never_emailed, t.marked_sent_never_emailed_stamped_in_cycle,
+      t.marked_sent_never_emailed_standing, t.marked_sent_never_emailed_oldest_stamp_day];
+  })(),
+  [0, 0, 0, null]);
+
 // recoveredTally — a backlog finally flying is not a new person reached. See
 // countFirstTouchRecovered() in src/db.ts for the 51 of 52 first touches on 2026-10-29
 // that were the 10-13 stranded cohort, published as a nine-fold jump in reach.
