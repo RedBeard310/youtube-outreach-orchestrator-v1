@@ -5387,9 +5387,11 @@ async function main(): Promise<void> {
     // `email_points` is the number that matters: only an email flips a lead to
     // approved_hold. A null block means the queries failed, not that yield was zero.
     //
-    // The `free_*` fields are this lane's own work and the `*_added` totals are not:
-    // the paid Apify lane writes into the same table. See collectYieldBetween() for
-    // the 2026-10-01 cycle that made the difference load-bearing.
+    // The `lane_*` fields are this lane's own work and neither the `*_added` totals nor
+    // the `free_*` split are: the paid Apify lane and automator's contact-lookup timer
+    // both write into the same table, the second one through this lane's own CLI. See
+    // collectYieldBetween() for the 2026-10-01 and 2026-11-10 cycles that made each
+    // difference load-bearing.
     recovery_lane: {
       contact_points_added: laneYieldNow?.points ?? null,
       email_points_added: laneYieldNow?.email_points ?? null,
@@ -5407,6 +5409,24 @@ async function main(): Promise<void> {
       paid_email_points_added: laneYieldNow?.paid_email_points ?? null,
       paid_leads_with_new_email: laneYieldNow?.paid_leads_with_email_points ?? null,
       paid_contact_points_prev_7d: laneYieldNow?.paid_points_prev_7d ?? null,
+      // AND THE free_* FIELDS ARE TWO LANES, NOT ONE (2026-11-11). automator's
+      // contact-lookup.timer calls the SAME bloodhound CLI on single leads, so its
+      // points carry the same method names and the free split cannot see them. On
+      // 2026-11-10 that was 160 of 173 points and 18 of 20 addresses, on people
+      // already sitting in approved_hold. lane_* is free points on a lead in THIS
+      // lane's book; read it, not free_*. See collectYieldBetween().
+      lane_contact_points_added: laneYieldNow?.lane_points ?? null,
+      lane_email_points_added: laneYieldNow?.lane_email_points ?? null,
+      lane_leads_with_new_points: laneYieldNow?.lane_leads_with_points ?? null,
+      lane_leads_with_new_email: laneYieldNow?.lane_leads_with_email_points ?? null,
+      lane_contact_points_prev_7d: laneYieldNow?.lane_points_prev_7d ?? null,
+      lane_email_points_prev_7d: laneYieldNow?.lane_email_points_prev_7d ?? null,
+      other_lane_contact_points_added: laneYieldNow?.other_lane_points ?? null,
+      other_lane_email_points_added: laneYieldNow?.other_lane_email_points ?? null,
+      other_lane_leads_with_new_points: laneYieldNow?.other_lane_leads_with_points ?? null,
+      other_lane_leads_with_new_email: laneYieldNow?.other_lane_leads_with_email_points ?? null,
+      other_lane_contact_points_prev_7d: laneYieldNow?.other_lane_points_prev_7d ?? null,
+      other_lane_email_points_prev_7d: laneYieldNow?.other_lane_email_points_prev_7d ?? null,
       collect_book_pool: laneBook?.pool ?? null,
       collect_book_stranded: laneBook?.stranded ?? null,
       collect_laps: laneState.collectLaps ?? null,
@@ -5443,10 +5463,29 @@ async function main(): Promise<void> {
         : null,
       note:
         'Contact points written in the cycle, from leads.contact_points.created_at. ' +
-        'READ THE free_* FIELDS AS THIS LANE: the totals also contain the paid Apify ' +
+        'READ THE lane_* FIELDS AS THIS LANE. The totals also contain the paid Apify ' +
         'lane, which writes into the same table, and on 2026-10-01 that was 701 of 742 ' +
-        'points while the free pass found 6 addresses. ' +
-        'COUNT PEOPLE, NOT ADDRESSES: free_leads_with_new_email is the number that ' +
+        'points while the free pass found 6 addresses — that is what free_* was built ' +
+        'for. BUT free_* IS TWO LANES AS WELL (2026-11-11): automator/scripts/' +
+        'contact-lookup.py, on a 30-minute timer, shells out to the SAME ' +
+        '`npm run bloodhound -- --lead-ids` CLI to research one lead at a time, so its ' +
+        'points land in this table under the identical method names and nothing in the ' +
+        'row says which caller wrote it. On the 2026-11-10 cycle free_* published 173 ' +
+        'points and 19 people with a new address against 73 and 23 the prior week, ' +
+        'which reads as this lane tripling. THIRTEEN of the points were this lane\'s, on ' +
+        '11 people, and TWO of the addresses; the other 160 were contact-lookup\'s, on ' +
+        '30 approved_hold and 7 approved leads — people on the shelf already, who cannot ' +
+        'be recovered because they were never lost. The lane\'s own week ran 59 points to ' +
+        '13, a collapse, published as a jump, while its own four collect passes reported ' +
+        '14 points in site_resolution.cycle.points in the same snapshot. The ' +
+        'discriminator is the lead and not the source: this lane walks needs_contact ' +
+        'and nobody else (collectBookDepth\'s book), so lane_* is free points on a lead ' +
+        'in the book and other_lane_* is free points on everybody else. ONE EDGE, AND IT ' +
+        'CUTS THE SAFE WAY: review_status is read now, so a lead recovered inside the ' +
+        'cycle has already flipped to approved_hold and its points land in other_lane_*, ' +
+        'understating lane_* by at most that cycle\'s own parks — read parked_today ' +
+        'beside it. ' +
+        'COUNT PEOPLE, NOT ADDRESSES: lane_leads_with_new_email is the number that ' +
         'predicts parking, because one creator with a mailto on every page writes dozens of ' +
         'email points alone. On 2026-10-02 free_email_points_added was 32 and ' +
         'free_leads_with_new_email was 2, with 31 of the 32 from one lead; both flipped and ' +
@@ -5454,7 +5493,7 @@ async function main(): Promise<void> {
         'the wrong denominator for addresses (it read 12 that day). ' +
         'A lap is one full walk of collect_book_pool; past lap 1 most leads are re-walks, so a ' +
         'low yield at a high lap count is a picked-over book rather than a fault, so read it ' +
-        'against free_contact_points_prev_7d. ' +
+        'against lane_contact_points_prev_7d. ' +
         'READ site_resolution BEFORE BLAMING A PICKED-OVER BOOK: it describes the newest ' +
         'completed collect pass OF AT LEAST 30 LEADS, nine of thirteen collection methods ' +
         'need the creator website first, and collapsed:true means the lane had almost no ' +

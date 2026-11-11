@@ -607,8 +607,44 @@ export async function collectBookDepth(): Promise<{ pool: number; stranded: numb
  *  reported beside them so the two can never be confused again. The discriminator
  *  is the `source` prefix, which the paid writer sets itself; anything that is not
  *  prefixed `apify` is counted as free, so a new free method needs no change here
- *  and a new PAID writer must add its prefix to PAID_POINT_SOURCE_PREFIXES. */
+ *  and a new PAID writer must add its prefix to PAID_POINT_SOURCE_PREFIXES.
+ *
+ *  AND `free_` IS NOT THIS LANE EITHER — SPLIT BY WHOSE BOOK THE LEAD IS IN
+ *  (2026-11-11). The prefix split assumed one free writer. There are two:
+ *  `automator/scripts/contact-lookup.py` (contact-lookup.timer, every 30 min)
+ *  shells out to the SAME `npm run bloodhound -- --lead-ids <ids>` CLI to research
+ *  one lead at a time, so its points land in this table under the identical method
+ *  names (`33-about-text`, `34-channel-page`, ...). Nothing in the row says which
+ *  caller wrote it, and the `free_*` fields counted both.
+ *
+ *  On the 2026-11-10 cycle that published 173 free points and 19 people with a new
+ *  address, against 73 and 23 the prior week, which reads as the recovery lane
+ *  tripling its output. THIRTEEN of the 173 points were the lane's, on 11 people,
+ *  and TWO of the addresses. The other 160 were contact-lookup's, on 30
+ *  `approved_hold` and 7 `approved` leads — people already on the shelf, who cannot
+ *  be recovered because they were never lost. The lane's own week ran 59 points to
+ *  13, a collapse, published as a jump. The lane's four collect passes said so
+ *  themselves in the collect log (14 points) and that figure sat in
+ *  `site_resolution.cycle.points` in the same snapshot, 12x below the field a reader
+ *  is told to read.
+ *
+ *  The discriminator is the lead, not the source: this lane walks its own book and
+ *  that book is `review_status = 'needs_contact'` (see collectBookDepth()), while
+ *  contact-lookup researches whatever lead it was handed. So `lane_*` is free points
+ *  on a lead in the book and `other_lane_*` is free points on everybody else — which
+ *  needs no maintenance when a new free method or a third caller appears.
+ *
+ *  ONE EDGE, STATED BECAUSE IT CUTS THE RIGHT WAY: review_status is read NOW, so a
+ *  lead this lane recovers inside the window has already flipped to `approved_hold`
+ *  by measurement time and its points fall into `other_lane_*`. That understates
+ *  `lane_*` by at most the cycle's own recoveries, which `parked_today` publishes
+ *  beside it. Understating a success is the safe direction; crediting another lane's
+ *  work to this one is what cost the 11-10 reading. */
 const PAID_POINT_SOURCE_PREFIXES = ['apify'];
+
+/** The leads this lane walks. Must match collectBookDepth()'s book, or `lane_*`
+ *  measures a different population from the one the pool depth describes. */
+const LANE_BOOK_REVIEW_STATUS = 'needs_contact';
 
 export async function collectYieldBetween(
   sinceISO: string,
@@ -630,6 +666,18 @@ export async function collectYieldBetween(
   paid_email_points: number;
   paid_leads_with_email_points: number;
   paid_points_prev_7d: number;
+  lane_points: number;
+  lane_email_points: number;
+  lane_leads_with_points: number;
+  lane_leads_with_email_points: number;
+  lane_points_prev_7d: number;
+  lane_email_points_prev_7d: number;
+  other_lane_points: number;
+  other_lane_email_points: number;
+  other_lane_leads_with_points: number;
+  other_lane_leads_with_email_points: number;
+  other_lane_points_prev_7d: number;
+  other_lane_email_points_prev_7d: number;
 }> {
   const emailKinds = `('business_email', 'personal_email', 'youtube_email')`;
   const inWindow = `cp.created_at >= $1::timestamptz AND cp.created_at < $2::timestamptz`;
@@ -640,6 +688,10 @@ export async function collectYieldBetween(
     .map((p) => `cp.source LIKE '${p}%'`)
     .join(' OR ');
   const isFree = `NOT (${isPaid}) OR cp.source IS NULL`;
+  // Free AND on a lead in this lane's book. A point on anybody else is some other
+  // caller of the same CLI — see the block comment above.
+  const inLane = `(${isFree}) AND lc.review_status = '${LANE_BOOK_REVIEW_STATUS}'`;
+  const outOfLane = `(${isFree}) AND (lc.review_status IS DISTINCT FROM '${LANE_BOOK_REVIEW_STATUS}')`;
   const rows = await query<Record<string, string | number>>(
     `SELECT
        count(*) FILTER (WHERE ${inWindow}) AS points,
@@ -666,8 +718,26 @@ export async function collectYieldBetween(
        count(*) FILTER (WHERE ${inWindow} AND (${isPaid}) AND cp.kind IN ${emailKinds}) AS paid_email_points,
        count(DISTINCT cp.lead_id) FILTER (WHERE ${inWindow} AND (${isPaid}) AND cp.kind IN ${emailKinds})
          AS paid_leads_with_email_points,
-       count(*) FILTER (WHERE ${inPrev7d} AND (${isPaid})) AS paid_points_prev_7d
-       FROM leads.contact_points cp`,
+       count(*) FILTER (WHERE ${inPrev7d} AND (${isPaid})) AS paid_points_prev_7d,
+       count(*) FILTER (WHERE ${inWindow} AND (${inLane})) AS lane_points,
+       count(*) FILTER (WHERE ${inWindow} AND (${inLane}) AND cp.kind IN ${emailKinds}) AS lane_email_points,
+       count(DISTINCT cp.lead_id) FILTER (WHERE ${inWindow} AND (${inLane})) AS lane_leads_with_points,
+       count(DISTINCT cp.lead_id) FILTER (WHERE ${inWindow} AND (${inLane}) AND cp.kind IN ${emailKinds})
+         AS lane_leads_with_email_points,
+       count(*) FILTER (WHERE ${inPrev7d} AND (${inLane})) AS lane_points_prev_7d,
+       count(*) FILTER (WHERE ${inPrev7d} AND (${inLane}) AND cp.kind IN ${emailKinds})
+         AS lane_email_points_prev_7d,
+       count(*) FILTER (WHERE ${inWindow} AND (${outOfLane})) AS other_lane_points,
+       count(*) FILTER (WHERE ${inWindow} AND (${outOfLane}) AND cp.kind IN ${emailKinds})
+         AS other_lane_email_points,
+       count(DISTINCT cp.lead_id) FILTER (WHERE ${inWindow} AND (${outOfLane})) AS other_lane_leads_with_points,
+       count(DISTINCT cp.lead_id) FILTER (WHERE ${inWindow} AND (${outOfLane}) AND cp.kind IN ${emailKinds})
+         AS other_lane_leads_with_email_points,
+       count(*) FILTER (WHERE ${inPrev7d} AND (${outOfLane})) AS other_lane_points_prev_7d,
+       count(*) FILTER (WHERE ${inPrev7d} AND (${outOfLane}) AND cp.kind IN ${emailKinds})
+         AS other_lane_email_points_prev_7d
+       FROM leads.contact_points cp
+       LEFT JOIN leads.lead_candidates lc ON lc.id = cp.lead_id`,
     [sinceISO, untilISO],
   );
   const r = rows[0] ?? {};
@@ -689,6 +759,18 @@ export async function collectYieldBetween(
     paid_email_points: n('paid_email_points'),
     paid_leads_with_email_points: n('paid_leads_with_email_points'),
     paid_points_prev_7d: n('paid_points_prev_7d'),
+    lane_points: n('lane_points'),
+    lane_email_points: n('lane_email_points'),
+    lane_leads_with_points: n('lane_leads_with_points'),
+    lane_leads_with_email_points: n('lane_leads_with_email_points'),
+    lane_points_prev_7d: n('lane_points_prev_7d'),
+    lane_email_points_prev_7d: n('lane_email_points_prev_7d'),
+    other_lane_points: n('other_lane_points'),
+    other_lane_email_points: n('other_lane_email_points'),
+    other_lane_leads_with_points: n('other_lane_leads_with_points'),
+    other_lane_leads_with_email_points: n('other_lane_leads_with_email_points'),
+    other_lane_points_prev_7d: n('other_lane_points_prev_7d'),
+    other_lane_email_points_prev_7d: n('other_lane_email_points_prev_7d'),
   };
 }
 
