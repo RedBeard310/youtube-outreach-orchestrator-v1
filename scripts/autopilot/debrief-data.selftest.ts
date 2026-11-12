@@ -2128,41 +2128,74 @@ writeSnap('2026-11-06', [...FIVE, 'recF', 'recG', 'recH', 'recI']);
 // Newest first, which is the order the caller passes and the order the streak walk needs.
 const PRIOR = ['2026-11-06', '2026-11-05', '2026-11-04', '2026-11-03'];
 ok('nine losses that have all been lost before are a standing cohort, not a fresh loss',
-  (() => { const c = lostCohort([...FIVE, 'recF', 'recG', 'recH', 'recI'], PRIOR, COHORT_DIR);
+  (() => { const c = lostCohort([...FIVE, 'recF', 'recG', 'recH', 'recI'], PRIOR, COHORT_DIR, 9);
     return [c.lost_recurring, c.lost_new, c.lost_longest_streak]; })(),
   [9, 0, 5]);
 ok('a person lost for the first time today is the day\'s own damage',
-  (() => { const c = lostCohort(['recA', 'recNEW'], PRIOR, COHORT_DIR);
+  (() => { const c = lostCohort(['recA', 'recNEW'], PRIOR, COHORT_DIR, 2);
     return [c.lost_recurring, c.lost_new, c.lost_longest_streak, c.lost_recurring_ids]; })(),
   [1, 1, 5, ['recA']]);
 ok('a streak counts consecutive days, so a gap in the middle ends it',
-  lostCohort(['recI'], PRIOR, COHORT_DIR).lost_longest_streak, 2);
+  lostCohort(['recI'], PRIOR, COHORT_DIR, 1).lost_longest_streak, 2);
 // A weekend has no push, so it has no loss list. Stepping over it must not break a streak.
 writeSnap('2026-11-07', null);
 // 5 = today plus the four days that do carry a list. Breaking the streak there would be 1.
 ok('a snapshot with no loss list is stepped over, not read as a clear day',
-  lostCohort(FIVE, ['2026-11-07', ...PRIOR], COHORT_DIR).lost_longest_streak, 5);
+  lostCohort(FIVE, ['2026-11-07', ...PRIOR], COHORT_DIR, 5).lost_longest_streak, 5);
 // ...and the shape a weekend REALLY writes: an empty list beside an unknown loss. This read
 // as a clear day and published a streak of 1 on 2026-11-10 against nine recurring losses.
 writeNoPushSnap('2026-11-08');
 ok('an empty loss list beside an unknown loss is a weekend, not a clear day',
-  lostCohort(FIVE, ['2026-11-08', ...PRIOR], COHORT_DIR).lost_longest_streak, 5);
+  lostCohort(FIVE, ['2026-11-08', ...PRIOR], COHORT_DIR, 5).lost_longest_streak, 5);
 ok('...and it does not make the whole cohort look new',
-  (() => { const c = lostCohort(FIVE, ['2026-11-08', ...PRIOR], COHORT_DIR);
+  (() => { const c = lostCohort(FIVE, ['2026-11-08', ...PRIOR], COHORT_DIR, 5);
     return [c.lost_recurring, c.lost_new]; })(),
   [5, 0]);
 // A push that really ran and lost nobody still ends a streak. That is the day the field is
 // there to tell apart from a weekend.
 writeSnap('2026-11-08', []);
 ok('a push that ran and lost nobody is a clear day and ends the streak',
-  lostCohort(FIVE, ['2026-11-08', ...PRIOR], COHORT_DIR).lost_longest_streak, 1);
+  lostCohort(FIVE, ['2026-11-08', ...PRIOR], COHORT_DIR, 5).lost_longest_streak, 1);
 ok('no readable prior snapshot is unknown, not a cohort of new people',
-  lostCohort(FIVE, ['2026-10-01'], COHORT_DIR),
-  { lost_recurring: null, lost_new: null, lost_longest_streak: null, lost_recurring_ids: [] });
+  lostCohort(FIVE, ['2026-10-01'], COHORT_DIR, 5),
+  {
+    lost_recurring: null, lost_new: null, lost_longest_streak: null, lost_recurring_ids: [],
+    lost_split_covered: null, lost_split_complete: null, lost_history_capped_days: null,
+  });
 ok('a day that lost nobody is a real zero with no streak',
-  (() => { const c = lostCohort([], PRIOR, COHORT_DIR);
+  (() => { const c = lostCohort([], PRIOR, COHORT_DIR, 0);
     return [c.lost_recurring, c.lost_new, c.lost_longest_streak]; })(),
   [0, 0, 0]);
+
+// 2026-11-12. The denominator was a list capped at 12 and the split answered for the part it
+// saw: the live 11-12 shape is 18 people lost, 12 named, all 12 recurring, published as
+// lost_new 0 — "no new damage" on a day six people were never examined.
+ok('a loss list that cannot cover the whole loss says so instead of answering for part of it',
+  (() => { const c = lostCohort([...FIVE, 'recF', 'recG', 'recH', 'recI'], PRIOR, COHORT_DIR, 18);
+    return [c.lost_new, c.lost_split_covered, c.lost_split_complete]; })(),
+  [0, 9, false]);
+ok('...and a list that does cover it reads complete',
+  (() => { const c = lostCohort([...FIVE, 'recNEW'], PRIOR, COHORT_DIR, 6);
+    return [c.lost_new, c.lost_split_covered, c.lost_split_complete]; })(),
+  [1, 6, true]);
+// Recurrence cannot be checked against a loss a past snapshot never wrote down, so a prior
+// day whose own list was short makes lost_new a lower bound however complete today's is.
+writeFileSync(
+  joinPath(COHORT_DIR, 'autopilot-debrief-2026-11-02.json'),
+  JSON.stringify({ send_plan: { push_outcome: { lost_ids: ['recA'], people_lost: 16 } } }),
+);
+ok('a prior day that named fewer people than it lost is counted and published',
+  lostCohort(FIVE, ['2026-11-02', ...PRIOR], COHORT_DIR, 5).lost_history_capped_days, 1);
+ok('...and a window of complete prior days reads 0',
+  lostCohort(FIVE, PRIOR, COHORT_DIR, 5).lost_history_capped_days, 0);
+// A loss nobody computed is unknown. The 11-08 and 11-09 snapshots published three zeros for
+// cycles whose plan could not be read at all.
+ok('a push whose loss was never computed is unknown, not a loss of nobody',
+  lostCohort([], PRIOR, COHORT_DIR, null),
+  {
+    lost_recurring: null, lost_new: null, lost_longest_streak: null, lost_recurring_ids: [],
+    lost_split_covered: null, lost_split_complete: null, lost_history_capped_days: null,
+  });
 rmSync(COHORT_DIR, { recursive: true, force: true });
 // The parser itself must stay a pure read: the cohort is the caller's to fill in.
 ok('the push parser leaves the cohort unknown for the caller',

@@ -1368,7 +1368,8 @@ export type SiegePushOutcome = {
    *  path, not a lead problem: check the batch's block in automator/logs/siege.log. */
   emailed_unlogged_ids: string[];
   /** Those people, named, so the morning is one grep and not a hand-written join.
-   *  Capped at 12. */
+   *  Capped at 60 (was 12 until 2026-11-12, when the cap started truncating the cohort
+   *  split below — see the coverage block on lostCohort()). */
   lost_ids: string[];
   /** How many of the people named in `lost_ids` an earlier snapshot already named. A
    *  standing cohort and a fresh loss read identically in `people_lost`, and five debriefs
@@ -1380,9 +1381,22 @@ export type SiegePushOutcome = {
    *  means nobody has been lost twice in a row; a figure climbing by one a day is a person
    *  the plan will keep re-planning and the push will keep refusing. */
   lost_longest_streak: number | null;
-  /** The recurring ones, named, capped at 12, so the standing cohort can be worked on
+  /** The recurring ones, named, capped at 60, so the standing cohort can be worked on
    *  rather than re-counted. */
   lost_recurring_ids: string[];
+  /** How many of `people_lost` the three fields above actually examined. Read it beside
+   *  `people_lost`: the split is measured over the named list, so a day that loses more
+   *  people than the list holds has an UNMEASURED remainder, and `lost_new: 0` then means
+   *  "none of the ones I looked at", not "no new damage". */
+  lost_split_covered: number | null;
+  /** True when the split covered the whole loss. False means the figures above are a
+   *  lower bound on recurrence and `lost_new` is a lower bound on the day's own damage.
+   *  Null when the loss itself is unknown. */
+  lost_split_complete: boolean | null;
+  /** Prior days inside the streak window whose OWN list was shorter than their own loss,
+   *  so recurrence could not be checked against all of their losses either. A nonzero
+   *  figure makes `lost_new` a lower bound however complete today's list is. */
+  lost_history_capped_days: number | null;
   /** Skips that cost a draft and not a person: a SKIP in one batch, a SENT in another,
    *  same run. This is why `skipped` can exceed `people_lost` and must not be read as
    *  a loss on its own. */
@@ -1430,6 +1444,9 @@ export const NO_PUSH_OUTCOME: SiegePushOutcome = {
   lost_new: null,
   lost_longest_streak: null,
   lost_recurring_ids: [],
+  lost_split_covered: null,
+  lost_split_complete: null,
+  lost_history_capped_days: null,
   skipped_then_sent: null,
   skipped_unplanned: null,
   approved_leads: null,
@@ -1870,9 +1887,30 @@ export function sendPlanHealth(
       'and lost_recurring_ids names them. A streak climbing by one a morning is somebody no ' +
       'push will ever send: two of these nine have channels that no longer exist on YouTube ' +
       'and five carry a bounce already on SmartLead\'s file, so the repair is to stop ' +
-      'planning them, not to re-count them. Measured over lost_ids, which is capped at 12, ' +
-      'so a day losing more than that reports a lower bound. Null, not 0, when no earlier ' +
-      'snapshot carries a readable list: unknown, and NOT a cohort of new people. ' +
+      'planning them, not to re-count them. Measured over lost_ids. Null, not 0, when no ' +
+      'earlier snapshot carries a readable list: unknown, and NOT a cohort of new people. ' +
+      'AND READ lost_split_complete BEFORE READING lost_new AS THE DAY\'S DAMAGE ' +
+      '(2026-11-12): that denominator was a list capped at 12, the cap was documented in the ' +
+      'code and nowhere a reader looks, and it had already truncated this field twice ' +
+      'running. On 11-11 the push lost 16 people, the list held 12, and lost_new published ' +
+      '4 — four of the twelve examined, reported as the whole day. On 11-12 it lost 18, the ' +
+      'list held the same 12, all twelve were recurring, and the field read 0: "nobody new ' +
+      'was lost today" about a day with six people nobody had looked at, in the one field ' +
+      'built to answer whether the loss is growing. That is the 10-29 rule (a capped display ' +
+      'list used as a denominator) one more level up. The cap is now 60, so the split is ' +
+      'complete on any real day, and the coverage is published either way: ' +
+      'lost_split_covered is how many of people_lost it examined, lost_split_complete is ' +
+      'whether that was all of them, and lost_history_capped_days counts prior days inside ' +
+      'the window whose own list was shorter than their own loss, because recurrence cannot ' +
+      'be checked against a loss a past snapshot never named (the 11-11 and 11-12 snapshots ' +
+      'are both such days, so the first fully comparable window starts 11-13). A false ' +
+      'lost_split_complete or a nonzero lost_history_capped_days makes lost_new a LOWER ' +
+      'BOUND. AND A LOSS NOBODY COMPUTED IS NOT A LOSS OF NOBODY: people_lost is null when ' +
+      'the plan could not be read and the loss list is then empty beside it, which is the ' +
+      'shape the 11-10 fix taught the history walk to step over while today\'s side kept ' +
+      'answering 0 — the 11-08 and 11-09 snapshots both carry lost_recurring 0, lost_new 0 ' +
+      'and a streak of 0 for cycles whose loss was never computed at all. Those read null ' +
+      'now. ' +
       'AND READ approved_leads, NOT planned_leads, AS WHAT THE PUSH WAS ASKED FOR ' +
       '(2026-10-22): plan.json is not the push\'s instruction. Siege runs twice each ' +
       'morning — a sample run records the people it covers, then the push run rebuilds the ' +
@@ -2356,8 +2394,11 @@ export function siegePushOutcome(
       emailed_unlogged: unlogged === null ? null : unlogged.length,
       emailed_unlogged_ids: (unlogged ?? []).slice(0, 12),
       // Named, because the loss is usually one or two people and a name is actionable
-      // where a count is not. Capped for the same reason everything else here is.
-      lost_ids: lost.slice(0, 12),
+      // where a count is not. Capped at 60 rather than the 12 every other list here uses,
+      // because this one is not only displayed: lostCohort() measures the day's new damage
+      // over it, and at 12 it had already truncated that split on two consecutive days
+      // (16 lost and 18 lost). 60 covers any day worth reporting on a ~300-slot plan.
+      lost_ids: lost.slice(0, 60),
       // Ledger-aware for the same reason the loss is: a skip after a send whose SENT line
       // went missing is still a skip that cost a draft and not a person.
       skipped_then_sent: [...skippedIds].filter((id) => wasEmailed(id)).length,
@@ -3042,10 +3083,31 @@ export function priorSendPlan(
  *  climbs by one every morning names a person no push will ever send, which is a reason to
  *  stop planning them rather than to re-count them.
  *
- *  Measured over `lost_ids`, which is capped at 12, so on a day that lost more than that
- *  these are a lower bound and their denominator is that list, not `people_lost`. Null when
+ *  Measured over `lost_ids`, so the list is the denominator and not `people_lost`. Null when
  *  no prior snapshot carries a readable `lost_ids`: unknown, and NOT a cohort of new
  *  people. A day that lost nobody is a real zero with a streak of 0.
+ *
+ *  AND THE SPLIT SAYS HOW MUCH OF THE LOSS IT EXAMINED (2026-11-12). That denominator was a
+ *  list capped at 12, and the cap was stated here and nowhere a reader looks. It had already
+ *  truncated the figure twice running. On 2026-11-11 the push lost 16 people, the list held
+ *  12, and the snapshot published `lost_new: 4` — four of the twelve examined, read and
+ *  reported as the whole day's new damage. On 2026-11-12 it lost 18, the list held the same
+ *  12, every one of them was recurring, and the field read `lost_new: 0`: "nobody new was
+ *  lost today" about a day with six people nobody had looked at. That is the 2026-10-29
+ *  lesson (a capped display list used as a denominator) in the one field built to answer
+ *  whether the loss is growing. The cap on `lost_ids` is now 60, so the split is complete on
+ *  any real day, and the coverage is published either way: `lost_split_covered` is how many
+ *  people it examined, `lost_split_complete` is whether that was all of them, and
+ *  `lost_history_capped_days` counts prior days whose own list was shorter than their own
+ *  loss, because recurrence cannot be checked against losses a past snapshot never named.
+ *  A false or nonzero reading makes `lost_new` a LOWER BOUND, which is a different sentence
+ *  from the one it has been printing.
+ *
+ *  AND A LOSS THAT IS UNKNOWN IS NOT A LOSS OF NOBODY. `people_lost` is null when the plan
+ *  could not be read, and the loss list is then an empty array beside it — the same shape
+ *  the 2026-11-10 fix taught the history walk to step over. Today's side had no such guard,
+ *  so the 11-08 and 11-09 snapshots both carry `lost_recurring: 0, lost_new: 0, streak: 0`
+ *  for cycles whose loss was never computed at all. Those three zeros now read null.
  *
  *  A SNAPSHOT WITH NO PUSH IS STEPPED OVER ON `people_lost`, NOT ON `lost_ids` (2026-11-10).
  *  The streak walk was already written to step over a day with no push, and it looked for
@@ -3065,18 +3127,33 @@ export function lostCohort(
   lostIds: string[],
   priorDates: string[],
   logsDir: string = LOGS,
+  /** The join's own count of people lost, which is what the list is measured against.
+   *  Null means the push's loss was never computed, and nothing below is knowable. */
+  peopleLost: number | null = null,
 ): {
   lost_recurring: number | null;
   lost_new: number | null;
   lost_longest_streak: number | null;
   lost_recurring_ids: string[];
+  lost_split_covered: number | null;
+  lost_split_complete: boolean | null;
+  lost_history_capped_days: number | null;
 } {
   const unknown = {
     lost_recurring: null, lost_new: null, lost_longest_streak: null,
     lost_recurring_ids: [] as string[],
+    lost_split_covered: null, lost_split_complete: null,
+    lost_history_capped_days: null,
   };
+  // A loss nobody computed is unknown, not a loss of nobody. The empty list beside a null
+  // count is the no-push shape, and answering 0 to it is what the 11-08 and 11-09 snapshots
+  // did for two cycles running.
+  if (peopleLost === null) return unknown;
   // Newest first, so the streak walk below runs backwards in time from today.
   const history: Array<Set<string>> = [];
+  // Prior days that named fewer people than they lost. Recurrence cannot be checked against
+  // a loss a past snapshot never wrote down, so this is published rather than assumed away.
+  let historyCapped = 0;
   for (const d of priorDates) {
     const p = join(logsDir, `autopilot-debrief-${d}.json`);
     if (!existsSync(p)) continue;
@@ -3094,7 +3171,9 @@ export function lostCohort(
       // weekend, or a run that died before the push — and it is the one this walk kept
       // reading as a clear day. `people_lost` is a number only when the join really ran.
       if (typeof lost !== 'number') continue;
-      history.push(new Set(ids.filter((x): x is string => typeof x === 'string')));
+      const named = new Set(ids.filter((x): x is string => typeof x === 'string'));
+      if (named.size < lost) historyCapped++;
+      history.push(named);
     } catch { /* a snapshot we cannot read is not a day on which nobody was lost */ }
   }
   if (history.length === 0) return unknown;
@@ -3113,7 +3192,10 @@ export function lostCohort(
     lost_recurring: recurring.length,
     lost_new: today.length - recurring.length,
     lost_longest_streak: longest,
-    lost_recurring_ids: recurring.slice(0, 12),
+    lost_recurring_ids: recurring.slice(0, 60),
+    lost_split_covered: today.length,
+    lost_split_complete: today.length >= peopleLost,
+    lost_history_capped_days: historyCapped,
   };
 }
 
@@ -5218,6 +5300,10 @@ async function main(): Promise<void> {
       ...lostCohort(
         sendPlan.push_outcome.lost_ids,
         Array.from({ length: 14 }, (_, i) => pacificDate(new Date(sinceMs - i * 86_400_000))),
+        LOGS,
+        // The denominator the split is measured against, so a list that could not cover the
+        // whole loss says so instead of answering for the part it saw.
+        sendPlan.push_outcome.people_lost,
       ),
     };
   }
