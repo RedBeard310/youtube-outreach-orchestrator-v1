@@ -1829,6 +1829,74 @@ ok('no window leaves the short-reading fields unknown, not zero',
   })(),
   [null, null, null]);
 
+// The 2026-11-13 fault: the three move counts are ARRIVALS, and the published subtraction
+// treats every arrival in watch or stop as a departure from normal. A mailbox sliding
+// watch to stop came out of neither. Numbers are the real 11-12/11-13 gate history: one
+// back to normal at 11:06Z, two to watch at 12:06Z, one watch-to-stop at 00:06Z and one
+// back to normal at 01:06Z, closing on a band_normal of 44 that the old arithmetic
+// reported as 43 — on a day with no short read, so nothing told the reader why.
+const BAND_SIDEWAYS = {
+  generated_at: '2026-11-13T08:05:01Z',
+  owned: {},
+  mailboxes: {},
+  runs: [
+    // Behind the window, and the only lines that place these two.
+    { at: '2026-11-11T18:06:00Z', counts: { normal: 46, watch: 13, stop: 36 }, to_normal: ['fell@x.com'], to_watch: [], to_stop: [] },
+    { at: '2026-11-11T20:06:00Z', counts: { normal: 45, watch: 14, stop: 36 }, to_normal: [], to_watch: ['slider@x.com'], to_stop: [] },
+    { at: '2026-11-12T08:06:01Z', counts: { normal: 44, watch: 14, stop: 36 }, to_normal: [], to_watch: [], to_stop: [] },
+    { at: '2026-11-12T11:06:01Z', counts: { normal: 45, watch: 13, stop: 36 }, to_normal: ['back.a@x.com'], to_watch: [], to_stop: [] },
+    { at: '2026-11-12T12:06:52Z', counts: { normal: 43, watch: 15, stop: 36 }, to_normal: [], to_watch: ['back.a@x.com', 'fell@x.com'], to_stop: [] },
+    // Watch to stop. The watch band loses one, the stopped band gains one, normal is untouched.
+    { at: '2026-11-13T00:06:52Z', counts: { normal: 43, watch: 14, stop: 37 }, to_normal: [], to_watch: [], to_stop: ['slider@x.com'] },
+    { at: '2026-11-13T01:06:34Z', counts: { normal: 44, watch: 13, stop: 37 }, to_normal: ['back.b@x.com'], to_watch: [], to_stop: [] },
+    { at: '2026-11-13T08:05:01Z', counts: { normal: 44, watch: 13, stop: 37 }, to_normal: [], to_watch: [], to_stop: [] },
+  ],
+};
+const SIDEWAYS_WINDOW = { sinceISO: '2026-11-12T08:00:00.000Z', untilISO: '2026-11-13T08:00:00.000Z' };
+ok('a watch-to-stop slide stops being charged against the clear band',
+  (() => {
+    const b = bandGateFacts(BAND_SIDEWAYS, SIDEWAYS_WINDOW);
+    const oldWay = (b.band_normal_prev ?? 0) + (b.band_moved_to_normal ?? 0)
+      - (b.band_moved_to_watch ?? 0) - (b.band_moved_to_stop ?? 0);
+    const closes = (b.band_normal_prev ?? 0) + (b.band_moved_to_normal ?? 0)
+      - (b.band_left_normal ?? 0) === b.band_normal;
+    return [b.band_normal_prev, b.band_normal, b.band_moved_to_normal, b.band_moved_to_watch,
+      b.band_moved_to_stop, b.band_left_normal, b.band_left_normal_unknown, oldWay, closes];
+  })(),
+  [44, 44, 2, 2, 1, 2, 0, 43, true]);
+ok('the day still reads as comparable, because no run read a short fleet',
+  (() => {
+    const b = bandGateFacts(BAND_SIDEWAYS, SIDEWAYS_WINDOW);
+    return [b.band_short_readings, b.band_moves_comparable, b.band_normal_change];
+  })(),
+  [0, true, 0]);
+// The prior band comes from the runs BEHIND the window as well — `slider` was handed
+// watch twelve hours before the cycle began, and that is the only line that places it.
+// Drop that line and the run's own band deltas still settle it: the clear count did not
+// move, so the mailbox it stopped did not come out of normal.
+ok('a mover no retained run can place is settled by the run\'s own band deltas',
+  (() => {
+    const noSlider = BAND_SIDEWAYS.runs.filter((r) => !r.to_watch.includes('slider@x.com'));
+    const b = bandGateFacts({ ...BAND_SIDEWAYS, runs: noSlider }, SIDEWAYS_WINDOW);
+    return [b.band_left_normal, b.band_left_normal_unknown];
+  })(),
+  [2, 0]);
+ok('a run that moved people both ways cannot settle an unplaced mover, so it stays unknown',
+  (() => {
+    const b = bandGateFacts(BAND_TRAILING_RUN, TRAIL_WINDOW);
+    // w2 and w3 move in runs that only demote, so the clear count places them. w1 moves in
+    // the 12:06Z run, which promoted three mailboxes at the same time, so nothing can say
+    // which band it left — and a guess there is what this field exists to refuse.
+    return [b.band_moved_to_watch, b.band_left_normal, b.band_left_normal_unknown];
+  })(),
+  [3, 2, 1]);
+ok('no window leaves the departure fields unknown, not zero',
+  (() => {
+    const b = bandGateFacts(BAND_SIDEWAYS, null);
+    return [b.band_left_normal, b.band_left_normal_unknown];
+  })(),
+  [null, null]);
+
 ok('no per-mailbox map costs the outcome fields, not the move counts (the 10-18 shape)',
   (() => {
     const b = bandGateFacts(BAND_HISTORY, { sinceISO: '2026-10-17T07:00:00.000Z', untilISO: '2026-10-18T07:00:00.000Z' });

@@ -654,6 +654,38 @@ export type FleetFacts = {
   band_moved_to_normal: number | null;
   band_moved_to_watch: number | null;
   band_moved_to_stop: number | null;
+  /** --- AND A MOVE INTO watch OR stop IS NOT A MOVE OUT OF normal (2026-11-13) ---
+   *
+   *  The three counts above are arrivals: how many mailboxes the gate handed each band.
+   *  The subtraction every reader is told to perform — `band_normal_prev` plus the
+   *  arrivals in normal, minus the arrivals in watch and stop — assumes every one of
+   *  those arrivals came OUT of normal. A mailbox sliding watch to stop came out of
+   *  neither, so the identity is short by one for each of them.
+   *
+   *  Measured on 2026-11-13. The gate ran every hour with no short read, and the moves
+   *  inside the span were 1 back to normal at 11:06Z, 2 to watch at 12:06Z, 1 to stop at
+   *  00:06Z and 1 back to normal at 01:06Z. The published arithmetic reads
+   *  44 + 2 − 2 − 1 = 43 against a `band_normal` of 44. The 00:06Z mover came from watch:
+   *  the watch band went 15 to 14, the stopped band 36 to 37, and normal did not move at
+   *  all. Nothing was wrong with the fleet and nothing was wrong with the counts.
+   *
+   *  That matters because of what the reader has left to conclude. The 11-09 fix states
+   *  the subtraction closes "every day", and the ONLY documented shape that breaks it is
+   *  the 11-10 short read — which `band_moves_comparable` reports as absent, truthfully,
+   *  on exactly the days this fails. So a day whose fleet behaved perfectly reads as a
+   *  day whose instrument cannot be trusted, which is the 10-29 rule (a figure that
+   *  counts the wrong population reading as the one a decision turns on) one level up.
+   *
+   *  `band_left_normal` is the arrivals in watch or stop whose band immediately before
+   *  the move really was normal, so `band_normal_prev + band_moved_to_normal −
+   *  band_left_normal = band_normal` closes by construction. The prior band is
+   *  reconstructed by walking every retained run in order, because a run names the
+   *  mailboxes it moved and never the band it moved them from.
+   *  `band_left_normal_unknown` is the movers whose prior band no retained run can
+   *  supply, and a nonzero one makes `band_left_normal` a LOWER bound. Both null without
+   *  a window, like the counts they correct. */
+  band_left_normal: number | null;
+  band_left_normal_unknown: number | null;
   /** --- AND A GATE RUN THAT READ A SHORT FLEET INVENTS MOVES (2026-11-10) ---
    *
    *  The move figures are the gate's own per-run lists summed, and the gate bands whatever
@@ -760,6 +792,8 @@ const NO_FLEET: FleetFacts = {
   band_moved_to_normal: null,
   band_moved_to_watch: null,
   band_moved_to_stop: null,
+  band_left_normal: null,
+  band_left_normal_unknown: null,
   band_short_readings: null,
   band_short_reading_at: null,
   band_moves_comparable: null,
@@ -862,6 +896,7 @@ export function bandGateFacts(
   | 'band_prev_at' | 'band_normal_prev' | 'band_watch_prev' | 'band_stop_prev'
   | 'band_normal_change' | 'band_stop_change' | 'band_gap_hours' | 'band_delta_comparable'
   | 'band_moved_to_normal' | 'band_moved_to_watch' | 'band_moved_to_stop' | 'band_returned'
+  | 'band_left_normal' | 'band_left_normal_unknown'
   | 'band_short_readings' | 'band_short_reading_at' | 'band_moves_comparable'
   | 'band_peak_normal' | 'band_peak_normal_at' | 'band_returned_still_normal'
   | 'band_round_trips' | 'band_round_trip_ids'
@@ -875,6 +910,7 @@ export function bandGateFacts(
     band_normal_change: null, band_stop_change: null,
     band_gap_hours: null, band_delta_comparable: null,
     band_moved_to_normal: null, band_moved_to_watch: null, band_moved_to_stop: null,
+    band_left_normal: null, band_left_normal_unknown: null,
     band_short_readings: null, band_short_reading_at: null, band_moves_comparable: null,
     band_returned: [],
     band_peak_normal: null, band_peak_normal_at: null,
@@ -944,6 +980,10 @@ export function bandGateFacts(
   let toNormal: number | null = null;
   let toWatch: number | null = null;
   let toStop: number | null = null;
+  // Arrivals in watch or stop that really came OUT of normal, and the ones whose prior
+  // band the retained runs cannot supply — see the 2026-11-13 block on FleetFacts.
+  let leftNormal: number | null = null;
+  let leftNormalUnknown: number | null = null;
   const returned: string[] = [];
   // The outcome beside the move (2026-10-27): the peak the fleet reached inside the
   // cycle, and which returners did not keep the band they were given.
@@ -1015,8 +1055,16 @@ export function bandGateFacts(
       const prevMs = prev && typeof prev.at === 'string' ? Date.parse(prev.at) : NaN;
       const movesAfter = Number.isFinite(prevMs) && prevMs >= a && prevMs < b ? prevMs : null;
       toNormal = 0; toWatch = 0; toStop = 0;
+      leftNormal = 0; leftNormalUnknown = 0;
       shortInSpan = 0;
       const fellBack = new Set<string>();
+      // A run names the mailboxes it moved and never the band it moved them from, so the
+      // prior band is whatever band the newest EARLIER run handed that mailbox. The walk
+      // below is already in order and already covers every retained run, so this map is
+      // filled from the history behind the span before the span's own moves read it.
+      const bandBefore = new Map<string, 'normal' | 'watch' | 'stop'>();
+      let prevRun: Run | null = null;
+      let prevNormal: number | null = null;
       // The upper bound is the newest reading, which is `lastMs` when it is readable and
       // the cycle end when it is not. `last` IS the newest run, so this can never reach
       // past it however many runs the state file holds.
@@ -1024,29 +1072,61 @@ export function bandGateFacts(
       for (const r of runs) {
         if (typeof r?.at !== 'string') continue;
         const ms = Date.parse(r.at);
-        if (!Number.isFinite(ms) || ms < a || ms > endMs) continue;
-        const short = shortRuns.has(r.at);
-        const nrm = num((r.counts && typeof r.counts === 'object' ? r.counts : {}).normal);
-        // A partial inventory cannot set the day's high-water mark.
-        if (!short && nrm !== null && (peak === null || nrm > peak)) { peak = nrm; peakAt = r.at; }
-        if (movesAfter !== null && ms <= movesAfter) continue;
-        if (short) {
-          shortInSpan = (shortInSpan ?? 0) + 1;
-          if (shortAt === null || r.at > shortAt) shortAt = r.at;
-        }
+        // Runs older than the window are walked too, and do nothing but tell `bandBefore`
+        // which band each mailbox was last handed. Without them a mailbox that last moved
+        // days ago would have no prior band at all and every demotion would read unknown.
+        if (!Number.isFinite(ms) || ms > endMs) continue;
         const n = Array.isArray(r.to_normal) ? r.to_normal.map(String) : [];
         const w = Array.isArray(r.to_watch) ? r.to_watch.map(String) : [];
         const st = Array.isArray(r.to_stop) ? r.to_stop.map(String) : [];
-        toNormal += n.length;
-        toWatch += w.length;
-        toStop += st.length;
-        for (const e of n) {
-          if (returned.length < 12) returned.push(e);
-          cameBack.add(e);
+        const counting = ms >= a;
+        if (counting) {
+          const short = shortRuns.has(r.at);
+          const nrm = num((r.counts && typeof r.counts === 'object' ? r.counts : {}).normal);
+          // A partial inventory cannot set the day's high-water mark.
+          if (!short && nrm !== null && (peak === null || nrm > peak)) { peak = nrm; peakAt = r.at; }
+          if (movesAfter === null || ms > movesAfter) {
+            if (short) {
+              shortInSpan = (shortInSpan ?? 0) + 1;
+              if (shortAt === null || r.at > shortAt) shortAt = r.at;
+            }
+            toNormal += n.length;
+            toWatch += w.length;
+            toStop += st.length;
+            // Read the prior band before this run's own moves overwrite it. A mailbox the
+            // retained runs cannot place falls back on this run's own band deltas, which
+            // settle it whenever the run moved people in ONE direction: a run with no
+            // returners whose clear count fell by exactly the number of demotions took all
+            // of them out of normal, and one whose clear count did not move took none.
+            // Anything else stays unknown rather than being guessed at. The fleet totals
+            // must match, or a short read would be read as a wave of departures.
+            const dn = num((r.counts && typeof r.counts === 'object' ? r.counts : {}).normal);
+            const sameFleet = fleetSize(r) !== null && fleetSize(prevRun) === fleetSize(r);
+            const dropped = dn !== null && prevNormal !== null ? prevNormal - dn : null;
+            const allFromNormal = n.length === 0 && sameFleet && dropped === w.length + st.length;
+            const noneFromNormal = n.length === 0 && sameFleet && dropped === 0;
+            for (const e of [...w, ...st]) {
+              const was = bandBefore.get(e);
+              if (was === 'normal' || (was === undefined && allFromNormal)) {
+                leftNormal = (leftNormal ?? 0) + 1;
+              } else if (was === undefined && !noneFromNormal) {
+                leftNormalUnknown = (leftNormalUnknown ?? 0) + 1;
+              }
+            }
+            for (const e of n) {
+              if (returned.length < 12) returned.push(e);
+              cameBack.add(e);
+            }
+            // Ordered walk, so a demotion only counts against a mailbox that had already
+            // been handed `normal` earlier in this same cycle.
+            for (const e of [...w, ...st]) if (cameBack.has(e)) fellBack.add(e);
+          }
         }
-        // Ordered walk, so a demotion only counts against a mailbox that had already
-        // been handed `normal` earlier in this same cycle.
-        for (const e of [...w, ...st]) if (cameBack.has(e)) fellBack.add(e);
+        for (const e of n) bandBefore.set(e, 'normal');
+        for (const e of w) bandBefore.set(e, 'watch');
+        for (const e of st) bandBefore.set(e, 'stop');
+        prevRun = r;
+        prevNormal = num((r.counts && typeof r.counts === 'object' ? r.counts : {}).normal);
       }
       roundTrips = fellBack.size;
       for (const e of fellBack) if (roundTripIds.length < 12) roundTripIds.push(e);
@@ -1110,6 +1190,8 @@ export function bandGateFacts(
     band_moved_to_normal: toNormal,
     band_moved_to_watch: toWatch,
     band_moved_to_stop: toStop,
+    band_left_normal: leftNormal,
+    band_left_normal_unknown: leftNormalUnknown,
     band_short_readings: shortInSpan,
     band_short_reading_at: shortAt,
     band_moves_comparable: movesComparable,
@@ -1205,6 +1287,8 @@ export function fleetFacts(
     band_moved_to_normal: band.band_moved_to_normal,
     band_moved_to_watch: band.band_moved_to_watch,
     band_moved_to_stop: band.band_moved_to_stop,
+    band_left_normal: band.band_left_normal,
+    band_left_normal_unknown: band.band_left_normal_unknown,
     band_short_readings: band.band_short_readings,
     band_short_reading_at: band.band_short_reading_at,
     band_moves_comparable: band.band_moves_comparable,
@@ -2065,7 +2149,25 @@ export function sendPlanHealth(
       'band_moves_comparable is false when any sits in the span — then the band counts and ' +
       'band_normal_change are the honest reading of the day and the move counts are not. A ' +
       'short run also cannot set band_peak_normal: a partial inventory is not a ' +
-      'measurement of the fleet. Null when no window was supplied.',
+      'measurement of the fleet. Null when no window was supplied. AND SUBTRACT ' +
+      'band_left_normal, NOT band_moved_to_watch PLUS band_moved_to_stop (2026-11-13): ' +
+      'those three counts are ARRIVALS, how many mailboxes the gate handed each band, and ' +
+      'the subtraction the 11-09 fix installed assumes every arrival in watch or stop came ' +
+      'OUT of normal. A mailbox sliding watch to stop came out of neither. On 2026-11-13 ' +
+      'the gate ran every hour with no short read and the span held 2 back to normal, 2 to ' +
+      'watch and 1 to stop, so the published arithmetic read 44 + 2 - 2 - 1 = 43 against a ' +
+      'band_normal of 44: the 00:06Z mover came from watch, which went 15 to 14 while the ' +
+      'stopped band went 36 to 37 and normal did not move. Nothing was wrong with the ' +
+      'fleet. The only documented shape that breaks the subtraction is the 11-10 short ' +
+      'read, which band_moves_comparable truthfully reports as ABSENT on exactly the days ' +
+      'this fails, so a clean day read as an untrustworthy instrument. band_left_normal is ' +
+      'the arrivals in watch or stop whose band immediately before the move really was ' +
+      'normal, so band_normal_prev + band_moved_to_normal - band_left_normal = band_normal ' +
+      'closes by construction. A run names the mailboxes it moved and never the band it ' +
+      'moved them from, so the prior band is reconstructed by walking every retained run ' +
+      'in order, including the ones behind the window. band_left_normal_unknown is the ' +
+      'movers no retained run can place, and a nonzero one makes band_left_normal a LOWER ' +
+      'bound. Both null without a window, like the counts they correct.',
   };
 }
 
