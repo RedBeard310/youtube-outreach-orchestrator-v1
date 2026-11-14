@@ -1,5 +1,5 @@
 import { bulkRewriteShape, bandGateFacts, condenseInboxReason, notLiveReasonMoves, notLiveReasonTally, splitInboxReasons, fleetFacts, inboxGateFacts, apifyBatchFacts, apifyIdleCause, apifyLedgerLine, NO_PUSH_OUTCOME, normalizePushReason, offerFromBatchId, openRouterRunwayAlarm, OPENROUTER_RATE_MAX_AGE_H, siegeApprovedLeadIds, siegePlanLeadIds, siegePushOutcome, classifyKeyProbe, cyclePacificDay, costWindows, enrichmentChainFacts, isSendingDay, perEnrichedLeadCost, PER_LEAD_SAMPLE_FLOOR, projectRecoveryBudget, MAX_MISSING_DEBRIEFS, missingDebriefs, NO_UNIT, pushRunVerdict, siegeRunAlarm, unitStartedAt, sendPlanHealth, siegePlanFacts, summarizeSendLines, isVerifiedOrBeyond, laneYield, priorAdvanceSource, priorSeedsAdvanced, priorSeedsWalked, reconcileAdvanced, sessionSeedsAdvanced, sessionStartMs, walkRateTrend } from './debrief-data.ts';
-import { lostCohort } from './debrief-data.ts';
+import { lostCohort, replyLaneFacts } from './debrief-data.ts';
 import { aggregateCollectPasses, collectPasses } from '../../src/recovery/bloodhound-lane.ts';
 import { MAX_SHELF_STRANDED_IDS, recoveredTally, shelfTally, type ShelfRow } from '../../src/db.ts';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
@@ -2315,6 +2315,77 @@ ok('a one-pass cycle reads as that pass',
   (() => { const a = aggregateCollectPasses([twoPasses[1]!])!;
     return [a.passes_measured, a.top_fault_condition_count, a.newest_pass_error_share_pct]; })(),
   [1, 33, 100]);
+
+// replyLaneFacts — the reply lane (2026-11-14). The log interleaves concurrent invocations
+// and re-reads whatever is still queued every two minutes, so the whole point is that a
+// person counts once however many lines they collect.
+const REPLY_LOG = [
+  // Lifetime stamps, far outside the cycle. A tailed window would lose these and read as
+  // never-armed / never-sent, which is the fault the whole-file read exists to avoid.
+  '[2026-08-05T22:30:54Z]   SENT  daniel@honorwm.com                     bank entry 1b yes-plus-personal-note (APPROVED-AUTO) — http 200',
+  '[2026-09-17T14:39:22Z] start [LIVE — SENDING ARMED] — 0 reply(ies) to classify',
+  // The money outage, inside the cycle.
+  '[2026-11-14T00:48:11Z]     classifier (openrouter) failed to run: HTTP Error 402: Payment Required',
+  '[2026-11-14T00:48:12Z]     classifier (openrouter) failed to run: HTTP Error 402: Payment Required',
+  '[2026-11-14T00:48:12Z] done — sent 0, would-send 0, escalated 0, failed 16',
+  // Credit lands; the lane recovers and reads the queue.
+  '[2026-11-14T02:32:00Z] start [DRY-RUN (nothing will be sent)] — 16 reply(ies) to classify',
+  '[2026-11-14T02:32:07Z]   HOLD +draft  leigh@leighbrown.com                   simple-yes/high — cannot tell which mailbox this thread sends from, so cannot sign it',
+  '[2026-11-14T02:37:48Z]   WOULD-SEND  facemetrics1@gmail.com           simple-yes/high — first_name=\'\'',
+  '[2026-11-14T02:38:01Z]   HOLD  benjamin@uksmosthatedsalestrainer.com  not-interested/medium — category=not-interested is not approved for auto-send',
+  '[2026-11-14T02:38:01Z] done — sent 0, would-send 1, escalated 16, failed 0',
+  // The same creator re-read an hour later, warmer. One person, newest category wins.
+  '[2026-11-14T05:20:01Z] start [DRY-RUN (nothing will be sent)] — 1 reply(ies) to classify',
+  '[2026-11-14T05:20:51Z]   HOLD +draft  facemetrics1@gmail.com                 yes-plus-questions/high — category=yes-plus-questions is not approved for auto-send',
+  '[2026-11-14T05:20:51Z] done — sent 0, would-send 0, escalated 1, failed 0',
+  '',
+].join('\n');
+const RL = replyLaneFacts(REPLY_LOG, '2026-11-13T08:00:00.000Z', '2026-11-14T08:00:00.000Z');
+ok('a person re-read all cycle counts once', RL.people_classified, 3);
+ok('two creators agreed to talk', [RL.warm_people, RL.warm_ids],
+  [2, ['leigh@leighbrown.com', 'facemetrics1@gmail.com']]);
+ok('the newest reading is the one that counts', RL.category_people,
+  [{ category: 'not-interested', people: 1 }, { category: 'simple-yes', people: 1 },
+   { category: 'yes-plus-questions', people: 1 }]);
+ok('a not-interested is not warm', RL.warm_ids?.includes('benjamin@uksmosthatedsalestrainer.com'), false);
+ok('the outage sizes and bounds itself',
+  [RL.classifier_failures, RL.classifier_failed_runs, RL.failure_first_at, RL.failure_last_at],
+  [2, 1, '2026-11-14T00:48:11Z', '2026-11-14T00:48:12Z']);
+ok('an outage that ended inside the cycle says so', RL.recovered_at, '2026-11-14T02:38:01Z');
+ok('the failure names the status, not a digit-condensed nothing',
+  RL.top_failure, 'HTTP Error 402: Payment Required');
+ok('the queue is read at its deepest and its newest', [RL.queue_depth_max, RL.queue_depth_last], [16, 1]);
+ok('nothing auto-sent, and that is the pause not a fault',
+  [RL.auto_sent, RL.armed, RL.would_send_people], [0, false, 1]);
+ok('the lifetime stamps survive, which a tailed window would not',
+  [RL.armed_last_at, RL.last_auto_sent_at], ['2026-09-17T14:39:22Z', '2026-08-05T22:30:54Z']);
+ok('the unsignable yes is counted on its own, because re-arming will not fix it',
+  [RL.cannot_sign_people, RL.cannot_sign_ids], [1, ['leigh@leighbrown.com']]);
+// facemetrics is WOULD-SEND at 02:37 and HOLD at 05:20, so it is a held person: a creator
+// held by the end of the cycle is held, whatever an earlier run said about them.
+ok('held people are people, each charged to its own reason', [RL.held_people, RL.held_reasons],
+  [3,
+   [{ reason: 'cannot tell which mailbox this thread sends from, so cannot sign it', people: 1 },
+    { reason: 'category=not-interested is not approved for auto-send', people: 1 },
+    { reason: 'category=yes-plus-questions is not approved for auto-send', people: 1 }]]);
+ok('a lane with 2 runs in the window does not count the ones outside it', RL.runs, 2);
+// A failure AFTER a clean run must clear the recovery: the field means the newest failure.
+ok('a relapse clears the recovery',
+  replyLaneFacts([
+    '[2026-11-13T10:00:00Z] done — sent 0, would-send 0, escalated 0, failed 2',
+    '[2026-11-13T11:00:00Z] done — sent 0, would-send 0, escalated 1, failed 0',
+    '[2026-11-13T12:00:00Z]     classifier (openrouter) failed to run: HTTP Error 402: Payment Required',
+  ].join('\n'), '2026-11-13T08:00:00.000Z', '2026-11-14T08:00:00.000Z').recovered_at, null);
+// A clean lane must not invent a recovery it never needed.
+ok('a lane that never failed has no recovery stamp',
+  replyLaneFacts('[2026-11-13T11:00:00Z] done — sent 0, would-send 0, escalated 1, failed 0',
+    '2026-11-13T08:00:00.000Z', '2026-11-14T08:00:00.000Z').recovered_at, null);
+// Two calls must not share state: the first call's failures cannot leak into the second.
+ok('a second call does not inherit the first call\'s failures',
+  replyLaneFacts('[2026-11-13T11:00:00Z] start [DRY-RUN] — 0 reply(ies) to classify',
+    '2026-11-13T08:00:00.000Z', '2026-11-14T08:00:00.000Z').top_failure, null);
+ok('an empty log is a readable lane that did nothing, not a null one',
+  replyLaneFacts('', '2026-11-13T08:00:00.000Z', '2026-11-14T08:00:00.000Z').people_classified, 0);
 
 console.log(fail === 0 ? '\nALL PASS' : `\n${fail} FAILED`);
 process.exit(fail === 0 ? 0 : 1);

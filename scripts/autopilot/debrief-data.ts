@@ -2752,6 +2752,244 @@ function readSiegePushOutcome(
   }
 }
 
+/** The reply lane: what came back from the people we emailed, and what happened to it.
+ *
+ *  THE ONLY EVENT IN THIS PIPELINE THAT CAN EARN MONEY WAS IN NO FIELD AT ALL (2026-11-14).
+ *  Every block above measures outbound — people found, enriched, parked, planned, pushed.
+ *  A creator writing back and saying yes is the point of all of it, and this file never
+ *  read the lane that handles one. It cost two mornings running. On 2026-11-13 the debrief
+ *  had to go find a money outage by hand in automator's log to learn that reply reading had
+ *  stopped at 2026-11-12T22:27:55Z, because the snapshot's own `openrouter_today` reads the
+ *  finder's spend log and the finder is paused, so it published a balance and a runway and
+ *  nothing about an account that had gone past zero. The next morning — this one — credit
+ *  landed, the lane came back inside two hours, and the first thing it did was read TWO
+ *  creators agreeing to talk. Neither appeared anywhere in the generated metrics.
+ *
+ *  COUNT PEOPLE, NOT LINES: the classifier re-reads whatever is still queued every two
+ *  minutes, so one creator collects a verdict line per run. `leigh@leighbrown.com` was read
+ *  as `simple-yes/high` SEVEN times on 2026-11-12 alone. Every count here is distinct
+ *  addresses. This is the 10-21 rule (a counter that counts log lines cannot count people)
+ *  in the one block where the unit is unambiguously a person.
+ *
+ *  AND `auto_sent` IS NOT WHETHER ANYBODY ANSWERED. Casey paused the auto-reply sender on
+ *  2026-09-17 with a systemd drop-in (`smartlead-auto-reply.service.d/outbound-paused.conf`,
+ *  "All outbound sending is paused until further notice"), which runs the lane in dry-run:
+ *  replies are still classified and logged, nothing is sent, nothing is marked processed, so
+ *  each one stays queued. That is deliberate and scoped to THIS unit — Siege's first touches
+ *  are unaffected and sent 170 emails the same cycle. Casey answers these by hand off his own
+ *  lanes (`reply-drafts-doc.timer` builds an "Email Draft Replies" doc each morning,
+ *  `positive-reply-to-board.timer` puts clear positives on the Notion board), and neither
+ *  leaves a line in this log. So `armed:false` with warm people waiting is the EXPECTED
+ *  shape and NOT a backlog of ignored creators. `armed_last_at` and `last_auto_sent_at` are
+ *  how old the pause is, read off the whole retained log rather than the cycle.
+ *
+ *  `cannot_sign_people` is the one shape here that is a defect rather than a decision: the
+ *  drafter cannot resolve which mailbox a thread sends from, so it cannot sign the reply and
+ *  holds it even though the classification is a confident yes. Eight of the eleven since
+ *  2026-10-07 were `simple-yes/high`. Re-arming the sender does not fix those.
+ *
+ *  Pure parse of a log we already read for the push. No network, no database, no LLM call.
+ *  Every field is null on an unreadable log, which is unknown and NOT a quiet lane. */
+export type ReplyLaneFacts = {
+  log_found: boolean;
+  runs: number | null;
+  queue_depth_last: number | null;
+  queue_depth_max: number | null;
+  people_classified: number | null;
+  warm_people: number | null;
+  warm_ids: string[] | null;
+  category_people: { category: string; people: number }[] | null;
+  auto_sent: number | null;
+  would_send_people: number | null;
+  armed: boolean | null;
+  armed_last_at: string | null;
+  last_auto_sent_at: string | null;
+  held_people: number | null;
+  held_reasons: { reason: string; people: number }[] | null;
+  cannot_sign_people: number | null;
+  cannot_sign_ids: string[] | null;
+  classifier_failed_runs: number | null;
+  classifier_failures: number | null;
+  top_failure: string | null;
+  failure_first_at: string | null;
+  failure_last_at: string | null;
+  recovered_at: string | null;
+};
+
+export const NO_REPLY_LANE: ReplyLaneFacts = {
+  log_found: false, runs: null, queue_depth_last: null, queue_depth_max: null,
+  people_classified: null, warm_people: null, warm_ids: null, category_people: null,
+  auto_sent: null, would_send_people: null, armed: null, armed_last_at: null,
+  last_auto_sent_at: null, held_people: null, held_reasons: null,
+  cannot_sign_people: null, cannot_sign_ids: null, classifier_failed_runs: null,
+  classifier_failures: null, top_failure: null, failure_first_at: null,
+  failure_last_at: null, recovered_at: null,
+};
+
+/** Categories the classifier uses for a creator who is saying yes. A `price-only` or an
+ *  `other` is a reply worth a human's eye but it is not an agreement, so it stays out of
+ *  `warm_people` and shows up in `category_people` instead, where it can be read. */
+export const WARM_REPLY_CATEGORIES = [
+  'simple-yes', 'yes-plus-questions', 'yes-plus-personal-note', 'content-strategy-yes',
+];
+
+const MAX_REPLY_IDS = 12;
+
+export function replyLaneFacts(log: string, sinceISO: string, untilISO: string): ReplyLaneFacts {
+  const since = Date.parse(sinceISO);
+  const until = Date.parse(untilISO);
+  let runs = 0;
+  let queueLast: number | null = null;
+  let queueMax: number | null = null;
+  let autoSent = 0;
+  let armed: boolean | null = null;
+  let armedLastAt: string | null = null;
+  let lastAutoSentAt: string | null = null;
+  let failedRuns = 0;
+  let failures = 0;
+  let failureFirst: string | null = null;
+  let failureLast: string | null = null;
+  let recoveredAt: string | null = null;
+  // Distinct people, keyed by address. A person re-read every two minutes must count once.
+  const classified = new Set<string>();
+  const wouldSend = new Set<string>();
+  const held = new Set<string>();
+  const cannotSign = new Set<string>();
+  // The NEWEST reading wins: a creator read `simple-yes` and then `yes-plus-questions` an
+  // hour later has one current category, not two. Insertion order is first-seen, which is
+  // the order a reader wants `warm_ids` in.
+  const categoryOf = new Map<string, string>();
+  const heldReasonOf = new Map<string, string>();
+  const failureCounts = new Map<string, number>();
+
+  for (const raw of log.split('\n')) {
+    const m = /^\[(\d{4}-\d{2}-\d{2}T[\d:]+Z)\]\s+(.*)$/.exec(raw);
+    if (!m) continue;
+    const stamp = m[1]!;
+    const body = m[2]!;
+    const t = Date.parse(stamp);
+    if (!Number.isFinite(t)) continue;
+
+    // Read off the WHOLE retained log, not the cycle: how old the pause is, is the point.
+    if (/^start \[LIVE/.test(body)) armedLastAt = stamp;
+    const sentHere = /^SENT\s/.test(body);
+    if (sentHere) lastAutoSentAt = stamp;
+
+    if (t < since || t >= until) continue;
+
+    const start = /^start \[(LIVE|DRY-RUN)[^\]]*\]\s*—\s*(\d+) repl/.exec(body);
+    if (start) {
+      runs++;
+      const live = start[1] === 'LIVE';
+      armed = armed === null ? live : armed || live;
+      const depth = Number(start[2]);
+      queueLast = depth;
+      queueMax = queueMax === null ? depth : Math.max(queueMax, depth);
+      continue;
+    }
+    // A run's own verdict on itself. `failed N` counts the classifier calls that errored,
+    // which is how a money outage sizes itself; `recovered_at` is the first clean run after
+    // the newest failure, so an outage that ENDED inside the cycle says so.
+    const done = /^done\s*—\s*sent \d+, would-send \d+, escalated \d+, failed (\d+)/.exec(body);
+    if (done) {
+      if (Number(done[1]) > 0) failedRuns++;
+      else if (failureLast !== null && recoveredAt === null) recoveredAt = stamp;
+      continue;
+    }
+    if (/failed to run:/.test(body)) {
+      failures++;
+      const reason = body.replace(/^.*failed to run:\s*/, '').trim();
+      if (failureFirst === null) { failureFirst = stamp; failureLast = stamp; }
+      else failureLast = stamp;
+      // One shape wins by volume; the set is small and closed (two shapes in the whole
+      // retained log), so it is kept verbatim. The status IS the fact here — a digit-
+      // condensed "HTTP Error N" would say nothing, which is the 10-22 lesson.
+      failureCounts.set(reason, (failureCounts.get(reason) ?? 0) + 1);
+      // A failure cancels a recovery recorded earlier in the cycle: the newest clean run
+      // after the newest failure is what the field means.
+      recoveredAt = null;
+      continue;
+    }
+
+    const verdict = /^(SENT|WOULD-SEND|HOLD \+draft|HOLD)\s+(\S+)\s+(.*)$/.exec(body);
+    if (!verdict) continue;
+    const kind = verdict[1]!;
+    const who = verdict[2]!;
+    const rest = verdict[3]!;
+    classified.add(who);
+    if (kind === 'SENT') { autoSent++; continue; }
+    if (kind === 'WOULD-SEND') wouldSend.add(who);
+    else held.add(who);
+
+    const cat = /^([a-z-]+)\/(?:high|medium|low)/.exec(rest);
+    if (cat) categoryOf.set(who, cat[1]!);
+    if (kind !== 'WOULD-SEND') {
+      const why = rest.replace(/^[a-z-]+\/(?:high|medium|low)\s*—\s*/, '').trim();
+      if (why) heldReasonOf.set(who, why.replace(/\d+/g, 'N'));
+      if (/cannot tell which mailbox/.test(rest)) cannotSign.add(who);
+    }
+  }
+
+  const warm = [...categoryOf.entries()]
+    .filter(([, c]) => WARM_REPLY_CATEGORIES.includes(c))
+    .map(([who]) => who);
+  const catTally = new Map<string, number>();
+  for (const c of categoryOf.values()) catTally.set(c, (catTally.get(c) ?? 0) + 1);
+  const heldTally = new Map<string, number>();
+  for (const r of heldReasonOf.values()) heldTally.set(r, (heldTally.get(r) ?? 0) + 1);
+  const topFailure = [...failureCounts.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0]?.[0] ?? null;
+
+  return {
+    log_found: true,
+    runs,
+    queue_depth_last: queueLast,
+    queue_depth_max: queueMax,
+    people_classified: classified.size,
+    warm_people: warm.length,
+    warm_ids: warm.slice(0, MAX_REPLY_IDS),
+    category_people: [...catTally.entries()]
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .map(([category, people]) => ({ category, people })),
+    auto_sent: autoSent,
+    would_send_people: wouldSend.size,
+    armed,
+    armed_last_at: armedLastAt,
+    last_auto_sent_at: lastAutoSentAt,
+    held_people: held.size,
+    held_reasons: [...heldTally.entries()]
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .map(([reason, people]) => ({ reason, people })),
+    cannot_sign_people: cannotSign.size,
+    cannot_sign_ids: [...cannotSign].slice(0, MAX_REPLY_IDS),
+    classifier_failed_runs: failedRuns,
+    classifier_failures: failures,
+    top_failure: topFailure,
+    failure_first_at: failureFirst,
+    failure_last_at: failureLast,
+    recovered_at: recoveredAt,
+  };
+}
+
+/** DELIBERATELY READS THE WHOLE LOG, unlike the push reader above, which slices a tail.
+ *  `armed_last_at` and `last_auto_sent_at` are lifetime stamps and the whole point of them
+ *  is that they can be months old: the sender was paused on 2026-09-17 and the last reply it
+ *  really sent was 2026-08-05. A 20,000-line tail of this file reaches 2026-10-12, so it
+ *  would have published null for both — "never armed, never sent" — which is a silent cap
+ *  used as a measurement, the fault this file has now closed five times in other blocks. The
+ *  file is ~8 MB and read once a day with no network and no database behind it. If it ever
+ *  grows enough to matter, scan the whole file for those two stamps and tail the rest;
+ *  do not just shorten the window. */
+function readReplyLane(sinceISO: string, untilISO: string): ReplyLaneFacts {
+  const f = join(AUTOMATOR_REPO, 'logs', 'smartlead-auto-reply.log');
+  if (!existsSync(f)) return NO_REPLY_LANE;
+  try {
+    return replyLaneFacts(readFileSync(f, 'utf8'), sinceISO, untilISO);
+  } catch {
+    return NO_REPLY_LANE;
+  }
+}
+
 // Health snapshot for the three sweep-based discovery methods (2026-08-09). None of
 // these show up in campaign.jsonl (that's the keyword engine only), so without this
 // a stalled daemon is invisible to the daily report — exactly how graph-sweep sat
@@ -5889,6 +6127,59 @@ async function main(): Promise<void> {
         'wrote it; _oldest_stamp_day is how old the worst of them is. All three are ' +
         'null, not 0, when the ledger is unreadable or a stranded lead carries no stamp ' +
         'date, because a partial split reads as a complete one.',
+    },
+    // What came back from the people we emailed. See the block comment on replyLaneFacts():
+    // until 2026-11-14 the only event in this pipeline that can earn money was in no field
+    // in this file at all.
+    reply_lane: {
+      ...readReplyLane(sinceISO, untilISO),
+      note:
+        'The reply lane, read from automator/logs/smartlead-auto-reply.log (no network, no ' +
+        'database, no LLM call). EVERY OTHER BLOCK IN THIS FILE MEASURES OUTBOUND, and a ' +
+        'creator writing back to say yes is the point of all of it. This block did not ' +
+        'exist until 2026-11-14 and its absence cost two mornings running. On 2026-11-13 ' +
+        'the debrief had to find a money outage by hand in this log to learn that reply ' +
+        'reading had stopped at 2026-11-12T22:27:55Z on a 402, because openrouter_today ' +
+        'reads the FINDER\'s spend log and the finder is paused, so the snapshot published ' +
+        'a balance and 14,990 days of runway beside an account that had gone past zero. ' +
+        'The next morning credit landed, the last 402 fired at 2026-11-14T00:48:12Z on a ' +
+        'run that ended `failed 16`, the 02:38:01Z run ended `failed 0, escalated 16`, and ' +
+        'the first thing the recovered lane did was read TWO creators agreeing to talk. ' +
+        'Neither was in a single generated field. classifier_failures sizes an outage, ' +
+        'failure_first_at / failure_last_at bound it, and recovered_at is the first clean ' +
+        'run after the newest failure, so an outage that ENDED inside the cycle says so ' +
+        'rather than reading as a lane still down. ' +
+        'COUNT PEOPLE, NOT LINES: the classifier re-reads whatever is still queued every ' +
+        'two minutes, so one creator collects a verdict line per run — ' +
+        'leigh@leighbrown.com was read simple-yes/high SEVEN times on 2026-11-12 alone. ' +
+        'Every count here is distinct addresses, and the NEWEST reading is the one that ' +
+        'counts, because a person read simple-yes and then yes-plus-questions an hour ' +
+        'later has one current category and not two. That is the 10-21 rule (a counter ' +
+        'that counts log lines cannot count people) in the one block whose unit is ' +
+        'unambiguously a person. warm_people is the creators whose current category is an ' +
+        'agreement (WARM_REPLY_CATEGORIES); a price-only or an other is worth a human\'s ' +
+        'eye but is not a yes, so read category_people for the rest. ' +
+        'AND auto_sent IS NOT WHETHER ANYBODY ANSWERED — DO NOT READ armed:false AS A ' +
+        'BACKLOG OF IGNORED CREATORS. Casey paused the auto-reply sender on 2026-09-17 ' +
+        '(smartlead-auto-reply.service.d/outbound-paused.conf, "All outbound sending is ' +
+        'paused until further notice"), which runs the lane in dry-run: replies are still ' +
+        'classified and logged, nothing is sent, nothing is marked processed, so each one ' +
+        'stays queued. It is deliberate, it is scoped to THAT ONE UNIT, and Siege\'s first ' +
+        'touches are unaffected — 170 emails went out the same cycle. Casey answers these ' +
+        'by hand off his own lanes (reply-drafts-doc.timer builds an "Email Draft Replies" ' +
+        'doc each morning, positive-reply-to-board.timer puts clear positives on the ' +
+        'Notion board) and neither leaves a line in this log, so this file cannot see an ' +
+        'answer and must never claim one did not happen. armed is whether any run inside ' +
+        'the cycle was LIVE; armed_last_at and last_auto_sent_at are lifetime stamps read ' +
+        'off the WHOLE log on purpose, because the pause is 58 days old and the last reply ' +
+        'this lane really sent was 2026-08-05T22:30:54Z, and a tailed window would have ' +
+        'published null for both and read as never-armed. ' +
+        'cannot_sign_people IS THE ONE SHAPE HERE THAT IS A DEFECT AND NOT A DECISION: the ' +
+        'drafter cannot resolve which mailbox a thread sends from, so it cannot sign the ' +
+        'reply and holds it even on a confident yes. Eleven since 2026-10-07, EIGHT of ' +
+        'them simple-yes/high. Re-arming the sender does not fix those, and the repair is ' +
+        'in automator, which owns the reply path and is not this repo\'s to edit. ' +
+        'Every field is null on an unreadable log, which is unknown and NOT a quiet lane.',
     },
     discovered_today: {
       total: discovered.length,
