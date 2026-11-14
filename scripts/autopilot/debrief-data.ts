@@ -2475,6 +2475,12 @@ export function siegePushOutcome(
     ? {
       planned_leads: null, people_emailed: null, people_lost: null,
       lost_to_fail: null, lost_to_skip: null, lost_silently: null,
+      // Null, not absent. Every sibling in this branch is spelled out as null because an
+      // unreadable plan makes the whole split unknowable, and `lost_before_push` was the
+      // one the branch forgot (2026-11-14) — so on a cycle whose plan could not be read it
+      // was simply missing from the JSON rather than reading unknown, which is the file's
+      // own standing convention turned off in the one case it exists for.
+      lost_before_push: null,
       emailed_unlogged: null, emailed_unlogged_ids: [],
       lost_ids: [], skipped_then_sent: null, skipped_unplanned: null,
       approved_leads: approved === null ? null : approved.size,
