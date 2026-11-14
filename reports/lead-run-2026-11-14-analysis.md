@@ -226,9 +226,45 @@ answering lanes leave no trace in this log, so a future reader cannot file `arme
 backlog of ignored creators. `cannot_sign_people` is published separately because it is the one
 shape in the block that is a defect rather than a decision.
 
-Typecheck clean. 17 new self-test assertions, all passing. Verified against the live log for
-this cycle: 66 runs, 18 people, 3 warm, 301 refusals, recovered 02:38:01Z. The live read also
-caught a warm reply a hand-grep had missed, `ovais@senatorwerunads.com`.
+17 new self-test assertions, all passing. Verified against the live log for this cycle: 66
+runs, 18 people, 3 warm, 301 refusals, recovered 02:38:01Z. The live read also caught a warm
+reply a hand-grep had missed, `ovais@senatorwerunads.com`.
+
+**`youtube-outreach-orchestrator-v1` `4219181`** — an unreadable Siege plan left
+`lost_before_push` absent from the report instead of null.
+
+Every other field in that branch of the per-person join is spelled out as null on purpose: an
+unreadable plan makes the whole loss split unknowable, and this file's standing rule is that
+unknown reads null and never 0 or absent. That one field was missed when it shipped on
+2026-11-07, so on a cycle whose plan could not be read it was simply missing from the JSON.
+Selftest all passing.
+
+### A gap worth a deliberate pass: the report generator is not typechecked
+
+Found while verifying the first fix, and it is the more useful finding of the two.
+**`tsconfig.json` includes only `src/**`, so `npm run typecheck` has never covered
+`scripts/autopilot/`** — the directory that generates the authoritative metrics file this
+whole report series is grounded in. I had claimed "typecheck clean" on first writing this up,
+which was wrong: the command ran and passed without ever reading the file I had changed.
+
+Checking the two files directly turns up **three type errors that predate today**:
+
+| Site | Error | Nature |
+|---|---|---|
+| `debrief-data.selftest.ts:1879` | TS2345 | A band-gate test fixture's array infers as `never[]` |
+| `debrief-data.ts:1176` | TS2322 | `bandGateFacts` return is missing `reasons` |
+| `debrief-data.ts:2529` | TS2322 | `siegePushOutcome` declares three `lost_split_*` fields it does not itself set |
+
+None of them affected this morning's numbers. All three are declaration-level rather than
+logic, and the third is over-promising in a return type whose fields really do arrive later at
+the assembly site, which is why the JSON is correct in practice.
+
+**Turning the coverage on means fixing those three first**, and two of them sit in the band-gate
+and push-outcome readers, the most load-bearing code in the repo. Doing that blind in an
+unattended run is exactly how a silently wrong number reaches tomorrow's report, so it is left
+for a deliberate pass. It is worth doing: my own near-misses on the reply-lane reader, a
+module-global scratch map and a tail window too short to reach the lifetime stamps, were both
+caught by reading the code rather than by any tool.
 
 Nothing else was changed. The three repairs most worth making this morning all sit in
 `automator`, which owns the send and reply paths and is not one of the five repos this agent

@@ -409,12 +409,40 @@
           writing: it reads the whole log rather than a tail, because the pause is 58 days old
           and a 20,000-line tail reaches only 2026-10-12 and would have published "never armed,
           never sent"; and the note states plainly that an unarmed sender is Casey's own order,
-          so no future reader files it as ignored creators. Typecheck clean, 17 new self-test
-          assertions passing, and verified against the live log for this cycle.
+          so no future reader files it as ignored creators. 17 new self-test assertions
+          passing, and verified against the live log for this cycle.
+        </td>
+      </tr>
+      <tr class="fix">
+        <td>youtube-outreach-orchestrator-v1</td>
+        <td><code>4219181</code></td>
+        <td>
+          An unreadable Siege plan used to leave <code>lost_before_push</code> absent from the
+          report rather than null. Every sibling field in that branch is spelled out as null on
+          purpose, because an unreadable plan makes the whole loss split unknowable and this
+          file's standing rule is that unknown reads null and never 0 or absent. That one field
+          was missed when it shipped on 2026-11-07.
         </td>
       </tr>
     </table>
   </div>
+
+  <p>
+    <b>One thing found while checking the first fix, worth a deliberate pass:
+    <code>npm run typecheck</code> has never covered the code that writes this report.</b>
+    <code>tsconfig.json</code> includes only <code>src/**</code>, so
+    <code>scripts/autopilot/</code>, the directory that generates the authoritative metrics
+    file, has been unchecked the whole time. Checking it by hand turns up <b>three
+    declaration-level type errors that predate today</b> and none of which affected this
+    morning's numbers. The second fix above is one of the things that fell out of looking.
+  </p>
+
+  <p class="muted">
+    Turning that coverage on means fixing those three first, and two of them sit in the
+    band-gate and push-outcome readers, which are the most load-bearing code in the repo. Doing
+    that blind in an unattended run is how a silently wrong number reaches tomorrow's report, so
+    it is left for a deliberate pass rather than shipped tonight.
+  </p>
 
   <p class="muted">
     Nothing else was changed. The three things most worth repairing this morning all sit in
