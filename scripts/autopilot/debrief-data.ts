@@ -1174,6 +1174,16 @@ export function bandGateFacts(
   }
 
   return {
+    // The per-mailbox reason map, which `inboxGateFacts` uses as the LAST fallback in the
+    // health/warmup/unexplained split: the band gate adopts health-only pauses out of the
+    // old gate's registry and deletes them there, so for those mailboxes this ledger is
+    // the only place the reason still exists. It was computed here and then dropped from
+    // this return (the blank one above carried it), so `band.reasons` was undefined on
+    // every real run and the fallback silently never fired — a pause explained only by
+    // the band gate counted as `gate_paused_unexplained`, which is the one answer the
+    // 2026-10-15 split was built so it could never give. Found 2026-11-15 by turning the
+    // typechecker on over this directory.
+    reasons,
     band_gate_run_at: runAt,
     band_normal: normal,
     band_watch: watch,
@@ -2541,6 +2551,14 @@ export function siegePushOutcome(
     lost_new: null,
     lost_longest_streak: null,
     lost_recurring_ids: [],
+    // The coverage of that same walk, and null for the same reason: this function has not
+    // examined any prior day, so how much of the loss a recurrence check could see is
+    // unknown here rather than complete. Declared so the return really carries every field
+    // `SiegePushOutcome` promises — they were missing outright until 2026-11-15, which the
+    // typechecker could not say because it had never read this directory.
+    lost_split_covered: null,
+    lost_split_complete: null,
+    lost_history_capped_days: null,
     deferred_logged: deferredLogged,
     // Ranked by the people each reason really cost, not by the lines it printed. A reason
     // whose leads were all written again and sent reads 0 and sinks below one that cost

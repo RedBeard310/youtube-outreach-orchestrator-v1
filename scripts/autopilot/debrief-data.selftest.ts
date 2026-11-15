@@ -1584,6 +1584,20 @@ ok('the newest band run is the fleet, and owned is counted whole',
 ok('a missing band state costs nulls, not the block',
   (() => { const b = bandGateFacts(null); return [b.band_stop, b.band_gate_owned, b.reasons]; })(),
   [null, null, {}]);
+// The reason ledger has to survive the SUCCESS path too, which it did not until
+// 2026-11-15: it was computed, left out of this return, and carried only by the blank one
+// above. So `band.reasons` was undefined on every real run and the last fallback in the
+// pause split never fired. A mailbox the band gate had adopted then counted as
+// `unexplained`, the one answer that split exists so it can never give.
+ok('the band ledger reaches the caller on a readable state, not only on a blank one',
+  bandGateFacts(BAND_STATE).reasons,
+  { 'p@x.com': ['health 73.4<90'] });
+ok('and it still explains an adopted pause once it gets there',
+  (() => {
+    const g = inboxGateFacts(ADOPTED_STATE, bandGateFacts(BAND_STATE).reasons);
+    return [g.gate_paused_on_health, g.gate_paused_on_warmup, g.gate_paused_unexplained];
+  })(),
+  [1, 0, 1]);
 
 // The 2026-10-18 fault: on a non-sending day band_normal (28) sat beside live_inboxes_prev
 // (18, Siege's plan-time count from Friday) and subtracting them read as +10. The prior
@@ -1835,7 +1849,21 @@ ok('no window leaves the short-reading fields unknown, not zero',
 // back to normal at 11:06Z, two to watch at 12:06Z, one watch-to-stop at 00:06Z and one
 // back to normal at 01:06Z, closing on a band_normal of 44 that the old arithmetic
 // reported as 43 — on a day with no short read, so nothing told the reader why.
-const BAND_SIDEWAYS = {
+// The element type is spelled out because a fixture run whose `to_watch` is `[]` infers
+// `never[]`, and the test below filters on `to_watch.includes(...)`. Inference alone makes
+// that a type error nobody saw while this directory sat outside `npm run typecheck`.
+const BAND_SIDEWAYS: {
+  generated_at: string;
+  owned: Record<string, unknown>;
+  mailboxes: Record<string, unknown>;
+  runs: Array<{
+    at: string;
+    counts: Record<string, number>;
+    to_normal: string[];
+    to_watch: string[];
+    to_stop: string[];
+  }>;
+} = {
   generated_at: '2026-11-13T08:05:01Z',
   owned: {},
   mailboxes: {},
