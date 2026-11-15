@@ -1056,6 +1056,27 @@ ok('a dry pool beats an unmeasurable recovery rate',
     perLead: PER_LEAD_133, balanceUsd: 165.28, candidatePoolDry: true,
   }); return [p.recovered_per_channel, p.projected_leads, p.binding_constraint]; })(),
   [null, 0, 'candidate_supply']);
+// 2026-11-15: a lane that refused every tick before it ever counted candidates. The
+// Apify token stopped authenticating on 11-12 and the loop skipped ~36 ticks without
+// writing a run log, so `candidate_pool_dry` was still the 11-12 answer and three
+// debriefs published it as today's, one of them telling Casey the shortage was
+// candidates. Neither money nor supply is the wall when nobody asked.
+ok('a lane that never asked projects nothing, and names neither wall',
+  (() => { const p = projectRecoveryBudget({
+    spendableUsd: 21.06, pricePerRun: 0.0702, recoveredInCycle: null, channelsInCycle: 0,
+    perLead: PER_LEAD_133, balanceUsd: 299.63, candidatePoolDry: true,
+    laneAnsweredInCycle: false,
+  }); return [p.channels_affordable, p.projected_leads, p.binding_constraint,
+    p.supply_bound, p.openrouter_cost_of_projected_leads_usd]; })(),
+  // The dollars stay honest; everything that would read as a finished book goes unknown.
+  [300, null, 'lane_silent', null, null]);
+ok('a lane that did answer is unaffected by the new input',
+  (() => { const p = projectRecoveryBudget({
+    spendableUsd: 21.34, pricePerRun: 0.0702, recoveredInCycle: 286, channelsInCycle: 578,
+    perLead: PER_LEAD_133, balanceUsd: 17.96, candidatePoolDry: true,
+    laneAnsweredInCycle: true,
+  }); return [p.projected_leads, p.binding_constraint, p.supply_bound]; })(),
+  [0, 'candidate_supply', true]);
 
 // apifyIdleCause — the two reasons a tick does nothing are opposite decisions.
 ok('the batch script refusing for want of candidates',
