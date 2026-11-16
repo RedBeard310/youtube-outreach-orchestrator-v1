@@ -1,0 +1,510 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lead Run Debrief 2026-11-16</title>
+<style>
+  :root {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+      --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+      --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+    --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+    --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 40px 22px 80px; }
+  .eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); font-weight: 600; }
+  h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.12; margin: 10px 0 6px; text-wrap: balance; letter-spacing: -.02em; }
+  h2 { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); margin: 44px 0 16px; font-weight: 700; }
+  h3 { font-size: 18px; margin: 0 0 6px; letter-spacing: -.01em; }
+  p { margin: 0 0 14px; }
+  .lede { font-size: 18px; color: var(--ink-soft); max-width: 68ch; }
+  .tag { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--amber-soft); color: var(--amber); letter-spacing: .02em; }
+  .tag.red { background: var(--red-soft); color: var(--red); }
+  .tag.good { background: var(--teal-soft); color: var(--teal); }
+  .grid { display: grid; gap: 14px; }
+  .stats { grid-template-columns: repeat(4, 1fr); margin-top: 26px; }
+  @media (max-width: 720px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; box-shadow: var(--shadow); }
+  .stat .n { font-size: 30px; font-weight: 750; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .stat .l { font-size: 12.5px; color: var(--ink-soft); margin-top: 3px; }
+  .stat .s { font-size: 12px; margin-top: 8px; font-weight: 600; }
+  .up { color: var(--good); } .down { color: var(--red); } .warn { color: var(--amber); }
+  .accent-red { border-left: 3px solid var(--red); }
+  .accent-teal { border-left: 3px solid var(--teal); }
+  .accent-amber { border-left: 3px solid var(--amber); }
+
+  .strip { display: flex; align-items: flex-end; gap: 3px; height: 130px; padding: 14px 14px 10px; overflow-x: auto; }
+  .bar { flex: 1 0 8px; min-width: 6px; border-radius: 2px 2px 0 0; background: var(--teal); opacity: .9; }
+  .bar.zero { background: var(--line); height: 4px !important; }
+  .bar.bad { background: var(--amber); }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-soft); padding: 0 14px 14px; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+
+  .q { border-radius: 14px; padding: 20px 22px; margin-bottom: 14px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); }
+  .q .ask { font-size: 17px; font-weight: 700; color: var(--ink); margin-bottom: 10px; display: flex; gap: 10px; align-items: baseline; }
+  .q .ask .qn { color: var(--red); font-weight: 800; flex: 0 0 auto; }
+  .q p { color: var(--ink-soft); }
+  .q b { color: var(--ink); }
+  .pill { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink); background: var(--panel-2); padding: 1px 7px; border-radius: 6px; border: 1px solid var(--line); white-space: nowrap; }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; background: var(--panel-2); padding: 1px 5px; border-radius: 5px; border: 1px solid var(--line); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+  th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); }
+  td .num { font-variant-numeric: tabular-nums; font-weight: 650; }
+  tr.total td { background: var(--panel-2); font-weight: 700; }
+  .fix td:first-child { color: var(--good); font-weight: 650; }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); box-shadow: var(--shadow); margin-bottom: 14px; }
+  ol.recs { padding-left: 0; list-style: none; counter-reset: r; margin: 0; }
+  ol.recs li { counter-increment: r; position: relative; padding: 14px 16px 14px 52px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 10px; box-shadow: var(--shadow); }
+  ol.recs li::before { content: counter(r); position: absolute; left: 14px; top: 14px; width: 26px; height: 26px; border-radius: 8px; background: var(--teal-soft); color: var(--teal); font-weight: 800; font-size: 14px; display: grid; place-items: center; }
+  ol.recs b { color: var(--ink); }
+  .foot { margin-top: 46px; padding: 16px 18px; border-radius: 12px; background: var(--amber-soft); border: 1px solid var(--line); font-size: 14px; color: var(--ink-soft); }
+  .foot b { color: var(--ink); }
+  .muted { color: var(--ink-soft); font-size: 13.5px; }
+  pre { background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 14px; overflow-x: auto; font-size: 13px; line-height: 1.5; margin: 0 0 14px; }
+</style>
+
+
+<div class="wrap">
+
+  <div class="eyebrow">Lead Run Debrief · YouTube outreach</div>
+  <h1>2026-11-16 &mdash; the lane is still dead, and yesterday&rsquo;s fix reset the number that measured it</h1>
+
+  <p class="lede">
+    The Apify token is still rejected. The loop has now refused 48 consecutive ticks over
+    93.7 hours. Yesterday that outage was sized at 71.6 hours of silence; this morning, a
+    full day worse, the same field reads 1.6. Nothing recovered. The fix that made the lane
+    visible became one of the instruments that measure its quiet. Also: the weekly floor
+    sweep ran and graduated 36 leads, not one of whom we can email.
+  </p>
+
+  <p>
+    <span class="tag red">Apify dead 93.7h, 48 refused ticks</span>
+    <span class="tag red">the outage gauge inverted</span>
+    <span class="tag good">1 creator said yes</span>
+    <span class="tag">0 emails, not a sending day</span>
+    <span class="tag good">0 fatal signatures</span>
+  </p>
+
+  <div class="grid stats">
+    <div class="card stat accent-red">
+      <div class="n">93.7h</div>
+      <div class="l">the Apify lane has refused every tick</div>
+      <div class="s down">48 ticks, same rejected token, $21.06 spendable</div>
+    </div>
+    <div class="card stat accent-red">
+      <div class="n">1.6h</div>
+      <div class="l">what the old gauge said this morning</div>
+      <div class="s down">71.6h yesterday, on a shorter outage</div>
+    </div>
+    <div class="card stat accent-amber">
+      <div class="n">0</div>
+      <div class="l">sendable people from the weekly floor sweep</div>
+      <div class="s warn">36 graduated, 18 already emailed, 18 unscored</div>
+    </div>
+    <div class="card stat accent-teal">
+      <div class="n">1</div>
+      <div class="l">creator whose reply is a yes</div>
+      <div class="s">drafted and filed; the sender is paused by order</div>
+    </div>
+  </div>
+
+  <div class="grid stats">
+    <div class="card stat">
+      <div class="n">0</div>
+      <div class="l">emails loaded into SmartLead</div>
+      <div class="s">Sunday. The timer runs Mon to Fri</div>
+    </div>
+    <div class="card stat accent-teal">
+      <div class="n">1</div>
+      <div class="l">lead parked into <code>approved_hold</code></div>
+      <div class="s">pool 7,387 to 7,388; shelf 4,852 ready</div>
+    </div>
+    <div class="card stat accent-amber">
+      <div class="n">9</div>
+      <div class="l">recovery-lane contact points of its own</div>
+      <div class="s warn">0 addresses, against 54 and 9 last week</div>
+    </div>
+    <div class="card stat accent-teal">
+      <div class="n">48</div>
+      <div class="l">mailboxes in the clear band</div>
+      <div class="s">flat; 10 held but already healthy</div>
+    </div>
+  </div>
+
+  <h2>The shape of the day</h2>
+
+  <div class="card" style="padding:0">
+    <div class="strip" id="strip"></div>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--teal)"></span>ticks that reached a batch</span>
+      <span><span class="dot" style="background:var(--amber)"></span>ticks that refused on the ledger read</span>
+      <span>Apify endspec, two bars per UTC day, 11-09 to 11-16. Run logs counted off the logs folder, refusals off the journal. 11-16 is partial, to 08:22Z.</span>
+    </div>
+  </div>
+
+  <p>
+    Four more normal days, then nothing since the cliff inside 11-12. The last run log is
+    <span class="pill">08:21:48Z</span> that morning and the first refusal is
+    <span class="pill">10:20Z</span>. Every tick since has exited on the same line,
+    <code>could not read the Apify monthly ledger</code>, and exited 0, so systemd keeps
+    reporting success.
+  </p>
+
+  <p>
+    <b>A live probe this morning still answers the same thing.</b>
+    <code>/v2/users/me/limits</code> with the 46-character token from the shared env bank
+    returns <code>user-or-token-not-found</code>. It is a credential Apify no longer
+    recognises, not a missing variable, and secrets are operator-managed, so nothing in the
+    pipeline will fix it.
+  </p>
+
+  <h2>The three questions</h2>
+
+  <div class="q">
+    <div class="ask"><span class="qn">Q1</span><span>Why does a lane that is four days dead read as 1.6 hours quiet?</span></div>
+    <p>
+      Because the fix that made it visible became one of the instruments that measure its
+      silence.
+    </p>
+    <p>
+      <code>lane_silent_hours</code> is the age of the newest trace the lane leaves on disk,
+      taken across every file it writes. Until 11-15 that was two files, both written only by
+      a tick that reached the batch, so a lane refusing early left nothing behind and the
+      number grew. That is how it reported 71.6 hours yesterday and sized the outage
+      honestly.
+    </p>
+    <p>
+      Yesterday&rsquo;s fix added a third file, <code>apify-endspec-tick.json</code>, written
+      by <b>every</b> exit path including the refusal. The refusals happen hourly. So from
+      the moment it deployed, the newest trace is never more than an hour old, whatever the
+      lane is doing.
+    </p>
+
+    <div class="tablewrap" style="margin-top:4px">
+      <table>
+        <tr><th>Morning</th><th>Lane state</th><th><code>lane_silent_hours</code></th></tr>
+        <tr><td>11-15</td><td>Dead about 71 hours on a rejected token</td><td class="num"><b>71.6</b></td></tr>
+        <tr><td>11-16</td><td>Dead about 94 hours on the same rejected token</td><td class="num"><b>1.6</b></td></tr>
+      </table>
+    </div>
+
+    <p>
+      <b>Nothing else in the block misled.</b> <code>lane_answered_in_cycle</code> is false,
+      <code>candidate_pool_dry</code> is correctly null rather than true,
+      <code>projection.binding_constraint</code> reads <code>lane_silent</code>, and the
+      newest tick names its own cause. But the one field a reader opens to ask
+      <i>how bad is this</i> had inverted, and it pointed the reassuring way.
+    </p>
+    <p>
+      The outage itself, counted off the journal: <b>7</b> refusals on 11-12 from 10:20Z,
+      then <b>12, 12, 12</b>, then <b>5</b> by 08:22Z this morning. Forty-eight ticks,
+      unbroken, 93.7 hours at the cycle end. $31.06 of the November allowance is on the
+      books, $21.06 of it spendable, against a billing cycle that closes 2026-11-30.
+    </p>
+  </div>
+
+  <div class="q">
+    <div class="ask"><span class="qn">Q2</span><span>The weekly floor sweep ran. Did it find anybody?</span></div>
+    <p>
+      It graduated 36 channels and not one of them is a person we can email.
+    </p>
+    <p>
+      The sweep is the 3,000-subscriber floor re-check: channels parked below the bar get
+      re-measured, and the ones that have grown past it come back. It is the lane the
+      standing notes name as the only source of net-new sendable people while discovery is
+      paused, 149 of them on 2026-10-19. It ran <span class="pill">06:40:49Z</span> to
+      <span class="pill">06:43:15Z</span>, restamping 35,086 rows in 147 batches.
+    </p>
+
+    <div class="tablewrap" style="margin-top:4px">
+      <table>
+        <tr><th>Landed in</th><th>Leads</th><th>Already emailed?</th></tr>
+        <tr><td><code>unreviewed</code></td><td class="num">18</td><td>Unscored, so not eligible either way yet</td></tr>
+        <tr><td><code>approved</code></td><td class="num">18</td><td><b>All 18 are <code>sent_to_smartlead</code></b></td></tr>
+        <tr><td><code>needs_contact</code></td><td class="num">5</td><td>No verified address</td></tr>
+        <tr><td><code>approved_hold</code></td><td class="num">2</td><td>1 of the 2 is already <code>sent_to_smartlead</code></td></tr>
+      </table>
+    </div>
+
+    <p>
+      The <code>below_threshold</code> population fell by exactly 36, which is the 18 plus
+      18. So the week&rsquo;s whole graduate class is 18 people this pipeline has already
+      written to and 18 nobody has scored yet, and the standing note on that status is that
+      the backlog there scores 4 to 5, below the bar.
+    </p>
+    <p>
+      Worth saying plainly, because the supply story has rested on this sweep since
+      September: <b>it is not broken, and it is no longer producing.</b>
+    </p>
+  </div>
+
+  <div class="q">
+    <div class="ask"><span class="qn">Q3</span><span>Did anything produce?</span></div>
+    <p>
+      One lead parked, and the free recovery lane had another near-zero day.
+    </p>
+    <p>
+      <b>The lane&rsquo;s own half: 9 contact points on 7 people, zero addresses</b>, against
+      54 points and 9 people with a new address over the prior week. Across the cycle&rsquo;s
+      four collect passes: 600 leads walked, 2,186 methods found,
+      <b>2,176 of them already on file</b>, 10 points written. A 99.5% re-walk of a
+      picked-over book on lap 17 of a 1,784-lead pool, which is not a fault. The one address
+      of the day came from <code>contact-lookup</code>, automator&rsquo;s own timer, through
+      <code>17-podcast</code>.
+    </p>
+    <p>
+      <b>Site resolution is healthy and the ownership gate is the ceiling, as it has been
+      since October.</b> The newest pass ran 63 Brave searches with <b>zero refusals</b>,
+      found 55 candidate sites, and the gate refused <b>52 of them</b>. Cause reads
+      <code>resolution_ok</code>. No amount of Brave credit changes that number, and the 40%
+      no-site rate on that pass is the gate declining to tie a site to a creator rather than
+      a search that failed.
+    </p>
+    <p>
+      The cycle&rsquo;s top fault condition is <b>cross-domain redirect at 240 of 605 method
+      errors, 40%</b>, spread across the four passes as 60, 87, 62 and 31. Measured on
+      11-12 and still true: most of it is the ownership gate refusing by design, so it is an
+      evidence decision for Casey rather than a repair.
+      <code>collect_book_stranded</code> is 3, so the selector gap closed in September has
+      stayed closed.
+    </p>
+  </div>
+
+  <h2>The one creator who said yes</h2>
+
+  <p>
+    <code>synergywellnessny@gmail.com</code>, read <code>yes-plus-questions/high</code> at
+    <span class="pill">17:50:53Z</span> and escalated in the same second as
+    <code>HOLD +draft</code>. The hold reads <i>category=yes-plus-questions is not approved
+    for auto-send</i>. Neither half of that is a defect:
+  </p>
+  <ul>
+    <li><b>The category rule is moot.</b> Casey paused the auto-reply sender on 2026-09-17,
+      so the lane runs in dry run and would not have sent whatever the category said. The
+      reply was drafted and filed into the approval queue, which is where he wants it.</li>
+    <li><b>This is not the cannot-sign shape.</b> That hold, the one that has blocked 12
+      confident yeses since 09-27 because the originating mailbox is gone, did not fire this
+      cycle. Its count is unchanged at 12.</li>
+  </ul>
+  <p>
+    The classifier ran 86 times, read 2 people (one yes, one not-interested), failed zero
+    times, and ended with an empty queue.
+  </p>
+
+  <h2>The fleet</h2>
+
+  <div class="tablewrap">
+    <table>
+      <tr><th>Reading</th><th>Yesterday</th><th>Today</th></tr>
+      <tr><td>Clear band</td><td class="num">48</td><td class="num"><b>48</b></td></tr>
+      <tr><td>Watch band (follow-ups only)</td><td class="num">9</td><td class="num"><b>8</b></td></tr>
+      <tr><td>Stopped band</td><td class="num">37</td><td class="num"><b>38</b></td></tr>
+      <tr><td>Peak clear inside the cycle</td><td class="num">51</td><td class="num">49, at 11-15T11:05:19Z</td></tr>
+      <tr><td>Held but already healthy</td><td class="num">9</td><td class="num"><b>10</b> (9 on the clock, 1 sick sibling)</td></tr>
+      <tr><td>Soonest self-lift</td><td class="num">3h</td><td class="num"><b>0h</b></td></tr>
+    </table>
+  </div>
+
+  <p>
+    One mailbox returned to normal, <code>casey_brown@askcontentgetsclients.com</code>, and
+    it is still holding the band. No round trips, and no gate run read a short fleet, so the
+    move counts stand.
+  </p>
+  <p>
+    <b>The arithmetic does not close this morning, and the data says why.</b> 48 clear plus 1
+    returning minus 0 leaving gives 49 against a clear band of 48.
+    <code>band_left_normal_unknown</code> is 1: one mover&rsquo;s previous band could not be
+    reconstructed from any retained run, which makes <code>band_left_normal</code> a lower
+    bound by its own definition. The field is behaving as designed. Ten held mailboxes
+    already score above the recovery bar and nine of those lift themselves, the closest now,
+    so the real recoverable block is smaller than 38.
+  </p>
+
+  <h2>Everything else, and almost all of it is intended</h2>
+
+  <div class="tablewrap">
+    <table>
+      <tr><th>Lane</th><th>State</th><th>Is money the answer?</th></tr>
+      <tr><td>Discovery, all sweeps</td><td>0 new channels</td><td>No. Paused by Casey 2026-09-08</td></tr>
+      <tr><td>Weekly floor sweep</td><td><b>36 graduated, 0 of them sendable</b></td><td>No. It has stopped producing people</td></tr>
+      <tr><td>Recovery lane collect</td><td>Lap 17, 2,176 of 2,186 methods already on file</td><td>No. Picked over, resolution healthy, gate-bound</td></tr>
+      <tr><td>Apify endspec</td><td><b>Dead 93.7 hours on a rejected token</b></td><td>No. It needs a working credential, not credit</td></tr>
+      <tr><td>Enrichment chain</td><td>1 batch, 1 lead, bundling 99.8%</td><td>No. Nothing left to enrich</td></tr>
+      <tr><td>YouTube key pool</td><td>15 working of 66, 50 still exhausted after the reset</td><td>No. Settled 2026-09-16, and keyword search is paused</td></tr>
+      <tr><td>Reply classifier</td><td>86 runs, 0 failures, queue 0</td><td>No. Clean since it recovered on 11-14</td></tr>
+    </table>
+  </div>
+
+  <p>
+    <b>$0 Anthropic. OpenRouter balance $299.41 against an account rate of 23 cents a day. 0
+    fatal signatures. No halt flag.</b> The shelf still carries the single standing
+    marked-sent-never-emailed lead, <code>recPSkSNP2HeR6CCV</code>, stamped 2026-10-07.
+    Twenty minutes after the cycle closed, <code>npm run send</code> fired two parked leads
+    and SmartLead accepted both; that is tomorrow&rsquo;s number, not this one.
+  </p>
+
+  <h2>Fixes shipped this cycle</h2>
+
+  <p class="muted">
+    Both halves of one fix: a refusing lane can now be sized, instead of being measured by a
+    silence it no longer has.
+  </p>
+
+  <div class="q">
+    <div class="ask"><span>1. The tick stamp carries how long the same answer has run</span></div>
+    <p>
+      <code>youtube-email-outreach-v1</code>, <code>scripts/apify-endspec-loop.sh</code>.
+      <code>tick_note()</code> now reads the previous stamp before writing. An identical
+      outcome <b>and</b> reason carries the start forward and counts up; anything different
+      starts over.
+    </p>
+<pre>{"at":"2026-11-16T09:22:09Z","outcome":"skipped",
+ "reason":"could not read the Apify monthly ledger",
+ "since":"2026-11-12T10:20:12Z","consecutive":48}</pre>
+    <p>
+      One unbroken run of refusals is then one readable fact, rather than a stamp that always
+      looks a few minutes old. Written through a temp file and <code>os.replace</code>, so a
+      reader never sees a half-written stamp, and it still can never be a reason the tick
+      fails.
+    </p>
+    <p>
+      Verified by running the function against a scratch copy of the live stamp: it carries
+      forward from a pre-fix stamp that has no <code>since</code> (falling back to that
+      stamp&rsquo;s own <code>at</code>), increments across repeats, resets when the answer
+      changes, and starts fresh from an unreadable prior file. <code>bash -n</code> clean.
+      The auto-sync timer committed it under its own message (<code>7b8f76e10</code>) before
+      the <code>autopilot-improve:</code> commit could land, so the change is on the branch
+      and will push; the message is the timer&rsquo;s.
+    </p>
+  </div>
+
+  <div class="q">
+    <div class="ask"><span>2. Silence stopped measuring a dead lane</span></div>
+    <p>
+      <code>youtube-outreach-orchestrator-v1</code> <code>a230365</code>. A new exported
+      <code>apifyTickFacts()</code> reads the stamp and publishes three fields beside the
+      existing ones:
+    </p>
+    <ul>
+      <li><code>lane_last_tick_since</code> &mdash; when the current answer began.</li>
+      <li><code>lane_last_tick_streak</code> &mdash; how many consecutive ticks have given it.</li>
+      <li><code>lane_refusing_hours</code> &mdash; how long an unbroken run of refusals has
+        lasted at the cycle end. <b>This is the field that sizes an outage now.</b></li>
+    </ul>
+    <p>
+      Anything but <code>ran</code> counts as a refusal, including an outcome this reader has
+      never heard of, so a new exit path added to the loop script later cannot read as a
+      healthy lane without an edit here. All three are null on a stamp written before today,
+      which carries no <code>since</code>: unknown, and explicitly <b>not</b> a run that
+      started this tick. Defaulting that to &ldquo;started now&rdquo; would publish the
+      reassuring answer on exactly the lane this exists to catch.
+    </p>
+    <p>
+      <code>lane_silent_hours</code> stays, with its meaning narrowed in the block note: it
+      now only answers &ldquo;has this lane stopped running at all&rdquo;, which is a
+      different and rarer question. Verified against the live stamp before committing (it is
+      the pre-fix shape, so it correctly reports unknown and will start carrying from the
+      next tick) and against the shape the next tick will write. Typecheck clean, five new
+      selftest assertions, all passing.
+    </p>
+  </div>
+
+  <h2>What to do next</h2>
+
+  <ol class="recs">
+    <li><b>Replace the Apify token.</b> Four days, 48 refused ticks, $21.06 spendable and a
+      billing cycle that closes 2026-11-30. A live probe still answers
+      <code>user-or-token-not-found</code>. Secrets are operator-managed, so nothing in the
+      pipeline can do this. Unchanged from yesterday and the day before.</li>
+    <li><b>Answer <code>synergywellnessny@gmail.com</code>.</b> One creator agreed to talk
+      and the draft is in the approval queue. Behind it sit the 12 escalations since 09-27
+      blocked by the missing-mailbox hold, every one a confident yes. The only item here that
+      touches revenue rather than volume.</li>
+    <li><b>Decide what happens now the floor sweep has stopped producing.</b> It graduated 36
+      leads this week and not one is a person we can email. With discovery paused, the
+      recovery book on lap 17 at 99.5% already on file, and Apify dead, no lane left adds a
+      new sendable person. The pipeline is living entirely off the 4,852 written-ready people
+      on the shelf. Lifting the pause is Casey&rsquo;s call alone.</li>
+    <li><b>38 stopped mailboxes are the sending ceiling.</b> Ten of the held ones already
+      score above the recovery bar and nine lift themselves, the closest now. Monday&rsquo;s
+      plan will say how much of the block is real.</li>
+    <li><b>Stop planning the people the push loses every sending day.</b> No push this cycle,
+      so the cohort is unchanged from 11-14: nine people, two with channels gone from
+      YouTube, five with a bounce on SmartLead&rsquo;s file. It belongs in Siege&rsquo;s
+      selector, in <code>automator</code>.</li>
+  </ol>
+
+  <div class="foot">
+    <b>Checked rather than assumed.</b> The Apify token&rsquo;s rejection, against a live call
+    to <code>/v2/users/me/limits</code>. The 48 refused ticks and their per-day counts,
+    against <code>journalctl -u apify-endspec.service</code>. The
+    <code>lane_silent_hours</code> inversion, by reading the field&rsquo;s own computation
+    against the three files it takes its maximum over, and the two published snapshots side
+    by side. The floor sweep&rsquo;s output, by querying <code>leads.lead_candidates</code> on
+    <code>updated_at</code> inside the cycle and grouping by both status fields, so the 18
+    graduates carrying <code>sent_to_smartlead</code> is a direct count. The warm reply and
+    the cannot-sign count, by grepping the whole reply log rather than a tail. The new stamp
+    logic, by running <code>tick_note()</code> against a scratch copy of the live file through
+    four transitions. The new reader fields, against the live stamp and the next tick&rsquo;s
+    shape, before committing.
+    <br><br>
+    <b>Assumed:</b> that the 36 leads which left <code>below_threshold</code> are the floor
+    sweep&rsquo;s own work. The timing matches its window to the second and nothing else wrote
+    that status in the cycle, but the table keeps no per-row history that could prove it.
+    Also assumed, as every morning, that Casey&rsquo;s own answering lanes may have replied by
+    hand; this report cannot see either way.
+  </div>
+
+  <p class="muted" style="margin-top:28px">
+    Cycle 2026-11-15T08:00:00Z to 2026-11-16T08:00:00Z. Grounded in
+    <code>youtube-outreach-orchestrator-v1/logs/autopilot-debrief-2026-11-16.json</code>.
+    Companion: <a href="lead-run-2026-11-16-analysis.md">lead-run-2026-11-16-analysis.md</a>.
+  </p>
+
+</div>
+
+<script>
+  // Apify endspec ticks, two bars per UTC day from 11-09 to 11-16. Teal is a tick that
+  // reached a batch, counted off the run logs in youtube-email-outreach-v1/logs; amber is a
+  // tick that exited on "could not read the Apify monthly ledger", counted off the systemd
+  // journal. 11-16 is partial, to 08:22Z. The cliff sits inside 11-12: last run log
+  // 08:21:48Z, first refusal 10:20Z. Nothing has reached a batch since.
+  var days = ['11-09','11-10','11-11','11-12','11-13','11-14','11-15','11-16'];
+  var asked = [10,12,12,5,0,0,0,0];
+  var refused = [0,0,0,7,12,12,12,5];
+  var top = 12;
+  var strip = document.getElementById('strip');
+  days.forEach(function (d, i) {
+    [['', asked[i]], [' bad', refused[i]]].forEach(function (pair) {
+      var b = document.createElement('div');
+      b.className = 'bar' + pair[0] + (pair[1] === 0 ? ' zero' : '');
+      b.style.height = Math.round((pair[1] / top) * 100) + '%';
+      b.title = d + ', ' + pair[1] + (pair[0] === '' ? ' ticks reached a batch' : ' ticks refused');
+      strip.appendChild(b);
+    });
+  });
+</script>
+</html>
