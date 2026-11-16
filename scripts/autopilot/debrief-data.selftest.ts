@@ -1,4 +1,4 @@
-import { bulkRewriteShape, bandGateFacts, condenseInboxReason, notLiveReasonMoves, notLiveReasonTally, splitInboxReasons, fleetFacts, inboxGateFacts, apifyBatchFacts, apifyIdleCause, apifyLedgerLine, NO_PUSH_OUTCOME, normalizePushReason, offerFromBatchId, openRouterRunwayAlarm, OPENROUTER_RATE_MAX_AGE_H, siegeApprovedLeadIds, siegePlanLeadIds, siegePushOutcome, classifyKeyProbe, cyclePacificDay, costWindows, enrichmentChainFacts, isSendingDay, perEnrichedLeadCost, PER_LEAD_SAMPLE_FLOOR, projectRecoveryBudget, MAX_MISSING_DEBRIEFS, missingDebriefs, NO_UNIT, pushRunVerdict, siegeRunAlarm, unitStartedAt, sendPlanHealth, siegePlanFacts, summarizeSendLines, isVerifiedOrBeyond, laneYield, priorAdvanceSource, priorSeedsAdvanced, priorSeedsWalked, reconcileAdvanced, sessionSeedsAdvanced, sessionStartMs, walkRateTrend } from './debrief-data.ts';
+import { apifyTickFacts, bulkRewriteShape, bandGateFacts, condenseInboxReason, notLiveReasonMoves, notLiveReasonTally, splitInboxReasons, fleetFacts, inboxGateFacts, apifyBatchFacts, apifyIdleCause, apifyLedgerLine, NO_PUSH_OUTCOME, normalizePushReason, offerFromBatchId, openRouterRunwayAlarm, OPENROUTER_RATE_MAX_AGE_H, siegeApprovedLeadIds, siegePlanLeadIds, siegePushOutcome, classifyKeyProbe, cyclePacificDay, costWindows, enrichmentChainFacts, isSendingDay, perEnrichedLeadCost, PER_LEAD_SAMPLE_FLOOR, projectRecoveryBudget, MAX_MISSING_DEBRIEFS, missingDebriefs, NO_UNIT, pushRunVerdict, siegeRunAlarm, unitStartedAt, sendPlanHealth, siegePlanFacts, summarizeSendLines, isVerifiedOrBeyond, laneYield, priorAdvanceSource, priorSeedsAdvanced, priorSeedsWalked, reconcileAdvanced, sessionSeedsAdvanced, sessionStartMs, walkRateTrend } from './debrief-data.ts';
 import { lostCohort, replyLaneFacts } from './debrief-data.ts';
 import { aggregateCollectPasses, collectPasses } from '../../src/recovery/bloodhound-lane.ts';
 import { MAX_SHELF_STRANDED_IDS, recoveredTally, shelfTally, type ShelfRow } from '../../src/db.ts';
@@ -1077,6 +1077,43 @@ ok('a lane that did answer is unaffected by the new input',
     laneAnsweredInCycle: true,
   }); return [p.projected_leads, p.binding_constraint, p.supply_bound]; })(),
   [0, 'candidate_supply', true]);
+
+// apifyTickFacts — 2026-11-16. The 11-15 stamp closed the blind spot and inverted the
+// field that had sized it: a lane refusing hourly is never silent, so lane_silent_hours
+// read 71.6 on 11-15 and 1.6 on 11-16 about an outage one day WORSE. The run length is
+// the measurement now.
+const TICK_UNTIL = '2026-11-16T08:00:00.000Z';
+ok('an unbroken run of refusals is sized in hours, not by the age of its newest stamp',
+  (() => { const t = apifyTickFacts(JSON.stringify({
+    at: '2026-11-16T06:21:40Z', outcome: 'skipped',
+    reason: 'could not read the Apify monthly ledger',
+    since: '2026-11-12T10:20:12Z', consecutive: 60,
+  }), TICK_UNTIL); return [t.streak, t.refusing_hours, t.reason]; })(),
+  [60, 93.7, 'could not read the Apify monthly ledger']);
+ok('a tick that reached the batch is not refusing, however long the run',
+  (() => { const t = apifyTickFacts(JSON.stringify({
+    at: '2026-11-16T06:21:40Z', outcome: 'ran', reason: 'batch launched',
+    since: '2026-11-15T06:21:40Z', consecutive: 24,
+  }), TICK_UNTIL); return [t.streak, t.refusing_hours]; })(),
+  [24, null]);
+// A future exit path must read as a refusal, never as a healthy lane, without an edit here.
+ok('an outcome this reader has never heard of counts as a refusal',
+  apifyTickFacts(JSON.stringify({
+    at: '2026-11-16T06:21:40Z', outcome: 'quarantined', reason: 'new exit path',
+    since: '2026-11-16T00:00:00Z', consecutive: 7,
+  }), TICK_UNTIL).refusing_hours, 8);
+// The pre-11-16 stamp shape. Defaulting `since` to `at` would publish "the run started
+// this tick" about a lane that has been refusing for days — the exact wrong direction.
+ok('a stamp written before the run length existed reports unknown, not a fresh run',
+  (() => { const t = apifyTickFacts(JSON.stringify({
+    at: '2026-11-16T06:21:40Z', outcome: 'skipped',
+    reason: 'could not read the Apify monthly ledger',
+  }), TICK_UNTIL); return [t.since, t.streak, t.refusing_hours, t.outcome]; })(),
+  [null, null, null, 'skipped']);
+ok('an absent or unreadable stamp is all nulls, never a lane that ran',
+  [apifyTickFacts(null, TICK_UNTIL), apifyTickFacts('{not json', TICK_UNTIL)],
+  [{ at: null, outcome: null, reason: null, since: null, streak: null, refusing_hours: null },
+   { at: null, outcome: null, reason: null, since: null, streak: null, refusing_hours: null }]);
 
 // apifyIdleCause — the two reasons a tick does nothing are opposite decisions.
 ok('the batch script refusing for want of candidates',
