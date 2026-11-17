@@ -403,6 +403,23 @@ export type FirstTouchCounts = {
   /** The same split over the prior seven days, so the baseline is comparable. */
   first_touch_recovered_prev_7d: number | null;
   first_touch_new_prev_7d: number | null;
+  /**
+   * First touches per Pacific day across the prior window AND this cycle, OLDEST FIRST,
+   * so a week carried by one day cannot read as a steady week.
+   *
+   * WHY (2026-11-17). `first_touch_pct_prev_7d` is the baseline every morning compares
+   * against, and it is a ratio over a whole week, so one big day sets it for the next seven.
+   * On this cycle the published pair read 0.4% against 21.4%, which says today collapsed off
+   * a healthy week. The week was not healthy. People reached for the first time ever, by
+   * Pacific day, ran 210, 31, 7, 3, 2, 0, 0, 1 — a monotonic six-day slide, with 210 of the
+   * 254 on a single day, and the prior-week denominator was that one day. Five sending days
+   * had already gone by at one or zero and every morning read it as a one-day dip against a
+   * good week. Finding that out took a hand query of `leads.outreach_sends`.
+   *
+   * Days with nobody are present as zeros rather than missing, because a gap a reader has to
+   * notice is how a slide reads as noise. Empty, never null, when the query returns nothing.
+   */
+  first_touch_by_day: Array<{ day: string; people: number }>;
 };
 
 /**
@@ -566,9 +583,10 @@ export async function countFirstTouchBetween(
   // A recovered backlog and new supply print the same in first_touch. See
   // countFirstTouchRecovered(). Its table belongs to automator, so a rename costs these
   // five fields and never the counts above: null is unknown, NOT zero.
-  const [cyc, prev] = await Promise.all([
+  const [cyc, prev, byDay] = await Promise.all([
     countFirstTouchRecovered(sinceISO, untilISO).catch(() => null),
     countFirstTouchRecovered(prevStartISO, sinceISO).catch(() => null),
+    firstTouchByDay(prevStartISO, untilISO).catch(() => [] as Array<{ day: string; people: number }>),
   ]);
   return {
     people,
@@ -584,7 +602,46 @@ export async function countFirstTouchBetween(
     first_touch_recovered_oldest_day: cyc ? cyc.oldestDay : null,
     first_touch_recovered_prev_7d: prev ? prev.recovered : null,
     first_touch_new_prev_7d: prev ? prev.fresh : null,
+    first_touch_by_day: byDay,
   };
+}
+
+/**
+ * People reached for the FIRST TIME EVER, per Pacific day, oldest first.
+ *
+ * Buckets each person by the day of their own earliest row in `leads.outreach_sends`, which
+ * is the same definition `first_touch` uses one level up (no send before the one in the
+ * window), so the two cannot disagree. Days inside the span with nobody are filled in as
+ * zeros: a missing row is a gap a reader must notice, and that is how a six-day slide reads
+ * as noise. See the `first_touch_by_day` field comment for what this is for.
+ */
+async function firstTouchByDay(
+  fromISO: string,
+  untilISO: string,
+): Promise<Array<{ day: string; people: number }>> {
+  const rows = await query<{ day: string | null; people: string | number | null }>(
+    `SELECT to_char(f.first_at AT TIME ZONE 'America/Los_Angeles', 'YYYY-MM-DD') AS day,
+            count(*) AS people
+       FROM (SELECT lead_id, min(sent_at) AS first_at
+               FROM leads.outreach_sends GROUP BY 1) f
+      WHERE f.first_at >= $1 AND f.first_at < $2
+      GROUP BY 1
+      ORDER BY 1`,
+    [fromISO, untilISO],
+  );
+  const seen = new Map<string, number>();
+  for (const r of rows) {
+    if (typeof r.day === 'string') seen.set(r.day, Number(r.people ?? 0));
+  }
+  // Fill the span day by day in Pacific terms, so the series is dense and ordered.
+  const out: Array<{ day: string; people: number }> = [];
+  const DAY_MS = 24 * 3600 * 1000;
+  const end = Date.parse(untilISO);
+  for (let t = Date.parse(fromISO); t < end; t += DAY_MS) {
+    const day = new Date(t).toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' });
+    if (!out.some((d) => d.day === day)) out.push({ day, people: seen.get(day) ?? 0 });
+  }
+  return out;
 }
 
 // The shelf: parked leads that are researched, bundled and one command from a written

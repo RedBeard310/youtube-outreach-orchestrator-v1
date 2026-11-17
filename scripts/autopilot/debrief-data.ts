@@ -6110,7 +6110,19 @@ async function main(): Promise<void> {
         'backlog was. The honest reading of this cycle is ONE genuinely new person, and 5 ' +
         'across the eight days ending with it, so a 36.1% day and a 3.8% week describe the ' +
         'same starvation. The stranded pool is drained to 4, so this cannot repeat at size. ' +
-        'All five are null, not 0, when siege_plan cannot be read: unknown, NOT zero.',
+        'All five are null, not 0, when siege_plan cannot be read: unknown, NOT zero. ' +
+        'AND READ first_touch_by_day BEFORE READING first_touch_pct_prev_7d AS A BASELINE ' +
+        '(2026-11-17): that baseline is a ratio over a whole week, so ONE big day sets it ' +
+        'for the next seven, and the pair published this cycle read 0.4% against 21.4%, ' +
+        'which says today collapsed off a healthy week. The week was not healthy. People ' +
+        'reached for the first time EVER, by Pacific day, ran 210, 31, 7, 3, 2, 0, 0 and 1 ' +
+        '— a monotonic six-day slide in which 210 of the 254 arrived on a single day, and ' +
+        'that one day WAS the prior-week denominator. Five sending days had already gone by ' +
+        'at one or zero and each morning read its own as a one-day dip against a good week; ' +
+        'seeing it took a hand query of leads.outreach_sends. The series is dense and ' +
+        'oldest-first, with a day that reached nobody present as a 0 rather than missing, ' +
+        'because a gap a reader has to notice is how a slide reads as noise. It is empty, ' +
+        'never null, when the query returns nothing.',
     },
     // Why the cycle sent what it sent. sent_today counts emails; this says whether a
     // batch was written and left standing. See the block comment on siegePlanFacts().
