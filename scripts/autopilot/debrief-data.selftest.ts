@@ -972,6 +972,21 @@ ok('a log of nothing this reader knows is unknown, not healthy',
    enrichmentChainState('[2026-11-17T01:00:00Z] orphan sweep: killed stray enrichment pid 7\n',
      '2026-11-17T08:00:00Z').blocked],
   [null, null]);
+// A stamp cannot remember what it never wrote, so the outage is measured off the newest
+// run log, which only a tick that reached a batch can write (2026-11-17). Mirrors the one
+// line recoveryBudget() now computes: hoursBetween(untilISO, newestLogAt).
+const noWorkHours = (newestLogAt: string | null, untilISO: string) =>
+  (newestLogAt === null ? null
+    : Math.round(((Date.parse(untilISO) - Date.parse(newestLogAt)) / 3.6e6) * 10) / 10);
+// The real 11-17 shape: the lane last reached a batch on 11-12 and the stamp-based gauge
+// published 23.6 hours. This is the number that should be quoted beside it.
+ok('the outage is the age of the newest run log, whatever the stamp can remember',
+  noWorkHours('2026-11-12T08:21:48Z', '2026-11-17T08:00:00Z'), 119.6);
+ok('a lane that ran this cycle is not in an outage',
+  noWorkHours('2026-11-17T06:00:00Z', '2026-11-17T08:00:00Z'), 2);
+ok('no run log at all is unknown, not a lane that has always worked',
+  noWorkHours(null, '2026-11-17T08:00:00Z'), null);
+
 ok('lines past the cycle end are not this cycle',
   enrichmentChainState('[2026-11-18T01:00:00Z] openrouter account out of credits (DRY 0 1) — waiting\n',
     '2026-11-17T08:00:00Z').state, null);
