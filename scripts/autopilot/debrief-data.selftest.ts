@@ -1,4 +1,4 @@
-import { apifyTickFacts, bulkRewriteShape, bandGateFacts, condenseInboxReason, notLiveReasonMoves, notLiveReasonTally, splitInboxReasons, fleetFacts, inboxGateFacts, apifyBatchFacts, apifyIdleCause, apifyLedgerLine, NO_PUSH_OUTCOME, normalizePushReason, offerFromBatchId, openRouterRunwayAlarm, OPENROUTER_RATE_MAX_AGE_H, siegeApprovedLeadIds, siegePlanLeadIds, siegePushOutcome, classifyKeyProbe, cyclePacificDay, costWindows, enrichmentChainFacts, isSendingDay, perEnrichedLeadCost, PER_LEAD_SAMPLE_FLOOR, projectRecoveryBudget, MAX_MISSING_DEBRIEFS, missingDebriefs, NO_UNIT, pushRunVerdict, siegeRunAlarm, unitStartedAt, sendPlanHealth, siegePlanFacts, summarizeSendLines, isVerifiedOrBeyond, laneYield, priorAdvanceSource, priorSeedsAdvanced, priorSeedsWalked, reconcileAdvanced, sessionSeedsAdvanced, sessionStartMs, walkRateTrend } from './debrief-data.ts';
+import { apifyTickFacts, bulkRewriteShape, bandGateFacts, condenseInboxReason, notLiveReasonMoves, notLiveReasonTally, splitInboxReasons, fleetFacts, inboxGateFacts, apifyBatchFacts, apifyIdleCause, apifyLedgerLine, NO_PUSH_OUTCOME, normalizePushReason, offerFromBatchId, openRouterRunwayAlarm, OPENROUTER_RATE_MAX_AGE_H, siegeApprovedLeadIds, siegePlanLeadIds, siegePushOutcome, classifyKeyProbe, cyclePacificDay, costWindows, enrichmentChainFacts, enrichmentChainState, isSendingDay, perEnrichedLeadCost, PER_LEAD_SAMPLE_FLOOR, projectRecoveryBudget, MAX_MISSING_DEBRIEFS, missingDebriefs, NO_UNIT, pushRunVerdict, siegeRunAlarm, unitStartedAt, sendPlanHealth, siegePlanFacts, summarizeSendLines, isVerifiedOrBeyond, laneYield, priorAdvanceSource, priorSeedsAdvanced, priorSeedsWalked, reconcileAdvanced, sessionSeedsAdvanced, sessionStartMs, walkRateTrend } from './debrief-data.ts';
 import { lostCohort, replyLaneFacts } from './debrief-data.ts';
 import { aggregateCollectPasses, collectPasses } from '../../src/recovery/bloodhound-lane.ts';
 import { MAX_SHELF_STRANDED_IDS, recoveredTally, shelfTally, type ShelfRow } from '../../src/db.ts';
@@ -923,6 +923,58 @@ ok('chain facts inside the window only, with the in-flight batch counted',
 ok('a quiet cycle is zeros, not a crash',
   enrichmentChainFacts(CHAIN, '2026-09-28T07:00:00Z', '2026-09-29T07:00:00Z'),
   { batches: 0, leads_done: 0, leads_failed: 0, in_flight: 0 });
+
+// Enrichment chain state: four zeros cannot tell idle from frozen from dead (2026-11-17).
+// The real 11-12 freeze, which two cycles published as a quiet trickle.
+const CHAIN_FROZEN = '[2026-11-12T02:41:54Z] batch finished: exit=0 done=1 failed=0 log=x\n'
+  + '[2026-11-12T02:42:01Z] no pending inflow — idling (re-poll every 30m, silent until work arrives)\n'
+  + '[2026-11-12T05:43:13Z] openrouter account out of credits (DRY 0.94 1.00) — waiting (probe every 30m)\n'
+  + '[2026-11-13T06:29:39Z] chain started (pid 1035694, batch size 500)\n'
+  + '[2026-11-13T06:29:45Z] openrouter account out of credits (DRY -0.19 1.00) — waiting (probe every 30m)\n';
+// A restart inside the gate must not reset the clock: the chain re-execs on its own
+// and systemd restarts it, so that is the ordinary case. Reading it as a state
+// published 1.5 hours for a freeze 26 hours old.
+const FROZEN = enrichmentChainState(CHAIN_FROZEN, '2026-11-13T08:00:00Z');
+ok('a frozen chain names its gate and sizes the outage from when it began',
+  [FROZEN.state, FROZEN.blocked, FROZEN.blocked_since, FROZEN.blocked_hours],
+  ['gate_openrouter_credits', true, '2026-11-12T05:43:13Z', 26.3]);
+ok('a gate that re-logs every 30m is never silent, so silence cannot size it',
+  FROZEN.silent_hours, 1.5);
+ok('a log holding only a restart has said nothing: unknown, not healthy',
+  enrichmentChainState('[2026-11-13T06:29:39Z] chain started (pid 1035694, batch size 500)\n',
+    '2026-11-13T08:00:00Z').state, null);
+
+// This cycle's real shape: the trickle is drained and the chain waits. The only line
+// inside the window is the once-a-day decoy-flag note, which must not read as a halt.
+const CHAIN_IDLE = '[2026-11-16T04:20:22Z] batch finished: exit=0 done=1 failed=0 log=x\n'
+  + '[2026-11-16T04:20:27Z] no pending inflow — idling (re-poll every 30m, silent until work arrives)\n'
+  + '[2026-11-17T07:45:21Z] note: /x/scripts/backfill/halt.flag exists and is NOT the halt flag'
+  + ' — the chain reads /x/logs/backfill-2026-07/halt.flag. Nothing is halted. (said once a day)\n';
+const IDLE = enrichmentChainState(CHAIN_IDLE, '2026-11-17T08:00:00Z');
+ok('an idling chain is not blocked, and the decoy-flag note is not a halt',
+  [IDLE.state, IDLE.blocked, IDLE.blocked_hours], ['idling_no_inflow', false, null]);
+ok('the decoy note still proves the process is writing',
+  IDLE.last_line_at, '2026-11-17T07:45:21Z');
+
+// A real halt exits the process, after which the log is quiet forever.
+const CHAIN_HALTED = '[2026-11-10T02:00:00Z] halt flag present — stopping\n';
+const HALTED = enrichmentChainState(CHAIN_HALTED, '2026-11-17T08:00:00Z');
+ok('a stopped chain is blocked and its silence is real',
+  [HALTED.state, HALTED.blocked, HALTED.silent_hours], ['stopped_halt_flag', true, 174]);
+
+ok('an unreadable log is unknown, not a healthy chain',
+  enrichmentChainState(null, '2026-11-17T08:00:00Z'),
+  { state: null, state_at: null, blocked: null, blocked_since: null,
+    blocked_hours: null, last_line_at: null, silent_hours: null });
+ok('a log of nothing this reader knows is unknown, not healthy',
+  [enrichmentChainState('[2026-11-17T01:00:00Z] orphan sweep: killed stray enrichment pid 7\n',
+    '2026-11-17T08:00:00Z').state,
+   enrichmentChainState('[2026-11-17T01:00:00Z] orphan sweep: killed stray enrichment pid 7\n',
+     '2026-11-17T08:00:00Z').blocked],
+  [null, null]);
+ok('lines past the cycle end are not this cycle',
+  enrichmentChainState('[2026-11-18T01:00:00Z] openrouter account out of credits (DRY 0 1) — waiting\n',
+    '2026-11-17T08:00:00Z').state, null);
 
 // Dollars per enriched lead, measured over a window instead of one cycle (2026-10-26).
 const PER_LEAD_133 = perEnrichedLeadCost(

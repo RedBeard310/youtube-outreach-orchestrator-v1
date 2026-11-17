@@ -4669,6 +4669,132 @@ export function enrichmentChainFacts(
   return { batches, leads_done: done, leads_failed: failed, in_flight: Math.max(0, launched - batches) };
 }
 
+/**
+ * What the enrichment chain is DOING at cycle close, and how long it has been doing it.
+ *
+ * WHY (2026-11-17). `enrichmentChainFacts` above counts the work a cycle finished,
+ * and four zeros is the honest answer for a cycle that finished none. It is also the
+ * answer for a cycle the chain spent frozen on a gate, and for a cycle the chain was
+ * not running at all. Those are three different mornings and one published shape —
+ * which is the 11-15 Apify lesson (`lane_answered_in_cycle`) in the other lane the
+ * standing order keeps alive, and the one that matters more, because with discovery
+ * paused enrichment is the only thing that turns a recovered address into a lead
+ * anybody can write to.
+ *
+ * It had already cost two mornings. The chain hit `openrouter account out of credits
+ * (DRY 0.94 1.00)` at 2026-11-12T05:43:13Z and did not clear until
+ * 2026-11-14T00:59:58Z — 43 hours frozen, spanning two whole cycles that both
+ * published `batches: 0, leads_done: 0, leads_failed: 0, in_flight: 0`, exactly what
+ * a quiet trickle publishes. Nothing generated saw it: `openrouter_today` reads the
+ * FINDER's spend log and the finder is paused, so that block published a balance and
+ * five figures of runway beside an account past zero, and the 11-13 debrief found the
+ * outage only because a human went looking in a different lane's log by hand. The
+ * chain had said it in plain words in its own log the entire time.
+ *
+ * So read the chain's newest state, not the absence of batches. `blocked` is a state
+ * that stops enrichment until something outside the chain changes (no credit, no
+ * transcripts, no YouTube quota, a cool-down) or stops the process outright (the halt
+ * flag, the hard wall). `blocked_hours` is how long the current unbroken run of that
+ * one state has lasted at cycle close, which is the number that sizes the outage —
+ * the 11-16 lesson, because a chain that re-logs the same gate every 30 minutes is
+ * never silent, so `silent_hours` cannot measure it. `silent_hours` is the age of the
+ * newest line of ANY kind and answers only "is this process still writing at all",
+ * which is a rarer question and a real one: `halt flag present`, `HARD WALL` and
+ * `pool drained` all exit the process, after which the log goes quiet forever.
+ *
+ * `idling` is the benign shape and the one this cycle really had: the pool is 99.8%
+ * bundled, so the chain drains its 1-lead trickle and waits. `state` is null when no
+ * line in the log is one this reader knows, and `blocked` is then null too: an
+ * unrecognised chain must never read as a healthy one.
+ */
+const CHAIN_STATES: ReadonlyArray<{ re: RegExp; state: string; blocked: boolean }> = [
+  // Gates. Each re-logs on its own probe interval while it holds.
+  { re: /openrouter account out of credits/, state: 'gate_openrouter_credits', blocked: true },
+  { re: /transcripts unavailable/, state: 'gate_transcripts', blocked: true },
+  { re: /youtube quota exhausted on BOTH pools/, state: 'gate_youtube_quota', blocked: true },
+  { re: /MASS FAILURE \(/, state: 'cooling_down_mass_failure', blocked: true },
+  { re: /ZERO PROGRESS \(/, state: 'cooling_down_zero_progress', blocked: true },
+  // Exits. The process is gone after these, so the log stops rather than repeating.
+  // Anchored on the chain's exact wording: a once-a-day note in this same log says
+  // "halt.flag exists and is NOT the halt flag ... Nothing is halted", and a matcher
+  // loose enough to catch the word "halt" reads that note as an outage.
+  { re: /halt flag present — stopping/, state: 'stopped_halt_flag', blocked: true },
+  { re: /HARD WALL: two consecutive nonzero batch exits — stopping/, state: 'stopped_hard_wall', blocked: true },
+  { re: /pool drained \(pool=\d+/, state: 'pool_drained', blocked: false },
+  // Working, and the lines that clear a gate by proving the chain moved on.
+  { re: /launching batch: count=\d+/, state: 'batch_running', blocked: false },
+  { re: /batch finished: exit=\d+/, state: 'batch_finished', blocked: false },
+  { re: /no pending inflow — idling/, state: 'idling_no_inflow', blocked: false },
+  { re: /openrouter credits are back/, state: 'gate_cleared_openrouter', blocked: false },
+  { re: /transcripts back \(/, state: 'gate_cleared_transcripts', blocked: false },
+  { re: /youtube quota is back/, state: 'gate_cleared_youtube_quota', blocked: false },
+];
+
+// `chain started (pid ...)` is deliberately NOT a state. The chain re-execs itself
+// whenever chain.sh changes on disk and systemd restarts it besides, so a restart
+// inside a gate is the ordinary case, not a new situation — and counting it as a state
+// would end the gate's unbroken run and restart the clock that sizes the outage. The
+// real 11-12 freeze is what proved it: the gate held from 2026-11-12T05:43:13Z, the
+// chain restarted at 2026-11-13T06:29:39Z and re-logged the same gate six seconds
+// later, and reading the restart as a state published a 1.5-hour outage for a freeze
+// then 26 hours old. A log holding nothing but a restart leaves `state` null, which is
+// unknown and NOT a healthy chain, which is the right answer for a chain that has
+// started and not yet said what it is doing.
+const CHAIN_TRANSPARENT = /chain started \(pid /;
+
+export function enrichmentChainState(chainLog: string | null, untilISO: string): {
+  state: string | null;
+  state_at: string | null;
+  blocked: boolean | null;
+  blocked_since: string | null;
+  blocked_hours: number | null;
+  last_line_at: string | null;
+  silent_hours: number | null;
+} {
+  const blank = {
+    state: null, state_at: null, blocked: null,
+    blocked_since: null, blocked_hours: null, last_line_at: null, silent_hours: null,
+  };
+  if (!chainLog) return blank;
+
+  let state: string | null = null;
+  let blocked: boolean | null = null;
+  let stateAt: string | null = null;
+  // The first timestamp of the current unbroken run of this one state, so a gate that
+  // re-logs every 30 minutes is sized from when it began and not from its last line.
+  let runSince: string | null = null;
+  let lastLineAt: string | null = null;
+
+  for (const line of chainLog.split('\n')) {
+    const t = /^\[(\d{4}-\d{2}-\d{2}T[\d:]+Z)\]/.exec(line);
+    if (!t || t[1] >= untilISO) continue;
+    lastLineAt = t[1];
+    if (CHAIN_TRANSPARENT.test(line)) continue;  // a restart is not a change of state
+    const hit = CHAIN_STATES.find((s) => s.re.test(line));
+    if (!hit) continue;             // bookkeeping, the decoy-flag note, re-exec chatter
+    if (hit.state !== state) runSince = t[1];
+    state = hit.state;
+    blocked = hit.blocked;
+    stateAt = t[1];
+  }
+
+  const hours = (fromISO: string | null): number | null => {
+    if (!fromISO) return null;
+    const ms = Date.parse(untilISO) - Date.parse(fromISO);
+    return Number.isFinite(ms) ? Math.round((ms / 3_600_000) * 10) / 10 : null;
+  };
+
+  return {
+    state,
+    state_at: stateAt,
+    blocked,
+    blocked_since: blocked === true ? runSince : null,
+    blocked_hours: blocked === true ? hours(runSince) : null,
+    last_line_at: lastLineAt,
+    silent_hours: hours(lastLineAt),
+  };
+}
+
 // WHY THE PER-LEAD ENRICHMENT COST IS MEASURED OVER A WINDOW (2026-10-26).
 //
 // `openrouter_usd_per_enriched_lead` used to be one cycle's whole account spend
@@ -5121,6 +5247,11 @@ function recoveryBudgetHealth(
       chain = enrichmentChainFacts(chainText, sinceISO, untilISO);
     } catch { /* keep zeros */ }
   }
+  // Four zeros cannot say whether the chain was idle, frozen on a gate or not running
+  // at all, and the 11-12/11-14 OpenRouter freeze published the same four zeros as a
+  // quiet trickle (2026-11-17). An unreadable log leaves every field null: unknown,
+  // and NOT a healthy chain.
+  const chainState = enrichmentChainState(chainText || null, untilISO);
 
   // Per-day spend and enrichment for the trailing windows, newest first. Spend comes
   // from each cycle's own snapshot (the live reading for the cycle being written now,
@@ -5239,7 +5370,17 @@ function recoveryBudgetHealth(
       lane_refusing_hours: tick.refusing_hours,
       lane_silent_hours: silentHours,
     },
-    enrichment: chain,
+    enrichment: {
+      ...chain,
+      log_found: chainText !== '',
+      chain_state: chainState.state,
+      chain_state_at: chainState.state_at,
+      chain_blocked: chainState.blocked,
+      chain_blocked_since: chainState.blocked_since,
+      chain_blocked_hours: chainState.blocked_hours,
+      chain_last_line_at: chainState.last_line_at,
+      chain_silent_hours: chainState.silent_hours,
+    },
     projection: projectRecoveryBudget({
       spendableUsd: spendable,
       pricePerRun: PRICE_PER_RUN,
@@ -5250,7 +5391,7 @@ function recoveryBudgetHealth(
       candidatePoolDry: poolDry,
       laneAnsweredInCycle: laneAnswered,
     }),
-    note: 'Apify allowance read off the newest endspec run log (no token, no network) — `budget_read_at` is its age. `projection` turns the unspent allowance into leads at the cycle\'s measured recovery rate, then into the OpenRouter dollars those leads will cost to enrich, so the two budgets are decided together. `openrouter_usd_per_enriched_lead` charges ALL account spend to enrichment, so it is an upper bound, and it is the TIGHTEST bound of several trailing windows, each needing at least `per_lead_sample_floor` enriched leads and a real spend reading every day — read `per_lead_window_days` and `per_lead_sample_leads` with it. A single idle cycle cannot set it any more (one cycle enriching 1 lead priced it at $1.49 on 2026-10-26 and $3.74 on 10-10). Null plus `per_lead_unmeasured` means no window could carry a rate, which is unknown, NOT free. `halted`/`price_strikes` are the lane\'s own brake: 2 strikes stops it for the month. READ `candidate_pool_dry` BEFORE READING `projection` AS A FORECAST (2026-11-02): a tick that scrapes nothing still writes a run log, and until this date one was invisible — it counted as no batch and nothing said whether the lane had stopped for want of candidates or for want of money. Those are opposite decisions and only one is answered by buying allowance. On 2026-11-02 the lane answered `no_candidates` on SIX consecutive ticks across twelve hours, having finished its book, with $31.34 of the November allowance unspent and unspendable, and this block projected 303 channels and 150 leads off those dollars anyway; the hourly runway alarm then quoted that figure to argue the lane "will keep parking people this one cannot turn into anything writable", about a lane that had stopped parking anybody. `candidate_pool_dry` is the newest tick refusing for want of candidates, `candidate_dry_streak` is how many consecutive ticks have done so (one is a flicker as the weekly floor sweep trickles arrivals in, six is a finished book), `candidate_dry_since` is when the run began, and `idle_batches_in_cycle` counts the ticks inside the window that did nothing. When the pool is dry `projection.projected_leads` is 0 and `projection.binding_constraint` reads `candidate_supply`: that 0 is MEASURED, not unknown, because the lane said so itself. A dry lane restarts only on new arrivals, so the lever is upstream supply and never more Apify money. AND READ `lane_answered_in_cycle` BEFORE READING ANY OF THAT AS TODAY (2026-11-15): the paragraph above rests on "a tick that scrapes nothing still writes a run log", and that is only true of a tick that reaches the batch. Five earlier exits in apify-endspec-loop.sh refused and wrote NOTHING to disk, so a lane refusing every tick left the newest run log standing and read exactly like a lane resting on a finished book. It did for three days: the Apify token stopped authenticating at 2026-11-12T10:20Z ("user-or-token-not-found"), the ledger read returned ERR on all ~36 ticks after it, and the 11-14 and 11-15 snapshots both published `candidate_pool_dry:true`, a 34-tick dry streak and "$31.06 left" off the 2026-11-12T08:21:48Z log, while the 11-14 debrief told Casey the shortage was candidates. The 11-13 snapshot still had one real log inside its window, so it was the last honest reading, and the shape is therefore two mornings old rather than three. The refusals were in the systemd journal, which nothing here reads. `lane_answered_in_cycle` is whether any run log falls inside the window, which is the only evidence the lane got as far as counting candidates; when it is false `candidate_pool_dry` reads null (unknown, and NOT a finished book) and `projection.binding_constraint` reads `lane_silent` with `projected_leads` null, because neither money nor supply is the wall when nobody asked. `candidate_dry_streak` and `candidate_dry_since` stay, because they are real history up to that last log — read them beside `lane_silent_hours`, which is how long the lane has left no trace on ANY of its three instruments, never as today. `lane_last_tick_at` / `_outcome` / `_reason` are the stamp every exit path writes since 2026-11-15, so a refusing lane now names its own cause; they are null on a lane that has not ticked since that shipped, which is unknown and NOT healthy. A `budget_read_at` far behind `lane_last_tick_at` is the same fault in the money figure. AND READ `lane_refusing_hours`, NOT `lane_silent_hours`, AS THE SIZE OF AN OUTAGE (2026-11-16): the fix above closed a three-day blind spot and inverted the one field that had sized it. `lane_silent_hours` is the age of the newest trace the lane leaves on ANY instrument and the new stamp is one of them, so it read 71.6 hours on 11-15 and **1.6 hours on 11-16** with the token still answering `user-or-token-not-found` and the lane a day deader. A lane refusing every hour is never silent, so silence can no longer measure a dead lane: `lane_silent_hours` now only answers "has this lane stopped running at all", which is a different question and a rarer one. `lane_last_tick_since` is when the current answer began, `lane_last_tick_streak` is how many consecutive ticks have given it (the stamp carries both forward while the outcome AND reason are unchanged, and starts over on either), and `lane_refusing_hours` is how long an unbroken run of refusals has lasted at the cycle end. Anything but `ran` counts as a refusal, including an outcome this reader has not heard of, so a new exit path cannot read as a healthy lane. All three are null on a stamp written before 2026-11-16, which carries no `since`: unknown, and NOT a run that started this tick.',
+    note: 'Apify allowance read off the newest endspec run log (no token, no network) — `budget_read_at` is its age. `projection` turns the unspent allowance into leads at the cycle\'s measured recovery rate, then into the OpenRouter dollars those leads will cost to enrich, so the two budgets are decided together. `openrouter_usd_per_enriched_lead` charges ALL account spend to enrichment, so it is an upper bound, and it is the TIGHTEST bound of several trailing windows, each needing at least `per_lead_sample_floor` enriched leads and a real spend reading every day — read `per_lead_window_days` and `per_lead_sample_leads` with it. A single idle cycle cannot set it any more (one cycle enriching 1 lead priced it at $1.49 on 2026-10-26 and $3.74 on 10-10). Null plus `per_lead_unmeasured` means no window could carry a rate, which is unknown, NOT free. `halted`/`price_strikes` are the lane\'s own brake: 2 strikes stops it for the month. READ `candidate_pool_dry` BEFORE READING `projection` AS A FORECAST (2026-11-02): a tick that scrapes nothing still writes a run log, and until this date one was invisible — it counted as no batch and nothing said whether the lane had stopped for want of candidates or for want of money. Those are opposite decisions and only one is answered by buying allowance. On 2026-11-02 the lane answered `no_candidates` on SIX consecutive ticks across twelve hours, having finished its book, with $31.34 of the November allowance unspent and unspendable, and this block projected 303 channels and 150 leads off those dollars anyway; the hourly runway alarm then quoted that figure to argue the lane "will keep parking people this one cannot turn into anything writable", about a lane that had stopped parking anybody. `candidate_pool_dry` is the newest tick refusing for want of candidates, `candidate_dry_streak` is how many consecutive ticks have done so (one is a flicker as the weekly floor sweep trickles arrivals in, six is a finished book), `candidate_dry_since` is when the run began, and `idle_batches_in_cycle` counts the ticks inside the window that did nothing. When the pool is dry `projection.projected_leads` is 0 and `projection.binding_constraint` reads `candidate_supply`: that 0 is MEASURED, not unknown, because the lane said so itself. A dry lane restarts only on new arrivals, so the lever is upstream supply and never more Apify money. AND READ `lane_answered_in_cycle` BEFORE READING ANY OF THAT AS TODAY (2026-11-15): the paragraph above rests on "a tick that scrapes nothing still writes a run log", and that is only true of a tick that reaches the batch. Five earlier exits in apify-endspec-loop.sh refused and wrote NOTHING to disk, so a lane refusing every tick left the newest run log standing and read exactly like a lane resting on a finished book. It did for three days: the Apify token stopped authenticating at 2026-11-12T10:20Z ("user-or-token-not-found"), the ledger read returned ERR on all ~36 ticks after it, and the 11-14 and 11-15 snapshots both published `candidate_pool_dry:true`, a 34-tick dry streak and "$31.06 left" off the 2026-11-12T08:21:48Z log, while the 11-14 debrief told Casey the shortage was candidates. The 11-13 snapshot still had one real log inside its window, so it was the last honest reading, and the shape is therefore two mornings old rather than three. The refusals were in the systemd journal, which nothing here reads. `lane_answered_in_cycle` is whether any run log falls inside the window, which is the only evidence the lane got as far as counting candidates; when it is false `candidate_pool_dry` reads null (unknown, and NOT a finished book) and `projection.binding_constraint` reads `lane_silent` with `projected_leads` null, because neither money nor supply is the wall when nobody asked. `candidate_dry_streak` and `candidate_dry_since` stay, because they are real history up to that last log — read them beside `lane_silent_hours`, which is how long the lane has left no trace on ANY of its three instruments, never as today. `lane_last_tick_at` / `_outcome` / `_reason` are the stamp every exit path writes since 2026-11-15, so a refusing lane now names its own cause; they are null on a lane that has not ticked since that shipped, which is unknown and NOT healthy. A `budget_read_at` far behind `lane_last_tick_at` is the same fault in the money figure. AND READ `lane_refusing_hours`, NOT `lane_silent_hours`, AS THE SIZE OF AN OUTAGE (2026-11-16): the fix above closed a three-day blind spot and inverted the one field that had sized it. `lane_silent_hours` is the age of the newest trace the lane leaves on ANY instrument and the new stamp is one of them, so it read 71.6 hours on 11-15 and **1.6 hours on 11-16** with the token still answering `user-or-token-not-found` and the lane a day deader. A lane refusing every hour is never silent, so silence can no longer measure a dead lane: `lane_silent_hours` now only answers "has this lane stopped running at all", which is a different question and a rarer one. `lane_last_tick_since` is when the current answer began, `lane_last_tick_streak` is how many consecutive ticks have given it (the stamp carries both forward while the outcome AND reason are unchanged, and starts over on either), and `lane_refusing_hours` is how long an unbroken run of refusals has lasted at the cycle end. Anything but `ran` counts as a refusal, including an outcome this reader has not heard of, so a new exit path cannot read as a healthy lane. All three are null on a stamp written before 2026-11-16, which carries no `since`: unknown, and NOT a run that started this tick. AND READ `enrichment.chain_state`, NEVER `enrichment.batches`, AS WHETHER ENRICHMENT IS RUNNING (2026-11-17): the four counters are the work a cycle FINISHED, and zero is the honest answer for a quiet trickle, for a chain frozen on a gate, and for a chain that is not running at all. That is the 11-15 `lane_answered_in_cycle` fault in the other lane the standing order keeps alive, and the one that matters more, because with discovery paused enrichment is the only thing that turns a recovered address into a lead anybody can write to. It had already cost two mornings: the chain hit `openrouter account out of credits (DRY 0.94 1.00)` at 2026-11-12T05:43:13Z and did not clear until 2026-11-14T00:59:58Z, 43 hours frozen across two whole cycles that each published `batches: 0, leads_done: 0, leads_failed: 0, in_flight: 0`, identical to this one. Nothing generated saw it, because `openrouter_today` reads the FINDER spend log and the finder is paused, so that block published a balance and five figures of runway beside an account past zero; the 11-13 debrief found the outage only by a hand search of a different lane log, while the chain had been saying it in plain words in its own log the whole time. `chain_state` is the newest state the chain named and `chain_blocked` is whether that state stops enrichment until something outside the chain changes (no credit, no transcripts, no YouTube quota, a cool-down) or stops the process outright (the halt flag, the hard wall). `chain_blocked_hours` is how long the current unbroken run of that one state has lasted at cycle close, which is the number that sizes the outage: this is the 11-16 lesson, because a chain that re-logs its gate every 30 minutes is never silent. `chain_silent_hours` is the age of the newest line of ANY kind and answers only whether the process is still writing, which is rarer and real, since `halt flag present`, `HARD WALL` and `pool drained` all exit it and the log then goes quiet forever. `idling_no_inflow` is the benign shape and is what a 99.8% bundled pool produces. `chain_state` is null, and `chain_blocked` null with it, when no line in the log is one this reader knows: an unrecognised chain must never read as a healthy one, and `log_found:false` is an unreadable log, which is unknown and NOT a quiet chain.',
   };
 }
 
