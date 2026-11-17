@@ -1,0 +1,561 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lead Run Debrief 2026-11-17</title>
+<style>
+  :root {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+      --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+      --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+    --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+    --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 40px 22px 80px; }
+  .eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); font-weight: 600; }
+  h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.12; margin: 10px 0 6px; text-wrap: balance; letter-spacing: -.02em; }
+  h2 { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); margin: 44px 0 16px; font-weight: 700; }
+  h3 { font-size: 18px; margin: 0 0 6px; letter-spacing: -.01em; }
+  p { margin: 0 0 14px; }
+  .lede { font-size: 18px; color: var(--ink-soft); max-width: 68ch; }
+  .tag { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--amber-soft); color: var(--amber); letter-spacing: .02em; }
+  .tag.red { background: var(--red-soft); color: var(--red); }
+  .tag.good { background: var(--teal-soft); color: var(--teal); }
+  .grid { display: grid; gap: 14px; }
+  .stats { grid-template-columns: repeat(4, 1fr); margin-top: 26px; }
+  @media (max-width: 720px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; box-shadow: var(--shadow); }
+  .stat .n { font-size: 30px; font-weight: 750; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .stat .l { font-size: 12.5px; color: var(--ink-soft); margin-top: 3px; }
+  .stat .s { font-size: 12px; margin-top: 8px; font-weight: 600; }
+  .up { color: var(--good); } .down { color: var(--red); } .warn { color: var(--amber); }
+  .accent-red { border-left: 3px solid var(--red); }
+  .accent-teal { border-left: 3px solid var(--teal); }
+  .accent-amber { border-left: 3px solid var(--amber); }
+
+  .strip { display: flex; align-items: flex-end; gap: 6px; height: 150px; padding: 14px 14px 10px; overflow-x: auto; }
+  .col { flex: 1 0 44px; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; height: 100%; }
+  .bar { width: 100%; border-radius: 3px 3px 0 0; background: var(--teal); opacity: .9; }
+  .bar.zero { background: var(--line); height: 4px !important; }
+  .bar.bad { background: var(--amber); }
+  .col .cap { font-size: 11px; color: var(--ink-soft); margin-top: 6px; font-variant-numeric: tabular-nums; }
+  .col .vn { font-size: 12px; font-weight: 700; margin-bottom: 4px; font-variant-numeric: tabular-nums; }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-soft); padding: 0 14px 14px; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+
+  .q { border-radius: 14px; padding: 20px 22px; margin-bottom: 14px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); }
+  .q .ask { font-size: 17px; font-weight: 700; color: var(--ink); margin-bottom: 10px; display: flex; gap: 10px; align-items: baseline; }
+  .q .ask .qn { color: var(--red); font-weight: 800; flex: 0 0 auto; }
+  .q p { color: var(--ink-soft); }
+  .q b { color: var(--ink); }
+  .pill { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink); background: var(--panel-2); padding: 1px 7px; border-radius: 6px; border: 1px solid var(--line); white-space: nowrap; }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; background: var(--panel-2); padding: 1px 5px; border-radius: 5px; border: 1px solid var(--line); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+  th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); }
+  td .num { font-variant-numeric: tabular-nums; font-weight: 650; }
+  tr.total td { background: var(--panel-2); font-weight: 700; }
+  .fix td:first-child { color: var(--good); font-weight: 650; }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); box-shadow: var(--shadow); margin-bottom: 14px; }
+  ol.recs { padding-left: 0; list-style: none; counter-reset: r; margin: 0; }
+  ol.recs li { counter-increment: r; position: relative; padding: 14px 16px 14px 52px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 10px; box-shadow: var(--shadow); }
+  ol.recs li::before { content: counter(r); position: absolute; left: 14px; top: 14px; width: 26px; height: 26px; border-radius: 8px; background: var(--teal-soft); color: var(--teal); font-weight: 800; font-size: 14px; display: grid; place-items: center; }
+  ol.recs b { color: var(--ink); }
+  .foot { margin-top: 46px; padding: 16px 18px; border-radius: 12px; background: var(--amber-soft); border: 1px solid var(--line); font-size: 14px; color: var(--ink-soft); }
+  .foot b { color: var(--ink); }
+  .muted { color: var(--ink-soft); font-size: 13.5px; }
+  pre { background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 14px; overflow-x: auto; font-size: 13px; line-height: 1.5; margin: 0 0 14px; }
+</style>
+
+
+<div class="wrap">
+
+  <div class="eyebrow">Lead Run Debrief · YouTube outreach</div>
+  <h1>2026-11-17: 227 emails went out and reached one person who had never heard from us</h1>
+
+  <p class="lede">
+    Monday&rsquo;s push was close to clean. It loaded 227 emails, lost 22 people, and 222 of
+    the 223 it reached were repeat offers to someone we had already written to. That is not a
+    bad day on its own. It is the sixth day of it, and the number everyone has been comparing
+    against was hiding that.
+  </p>
+
+  <p>
+    <span class="tag red">1 new person reached</span>
+    <span class="tag red">a six-day slide, 210 down to 1</span>
+    <span class="tag red">Apify dead 119.6h</span>
+    <span class="tag good">fleet best in three weeks, 55 clear</span>
+    <span class="tag good">0 fatal signatures, $0 Anthropic</span>
+  </p>
+
+  <div class="grid stats">
+    <div class="card stat accent-red">
+      <div class="n">1</div>
+      <div class="l">people reached for the first time ever</div>
+      <div class="s down">out of 227 emails and 223 people</div>
+    </div>
+    <div class="card stat accent-red">
+      <div class="n">210 &rsaquo; 1</div>
+      <div class="l">new people a day, 11-09 to 11-16</div>
+      <div class="s down">five sending days at 1 or 0, not one dip</div>
+    </div>
+    <div class="card stat accent-red">
+      <div class="n">119.6h</div>
+      <div class="l">since the Apify lane last did any work</div>
+      <div class="s down">the published gauge read 23.6</div>
+    </div>
+    <div class="card stat accent-teal">
+      <div class="n">55</div>
+      <div class="l">mailboxes in the clear band</div>
+      <div class="s up">up 7, and all 7 returners held it</div>
+    </div>
+  </div>
+
+  <div class="grid stats">
+    <div class="card stat accent-amber">
+      <div class="n">1,160</div>
+      <div class="l">ready people waiting for a slot</div>
+      <div class="s warn">485 whale, 650 strong7, 25 other7</div>
+    </div>
+    <div class="card stat accent-amber">
+      <div class="n">19</div>
+      <div class="l">of the 22 people lost were lost before</div>
+      <div class="s warn">one of them on 11 straight sending days</div>
+    </div>
+    <div class="card stat">
+      <div class="n">0</div>
+      <div class="l">leads parked into <code>approved_hold</code></div>
+      <div class="s">pool flat at 7,388; shelf 4,851 ready to write</div>
+    </div>
+    <div class="card stat">
+      <div class="n">0</div>
+      <div class="l">creators whose reply is a yes</div>
+      <div class="s">6 people read: 2 no, 2 unsubscribe, 2 other</div>
+    </div>
+  </div>
+
+  <h2>The shape of the day</h2>
+
+  <div class="card" style="padding:0">
+    <div class="strip" id="strip"></div>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--teal)"></span>people emailed for the first time ever</span>
+      <span><span class="dot" style="background:var(--line)"></span>a day that reached nobody new</span>
+      <span>By Pacific day, 11-09 to 11-16, counted off each person&rsquo;s own earliest row in <code>leads.outreach_sends</code>. 11-14 and 11-15 are the weekend.</span>
+    </div>
+  </div>
+
+  <p>
+    <b>210, then 31, 7, 3, 2, 0, 0, 1.</b> Two hundred and ten of the 254 people reached in
+    those eight days arrived on one Monday. Every sending day since has been single digits,
+    and four of the last five were one or zero.
+  </p>
+
+  <p>
+    Each of those mornings read its own number as a one-day dip against a healthy week,
+    because the baseline it compared against was <code>first_touch_pct_prev_7d</code>, a ratio
+    over seven days. One big day sets that ratio for the next seven. So this morning the pair
+    published was <span class="pill">0.4%</span> today against
+    <span class="pill">21.4%</span> last week, and the 21.4% was almost entirely
+    <b>2026-11-09</b>.
+  </p>
+
+  <h2>The three questions</h2>
+
+  <div class="q">
+    <div class="ask"><span class="qn">Q1</span><span>Where are the new people going?</span></div>
+    <p>
+      Nowhere. They are waiting. <b>1,160 ready people did not get a slot</b>, and the slots
+      that existed went to repeat offers.
+    </p>
+    <p>
+      Monday had a hard ceiling before it planned anybody. The fleet&rsquo;s daily allowance
+      was <span class="pill">735</span> messages and it already owed
+      <span class="pill">945</span> follow-ups, so what was left to hand out was
+      <span class="pill">247</span> slots. That is the documented weekend effect: every offer
+      is a three-email sequence on days 0, 4 and 10, SmartLead sends Monday to Thursday, so a
+      weekend of due follow-ups lands on Monday on top of Monday&rsquo;s own.
+    </p>
+    <p>
+      Then Siege filled those 247 slots by tier. The waiting queue is 485 whale, 650 strong7
+      and 25 other7, and the whale tier ran out of never-emailed people back on 2026-10-13, so
+      its re-offer queue takes the slots while lower tiers wait. <b>That is a priority
+      decision, not a fault</b>, and repeat offers are deliberate since 2026-10-07. The point
+      is that it has now been running for six days and nobody could see the total.
+    </p>
+
+    <div class="tablewrap" style="margin-top:4px">
+      <table>
+        <tr><th>Pacific day</th><th>Emails loaded</th><th>New people reached</th></tr>
+        <tr><td>11-09</td><td class="num">231</td><td class="num"><b>210</b></td></tr>
+        <tr><td>11-10</td><td class="num">374</td><td class="num">31</td></tr>
+        <tr><td>11-11</td><td class="num">242</td><td class="num">7</td></tr>
+        <tr><td>11-12</td><td class="num">180</td><td class="num">3</td></tr>
+        <tr><td>11-13</td><td class="num">170</td><td class="num">2</td></tr>
+        <tr><td>11-14, 11-15 (weekend)</td><td class="num">0</td><td class="num">0</td></tr>
+        <tr class="total"><td>11-16</td><td class="num">227</td><td class="num">1</td></tr>
+      </table>
+    </div>
+
+    <p>
+      <b>Since that first Monday, 1,193 emails over five sending days have reached 44 new
+      people.</b> The shelf still holds 4,851 people written and ready. Nothing is broken in
+      the send path, and Monday&rsquo;s push itself was close to lossless. The pipeline is
+      re-offering to the same book.
+    </p>
+    <p class="muted">
+      The two columns come from different instruments. Emails loaded is each cycle&rsquo;s own
+      snapshot; new people is one query run this morning over
+      <code>leads.outreach_sends</code>. They disagree by 3 on 11-09, where the snapshot taken
+      that morning read 213, so treat the single-digit days as exact and the 210 as about 210.
+    </p>
+  </div>
+
+  <div class="q">
+    <div class="ask"><span class="qn">Q2</span><span>How long has the Apify lane really been dead?</span></div>
+    <p>
+      <b>119.6 hours, five days.</b> The gauge published this morning read 23.6.
+    </p>
+    <p>
+      The token is still rejected. A live probe of <code>/v2/users/me/limits</code> with the
+      46-character token from the shared env bank returns HTTP 401 and
+      <code>user-or-token-not-found</code>. Apify no longer recognises the credential, and
+      secrets are operator-managed, so nothing in the pipeline can repair it.
+    </p>
+    <p>
+      <b>This is the third morning in a row that one field got the size of this outage wrong,
+      and each time it was the field a reader opens first.</b> Yesterday&rsquo;s fix taught
+      every exit path to stamp how long the same answer has run, and
+      <code>lane_refusing_hours</code> reads that stamp. The stamp has only existed since
+      yesterday, so the first tick after it deployed started a fresh run and the gauge counts
+      from there.
+    </p>
+
+    <div class="tablewrap" style="margin-top:4px">
+      <table>
+        <tr><th>Morning</th><th>Real outage</th><th>Field read</th><th>Which field</th></tr>
+        <tr><td>11-15</td><td>About 72 hours</td><td class="num">71.6</td><td><code>lane_silent_hours</code>, correct</td></tr>
+        <tr><td>11-16</td><td>About 96 hours</td><td class="num"><b>1.6</b></td><td><code>lane_silent_hours</code>, inverted by the new stamp</td></tr>
+        <tr class="total"><td>11-17</td><td>About 118 hours</td><td class="num"><b>23.6</b></td><td><code>lane_refusing_hours</code>, counting from the stamp&rsquo;s own birth</td></tr>
+      </table>
+    </div>
+
+    <p>
+      Counted off the journal, the refusals run <b>7</b> on 11-12 from 10:20Z, then
+      <b>12, 12, 12, 12</b>, then <b>5</b> by 08:00Z this morning. Sixty ticks, unbroken, all
+      on <code>could not read the Apify monthly ledger</code>, all exiting 0, so systemd keeps
+      reporting success. <span class="pill">$31.06</span> of the November allowance is on the
+      books and <span class="pill">$21.06</span> of it spendable, against a billing cycle that
+      closes <b>2026-11-30</b>. Fixed below, by measuring the outage off something that cannot
+      forget: the age of the newest run log.
+    </p>
+  </div>
+
+  <div class="q">
+    <div class="ask"><span class="qn">Q3</span><span>Did anything produce?</span></div>
+    <p>
+      Almost nothing, and for once every lane can say why in its own words.
+    </p>
+    <p>
+      <b>The recovery lane&rsquo;s own half: 9 contact points on 4 people, and 1 address on 1
+      person</b>, against 47 points and 8 addresses over the prior week. Across the
+      cycle&rsquo;s four collect passes it walked 584 leads, found 1,273 methods, and
+      <b>1,264 of them were already on file</b>. On the newest pass that figure was 591 of
+      591, every single one. This is lap 18 of a 1,783-lead book, so a re-walk is expected
+      rather than a fault, and <code>collect_book_stranded</code> is 3, meaning the selector
+      gap closed in September has stayed closed.
+    </p>
+    <p>
+      <b>Site resolution is healthy and the ownership gate is still the ceiling.</b> Cause
+      reads <code>resolution_ok</code>, the no-site rate is 4.7%, and the pass ran 10 Brave
+      searches with one refusal, found 8 candidate sites and kept 3. No amount of Brave credit
+      changes a gate that is declining to tie a page to a creator on purpose.
+    </p>
+    <p>
+      One shape to watch rather than diagnose. The cycle&rsquo;s top fault was
+      <b>cross-domain redirect at 128 of 486 method errors</b>, and across the four passes
+      oldest first it ran <b>0, 0, 62, 66</b>. These counts swing on which slice of the book
+      the cursor sits on, so two passes at zero and two in the sixties is either a different
+      slice or something that changed mid-cycle. Worth one look next cycle, not a repair
+      today.
+    </p>
+    <p>
+      <b>The enrichment chain did no batches, and that is correct.</b> It is idling for want of
+      work: the pool is 99.8% bundled, so the chain drains a one-lead trickle and waits. Until
+      this morning that was indistinguishable in the snapshot from a chain frozen on a gate.
+      Fixed below.
+    </p>
+  </div>
+
+  <h2>The fleet, and the best reading in three weeks</h2>
+
+  <div class="tablewrap">
+    <table>
+      <tr><th>Reading</th><th>Yesterday</th><th>Today</th></tr>
+      <tr><td>Clear band</td><td class="num">48</td><td class="num"><b>55</b></td></tr>
+      <tr><td>Watch band (follow-ups only)</td><td class="num">8</td><td class="num"><b>5</b></td></tr>
+      <tr><td>Stopped band</td><td class="num">38</td><td class="num"><b>34</b></td></tr>
+      <tr><td>Peak clear inside the cycle</td><td class="num">49</td><td class="num">55, at 11-16T13:05:09Z</td></tr>
+      <tr><td>Returned to clear, and still clear</td><td class="num">1 of 1</td><td class="num"><b>7 of 7</b></td></tr>
+      <tr><td>Round trips (came back, fell again)</td><td class="num">0</td><td class="num">0</td></tr>
+      <tr><td>Held but already healthy</td><td class="num">10</td><td class="num">5, all on the clock</td></tr>
+      <tr><td>Soonest self-lift</td><td class="num">0h</td><td class="num">2h</td></tr>
+    </table>
+  </div>
+
+  <p>
+    <b>The arithmetic closes this morning.</b> 48 clear plus 7 returning minus 0 leaving gives
+    55, which is the clear band. No gate run read a short fleet, so the move counts stand, and
+    the seven that came back were still holding at the last reading. Seven mailboxes came off
+    the stopped band in one day with no revolving door behind it, which is the healthiest fleet
+    move since the band gate took over.
+  </p>
+  <p>
+    It does not help this cycle, because capacity was never the binding constraint on Monday.
+    The ceiling was 945 owed follow-ups against a 735-message allowance. More clear mailboxes
+    raise the allowance, which is worth having, and it is the follow-up load and the tier queue
+    that decide whether any of it reaches somebody new.
+  </p>
+
+  <h2>Everything else, and almost all of it is intended</h2>
+
+  <div class="tablewrap">
+    <table>
+      <tr><th>Lane</th><th>State</th><th>Is money the answer?</th></tr>
+      <tr><td>Discovery, all sweeps</td><td>0 new channels</td><td>No. Paused by Casey 2026-09-08</td></tr>
+      <tr><td>Apify endspec</td><td><b>No work for 119.6 hours, 60 refused ticks</b></td><td>No. It needs a working credential, not credit</td></tr>
+      <tr><td>Recovery lane collect</td><td>Lap 18, 1,264 of 1,273 methods already on file</td><td>No. Picked over, resolution healthy, gate-bound</td></tr>
+      <tr><td>Enrichment chain</td><td><code>idling_no_inflow</code>, 0 batches, bundling 99.8%</td><td>No. Nothing left to enrich</td></tr>
+      <tr><td>Reply classifier</td><td>27 runs, 0 failures, queue 0, 6 people read</td><td>No. Clean since it recovered on 11-14</td></tr>
+      <tr><td>Reply sender</td><td>0 sent, by Casey&rsquo;s pause of 2026-09-17</td><td>No. He answers these off his own lanes</td></tr>
+      <tr><td>YouTube key pool</td><td>15 working of 66, 50 still exhausted after the reset</td><td>No. Settled 2026-09-16, and keyword search is paused</td></tr>
+      <tr><td>Weekly floor sweep</td><td>Did not run this cycle. It ran Sunday and graduated nobody sendable</td><td>No</td></tr>
+    </table>
+  </div>
+
+  <p>
+    <b>$0 Anthropic. OpenRouter balance $299.30 against an account rate of 11 cents a day. 0
+    fatal signatures. No halt flag.</b> The push logged 2 escalations and one batch that died
+    before its first lead. The shelf still carries the single standing
+    marked-sent-never-emailed lead, <code>recPSkSNP2HeR6CCV</code>, stamped 2026-10-07.
+    Twenty minutes after the cycle closed, <code>npm run send</code> fired and found
+    <b>0</b> ready leads, against 2 the morning before.
+  </p>
+
+  <h2>Fixes shipped this cycle</h2>
+
+  <p class="muted">
+    Three, all in the same place: a published zero that could mean three different things, an
+    outage gauge that could not remember, and a baseline carried by one day.
+  </p>
+
+  <div class="q">
+    <div class="ask"><span>1. Four zeros could not tell an idle enrichment chain from a frozen one</span></div>
+    <p>
+      <code>youtube-outreach-orchestrator-v1</code> <code>86efc81</code>. The enrichment block
+      published <code>batches: 0, leads_done: 0, leads_failed: 0, in_flight: 0</code>, which is
+      the honest answer for a quiet trickle, for a chain frozen on a gate, and for a chain that
+      is not running at all. Three different mornings, one published shape.
+    </p>
+    <p>
+      <b>It had already cost two.</b> The chain hit
+      <code>openrouter account out of credits (DRY 0.94 1.00)</code> at
+      <span class="pill">2026-11-12T05:43:13Z</span> and did not clear until
+      <span class="pill">2026-11-14T00:59:58Z</span>. Forty-three hours frozen, spanning two
+      whole cycles that each published those same four zeros. Nothing generated saw it, because
+      <code>openrouter_today</code> reads the finder&rsquo;s spend log and the finder is
+      paused, so that block printed a balance and five figures of runway beside an account past
+      zero. The chain had been saying it in plain words in its own log the whole time.
+    </p>
+    <p>
+      A new <code>enrichmentChainState()</code> reads the chain&rsquo;s newest state and
+      publishes it beside the counters: <code>chain_state</code>,
+      <code>chain_blocked</code>, <code>chain_blocked_since</code>,
+      <code>chain_blocked_hours</code>, <code>chain_silent_hours</code> and
+      <code>log_found</code>. Blocked means a gate (no credit, no transcripts, no YouTube
+      quota, a cool-down) or a state that exits the process (the halt flag, the hard wall).
+    </p>
+    <p>
+      Two details that matter. A restart is <b>transparent</b>: the chain re-execs itself when
+      its script changes on disk and systemd restarts it besides, so a restart inside a gate is
+      ordinary, and counting it as a state ended the gate&rsquo;s run and reset the clock.
+      Reading it that way published 1.5 hours for a freeze then 26 hours old. And the matcher
+      for the halt flag is anchored to the chain&rsquo;s exact wording, because a once-a-day
+      note in the same log says <i>halt.flag exists and is NOT the halt flag, nothing is
+      halted</i>, and a looser match reads that note as an outage.
+    </p>
+    <p>
+      Verified against the live chain log at three real cycle boundaries: the 11-13 close now
+      reports <code>gate_openrouter_credits</code> blocked for <b>26.3 hours</b> where it
+      published four zeros, and this cycle correctly reports <code>idling_no_inflow</code>, not
+      blocked. Seven new assertions, typecheck clean, whole selftest passing.
+    </p>
+  </div>
+
+  <div class="q">
+    <div class="ask"><span>2. A stamp cannot remember an outage older than itself</span></div>
+    <p>
+      <code>youtube-outreach-orchestrator-v1</code> <code>a8fc221</code>. One new field,
+      <code>lane_no_work_hours</code>: the age of the newest Apify run log. A tick only writes
+      a run log when it reaches a batch, so that age is exactly how long the lane has done no
+      work. It needs no stamp, no threshold and no judgement about which exit path ran.
+    </p>
+    <p>
+      On today&rsquo;s files it reads <b>119.6</b> where <code>lane_refusing_hours</code> read
+      23.6. The block note now says to quote it whenever the two disagree, because the stamp
+      only ever covers the part of an outage it witnessed.
+    </p>
+    <p>
+      <b>It is deliberately not called refusing-hours.</b> A lane can be quiet without
+      refusing, and the two differ here by the gap between the last good run at 08:21:48Z and
+      the first journal refusal at 10:20Z. So 119.6 brackets a refusal run of about 117.7
+      hours. Two hours of slack, stated in the note, is the better error than a gauge reading
+      23.6.
+    </p>
+    <p class="muted">
+      A first attempt tried to flag the stamp as incomplete by comparing the newest run log
+      against the stamp&rsquo;s start, and a selftest killed it: that comparison cannot tell a
+      four-day gap from a one-tick gap, so it would have flagged every honest outage too. The
+      field that shipped makes no such judgement.
+    </p>
+  </div>
+
+  <div class="q">
+    <div class="ask"><span>3. A week carried by one day read as a steady week</span></div>
+    <p>
+      <code>youtube-outreach-orchestrator-v1</code> <code>a7fbf70</code>,
+      <code>src/db.ts</code>. <code>first_touch_pct_prev_7d</code> is the baseline every
+      morning compares against, and it is a ratio over a whole week, so one big day sets it for
+      the next seven. This cycle it published 0.4% against 21.4%, which says today collapsed
+      off a healthy week.
+    </p>
+    <p>
+      The new <code>first_touch_by_day</code> publishes the series instead, oldest first,
+      buckets by each person&rsquo;s own earliest send so it cannot disagree with
+      <code>first_touch</code> one level up, and fills a day that reached nobody in as a
+      <b>0</b> rather than leaving it out, because a gap a reader has to notice is how a slide
+      reads as noise.
+    </p>
+<pre>first_touch_by_day: 11-09: 210   11-10: 31   11-11: 7   11-12: 3
+                    11-13: 2     11-14: 0    11-15: 0   11-16: 1</pre>
+    <p>
+      Verified by running the real query against Postgres. The whole six-day slide in this
+      report came out of it, and finding it before the fix took a hand query of
+      <code>leads.outreach_sends</code>. Typecheck clean.
+    </p>
+  </div>
+
+  <h2>What to do next</h2>
+
+  <ol class="recs">
+    <li><b>Decide what the slots are for.</b> This is now the first item, ahead of the dead
+      lane. Since 11-09, 1,193 emails over five sending days have reached 44 new people,
+      4,851 written-ready people sit on the shelf, and 1,160 were refused a slot on Monday
+      while the whale
+      tier re-offered to a book it has already finished. The lever is
+      <code>siege.fill_slots</code> and its <code>priority_key</code>, which lives in
+      <code>automator</code> and carries nothing about whether a person has heard from us.
+      Repeat offers were Casey&rsquo;s call on 2026-10-07, so the mix is his to set. What is
+      new is that the cost is now measurable.</li>
+    <li><b>Replace the Apify token.</b> Five days, 60 refused ticks, $21.06 spendable and a
+      billing cycle that closes 2026-11-30. A live probe still answers
+      <code>user-or-token-not-found</code>. Secrets are operator-managed, so nothing in the
+      pipeline can do this. Unchanged from the last three mornings.</li>
+    <li><b>Stop planning the people the push loses every sending day.</b> 19 of the 22 lost on
+      Monday had been lost before, one of them on 11 consecutive sending days. Nine were
+      refused for a bounce already on SmartLead&rsquo;s file and four for an unsubscribe, so no
+      push will ever send them. They took about 9% of a 247-slot day. The repair is in
+      Siege&rsquo;s selector, in <code>automator</code>.</li>
+    <li><b>Answer the 11 creators held because their reply cannot be signed.</b> None joined
+      the queue this cycle and no reply was a yes, so the count is unchanged. Eight of the 11
+      were read as a plain yes. The drafter cannot work out which mailbox the thread sends
+      from, so it holds the reply even on a confident one. The repair is in
+      <code>automator</code>, which owns the reply path.</li>
+    <li><b>Nothing needs doing about the fleet, the enrichment chain or the recovery lane.</b>
+      Seven mailboxes came back to clear and held, the chain is idle because the pool is
+      bundled out, and the recovery book is on lap 18 with 99.3% of what it finds already
+      stored. Watch the cross-domain redirect split (0, 0, 62, 66 across the four passes) for
+      one more cycle before treating it as anything.</li>
+  </ol>
+
+  <div class="foot">
+    <b>Checked rather than assumed.</b> The Apify token&rsquo;s rejection, against a live call
+    to <code>/v2/users/me/limits</code> returning HTTP 401. The 60 refused ticks and their
+    per-day counts, against <code>journalctl -u apify-endspec.service</code>. The stamp&rsquo;s
+    own contents, by reading <code>apify-endspec-tick.json</code>, which carries
+    <code>since: 2026-11-16T08:22:09Z</code> and proves the gauge counts from its own birth.
+    The six-day reach slide, by querying each person&rsquo;s earliest row in
+    <code>leads.outreach_sends</code> and bucketing by Pacific day, which is also how the new
+    field is computed. The 43-hour enrichment freeze and this cycle&rsquo;s idling, by reading
+    the chain log directly and running the new reader against three real cycle boundaries. All
+    three fixes typechecked and selftested before committing.
+    <br><br>
+    <b>Assumed:</b> that the 247 slots went to repeat offers because of the tier ordering
+    rather than something else. The waiting queue by tier, the whale tier&rsquo;s exhausted
+    first-touch supply and the 222 repeats are all measured, and the documented behaviour of
+    <code>siege.fill_slots</code> explains them, but that code is in another repo and this
+    report did not read it this cycle. Also assumed, as every morning, that Casey&rsquo;s own
+    answering lanes may have replied by hand; this report cannot see either way.
+  </div>
+
+  <p class="muted" style="margin-top:28px">
+    Cycle 2026-11-16T08:00:00Z to 2026-11-17T08:00:00Z. Grounded in
+    <code>youtube-outreach-orchestrator-v1/logs/autopilot-debrief-2026-11-17.json</code>.
+    Companion: <a href="lead-run-2026-11-17-analysis.md">lead-run-2026-11-17-analysis.md</a>.
+  </p>
+
+</div>
+
+<script>
+  // People emailed for the first time EVER, by Pacific day, 11-09 to 11-16. Counted off each
+  // person's own earliest row in leads.outreach_sends, which is the same definition
+  // first_touch uses, and is what the new first_touch_by_day field publishes. 11-14 and
+  // 11-15 are the weekend: siege-plan.timer runs Mon to Fri, so no email went out.
+  var days = ['11-09','11-10','11-11','11-12','11-13','11-14','11-15','11-16'];
+  var newPeople = [210, 31, 7, 3, 2, 0, 0, 1];
+  var top = 210;
+  var strip = document.getElementById('strip');
+  days.forEach(function (d, i) {
+    var col = document.createElement('div');
+    col.className = 'col';
+    var v = newPeople[i];
+    var vn = document.createElement('div');
+    vn.className = 'vn';
+    vn.textContent = v;
+    var b = document.createElement('div');
+    b.className = 'bar' + (v === 0 ? ' zero' : '');
+    // Square-root scale, so single digits stay visible beside a 210 day.
+    b.style.height = Math.max(2, Math.round(Math.sqrt(v / top) * 100)) + '%';
+    b.title = d + ', ' + v + ' people reached for the first time ever';
+    var cap = document.createElement('div');
+    cap.className = 'cap';
+    cap.textContent = d;
+    col.appendChild(vn);
+    col.appendChild(b);
+    col.appendChild(cap);
+    strip.appendChild(col);
+  });
+</script>
+</html>
