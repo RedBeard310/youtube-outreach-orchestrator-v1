@@ -1,4 +1,4 @@
-import { apifyTickFacts, bulkRewriteShape, bandGateFacts, condenseInboxReason, notLiveReasonMoves, notLiveReasonTally, splitInboxReasons, fleetFacts, inboxGateFacts, apifyBatchFacts, apifyIdleCause, apifyLedgerLine, NO_PUSH_OUTCOME, normalizePushReason, offerFromBatchId, openRouterRunwayAlarm, OPENROUTER_RATE_MAX_AGE_H, siegeApprovedLeadIds, siegePlanLeadIds, siegePushOutcome, classifyKeyProbe, cyclePacificDay, costWindows, enrichmentChainFacts, enrichmentChainState, isSendingDay, perEnrichedLeadCost, PER_LEAD_SAMPLE_FLOOR, projectRecoveryBudget, MAX_MISSING_DEBRIEFS, missingDebriefs, NO_UNIT, pushRunVerdict, siegeRunAlarm, unitStartedAt, sendPlanHealth, siegePlanFacts, summarizeSendLines, isVerifiedOrBeyond, laneYield, priorAdvanceSource, priorSeedsAdvanced, priorSeedsWalked, reconcileAdvanced, sessionSeedsAdvanced, sessionStartMs, walkRateTrend } from './debrief-data.ts';
+import { apifyTickFacts, bulkRewriteShape, bandGateFacts, condenseInboxReason, notLiveReasonMoves, notLiveReasonTally, splitInboxReasons, fleetFacts, inboxGateFacts, apifyBatchFacts, apifyIdleCause, apifyLedgerLine, NO_PUSH_OUTCOME, normalizePushReason, offerFromBatchId, openRouterRunwayAlarm, OPENROUTER_RATE_MAX_AGE_H, siegeApprovedLeadIds, siegePlanLeadIds, siegePushOutcome, classifyKeyProbe, cyclePacificDay, costWindows, enrichmentChainFacts, enrichmentChainState, isSendingDay, perEnrichedLeadCost, PER_LEAD_SAMPLE_FLOOR, projectRecoveryBudget, MAX_MISSING_DEBRIEFS, missingDebriefs, NO_UNIT, pushRunVerdict, siegeRunAlarm, unitStartedAt, sendPlanHealth, siegePlanFacts, followupReserveRate, summarizeSendLines, isVerifiedOrBeyond, laneYield, priorAdvanceSource, priorSeedsAdvanced, priorSeedsWalked, reconcileAdvanced, sessionSeedsAdvanced, sessionStartMs, walkRateTrend } from './debrief-data.ts';
 import { lostCohort, replyLaneFacts } from './debrief-data.ts';
 import { aggregateCollectPasses, collectPasses } from '../../src/recovery/bloodhound-lane.ts';
 import { MAX_SHELF_STRANDED_IDS, recoveredTally, shelfTally, type ShelfRow } from '../../src/db.ts';
@@ -239,7 +239,13 @@ ok('plan facts read off the real shape',
   siegePlanFacts(PLAN_29),
   { plan_found: true, plan_day: '2026-09-29', email_paused: false, day_cap: 150,
     planned: 150, mailbox_slots: 16, live_inboxes: 2, offers_blocked: 2,
-    mailbox_capacity: 30, followups_due: 14, inboxes_full: 0,
+    mailbox_capacity: 30, followups_due: 14,
+    // A plan written before automator carried SmartLead's queue cannot have its load
+    // read off it, and unknown must not read as an empty queue. See queueLoad().
+    queued_firsts: null, mid_sequence: null, followups_reserved: null, queue_load: null,
+    followups_rate: null, followups_rate_source: null, slots_explained: null,
+    followups_due_schedule_blind: null,
+    inboxes_full: 0,
     waiting_for_a_slot: null, waiting_by_tier: null,
     inboxes_total: 3, inboxes_no_campaign: 0, inboxes_only_no_campaign: 0,
     inboxes_not_live: 1,
@@ -256,7 +262,11 @@ ok('a dead inbox owes no follow-ups we can act on either',
   siegePlanFacts({ summary: { inboxes: [{ live: false, message_per_day: 15, followups_due: 40 }] } }),
   { plan_found: true, plan_day: null, email_paused: null, day_cap: null, planned: null,
     mailbox_slots: 0, live_inboxes: 0, offers_blocked: null,
-    mailbox_capacity: 0, followups_due: 0, inboxes_full: 0,
+    mailbox_capacity: 0, followups_due: 0,
+    queued_firsts: 0, mid_sequence: 0, followups_reserved: 0, queue_load: 0,
+    followups_rate: 0.5, followups_rate_source: 'default', slots_explained: true,
+    followups_due_schedule_blind: null,
+    inboxes_full: 0,
     waiting_for_a_slot: null, waiting_by_tier: null,
     inboxes_total: 1, inboxes_no_campaign: 0, inboxes_only_no_campaign: 0,
     inboxes_not_live: 1,
@@ -282,7 +292,11 @@ ok('follow-ups eating the fleet is readable, not just the small slot count',
   }),
   { plan_found: true, plan_day: '2026-10-12', email_paused: null, day_cap: 870,
     planned: 13, mailbox_slots: 13, live_inboxes: 3, offers_blocked: null,
-    mailbox_capacity: 45, followups_due: 55, inboxes_full: 2,
+    mailbox_capacity: 45, followups_due: 55,
+    queued_firsts: null, mid_sequence: null, followups_reserved: null, queue_load: null,
+    followups_rate: null, followups_rate_source: null, slots_explained: null,
+    followups_due_schedule_blind: null,
+    inboxes_full: 2,
     waiting_for_a_slot: null, waiting_by_tier: null,
     inboxes_total: 3, inboxes_no_campaign: 0, inboxes_only_no_campaign: 0,
     inboxes_not_live: 0, not_live_reasons: [],
@@ -290,11 +304,78 @@ ok('follow-ups eating the fleet is readable, not just the small slot count',
     not_live_top_reason_pct: null,
     not_live_only_top_reason: null, not_live_only_top_reason_count: null,
     plan_generated_at: null });
+
+// --- THE 2026-11-17 SHAPE: followups_due 0 ON EVERY MAILBOX, 620 PEOPLE MID-SEQUENCE,
+// --- AND 315 SLOTS OF A 765-MESSAGE ALLOWANCE. Sized with the old rule that is 450
+// --- slots thrown away; sized with Siege's own rule it is a full queue. See queueLoad().
+{
+  // Three live mailboxes at 15 a day. Mailbox one is the real adamweissnat row.
+  const PLAN_11_17 = {
+    summary: {
+      day: '2026-11-17', day_cap: 870,
+      inboxes: [
+        { live: true, message_per_day: 15, followups_due: 0, queued_firsts: 4, mid_sequence: 13, free_before_fill: 4 },
+        { live: true, message_per_day: 15, followups_due: 0, queued_firsts: 0, mid_sequence: 5, free_before_fill: 12 },
+        { live: true, message_per_day: 15, followups_due: 0, queued_firsts: 0, mid_sequence: 2, free_before_fill: 14 },
+        { live: false, message_per_day: 15, followups_due: 0, queued_firsts: 5, mid_sequence: 12, free_before_fill: 0 },
+      ],
+    },
+    assignments: new Array(30).fill({ lead_id: 'x' }),
+  };
+  const f = siegePlanFacts(PLAN_11_17);
+  ok('the load that really takes the slots is published, not the blind schedule count',
+    [f.mailbox_capacity, f.followups_due, f.queued_firsts, f.mid_sequence,
+      f.followups_reserved, f.queue_load],
+    [45, 0, 4, 20, 11, 15]);
+  ok('capacity minus the queue load reproduces Siege\'s own slot count',
+    [f.slots_explained, f.mailbox_slots], [true, 30]);
+  ok('a dead mailbox owes the live fleet no load either',
+    siegePlanFacts({ summary: { inboxes: [PLAN_11_17.summary.inboxes[3]] } }).queue_load, 0);
+  ok('a fleet-wide zero follow-up count beside real mid-sequence people names itself',
+    f.followups_due_schedule_blind, true);
+  // The rate follows automator's config, so a change there does not need an edit here.
+  ok('the reserve rate comes from automator\'s own volume config',
+    siegePlanFacts(PLAN_11_17, followupReserveRate({ volume: { followups_per_mid_sequence_lead: 1 } })),
+    { ...f, followups_reserved: 20, queue_load: 24, followups_rate: 1,
+      followups_rate_source: 'config',
+      // At 1.0 the reserve no longer matches what Siege actually subtracted, and saying
+      // so is the point: a derived story must collapse rather than quietly go wrong.
+      slots_explained: false });
+  ok('an unreadable config is the documented 0.5, not no answer',
+    [followupReserveRate(null), followupReserveRate({ volume: { followups_per_mid_sequence_lead: 'oops' } }),
+      followupReserveRate({ volume: { followups_per_mid_sequence_lead: 0 } })],
+    [{ rate: 0.5, source: 'default' }, { rate: 0.5, source: 'default' }, { rate: 0, source: 'config' }]);
+  // 10-12 had a real follow-up bill on the schedule, so it is NOT the blind shape, and
+  // a plan that stops carrying mid_sequence cannot answer the question either way.
+  ok('a schedule with follow-ups on it, or no mid-sequence count at all, is not blind',
+    [siegePlanFacts({ summary: { inboxes: [{ live: true, followups_due: 7, mid_sequence: 3 }] } })
+      .followups_due_schedule_blind,
+    siegePlanFacts({ summary: { inboxes: [{ live: true, followups_due: 0 }] } })
+      .followups_due_schedule_blind,
+    siegePlanFacts({ summary: { inboxes: [{ live: true, followups_due: 0, mid_sequence: 0 }] } })
+      .followups_due_schedule_blind],
+    [false, null, false]);
+  // Missing-means-unknown, one mailbox at a time: one row without the queue keys nulls
+  // the fleet's load rather than publishing a total that silently omits it.
+  ok('one mailbox missing the queue keys nulls the load, it does not undercount it',
+    siegePlanFacts({
+      summary: {
+        inboxes: [
+          { live: true, message_per_day: 15, queued_firsts: 2, mid_sequence: 4, free_before_fill: 11 },
+          { live: true, message_per_day: 15, free_before_fill: 15 },
+        ],
+      },
+    }).queue_load, null);
+}
 ok('a renamed key costs one null, not the block',
   siegePlanFacts({ summary: { day_cap: 'oops' }, assignments: [1] }),
   { plan_found: true, plan_day: null, email_paused: null, day_cap: null,
     planned: 1, mailbox_slots: null, live_inboxes: null, offers_blocked: null,
-    mailbox_capacity: null, followups_due: null, inboxes_full: null,
+    mailbox_capacity: null, followups_due: null,
+    queued_firsts: null, mid_sequence: null, followups_reserved: null, queue_load: null,
+    followups_rate: null, followups_rate_source: null, slots_explained: null,
+    followups_due_schedule_blind: null,
+    inboxes_full: null,
     waiting_for_a_slot: null, waiting_by_tier: null,
     inboxes_total: null, inboxes_no_campaign: null, inboxes_only_no_campaign: null,
     inboxes_not_live: null, not_live_reasons: null,

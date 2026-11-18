@@ -68,8 +68,33 @@ export type SiegePlanFacts = {
   offers_blocked: number | null;
   /** Total messages a day the live mailboxes allow, before follow-ups take their share. */
   mailbox_capacity: number | null;
-  /** Follow-ups the live mailboxes owe today. These are spent before any new person. */
+  /** The schedule's own count of follow-ups due today, kept for comparison ONLY. DO NOT
+   *  SIZE THE FLEET WITH THIS (2026-11-18) — see `queue_load`, which is what Siege
+   *  actually subtracts. automator stopped using this count on 2026-10-13. */
   followups_due: number | null;
+  /** First emails already pushed that SmartLead has NOT sent yet, over live mailboxes.
+   *  They land today and take today's slots exactly as a follow-up does. */
+  queued_firsts: number | null;
+  /** People mid-sequence in a live mailbox, read from SmartLead rather than from our
+   *  schedule. Each owes about `followups_rate` sends a day. */
+  mid_sequence: number | null;
+  /** The follow-up load the planner really reserves: per mailbox, ceil(mid_sequence x
+   *  followups_rate), summed. */
+  followups_reserved: number | null;
+  /** `queued_firsts` + `followups_reserved`. WHAT SmartLead's QUEUE HAS ALREADY SPOKEN
+   *  FOR out of `mailbox_capacity`, and the figure to read against capacity. */
+  queue_load: number | null;
+  /** The per-mid-sequence-lead rate used above, and where it came from. */
+  followups_rate: number | null;
+  followups_rate_source: 'config' | 'default' | null;
+  /** Whether capacity minus the queue load reproduces `mailbox_slots` mailbox by
+   *  mailbox. True means a reader may subtract and get Siege's own answer. False means
+   *  automator changed the formula, so trust `mailbox_slots` and nothing derived. */
+  slots_explained: boolean | null;
+  /** True when every mailbox in the plan reports 0 follow-ups due while people really
+   *  are mid-sequence. That is the 2026-10-13 shape that made Siege stop trusting the
+   *  schedule's count, and it reads as "nothing owed" to anybody who quotes it. */
+  followups_due_schedule_blind: boolean | null;
   /** Live mailboxes with no room left at all for a new person. */
   inboxes_full: number | null;
   /** Ready people who got no slot today, summed over Siege's tiers. This is the queue
@@ -125,6 +150,14 @@ const NO_PLAN: SiegePlanFacts = {
   offers_blocked: null,
   mailbox_capacity: null,
   followups_due: null,
+  queued_firsts: null,
+  mid_sequence: null,
+  followups_reserved: null,
+  queue_load: null,
+  followups_rate: null,
+  followups_rate_source: null,
+  slots_explained: null,
+  followups_due_schedule_blind: null,
   inboxes_full: null,
   waiting_for_a_slot: null,
   waiting_by_tier: null,
@@ -417,10 +450,125 @@ export function notLiveReasonMoves(
     .slice(0, MAX_NOT_LIVE_REASONS);
 }
 
+// --- THE FOLLOW-UP COUNT THIS BLOCK TELLS A READER TO SIZE THE FLEET WITH STOPPED
+// --- SIZING THE FLEET ON 2026-10-13 (found 2026-11-18) ---
+//
+// On 2026-11-17 the plan published `mailbox_capacity: 765`, `followups_due: 0` and
+// `mailbox_slots: 315`. Read with this block's own note — "mailbox_capacity against
+// followups_due is what sizes the fleet" — that says the fleet had 765 messages of room
+// and owed nothing, so 450 slots went begging while 1,299 ready people waited. It says
+// no such thing. `followups_due` was 0 on all 124 mailboxes because automator stopped
+// using it, and 620 people were mid-sequence in a live mailbox at the time.
+//
+// Siege's own words, in `automator/scripts/siege-plan.py` beside the call:
+//
+//   due = siege.followups_due(histories, day)
+//   # What SmartLead is already holding per mailbox. This, not the schedule, sets today's
+//   # free slots: on 10-13 the schedule saw 0 follow-ups due while SmartLead held 572
+//   # unsent first emails and 1,703 people mid-sequence, and the planner pushed 782 more.
+//   ...
+//   i.followups_due = due.get(i.email, 0)   # the schedule's own count, shown for comparison
+//
+// So since 2026-10-13 a mailbox's free slots are `inbox_cap` less `inbox_load`, and the
+// load is read from SmartLead: every first email pushed and not yet sent (STARTED),
+// plus `followups_per_mid_sequence_lead` sends for each person mid-sequence
+// (INPROGRESS, 0.5 in automator/config/siege.json — two follow-ups over about four
+// sending days). The schedule's count is carried for comparison and nothing else.
+//
+// A zero `followups_due` is therefore not news and not a reading failure. It is the
+// known blind spot, and quoting it inverts the day: this repo's 11-17 debrief explained
+// Monday as "945 owed follow-ups against a 735-message allowance" when the 247 slots
+// really came from 22 unsent firsts plus half of 917 mid-sequence people.
+//
+// `queue_load` is what to read against `mailbox_capacity`. `slots_explained` says
+// whether subtracting them reproduces Siege's own slot count mailbox by mailbox, so a
+// later change to automator's formula shows up as false rather than as a wrong story.
+export const FOLLOWUP_RESERVE_RATE = 0.5;
+
+/** The reserve rate out of automator's own volume config, so a change there follows.
+ *  Anything unreadable degrades to the documented 0.5 rather than to no answer. */
+export function followupReserveRate(rawConfig: unknown): { rate: number; source: 'config' | 'default' } {
+  const c = rawConfig && typeof rawConfig === 'object' ? (rawConfig as Record<string, unknown>) : null;
+  const v = c?.volume && typeof c.volume === 'object' ? (c.volume as Record<string, unknown>) : null;
+  const r = Number(v?.followups_per_mid_sequence_lead);
+  return Number.isFinite(r) && r >= 0 && r <= 10
+    ? { rate: r, source: 'config' }
+    : { rate: FOLLOWUP_RESERVE_RATE, source: 'default' };
+}
+
+/** What SmartLead's queue has already spoken for, and whether it explains the slots.
+ *
+ *  `live` is the live mailboxes (the ones that can send, so the only ones whose load
+ *  costs anybody a slot); `all` is every mailbox the plan describes, used only to
+ *  decide whether the schedule's follow-up count has gone blind fleet-wide — a dead
+ *  mailbox reporting 0 says nothing, so the test needs the whole file.
+ *
+ *  Both mid-sequence and queued-firsts are missing-means-unknown: a plan that stops
+ *  carrying them must null the derived fields rather than publish a load of zero and
+ *  make an occupied fleet look empty.
+ */
+function queueLoad(
+  live: Array<Record<string, unknown>> | null,
+  all: Array<Record<string, unknown>> | null,
+  reserve: { rate: number; source: 'config' | 'default' },
+): Pick<SiegePlanFacts,
+  'queued_firsts' | 'mid_sequence' | 'followups_reserved' | 'queue_load'
+  | 'followups_rate' | 'followups_rate_source' | 'slots_explained'
+  | 'followups_due_schedule_blind'> {
+  const blind = (() => {
+    if (!all || all.length === 0) return null;
+    const mid: Array<number | null> = all.map((i) => num(i.mid_sequence));
+    const due: Array<number | null> = all.map((i) => num(i.followups_due));
+    if (mid.some((m) => m === null) || due.some((d) => d === null)) return null;
+    return due.every((d) => d === 0)
+      && (mid as number[]).reduce((t, m) => t + m, 0) > 0;
+  })();
+  const none = {
+    queued_firsts: null, mid_sequence: null, followups_reserved: null, queue_load: null,
+    followups_rate: null, followups_rate_source: null, slots_explained: null,
+    followups_due_schedule_blind: blind,
+  };
+  if (live === null) return none;
+  let firsts = 0;
+  let mid = 0;
+  let reserved = 0;
+  let slots = 0;
+  for (const i of live) {
+    const q = num(i.queued_firsts);
+    const m = num(i.mid_sequence);
+    const cap = num(i.message_per_day);
+    if (q === null || m === null) return none;
+    const r = Math.ceil(Math.max(0, m) * reserve.rate);
+    firsts += q;
+    mid += m;
+    reserved += r;
+    // Siege clamps each mailbox at zero before summing, so the fleet total cannot be
+    // rescued by a mailbox with room to spare. Reproduced here the same way.
+    if (cap !== null) slots += Math.max(0, cap - q - r);
+  }
+  const published = live.reduce<number | null>(
+    (t, i) => (t === null ? null : (num(i.free_before_fill) === null ? null : t + (num(i.free_before_fill) as number))),
+    0,
+  );
+  return {
+    queued_firsts: firsts,
+    mid_sequence: mid,
+    followups_reserved: reserved,
+    queue_load: firsts + reserved,
+    followups_rate: reserve.rate,
+    followups_rate_source: reserve.source,
+    slots_explained: published === null ? null : published === slots,
+    followups_due_schedule_blind: blind,
+  };
+}
+
 // Pure so the selftest can feed it a hand-built plan. Every field is optional on the
 // way in: automator owns this file's shape and may change it without telling us, and a
 // renamed key must cost one null, not the block.
-export function siegePlanFacts(raw: unknown): SiegePlanFacts {
+export function siegePlanFacts(
+  raw: unknown,
+  reserve: { rate: number; source: 'config' | 'default' } = { rate: FOLLOWUP_RESERVE_RATE, source: 'default' },
+): SiegePlanFacts {
   if (!raw || typeof raw !== 'object') return NO_PLAN;
   const plan = raw as { summary?: Record<string, unknown>; assignments?: unknown };
   const s = plan.summary && typeof plan.summary === 'object' ? plan.summary : {};
@@ -465,12 +613,16 @@ export function siegePlanFacts(raw: unknown): SiegePlanFacts {
     // follow-ups piles onto Monday on top of Monday's own. A big first-touch day
     // mortgages the next week's capacity. Capacity against the follow-up bill is what
     // sizes the fleet; the slot remainder on its own argues for nothing.
+    //
+    // CORRECTED 2026-11-18: the follow-up bill to read is `queue_load`, not
+    // `followups_due`. The block comment above siegePlanFacts() has the whole story.
     mailbox_capacity: live === null
       ? null
       : live.reduce((t, i) => t + (num(i.message_per_day) ?? 0), 0),
     followups_due: live === null
       ? null
       : live.reduce((t, i) => t + (num(i.followups_due) ?? 0), 0),
+    ...queueLoad(live, inboxes, reserve),
     inboxes_full: live === null
       ? null
       : live.filter((i) => (num(i.free_before_fill) ?? 0) === 0).length,
@@ -1736,8 +1888,18 @@ export function sendPlanHealth(
       'structural: every offer is a three-email sequence on days 0, 4 and 10 and SmartLead ' +
       'sends Mon-Thu, so a weekend of due follow-ups lands on Monday on top of Monday\'s ' +
       'own, and a big first-touch day mortgages the next week. mailbox_capacity against ' +
-      'followups_due is what sizes the fleet; the slot remainder on its own argues for ' +
-      'nothing. ' +
+      'the follow-up bill is what sizes the fleet; the slot remainder on its own argues ' +
+      'for nothing. ' +
+      'BUT READ queue_load AS THAT BILL, NOT followups_due (2026-11-18): automator ' +
+      'stopped sizing slots with the schedule\'s follow-up count on 2026-10-13 and ' +
+      'carries it "for comparison" only, so a 0 there is the known blind spot and not ' +
+      'an empty fleet. On 2026-11-17 it read 0 on all 124 mailboxes beside 620 people ' +
+      'mid-sequence, which with the old rule says 765 of capacity and nothing owed ' +
+      'against a 315-slot plan. What Siege really subtracts is queued_firsts (first ' +
+      'emails pushed and not yet sent) plus followups_reserved (followups_rate, 0.5, ' +
+      'per mid-sequence person), and slots_explained says whether capacity minus ' +
+      'queue_load reproduces mailbox_slots mailbox by mailbox — false means automator ' +
+      'changed the formula, so quote mailbox_slots and derive nothing. ' +
       'day_cap is the warmup ramp and ' +
       'mailbox_slots is what the live inboxes would accept; the smaller one is the real ' +
       'ceiling. push_unit_result is siege-plan.service\'s own verdict on the run that sent ' +
@@ -2743,11 +2905,23 @@ function readSiegePlanLeadIds(day: string): string[] | null {
   }
 }
 
+// The reserve rate Siege charges per mid-sequence lead, read from its own config so a
+// change there follows without an edit here. Same rule as readSiegePlan: filesystem
+// only, and unreadable means the documented 0.5 rather than no answer.
+function readFollowupReserveRate(): { rate: number; source: 'config' | 'default' } {
+  const f = join(AUTOMATOR_REPO, 'config', 'siege.json');
+  try {
+    return followupReserveRate(JSON.parse(readFileSync(f, 'utf8')));
+  } catch {
+    return { rate: FOLLOWUP_RESERVE_RATE, source: 'default' };
+  }
+}
+
 function readSiegePlan(day: string): SiegePlanFacts {
   const f = join(AUTOMATOR_REPO, 'state', 'siege', day, 'plan.json');
   if (!existsSync(f)) return NO_PLAN;
   try {
-    return siegePlanFacts(JSON.parse(readFileSync(f, 'utf8')));
+    return siegePlanFacts(JSON.parse(readFileSync(f, 'utf8')), readFollowupReserveRate());
   } catch {
     return NO_PLAN;
   }
