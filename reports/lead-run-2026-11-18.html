@@ -1,0 +1,518 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lead Run Debrief 2026-11-18</title>
+<style>
+  :root {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+      --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+      --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+    --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+    --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 40px 22px 80px; }
+  .eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); font-weight: 600; }
+  h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.12; margin: 10px 0 6px; text-wrap: balance; letter-spacing: -.02em; }
+  h2 { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); margin: 44px 0 16px; font-weight: 700; }
+  h3 { font-size: 18px; margin: 0 0 6px; letter-spacing: -.01em; }
+  p { margin: 0 0 14px; }
+  .lede { font-size: 18px; color: var(--ink-soft); max-width: 68ch; }
+  .tag { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--amber-soft); color: var(--amber); letter-spacing: .02em; }
+  .tag.red { background: var(--red-soft); color: var(--red); }
+  .tag.good { background: var(--teal-soft); color: var(--teal); }
+  .grid { display: grid; gap: 14px; }
+  .stats { grid-template-columns: repeat(4, 1fr); margin-top: 26px; }
+  @media (max-width: 720px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; box-shadow: var(--shadow); }
+  .stat .n { font-size: 30px; font-weight: 750; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .stat .l { font-size: 12.5px; color: var(--ink-soft); margin-top: 3px; }
+  .stat .s { font-size: 12px; margin-top: 8px; font-weight: 600; }
+  .up { color: var(--good); } .down { color: var(--red); } .warn { color: var(--amber); }
+  .accent-red { border-left: 3px solid var(--red); }
+  .accent-teal { border-left: 3px solid var(--teal); }
+  .accent-amber { border-left: 3px solid var(--amber); }
+
+  .strip { display: flex; align-items: flex-end; gap: 6px; height: 150px; padding: 14px 14px 10px; overflow-x: auto; }
+  .col { flex: 1 0 44px; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; height: 100%; }
+  .bar { width: 100%; border-radius: 3px 3px 0 0; background: var(--teal); opacity: .9; }
+  .bar.zero { background: var(--line); height: 4px !important; }
+  .bar.bad { background: var(--amber); }
+  .col .cap { font-size: 11px; color: var(--ink-soft); margin-top: 6px; font-variant-numeric: tabular-nums; }
+  .col .vn { font-size: 12px; font-weight: 700; margin-bottom: 4px; font-variant-numeric: tabular-nums; }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-soft); padding: 0 14px 14px; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+
+  .q { border-radius: 14px; padding: 20px 22px; margin-bottom: 14px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); }
+  .q .ask { font-size: 17px; font-weight: 700; color: var(--ink); margin-bottom: 10px; display: flex; gap: 10px; align-items: baseline; }
+  .q .ask .qn { color: var(--red); font-weight: 800; flex: 0 0 auto; }
+  .q p { color: var(--ink-soft); }
+  .q b { color: var(--ink); }
+  .pill { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink); background: var(--panel-2); padding: 1px 7px; border-radius: 6px; border: 1px solid var(--line); white-space: nowrap; }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; background: var(--panel-2); padding: 1px 5px; border-radius: 5px; border: 1px solid var(--line); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+  th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); }
+  td .num { font-variant-numeric: tabular-nums; font-weight: 650; }
+  tr.total td { background: var(--panel-2); font-weight: 700; }
+  .fix td:first-child { color: var(--good); font-weight: 650; }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); box-shadow: var(--shadow); margin-bottom: 14px; }
+  ol.recs { padding-left: 0; list-style: none; counter-reset: r; margin: 0; }
+  ol.recs li { counter-increment: r; position: relative; padding: 14px 16px 14px 52px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 10px; box-shadow: var(--shadow); }
+  ol.recs li::before { content: counter(r); position: absolute; left: 14px; top: 14px; width: 26px; height: 26px; border-radius: 8px; background: var(--teal-soft); color: var(--teal); font-weight: 800; font-size: 14px; display: grid; place-items: center; }
+  ol.recs b { color: var(--ink); }
+  .foot { margin-top: 46px; padding: 16px 18px; border-radius: 12px; background: var(--amber-soft); border: 1px solid var(--line); font-size: 14px; color: var(--ink-soft); }
+  .foot b { color: var(--ink); }
+  .muted { color: var(--ink-soft); font-size: 13.5px; }
+  pre { background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 14px; overflow-x: auto; font-size: 13px; line-height: 1.5; margin: 0 0 14px; }
+</style>
+
+
+
+
+<div class="wrap">
+
+  <div class="eyebrow">Lead Run Debrief &middot; YouTube outreach</div>
+  <h1>2026-11-18: two creators said yes, and nothing in the pipeline is going to answer them</h1>
+
+  <p class="lede">
+    Tuesday loaded 290 emails and reached 3 people who had never heard from us, which is the
+    seventh day of a slide we now have a chart for. The thing worth opening the report for is
+    smaller and better: the reply lane read 7 people and 2 of them agreed to talk.
+  </p>
+
+  <p>
+    <span class="tag good">2 creators said yes</span>
+    <span class="tag red">both held, the sender is paused</span>
+    <span class="tag red">Apify dead 143.6h, HTTP 401</span>
+    <span class="tag good">450 "wasted" slots were not wasted</span>
+    <span class="tag good">0 fatal signatures, $0 Anthropic</span>
+  </p>
+
+  <div class="grid stats">
+    <div class="card stat accent-teal">
+      <div class="n">2</div>
+      <div class="l">creators whose reply is a yes</div>
+      <div class="s up">first time this report can say so</div>
+    </div>
+    <div class="card stat accent-red">
+      <div class="n">3</div>
+      <div class="l">people reached for the first time ever</div>
+      <div class="s down">of 290 emails and 289 people, all 3 off the shelf</div>
+    </div>
+    <div class="card stat accent-amber">
+      <div class="n">143.6h</div>
+      <div class="l">since the Apify lane last did any work</div>
+      <div class="s warn">six days, token rejected, operator-only</div>
+    </div>
+    <div class="card stat accent-teal">
+      <div class="n">450</div>
+      <div class="l">of 765 messages already claimed by the queue</div>
+      <div class="s up">so the 315-slot plan was right, not wasteful</div>
+    </div>
+  </div>
+
+  <div class="grid stats">
+    <div class="card stat accent-amber">
+      <div class="n">1,299</div>
+      <div class="l">ready people waiting for a slot</div>
+      <div class="s warn">532 whale, 685 strong7, 82 other7</div>
+    </div>
+    <div class="card stat accent-amber">
+      <div class="n">17</div>
+      <div class="l">of the 21 people lost were lost before</div>
+      <div class="s warn">one of them on 11 straight sending days</div>
+    </div>
+    <div class="card stat">
+      <div class="n">0</div>
+      <div class="l">leads parked into <code>approved_hold</code></div>
+      <div class="s">pool flat at 7,388; shelf 4,851 ready to write</div>
+    </div>
+    <div class="card stat">
+      <div class="n">53</div>
+      <div class="l">mailboxes in the clear band</div>
+      <div class="s warn">down 2 to watch, stopped band unmoved at 34</div>
+    </div>
+  </div>
+
+  <h2>The shape of the day</h2>
+
+  <div class="card" style="padding:0">
+    <div class="strip" id="strip"></div>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--teal)"></span>people emailed for the first time ever</span>
+      <span><span class="dot" style="background:var(--line)"></span>a day that reached nobody new</span>
+      <span>By Pacific day, 11-10 to 11-17, counted off each person&rsquo;s own earliest row in <code>leads.outreach_sends</code>. 11-14 and 11-15 are the weekend.</span>
+    </div>
+  </div>
+
+  <p>
+    <b>31, then 7, 3, 2, 0, 0, 1, 3.</b> Tuesday ticked up and is still the seventh single-digit
+    sending day in a row. All 3 of its new people came off the written-and-ready shelf, and
+    <b>none</b> was somebody the pipeline found for itself, because finding is switched off by
+    Casey&rsquo;s order of 2026-09-08.
+  </p>
+
+  <p>
+    The chart is the field that shipped yesterday. Before it, each of these mornings compared
+    its own number against a seven-day ratio that one big day had set, so a six-day slide read
+    as noise.
+  </p>
+
+  <h2>The three questions</h2>
+
+  <div class="q">
+    <div class="ask"><span class="qn">Q1</span><span>Did anybody say yes?</span></div>
+    <p>
+      <b>Yes. Two creators.</b> <code>drtubio@gmail.com</code> and
+      <code>jessie@innercircleprints.com</code>, both read as <code>yes-plus-questions</code>,
+      which is the lane&rsquo;s category for an agreement that comes with questions attached.
+    </p>
+    <p>
+      The lane ran 5 times, read <span class="pill">7</span> distinct people and classified
+      every one with no failures. The queue was 7 deep at its worst and 2 at the end.
+      Per person: 3 other, <b>2 yes-plus-questions</b>, 1 not-interested, 1 unsubscribe.
+    </p>
+    <p>
+      <b>All 7 are held, and that is the instruction rather than a fault.</b> Casey paused the
+      auto-reply sender on 2026-09-17 (&ldquo;All outbound sending is paused until further
+      notice&rdquo;), which runs the lane in dry-run: replies are still read and filed, nothing
+      goes out. So the only two people who said yes this week are sitting in a log file.
+      <code>cannot_sign_people</code> is 0 this cycle, so the separate standing count of
+      creators held because the drafter cannot tell which mailbox a thread sends from is
+      unchanged at 11.
+    </p>
+    <p>
+      This report cannot see Casey&rsquo;s own inbox, so he may already have answered both by
+      hand. Worth keeping beside the next question: 290 emails bought those two yeses, and both
+      came out of the repeat-offer stream, not from anybody new.
+    </p>
+  </div>
+
+  <div class="q">
+    <div class="ask"><span class="qn">Q2</span><span>Were 450 mailbox slots really going unused?</span></div>
+    <p>
+      <b>No. Every one of them was already spoken for, and the gauge that said otherwise was
+      ours.</b>
+    </p>
+    <pre>mailbox_capacity: 765    followups_due: 0    mailbox_slots: 315    waiting_for_a_slot: 1,299</pre>
+    <p>
+      Read with the rule this block has carried since 2026-10-13, capacity against follow-ups
+      owed, that is a fleet with 765 messages of room, owing nothing, handing out 315 slots
+      while 1,299 ready people wait. Four hundred and fifty slots thrown away on a Tuesday.
+    </p>
+    <p>
+      <b>The reading is wrong, because that count stopped setting slots on 2026-10-13.</b>
+      Siege says so in its own code, right beside the call: the schedule saw 0 follow-ups due
+      that day while SmartLead held 572 unsent first emails and 1,703 people mid-sequence, and
+      the planner pushed 782 more on top. So the figure became
+      <i>&ldquo;the schedule&rsquo;s own count, shown for comparison&rdquo;</i> and the load is
+      now read from SmartLead instead.
+    </p>
+    <p>
+      What really claims a mailbox&rsquo;s day is its ladder, less every first email already
+      pushed and not yet sent, less half a send a day for each person mid-sequence. Summed over
+      Tuesday&rsquo;s 51 live mailboxes:
+    </p>
+    <div class="tablewrap">
+      <table>
+        <tr><th></th><th>Tue 11-17</th><th>Mon 11-16</th></tr>
+        <tr><td>Allowance</td><td class="num">765</td><td class="num">735</td></tr>
+        <tr><td>First emails pushed, not yet sent</td><td class="num">128</td><td class="num">22</td></tr>
+        <tr><td>People mid-sequence</td><td class="num">620</td><td class="num">917</td></tr>
+        <tr><td>Reserved for their follow-ups</td><td class="num">322</td><td class="num">466</td></tr>
+        <tr class="total"><td>Claimed before anybody new</td><td class="num">450</td><td class="num">488</td></tr>
+        <tr class="total"><td>Slots left for new people</td><td class="num">315</td><td class="num">247</td></tr>
+      </table>
+    </div>
+    <p>
+      765 less 450 is 315, mailbox by mailbox, which is Siege&rsquo;s own figure exactly.
+      Nothing was wasted. The fleet was running about 59% full on follow-ups it already owed,
+      which is the designed steady state.
+    </p>
+    <p>
+      <b>It also corrects yesterday&rsquo;s report</b>, which explained Monday&rsquo;s 247 slots
+      as &ldquo;945 owed follow-ups against a 735-message allowance&rdquo;. Monday&rsquo;s real
+      claim was 22 unsent firsts plus 466 reserved. Same direction, wrong instrument. A zero in
+      that field will happen again, and it is the known blind spot rather than a failed reading.
+    </p>
+  </div>
+
+  <div class="q">
+    <div class="ask"><span class="qn">Q3</span><span>Did anything new get into the pipeline?</span></div>
+    <p>
+      Almost nothing, and every lane can say why in its own words.
+    </p>
+    <p>
+      <b>Discovery: 0 new channels, by Casey&rsquo;s order of 2026-09-08.</b> Not a fault and
+      not to be repaired.
+    </p>
+    <p>
+      <b>The recovery lane&rsquo;s own half found 5 contact points on 5 people, 3 of them real
+      addresses</b>, against 49 points and 7 addresses over the prior week. Read
+      <code>lane_*</code>, not <code>free_*</code>: the cycle totals (14 points, 5 addresses)
+      also hold automator&rsquo;s own contact-lookup timer, which found 9 of them.
+      <code>18-rdap</code> wrote 3 points and all 3 were addresses, <code>33-about-text</code> 2
+      points including an address, <code>02-subpages</code> 1 address.
+      <code>34-channel-page</code> wrote 7 points across 3 leads and none was an address.
+    </p>
+    <p>
+      The newest collect pass summed up its own work: <b>&ldquo;Collected 0 contact points from
+      0/150 leads.&rdquo;</b> It walked 150 leads, found <b>629 contact methods, and all 629
+      were already on file.</b> This is lap 18 of a 1,780-lead book, so a re-walk is expected.
+      <code>collect_book_stranded</code> is 3, so the selector gap closed in September has
+      stayed closed.
+    </p>
+    <p>
+      <b>Site resolution is healthy and the ownership gate is still the ceiling.</b> Cause reads
+      <code>resolution_ok</code>, the no-site rate is 5.3% (8 of 150), and the pass ran 8 Brave
+      searches with <b>zero refusals</b>, found 6 candidate sites and kept none. No amount of
+      Brave credit changes a gate declining to tie a page to a creator on purpose. The
+      cross-domain redirect split flagged yesterday (26%, running 0, 0, 62, 66) came back in
+      line at 50 of 216 faults, so it needs nothing.
+    </p>
+    <p>
+      <b>The enrichment chain did no batches, and that is correct.</b>
+      <code>chain_state</code> reads <code>idling_no_inflow</code> and its log was writing 6
+      minutes before the snapshot. The pool is 99.8% bundled, so it drains a one-lead trickle
+      and waits.
+    </p>
+    <p>
+      <b>The Apify lane is six days dead.</b> <code>lane_no_work_hours</code> reads 143.6, the
+      age of the newest run log, so exactly how long since a tick reached a batch, on a run of
+      24 consecutive refusals. $31.06 of the November allowance is on the books and $21.06 of it
+      spendable, against a billing cycle that closes <b>2026-11-30</b>. A live probe of
+      <code>/v2/users/me/limits</code> still answers HTTP 401
+      <code>user-or-token-not-found</code>. Secrets are operator-managed, so nothing in the
+      pipeline can repair it.
+    </p>
+  </div>
+
+  <h2>The push itself</h2>
+
+  <p>
+    315 planned, 334 approved, <b>285 sent, 12 failed, 22 skipped, 290 people emailed, 21
+    lost</b>. Two escalations, no batch died before its first lead, and 21 skipped drafts were
+    rewritten and sent in the same run, so they cost nobody. Five people were emailed with no
+    <code>SENT</code> line in the log at all, caught by the send ledger rather than the
+    narration, which is the 11-03 fix doing its job.
+  </p>
+
+  <div class="tablewrap">
+    <table>
+      <tr><th>Why a person was lost</th><th>Leads</th><th>Lost</th></tr>
+      <tr><td>SmartLead did not add the lead (<code>bounce_count=1</code>)</td><td class="num">6</td><td class="num">6</td></tr>
+      <tr><td>SmartLead did not add the lead (unsubscribed, 4 distinct addresses)</td><td class="num">4</td><td class="num">4</td></tr>
+      <tr><td>No draft was written: business owner, no clean job title exists</td><td class="num">1</td><td class="num">1</td></tr>
+      <tr class="total"><td>Refused by SmartLead, never reached, or never logged</td><td class="num">all three</td><td class="num">21</td></tr>
+    </table>
+  </div>
+
+  <p>
+    <b>17 of the 21 had been lost before, and one has now been lost on 11 consecutive sending
+    days.</b> Six carry a bounce already on SmartLead&rsquo;s file and four an unsubscribe, so no
+    push will ever send them. They took about 7% of a 315-slot day. Four more were deferred as
+    unapproved, three of which are the standing set stamped <code>sent_to_smartlead</code>
+    without ever being emailed (oldest stamp 2026-10-07); nothing joined that set this cycle.
+  </p>
+
+  <h2>The fleet</h2>
+
+  <div class="tablewrap">
+    <table>
+      <tr><th>Reading</th><th>Yesterday</th><th>Today</th></tr>
+      <tr><td>Clear band</td><td class="num">55</td><td class="num">53</td></tr>
+      <tr><td>Watch band (follow-ups only)</td><td class="num">5</td><td class="num">7</td></tr>
+      <tr><td>Stopped band</td><td class="num">34</td><td class="num">34</td></tr>
+      <tr><td>Peak clear inside the cycle</td><td class="num">55</td><td class="num">57, at 11-17T12:05:18Z</td></tr>
+      <tr><td>Returned to clear, and still clear</td><td class="num">7 of 7</td><td class="num">3 of 3</td></tr>
+      <tr><td>Round trips</td><td class="num">0</td><td class="num">0</td></tr>
+      <tr><td>Held but already healthy</td><td class="num">5</td><td class="num">3</td></tr>
+      <tr><td>Live inboxes, and their allowance</td><td class="num">49, 735</td><td class="num">51, 765</td></tr>
+    </table>
+  </div>
+
+  <p>
+    <b>The arithmetic closes.</b> 55 clear, plus 3 returning, minus 5 that left, gives 53.
+    <code>band_moves_comparable</code> is true and <code>band_short_readings</code> is 0, so no
+    gate run read a short fleet. The five that moved went to watch, which is follow-ups-only
+    rather than stopped, and the stopped band did not move at all. The fleet grew by two
+    mailboxes and 30 messages of allowance while the band gate gave two readings back.
+  </p>
+
+  <p class="muted">
+    Of the 73 mailboxes that could not send, 61 are suspended in SmartLead and 32 carry that as
+    their only reason, which is the standing shape and the largest recoverable block. Three were
+    held while already healthy: two on a recovery clock with the soonest lifting in 2h, one held
+    by a sick sibling on its domain.
+  </p>
+
+  <h2>Fixes shipped this cycle</h2>
+
+  <div class="card accent-teal" style="margin-bottom:14px">
+    <h3>1. The follow-up count this report sizes the fleet with stopped sizing the fleet on 10-13</h3>
+    <p class="muted"><code>b11a3be</code>, youtube-outreach-orchestrator-v1</p>
+    <p>
+      Q2 is the whole story. The send block published <code>followups_due</code> and told the
+      reader, in its own note, to size the fleet with it. Siege had stopped using that count
+      five weeks earlier. On Tuesday it read 0 on all 124 mailboxes beside 620 people
+      mid-sequence, which under the old rule turns a full queue into 450 wasted slots.
+    </p>
+    <p>
+      Six new fields publish what Siege really subtracts: <code>queued_firsts</code>,
+      <code>mid_sequence</code>, <code>followups_reserved</code>, <code>queue_load</code>,
+      <code>followups_rate</code> with its source, and <code>slots_explained</code>. The rate
+      comes out of <code>automator/config/siege.json</code> so a change there follows without an
+      edit here, and anything unreadable degrades to the documented 0.5.
+    </p>
+    <p>
+      <b><code>slots_explained</code> is the guard on the whole story.</b> It checks, mailbox by
+      mailbox, that capacity minus the load reproduces Siege&rsquo;s own slot count. True means a
+      reader may subtract; false means automator changed the formula, so quote
+      <code>mailbox_slots</code> and derive nothing. It reads true on the 11-13, 11-16 and 11-17
+      plans. And <b>missing means unknown, not empty</b>: a plan that stops carrying the queue
+      keys nulls the derived fields rather than publishing a load of zero, because a zero load
+      makes an occupied fleet look idle, which is the fault being fixed.
+    </p>
+    <p>
+      Verified against the three real plan files, which reproduce 184, 247 and 315 slots exactly.
+      Nine new assertions, selftest all-pass, typecheck clean.
+    </p>
+  </div>
+
+  <div class="card accent-teal">
+    <h3>2. Six mornings of hand-probing Apify, because one refusal covered four different repairs</h3>
+    <p class="muted"><code>9f5b76c4d</code>, youtube-email-outreach-v1</p>
+    <p>
+      The ledger read in <code>scripts/apify-endspec-loop.sh</code> had one failure message,
+      &ldquo;could not read the Apify monthly ledger&rdquo;, for a rejected token, an
+      unreachable Apify, a server error and a changed response shape. Those are four different
+      repairs: an operator replacing a credential, nothing, waiting, and an edit to that file.
+      The lane has refused on that line since 2026-11-12 and every morning since has probed
+      <code>/v2/users/me/limits</code> by hand to learn it is HTTP 401.
+    </p>
+    <p>
+      The status and Apify&rsquo;s own error type now go into the refusal, so the stamp a reader
+      opens first says <code>Apify rejected the token (HTTP 401
+      user-or-token-not-found)</code>. Apify&rsquo;s prose is dropped and only the type kept:
+      the message can carry an account name, and varying text would break the
+      <code>since</code>/<code>consecutive</code> counter that sizes an outage.
+    </p>
+    <p>
+      Six response shapes exercised against the real parser (401, unreachable, 429, 500, a
+      healthy 200 that returns $31.06 and matches the known allowance, and a 200 in an
+      unreadable shape), then the live script run end to end: new line logged, new stamp
+      written, exit 0.
+    </p>
+  </div>
+
+  <h2>What to do next</h2>
+
+  <ol class="recs">
+    <li><b>Answer the two creators who said yes.</b> <code>drtubio@gmail.com</code> and
+      <code>jessie@innercircleprints.com</code>, both read as <code>yes-plus-questions</code>,
+      both held because the auto-reply sender is paused by your own order of 2026-09-17. 290
+      emails bought those two and nothing downstream will touch them.</li>
+    <li><b>Decide what the slots are for.</b> Unchanged from yesterday and still the biggest
+      outbound lever. Since 11-09, 1,483 emails over six sending days have reached 47 new
+      people, 4,851 written-ready people sit on the shelf, and 1,299 were refused a slot on
+      Tuesday while the whale tier re-offered to a book it finished on 2026-10-13. The lever is
+      <code>siege.fill_slots</code> and its <code>priority_key</code>, in <code>automator</code>,
+      which carries nothing about whether a person has heard from us. Repeat offers were your
+      call on 2026-10-07, so the mix is yours to set. Worth weighing against it: both of this
+      cycle&rsquo;s yeses came out of the repeat stream.</li>
+    <li><b>Replace the Apify token.</b> Six days, 24 refused ticks on the current run, $21.06
+      spendable, billing cycle closes 2026-11-30. Operator-only, so nothing here can do it.
+      Unchanged from the last four mornings, and from today the lane names the reason itself.</li>
+    <li><b>Stop planning the people the push loses every sending day.</b> 17 of the 21 lost on
+      Tuesday had been lost before, one on 11 consecutive sending days. Six carry a bounce on
+      SmartLead&rsquo;s file and four an unsubscribe, so no push will ever send them. About 7% of
+      a 315-slot day. The repair is in Siege&rsquo;s selector, in <code>automator</code>.</li>
+    <li><b>Nothing needs doing about the fleet, the enrichment chain or the recovery lane.</b>
+      The fleet gave two clear readings back to the watch band with the stopped band unmoved and
+      the allowance up 30, the chain is idle because the pool is bundled out, and the recovery
+      book is on lap 18 with everything it found this cycle already on file. The cross-domain
+      redirect split flagged yesterday came back in line.</li>
+  </ol>
+
+  <div class="foot">
+    <b>Checked rather than assumed.</b> The Apify token&rsquo;s rejection, against a live call to
+    <code>/v2/users/me/limits</code> returning HTTP 401 <code>user-or-token-not-found</code>.
+    That <code>followups_due</code> no longer sizes slots, by reading
+    <code>automator/scripts/siege-plan.py</code>, <code>siege.inbox_load()</code> and
+    <code>config/siege.json</code> rather than inferring it from the numbers. The slot
+    arithmetic, by running the new reader over the real 11-13, 11-16 and 11-17 plan files and
+    confirming capacity minus load reproduces each day&rsquo;s own slot count (184, 247, 315).
+    That the zero follow-up count is fleet-wide rather than a live-mailbox artifact, by summing
+    the field over all 124 mailboxes. The two warm replies and their current categories, from a
+    block that counts distinct addresses and takes the newest reading per person. The new Apify
+    refusal, by exercising the parser on six response shapes and then running the live script.
+    Both fixes typechecked and selftested before committing.
+    <br><br>
+    <b>Assumed:</b> that you have not already answered the two creators by hand, which this
+    report cannot see either way. Also assumed, as yesterday, that the slots went to repeat
+    offers because of the tier ordering rather than something else: the waiting queue by tier and
+    the whale tier&rsquo;s exhausted first-touch supply are measured, but <code>fill_slots</code>
+    lives in another repo and this report did not read it this cycle.
+  </div>
+
+  <p class="muted" style="margin-top:28px">
+    Cycle 2026-11-17T08:00:00Z to 2026-11-18T08:00:00Z. Grounded in
+    <code>youtube-outreach-orchestrator-v1/logs/autopilot-debrief-2026-11-18.json</code>.
+    Companion: <a href="lead-run-2026-11-18-analysis.md">lead-run-2026-11-18-analysis.md</a>.
+  </p>
+
+</div>
+
+<script>
+  // People emailed for the first time EVER, by Pacific day, 11-10 to 11-17. Counted off each
+  // person's own earliest row in leads.outreach_sends, which is what first_touch_by_day
+  // publishes. 11-14 and 11-15 are the weekend: siege-plan.timer runs Mon to Fri.
+  var days = ['11-10','11-11','11-12','11-13','11-14','11-15','11-16','11-17'];
+  var newPeople = [31, 7, 3, 2, 0, 0, 1, 3];
+  var top = 31;
+  var strip = document.getElementById('strip');
+  days.forEach(function (d, i) {
+    var col = document.createElement('div');
+    col.className = 'col';
+    var v = newPeople[i];
+    var vn = document.createElement('div');
+    vn.className = 'vn';
+    vn.textContent = v;
+    var b = document.createElement('div');
+    b.className = 'bar' + (v === 0 ? ' zero' : '');
+    // Square-root scale, so single digits stay visible beside the 31 day.
+    b.style.height = Math.max(2, Math.round(Math.sqrt(v / top) * 100)) + '%';
+    b.title = d + ', ' + v + ' people reached for the first time ever';
+    var cap = document.createElement('div');
+    cap.className = 'cap';
+    cap.textContent = d;
+    col.appendChild(vn);
+    col.appendChild(b);
+    col.appendChild(cap);
+    strip.appendChild(col);
+  });
+</script>
+</html>
