@@ -1639,6 +1639,20 @@ async function main(): Promise<void> {
     const unit = siegeUnitFacts(day);
     const siegeDir = join(AUTOMATOR_REPO, 'state', 'siege', day);
     const dirThere = existsSync(siegeDir);
+    // Did the FIRST step finish? (2026-11-19) inbox-warmup-sync.py rewrites this snapshot
+    // and stamps it `generated_at`, and it refuses to overwrite a good one with an empty
+    // one, so a stamp older than this run's own start means that step did not complete.
+    // Unreadable or unparseable yields null, which the alarm treats as unknown rather than
+    // as the first step. One file read, no network.
+    const warmupRefreshedAfterStart = (() => {
+      if (!unit.unit_last_started) return null;
+      try {
+        const snap = JSON.parse(readFileSync(join(AUTOMATOR_REPO, 'state', 'inbox-warmup.json'), 'utf8'));
+        const at = Date.parse(snap?.generated_at ?? '');
+        if (!Number.isFinite(at)) return null;
+        return at >= Date.parse(unit.unit_last_started);
+      } catch { return null; }
+    })();
     const alarm = siegeRunAlarm({
       sendingDay: unit.sending_day,
       lastResult: unit.unit_last_result,
@@ -1649,6 +1663,7 @@ async function main(): Promise<void> {
       today: day,
       samplesRecorded: dirThere ? existsSync(join(siegeDir, 'samples.json')) : null,
       approvalRecorded: dirThere ? existsSync(join(siegeDir, 'approval.json')) : null,
+      warmupRefreshedAfterStart,
     });
     // Keyed on the failed run's own start stamp, so this says its piece once rather than
     // every hour until midnight — the same rule the recovery-lane alarms were given on

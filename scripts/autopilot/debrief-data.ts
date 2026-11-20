@@ -1802,7 +1802,38 @@ export function sendPlanHealth(
   // when there is no plan there are no ceilings to press against, and a hand-driven
   // batch reaching SmartLead does not excuse a missing plan on a sending day.
   if (!facts.plan_found && unit.sending_day === false) binding = 'not_a_sending_day';
-  else if (!facts.plan_found && unit.sending_day === true) binding = 'plan_missing_on_sending_day';
+  // THE UNIT THAT CRASHED BEFORE IT WROTE A PLAN (2026-11-19). Three names below already
+  // exist for a unit that failed — `unit_died_before_push`, `push_unit_failed`,
+  // `push_killed` — and NOT ONE of them can be reached on the day the crash happened
+  // first, because all three sit behind `approvalPending`, which needs `planned`, which
+  // needs a plan on disk. So the one shape where the unit took the whole day before
+  // writing anything fell into `plan_missing_on_sending_day`, whose own documented
+  // meaning is that the day produced no plan and THE TIMER IS WHAT TO LOOK AT. That is
+  // the 2026-10-29 lesson (a shape with no branch of its own borrows the next one's
+  // name, and the borrowed name points at the wrong repair) in the field a reader opens
+  // before any other.
+  //
+  // On Thursday 2026-11-19 the timer was fine. It fired, siege-plan.service started at
+  // 11:15:02Z, and its FIRST ExecStart — inbox-warmup-sync.py — exited on
+  // "INBOX_KIT_API is not set (expected in env-storage/.env)". The unit is one
+  // Type=oneshot of six sequential steps and systemd abandons the rest at the first
+  // non-zero exit, so the four steps that plan, approve, push and report never ran:
+  // no state/siege/2026-11-19 directory at all, and zero emails on a sending day with
+  // 4,853 people ready to write to. The key WAS in the bank when this was written, so
+  // the step lost a race with the env-file sync (the Mac rewrites env-storage/.env every
+  // ~2 minutes and load_env() reads it line by line, so a half-written file silently
+  // loads as a short one). The debrief said to look at the timer.
+  //
+  // `pushUnitResult` is already cycle-scoped by unitStartedAt(), so a non-null non-success
+  // reading here means the unit ran INSIDE this cycle and failed: that is a crash, not a
+  // timer. Null stays generic — an unmeasured unit must never read as a crash, and a unit
+  // that reported success and wrote no plan really is the timer's or the schedule's
+  // question.
+  else if (!facts.plan_found && unit.sending_day === true) {
+    binding = pushUnitResult !== null && pushUnitResult !== 'success'
+      ? 'unit_died_before_plan'
+      : 'plan_missing_on_sending_day';
+  }
   else if (facts.email_paused === true) binding = 'email_paused';
   // A PLAN THAT PLANNED NOBODY (2026-10-29). Until now this fell through every branch
   // and printed null — see campaignGapTally() for the day it cost. Ranked above the
@@ -1945,7 +1976,30 @@ export function sendPlanHealth(
       'nothing — and READ sending_day BEFORE CALLING IT A FAULT: siege-plan.timer is ' +
       'Mon-Fri, so a weekend cycle is binding_constraint:not_a_sending_day and nothing ' +
       'is wrong, while plan_missing_on_sending_day means a real sending day produced no ' +
-      'plan at all and the timer is what to look at. sending_day is read off the timer\'s ' +
+      'plan at all and the timer is what to look at. AND A UNIT THAT CRASHED BEFORE IT ' +
+      'WROTE A PLAN NOW NAMES ITSELF, NOT THE TIMER (2026-11-19): three names here ' +
+      'already describe a failed unit and NOT ONE of them can be reached on the day the ' +
+      'crash comes first, because unit_died_before_push, push_unit_failed and push_killed ' +
+      'all sit behind approval_pending, which needs planned, which needs a plan on disk. ' +
+      'So a unit that took the whole day before writing anything fell into the branch ' +
+      'above and sent a reader after a timer that had fired perfectly — the 10-29 lesson ' +
+      '(a shape with no branch of its own borrows the next one\'s name) in the field read ' +
+      'before any other. On Thursday 2026-11-19 siege-plan.service started at 11:15:02Z ' +
+      'and its FIRST of six sequential steps, inbox-warmup-sync.py, exited on ' +
+      '"INBOX_KIT_API is not set (expected in env-storage/.env)"; systemd abandoned the ' +
+      'four steps that plan, approve, push and report, there is no state/siege/2026-11-19 ' +
+      'directory at all, and nobody was emailed on a sending day with 4,853 people ready ' +
+      'to write to. The key was in the bank the next morning, so the step lost a race ' +
+      'with the env-file sync (the Mac rewrites env-storage/.env about every two minutes ' +
+      'and load_env() reads it line by line, so a half-written file loads as a short one ' +
+      'with no error). unit_died_before_plan is that shape, claimed only off ' +
+      'push_unit_result, which unitStartedAt() has already scoped to this cycle, so a ' +
+      'non-success reading means the unit really ran here and failed. A null verdict ' +
+      'stays plan_missing_on_sending_day, because an unmeasured unit is unknown and NOT a ' +
+      'crash, and a unit that reported success and still wrote no plan is the timer\'s ' +
+      'question after all. The repair is a leading "-" on that ExecStart, or a retry ' +
+      'around the env read, and both live in automator, which owns the send path and is ' +
+      'not this repo\'s to edit. sending_day is read off the timer\'s ' +
       'own OnCalendar, so it follows a schedule change. unit_state / unit_last_result / ' +
       'unit_last_started describe siege-plan.service\'s MOST RECENT run whenever it ' +
       'happened, which on a weekend is a weekday two days back — unlike ' +
@@ -3267,6 +3321,7 @@ export function siegeRunAlarm(opts: {
   today: string;
   samplesRecorded: boolean | null;
   approvalRecorded: boolean | null;
+  warmupRefreshedAfterStart?: boolean | null;
 }): { step: string; run_key: string; detail: string } | null {
   if (opts.sendingDay !== true) return null;
   if (!opts.lastResult || opts.lastResult === 'success') return null;
@@ -3274,14 +3329,48 @@ export function siegeRunAlarm(opts: {
   // A failure left behind by Friday's run must not be re-reported all weekend.
   if (opts.startedPacificDay !== opts.today) return null;
 
-  const step = opts.samplesRecorded === false
-    ? 'samples'
-    : opts.approvalRecorded === false
-      ? 'approve'
-      : opts.samplesRecorded === null || opts.approvalRecorded === null
-        ? 'unknown'
-        : 'push_or_report';
+  // THE FIRST STEP IS A STEP TOO (2026-11-19). The ladder below starts at `--samples 20`
+  // and reads the state directory, so a run that died BEFORE anything wrote into that
+  // directory had no rung of its own: it landed on `unknown`, which says only "Siege wrote
+  // no state directory for today". That is what fired at 12:11:02Z on Thursday 2026-11-19,
+  // 56 minutes after the crash and in time to act, about a run whose cause was sitting in
+  // one line of the journal — `inbox-warmup-sync.py` exited on "INBOX_KIT_API is not set"
+  // and systemd abandoned the five steps behind it. Nobody was emailed on a day with
+  // 4,853 people ready to write to.
+  //
+  // The first step answers for itself for free, and on exactly the same principle as the
+  // two rungs below: a step that completed left a file behind. inbox-warmup-sync.py
+  // rewrites state/inbox-warmup.json and stamps it `generated_at`, and it refuses to
+  // overwrite a good snapshot with an empty one, so a snapshot older than this run's own
+  // start stamp means the step did not finish. On 11-19 it read 2026-11-18T11:15:15Z
+  // against a run that started 2026-11-19T11:15:02Z — a day stale, unmistakable, and
+  // nothing read it. The repair is a different one from the samples rung's: a missing
+  // credential or a lost race with the env-file sync, not a traceback in Siege.
+  //
+  // Positively measured only, like every other rung: null (an unreadable or absent
+  // snapshot) falls through rather than claiming the first step, because an unknown step
+  // must never read as a named one.
+  const step = opts.warmupRefreshedAfterStart === false
+    ? 'warmup'
+    : opts.samplesRecorded === false
+      ? 'samples'
+      : opts.approvalRecorded === false
+        ? 'approve'
+        : opts.samplesRecorded === null || opts.approvalRecorded === null
+          ? 'unknown'
+          : 'push_or_report';
   const where = {
+    warmup: 'It died in the FIRST step, `inbox-warmup-sync.py`: state/inbox-warmup.json '
+      + 'was not rewritten after this run started, so the five steps behind it — the '
+      + 'campaign enrol, the samples, the approval, the live push and the report — never '
+      + 'ran at all, and nobody planned today was offered to SmartLead. This is the '
+      + '2026-11-19 shape, where that step exited on "INBOX_KIT_API is not set (expected '
+      + 'in env-storage/.env)" while the key was in the bank: the Mac rewrites that file '
+      + 'about every two minutes and load_env() reads it line by line, so a half-written '
+      + 'file loads as a short one with no error. Look for a missing or momentarily '
+      + 'unreadable credential, NOT a traceback inside Siege. A leading "-" on that '
+      + 'ExecStart would stop it costing the day, at the price of planning against a '
+      + 'warmup snapshot one day stale.',
     samples: 'It died at or before the `siege-plan.py --samples 20` step: no samples.json '
       + 'was written, so siege-approve, the live push and the report never ran and nobody '
       + 'planned today was offered to SmartLead. This is the 2026-10-30 shape, where a '
@@ -3296,7 +3385,8 @@ export function siegeRunAlarm(opts: {
       + 'shape first: a push that refuses because its plan holds nobody sendable also '
       + 'exits non-zero and is a different repair.',
     unknown: 'Which step died could not be read — Siege wrote no state directory for '
-      + 'today, which is itself worth a look.',
+      + 'today and the warmup snapshot could not be read either, so neither the first step '
+      + 'nor the sample step can be cleared. That combination is itself worth a look.',
   }[step]!;
 
   return {
@@ -3304,8 +3394,9 @@ export function siegeRunAlarm(opts: {
     run_key: opts.lastStartedISO,
     detail: `siege-plan.service failed on a sending day: it started ${opts.lastStartedISO} `
       + `and ended \`${opts.lastResult}\`. ${where} siege-plan.service is ONE Type=oneshot `
-      + 'with five sequential ExecStart steps and systemd abandons every remaining step at '
-      + 'the first non-zero exit, so a step that sends nothing can still cost the whole '
+      + 'with six sequential ExecStart steps, only the campaign enrol carrying a leading '
+      + '"-", and systemd abandons every remaining step at the first non-zero exit of any '
+      + 'of the other five, so a step that sends nothing can still cost the whole '
       + 'send day. Siege stops pushing at 12:00 ET, so there may still be time today: '
       + '`journalctl -u siege-plan.service -e` for the traceback, then rerun the unit once '
       + 'the cause is fixed. The send path lives in automator, NOT in the five repos the '

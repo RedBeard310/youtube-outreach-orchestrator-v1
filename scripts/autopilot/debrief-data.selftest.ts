@@ -688,6 +688,33 @@ ok('Siege never ran -> no plan, and no approval claim',
   (() => { const h = sendPlanHealth(siegePlanFacts(null), 4, 4);
     return [h.plan_found, h.approval_pending, h.binding_constraint]; })(),
   [false, null, null]);
+// --- the unit that crashed before it wrote a plan (2026-11-19) ---
+// Real shape: siege-plan.service started 11:15:02Z on a Thursday and its first of six
+// sequential steps exited on a missing INBOX_KIT_API, so no plan was ever written and
+// nobody was emailed. Every existing failed-unit name sits behind approval_pending,
+// which needs a plan, so this fell into plan_missing_on_sending_day and pointed the
+// reader at a timer that had fired perfectly.
+const UNIT_1119 = { ...NO_UNIT, sending_day: true };
+ok('11-19: no plan plus a unit that failed inside the cycle names the unit, not the timer',
+  (() => { const h = sendPlanHealth(siegePlanFacts(null), 0, 0, 'exit-code', UNIT_1119);
+    return [h.plan_found, h.approval_pending, h.binding_constraint]; })(),
+  [false, null, 'unit_died_before_plan']);
+// Unmeasured must not borrow the more specific name. A timer that never fired leaves no
+// verdict at all, and that is the shape the old branch was written for.
+ok('no unit verdict on a planless sending day stays the timer\'s question',
+  sendPlanHealth(siegePlanFacts(null), 0, 0, null, UNIT_1119).binding_constraint,
+  'plan_missing_on_sending_day');
+// A unit that reported success and still wrote nothing is also not a crash.
+ok('a successful unit that wrote no plan is still the timer\'s question',
+  sendPlanHealth(siegePlanFacts(null), 0, 0, 'success', UNIT_1119).binding_constraint,
+  'plan_missing_on_sending_day');
+// The weekend branch outranks it: a unit left failed from Friday must not rename Sunday.
+ok('a weekend cycle is never a crashed unit',
+  sendPlanHealth(siegePlanFacts(null), 0, 0, 'exit-code',
+    { ...NO_UNIT, sending_day: false }).binding_constraint, 'not_a_sending_day');
+// An unknown schedule stays unknown — the 10-29 rule, one branch over.
+ok('an unreadable timer schedule claims neither name',
+  sendPlanHealth(siegePlanFacts(null), 0, 0, 'exit-code', NO_UNIT).binding_constraint, null);
 // --- the push that was killed rather than finished (2026-10-01) ---
 // Real numbers: a 150-email plan, 135 reached SmartLead, none of them ours, and
 // siege-plan.service ended `timeout` after systemd SIGTERMed the push mid-batch.
@@ -816,6 +843,39 @@ ok('the 10-29 shape is reported against the push, not the sample step',
     startedPacificDay: '2026-10-29', today: '2026-10-29',
     samplesRecorded: true, approvalRecorded: true,
   })?.step, 'push_or_report');
+// --- the first step is a step too (2026-11-19) ---
+// The live shape: the unit started 11:15:02Z, inbox-warmup-sync.py exited on a missing
+// INBOX_KIT_API, nothing wrote a state directory, and the ladder could only answer
+// `unknown` about a run whose cause was one line of the journal.
+const ALARM_1119 = {
+  ...ALARM,
+  lastStartedISO: '2026-11-19T11:15:02.000Z' as string | null,
+  startedPacificDay: '2026-11-19' as string | null,
+  today: '2026-11-19',
+  samplesRecorded: null as boolean | null,
+  approvalRecorded: null as boolean | null,
+};
+ok('11-19: a stale warmup snapshot puts the failure in the first step',
+  (() => { const a = siegeRunAlarm({ ...ALARM_1119, warmupRefreshedAfterStart: false });
+    return [a?.step, a?.run_key]; })(),
+  ['warmup', '2026-11-19T11:15:02.000Z']);
+// A snapshot this run really refreshed clears the first step and the ladder carries on.
+ok('a refreshed warmup snapshot clears the first step',
+  siegeRunAlarm({ ...ALARM_1119, warmupRefreshedAfterStart: true })?.step, 'unknown');
+ok('a refreshed snapshot with no samples still blames the sample step',
+  siegeRunAlarm({ ...ALARM_1119, warmupRefreshedAfterStart: true, samplesRecorded: false })?.step,
+  'samples');
+// Unmeasured must never borrow the named rung — the rule every other rung here follows.
+ok('an unreadable warmup snapshot leaves the step unknown',
+  siegeRunAlarm({ ...ALARM_1119, warmupRefreshedAfterStart: null })?.step, 'unknown');
+ok('an absent warmup reading behaves exactly as before this rung existed',
+  siegeRunAlarm(ALARM_1119)?.step, 'unknown');
+// The first step cannot outrank the silence guards: a stale snapshot on a clean run is
+// just a snapshot the sync declined to overwrite, not an alarm.
+ok('a stale snapshot on a successful run is never an alarm',
+  siegeRunAlarm({ ...ALARM_1119, lastResult: 'success', warmupRefreshedAfterStart: false }), null);
+ok('a stale snapshot on a weekend is never an alarm',
+  siegeRunAlarm({ ...ALARM_1119, sendingDay: false, warmupRefreshedAfterStart: false }), null);
 
 // --- the money enrichment runs on (2026-11-01) ---
 // The live 11-01 shape: $43.08 on the account against a burn that went from $1.56/day to
