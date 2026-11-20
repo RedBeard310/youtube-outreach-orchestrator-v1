@@ -1,0 +1,466 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lead Run Debrief 2026-11-19</title>
+<style>
+  :root {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+      --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+      --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+    --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+    --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 40px 22px 80px; }
+  .eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); font-weight: 600; }
+  h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.12; margin: 10px 0 6px; text-wrap: balance; letter-spacing: -.02em; }
+  h2 { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); margin: 44px 0 16px; font-weight: 700; }
+  h3 { font-size: 18px; margin: 0 0 6px; letter-spacing: -.01em; }
+  p { margin: 0 0 14px; }
+  .lede { font-size: 18px; color: var(--ink-soft); max-width: 68ch; }
+  .tag { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--amber-soft); color: var(--amber); letter-spacing: .02em; }
+  .tag.red { background: var(--red-soft); color: var(--red); }
+  .tag.good { background: var(--teal-soft); color: var(--teal); }
+  .grid { display: grid; gap: 14px; }
+  .stats { grid-template-columns: repeat(4, 1fr); margin-top: 26px; }
+  @media (max-width: 720px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; box-shadow: var(--shadow); }
+  .stat .n { font-size: 30px; font-weight: 750; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .stat .l { font-size: 12.5px; color: var(--ink-soft); margin-top: 3px; }
+  .stat .s { font-size: 12px; margin-top: 8px; font-weight: 600; }
+  .up { color: var(--good); } .down { color: var(--red); } .warn { color: var(--amber); }
+  .accent-red { border-left: 3px solid var(--red); }
+  .accent-teal { border-left: 3px solid var(--teal); }
+  .accent-amber { border-left: 3px solid var(--amber); }
+
+  .strip { display: flex; align-items: flex-end; gap: 6px; height: 150px; padding: 14px 14px 10px; overflow-x: auto; }
+  .col { flex: 1 0 44px; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; height: 100%; }
+  .bar { width: 100%; border-radius: 3px 3px 0 0; background: var(--teal); opacity: .9; }
+  .bar.zero { background: var(--line); height: 4px !important; }
+  .bar.bad { background: var(--amber); }
+  .col .cap { font-size: 11px; color: var(--ink-soft); margin-top: 6px; font-variant-numeric: tabular-nums; }
+  .col .vn { font-size: 12px; font-weight: 700; margin-bottom: 4px; font-variant-numeric: tabular-nums; }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-soft); padding: 0 14px 14px; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+
+  .q { border-radius: 14px; padding: 20px 22px; margin-bottom: 14px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); }
+  .q .ask { font-size: 17px; font-weight: 700; color: var(--ink); margin-bottom: 10px; display: flex; gap: 10px; align-items: baseline; }
+  .q .ask .qn { color: var(--red); font-weight: 800; flex: 0 0 auto; }
+  .q p { color: var(--ink-soft); }
+  .q b { color: var(--ink); }
+  .pill { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink); background: var(--panel-2); padding: 1px 7px; border-radius: 6px; border: 1px solid var(--line); white-space: nowrap; }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; background: var(--panel-2); padding: 1px 5px; border-radius: 5px; border: 1px solid var(--line); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+  th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); }
+  td .num { font-variant-numeric: tabular-nums; font-weight: 650; }
+  tr.total td { background: var(--panel-2); font-weight: 700; }
+  .fix td:first-child { color: var(--good); font-weight: 650; }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); box-shadow: var(--shadow); margin-bottom: 14px; }
+  ol.recs { padding-left: 0; list-style: none; counter-reset: r; margin: 0; }
+  ol.recs li { counter-increment: r; position: relative; padding: 14px 16px 14px 52px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 10px; box-shadow: var(--shadow); }
+  ol.recs li::before { content: counter(r); position: absolute; left: 14px; top: 14px; width: 26px; height: 26px; border-radius: 8px; background: var(--teal-soft); color: var(--teal); font-weight: 800; font-size: 14px; display: grid; place-items: center; }
+  ol.recs b { color: var(--ink); }
+  .foot { margin-top: 46px; padding: 16px 18px; border-radius: 12px; background: var(--amber-soft); border: 1px solid var(--line); font-size: 14px; color: var(--ink-soft); }
+  .foot b { color: var(--ink); }
+  .muted { color: var(--ink-soft); font-size: 13.5px; }
+  pre { background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 14px; overflow-x: auto; font-size: 13px; line-height: 1.5; margin: 0 0 14px; }
+</style>
+
+
+
+
+<div class="wrap">
+
+  <div class="eyebrow">Lead Run Debrief &middot; YouTube outreach</div>
+  <h1>2026-11-19: one missing line in a settings file cost the whole sending day</h1>
+
+  <p class="lede">
+    Nobody was emailed on Thursday. Not a shortfall, not a thin plan, zero. The send
+    program started on time and quit on its very first step, which is a step that only
+    refreshes a mailbox report, and because all six of its steps run in one chain the five
+    that write and send the day never started. There is no plan file for Thursday at all.
+    4,853 finished emails sat on the shelf.
+  </p>
+
+  <p>
+    <span class="tag red">0 emails, on a Thursday</span>
+    <span class="tag red">died on step 1 of 6, at 11:15:02Z</span>
+    <span class="tag red">fleet lost 10 clear mailboxes, 0 came back</span>
+    <span class="tag good">the hourly alarm caught it in 56 minutes</span>
+    <span class="tag good">0 fatal signatures, $0 Anthropic</span>
+  </p>
+
+  <div class="grid stats">
+    <div class="card stat accent-red">
+      <div class="n">0</div>
+      <div class="l">emails loaded on a sending day</div>
+      <div class="s down">no plan file was ever written</div>
+    </div>
+    <div class="card stat accent-red">
+      <div class="n">4,853</div>
+      <div class="l">finished emails waiting on the shelf</div>
+      <div class="s down">written, verified, nobody asked for them</div>
+    </div>
+    <div class="card stat accent-amber">
+      <div class="n">39</div>
+      <div class="l">mailboxes clear to send</div>
+      <div class="s down">49 yesterday, 10 left, none returned</div>
+    </div>
+    <div class="card stat">
+      <div class="n">2</div>
+      <div class="l">people newly parked and ready</div>
+      <div class="s warn">pool 7,388 to 7,390</div>
+    </div>
+  </div>
+
+  <h2>The shape of the day</h2>
+
+  <div class="card" style="padding:0">
+    <div class="strip" id="strip"></div>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--teal)"></span>people emailed for the first time ever</span>
+      <span><span class="dot" style="background:var(--line)"></span>a day that reached nobody new</span>
+      <span>By Pacific day, 11-12 to 11-19, counted off each person&rsquo;s own earliest row in <code>leads.outreach_sends</code>. 11-14 and 11-15 are the weekend.</span>
+    </div>
+  </div>
+
+  <p>
+    <b>3, 2, 0, 0, 1, 3, 4, 0.</b> Thursday is the ninth single-digit day in a row and the
+    first weekday since the 210-person day on 11-09 that reached nobody at all. Over the
+    eight days on the chart, 13 people heard from us for the first time. The weekly figure
+    the snapshot publishes is 1.1%, and it has nothing to compare against this morning,
+    because no emails went out.
+  </p>
+
+  <p>
+    <b>Thursday is a different kind of zero from the eight days in front of it, though,
+    and that matters.</b> Those were days when hundreds of emails went out and all of them
+    went to people who had heard from us before, which is a choice about who gets the
+    slots. Thursday no email went anywhere. A whole working day of sending capacity, the
+    follow-ups it owed, and the first touches it could have carried are simply gone, and
+    the follow-up bill it skipped lands on Friday on top of Friday&rsquo;s own.
+  </p>
+
+  <h2>The three questions</h2>
+
+  <div class="q">
+    <div class="ask"><span class="qn">Q1</span><span>Why did nobody get an email on a sending Thursday?</span></div>
+    <p>
+      <b>The send program quit on the first of its six steps, and that step does not send
+      anything.</b> The timer fired correctly. <code>siege-plan.service</code> started at
+      <span class="pill">11:15:02Z</span> and the whole run ended on the one line it wrote
+      to the system journal:
+    </p>
+    <pre>Nov 19 11:15:02  python3[3690549]: INBOX_KIT_API is not set (expected in env-storage/.env)</pre>
+    <p>
+      That is <code>inbox-warmup-sync.py</code>, the first step. Its only job is to
+      download how old each sending mailbox is and how its warmup is going, and save that
+      to a file the planner reads later. The send day is built as one chain of six
+      commands that run in order, and the system abandons every remaining command the
+      moment one of them fails. So the five behind it never ran: the campaign enrolment,
+      the 20 sample emails, the approval record, the live push, and the report. There is no
+      <code>state/siege/2026-11-19</code> folder on disk at all.
+    </p>
+    <p>
+      <b>The key was there the next morning.</b> <code>INBOX_KIT_API</code> is in the
+      shared settings file right now, so nothing was deleted. What happened is a race:
+      Casey&rsquo;s Mac rewrites that file on the VPS about every two minutes, and the
+      reader walks it one line at a time with no check that it got the whole thing, so a
+      file caught halfway through being written loads as a short file and reports no error.
+      A one-second overlap took the sending day.
+    </p>
+    <p>
+      <b>The watchdog did its job.</b> The hourly check wrote
+      <code>siege_send_day_failed</code> at <span class="pill">12:11:02Z</span>, 56 minutes
+      after the crash. Siege stops pushing at noon New York time, so roughly five hours of
+      sending day were still recoverable at that point. Nothing acted on it, which is
+      expected: the loop runs unattended and the repair is in <code>automator</code>, a
+      repo the self-improvement agent is not allowed to edit.
+    </p>
+  </div>
+
+  <div class="q">
+    <div class="ask"><span class="qn">Q2</span><span>Why did the snapshot blame the timer?</span></div>
+    <p>
+      <b>Because the one field a reader opens first had no name for this, so it borrowed
+      the name next to it.</b> <code>binding_constraint</code> published
+      <code>plan_missing_on_sending_day</code>, whose own written meaning is that the day
+      produced no plan and <em>the timer is what to look at</em>. The timer was flawless.
+    </p>
+    <p>
+      Three names already existed for a send program that failed:
+      <code>unit_died_before_push</code>, <code>push_unit_failed</code> and
+      <code>push_killed</code>. None of the three could be reached on Thursday, and not by
+      accident. All three sit behind a test for &ldquo;a plan that moved nothing&rdquo;,
+      that test needs to know how many people were planned, and that number comes from the
+      plan file. No plan file, no number, no branch. The one shape where the crash comes
+      first is the one shape the crash names could never describe.
+    </p>
+    <p>
+      This is the same fault as 2026-10-29, when a plan that held nobody fell through every
+      branch and printed nothing at all, and the same as 2026-10-30, when a crashed program
+      borrowed the name of an approval wait that cannot happen any more. Each time it lands
+      in the field a tired reader checks before any other. <b>Fixed this morning</b>, see
+      below.
+    </p>
+  </div>
+
+  <div class="q">
+    <div class="ask"><span class="qn">Q3</span><span>Did anything get into the pipeline?</span></div>
+    <p>
+      <b>Two people, and the recovery lane found none of them.</b> The parked pool went
+      7,388 to 7,390. Both of the new addresses came from
+      <code>other_lane</code>, which is automator&rsquo;s half-hourly contact lookup
+      working on leads that are already on the shelf, not from the lane that walks the
+      2,875 people stuck without an address.
+    </p>
+    <p>
+      <b>The recovery lane&rsquo;s own half found 21 contact points on 8 people and zero
+      email addresses.</b> Its prior week was 41 points and 4 addresses, so it is roughly
+      half of a rate that was already small. The lane is not broken and this is not a fault
+      to chase: it is on lap 19 of a book of 1,778 people, and <b>1,090 of the 1,115
+      methods that hit this cycle found something already on file</b>. Website resolution
+      is the healthiest it has been in weeks, <code>resolution_ok</code>, 31 of 150 leads
+      with no site found, zero refusals from Brave on 39 searches. The book is picked over,
+      which is a supply problem and not a repair.
+    </p>
+    <p>
+      <b>Enrichment is idle and that is correct.</b> The chain reports
+      <code>idling_no_inflow</code>, finished 2 leads, and the shelf is 99.8% bundled.
+      There is nothing left to enrich because almost everybody already has been. 0 new
+      channels were found, by Casey&rsquo;s standing order from 2026-09-08.
+    </p>
+  </div>
+
+  <h2>The fleet</h2>
+
+  <p>
+    <b>Ten mailboxes stopped being clear to send and not one came back.</b> The band gate
+    read 39 clear, 13 on watch and 42 stopped at 08:05:13Z against 49, 10 and 35 the
+    morning before. The arithmetic closes exactly: 49 clear, 0 returned to clear, 10 left
+    it, 39. Ten mailboxes going one way with nothing coming the other way is the worst
+    one-day move since the fleet doubled on 11-01, and it is a real reading, not an
+    instrument fault: every hourly run inside the window read the full fleet
+    (<code>band_short_readings</code> 0) and the highest clear count all cycle was the 49
+    it started at.
+  </p>
+
+  <div class="tablewrap">
+    <table>
+      <tr><th>Fleet</th><th>Thu 11-19 08:05Z</th><th>Wed 11-18 08:05Z</th><th>Move</th></tr>
+      <tr><td>Clear to send</td><td class="num">39</td><td class="num">49</td><td class="num down">-10</td></tr>
+      <tr><td>On watch (follow-ups only)</td><td class="num">13</td><td class="num">10</td><td class="num">+3</td></tr>
+      <tr><td>Stopped</td><td class="num">42</td><td class="num">35</td><td class="num down">+7</td></tr>
+      <tr class="total"><td>Owned by the gate</td><td class="num">66</td><td class="num">&mdash;</td><td class="num">&mdash;</td></tr>
+    </table>
+  </div>
+
+  <p>
+    <b>Nine of the held mailboxes are already healthy enough to come back.</b> Six are
+    waiting out a recovery clock with the soonest owing one more hour, and three are held
+    only because two sick addresses share their domain, which is somebody else&rsquo;s
+    deliverability charged to a well mailbox. So some of this lifts itself.
+  </p>
+
+  <p>
+    <b>One knock-on worth knowing.</b> The older warmup gate in the email repo has not run
+    since 2026-11-18T10:46Z, and its 4 health pauses in the snapshot belong to Wednesday,
+    not to Thursday. That gate runs at send time, and there was no send, so its silence is
+    the crash and not a second fault. The same goes for the mailbox report the dead step was
+    supposed to refresh: it is stamped 2026-11-18T11:15:15Z, a day stale, so if Friday runs
+    it plans against Thursday&rsquo;s warmup ages and every young mailbox reads a day
+    younger than it is.
+  </p>
+
+  <h2>Everything else, in one place</h2>
+
+  <div class="tablewrap">
+    <table>
+      <tr><th>Lane</th><th>Reading</th><th>Verdict</th></tr>
+      <tr><td>Send path</td><td>0 emails, no plan file, unit <code>exit-code</code> at 11:15:02Z</td><td class="down">the day</td></tr>
+      <tr><td>Parked pool</td><td>7,390, up 2. Shelf 4,853 ready to write, 2,525 already sent</td><td class="warn">flat</td></tr>
+      <tr><td>Recovery lane, own half</td><td>21 points, 0 addresses, 8 people, lap 19 of 1,778, 3 stranded</td><td class="warn">picked-over book</td></tr>
+      <tr><td>Enrichment chain</td><td><code>idling_no_inflow</code>, 2 leads, pool 99.8% bundled</td><td class="up">correct</td></tr>
+      <tr><td>Apify email recovery</td><td>191.6h with no work, token still 401, 10 refused ticks, $21.06 spendable to 11-30</td><td class="down">dead 8 days</td></tr>
+      <tr><td>Reply lane</td><td>90 runs, 6 people read, 0 agreed to talk, 0 classifier failures</td><td class="up">healthy, quiet</td></tr>
+      <tr><td>YouTube keys</td><td>15 of 66 working after the reset</td><td class="warn">settled 09-16 finding</td></tr>
+      <tr><td>Money</td><td>$0 Anthropic. OpenRouter $298.86 at 7&cent;/day</td><td class="up">no risk</td></tr>
+      <tr><td>Crashes</td><td>0 fatal signatures, no halt flag, 0 hours halted</td><td class="up">clean</td></tr>
+    </table>
+  </div>
+
+  <h2>Fixes shipped this cycle</h2>
+
+  <div class="card accent-teal">
+    <h3>A send day lost to a crash read as a timer that never fired</h3>
+    <p class="muted"><code>53ecfe9fd</code>, youtube-outreach-orchestrator-v1</p>
+    <p>
+      Q2 is the whole story, and it is the one thing this cycle could close. Two changes,
+      both to the reporting, because the crash itself is in <code>automator</code>.
+    </p>
+    <p>
+      <b>The headline field now names the crash.</b> No plan on a sending day plus a send
+      program that ran inside this cycle and failed now reads
+      <code>unit_died_before_plan</code> instead of <code>plan_missing_on_sending_day</code>.
+      The verdict it reads was already scoped to this cycle by existing code, so a failure
+      left over from Friday cannot rename a Sunday. A missing verdict and a verdict of
+      <code>success</code> both keep the old name, because an unmeasured program is unknown
+      and a program that reported success and still wrote no plan really is the
+      timer&rsquo;s question.
+    </p>
+    <p>
+      <b>The hourly alarm can now name the first step.</b> It read
+      <code>step: unknown</code> on Thursday, which says only that no state folder exists,
+      about a run whose cause was one line away. The first step answers for itself for
+      free, on the same principle the two rungs below it already use: a step that finished
+      left a file behind. <code>inbox-warmup-sync.py</code> rewrites
+      <code>state/inbox-warmup.json</code> and stamps it, and it refuses to overwrite a
+      good file with an empty one, so a stamp older than the run&rsquo;s own start means
+      that step did not finish. Thursday read 2026-11-18T11:15:15Z against a run that
+      started 2026-11-19T11:15:02Z. A day stale, unmistakable, and nothing was reading it.
+      The new <code>warmup</code> rung says the cause is a missing or momentarily
+      unreadable credential and not a crash inside Siege, which is a different repair.
+    </p>
+    <p>
+      <b>Both only ever claim what they measured.</b> An unreadable or absent warmup file
+      falls through to <code>unknown</code> rather than blaming the first step, which is the
+      rule every other rung here follows and the one the 10-29 and 10-30 faults came from
+      breaking. The alarm also stopped describing the chain as five steps; it is six, and
+      only the campaign enrolment is allowed to fail without taking the day.
+    </p>
+    <p>
+      Verified: the self-test suite passes in full with 11 new assertions, including every
+      way both changes must stay silent, and both files typecheck clean. The crash, its
+      timestamp, the missing state folder, the stale warmup stamp and the alarm firing at
+      12:11:02Z were all read out of the live journal, the live disk and the live
+      observation log before anything was written.
+    </p>
+  </div>
+
+  <h2>What to do next</h2>
+
+  <ol class="recs">
+    <li><b>Stop the warmup step being able to cost a sending day.</b> New this cycle and the
+      single highest-value thing on this list. The step downloads a report; it writes no
+      email and sends nothing, and losing it costs the planner slightly stale mailbox ages.
+      It does not justify cancelling the four steps behind it. Two options, either is
+      enough: put a leading <code>-</code> on that one <code>ExecStart</code> line in
+      <code>siege-plan.service</code>, the way the campaign enrolment line already has,
+      or make the settings reader refuse a half-written file instead of silently loading a
+      short one. The second also protects every other script that reads that file. Both
+      live in <code>automator</code>, which the autopilot may not edit, so this is
+      yours.</li>
+    <li><b>Decide what the slots are for.</b> Unchanged for eleven days and still the
+      biggest outbound lever. Thursday is a gap in the evidence rather than a new data
+      point, but the eight days around it reached 13 people for the first time while 4,853
+      finished emails sit on the shelf. The whale tier finished its never-emailed book on
+      2026-10-13 and its repeat-offer queue still takes slots ahead of ready lower-tier
+      people. The lever is <code>siege.fill_slots</code> and its <code>priority_key</code>,
+      in <code>automator</code>. Repeat offers were your call on 2026-10-07, so the mix is
+      yours to set.</li>
+    <li><b>Replace the Apify token.</b> Eight days now, 191.6 hours with no work done, 10
+      refused ticks on the current run, $21.06 of allowance that expires 2026-11-30.
+      Still HTTP 401 <code>user-or-token-not-found</code>. Operator-only, so nothing here
+      can do it. Unchanged from the last six mornings.</li>
+    <li><b>Watch the fleet on Friday, and decide nothing yet.</b> Ten clear mailboxes lost
+      with zero returned is the sharpest one-day fall in three weeks, but Thursday sent no
+      email at all, so none of it was earned by Thursday&rsquo;s own sending. Nine of the
+      held mailboxes are already healthy, six on a clock with the soonest owing one hour,
+      so part of it lifts by itself. One more morning says whether this is a slide or a
+      wobble.</li>
+    <li><b>Nothing needs doing about the recovery lane, the enrichment chain, the reply
+      lane or the keys.</b> The lane is on lap 19 with 1,090 of 1,115 found methods already
+      on file and its best website resolution in weeks, which is a picked-over book, not a
+      fault. The chain is idle because the pool is 99.8% bundled. The reply lane read six
+      people cleanly and none of them said yes. The 15-of-66 key pool is the settled
+      2026-09-16 finding and the quota it buys is keyword search, which is switched
+      off.</li>
+  </ol>
+
+  <div class="foot">
+    <b>Checked rather than assumed.</b> The crash, from
+    <code>journalctl -u siege-plan.service</code>, which holds exactly one line for the
+    whole run. That the six <code>ExecStart</code> steps run in order and only the campaign
+    enrolment carries a leading <code>-</code>, by reading the unit file. That no plan was
+    written, by listing <code>automator/state/siege/</code>: 11-18 is there, 11-19 is not.
+    That the warmup file is a day stale, by reading its own <code>generated_at</code>. That
+    <code>INBOX_KIT_API</code> is present in the settings bank right now, by counting the
+    name in the file without printing its value, which is what makes this a race rather
+    than a deletion. That the reader loads line by line with no completeness check, by
+    reading <code>load_env()</code>. That the alarm fired, from the observation log line
+    stamped 12:11:02Z. That the three existing crash names are unreachable without a plan
+    file, by reading the branch order, which is why the fix adds a fourth rather than
+    widening one of them.
+    <br><br>
+    <b>Assumed:</b> that the missing credential was the env-file sync race rather than
+    something that emptied the file on purpose. It fits, the file is whole now, and the
+    hazard is already documented, but the exact moment of the overlap is not recoverable
+    because nothing logs that file&rsquo;s writes. Also assumed, as on the last four
+    mornings, that the slots go to repeat offers because of the tier ordering rather than
+    something else: <code>fill_slots</code> is in another repo and was not read this cycle,
+    and this cycle produced no push to measure it against anyway.
+  </div>
+
+  <p class="muted" style="margin-top:28px">
+    Cycle 2026-11-19T08:00:00Z to 2026-11-20T08:00:00Z. Grounded in
+    <code>youtube-outreach-orchestrator-v1/logs/autopilot-debrief-2026-11-20.json</code>.
+    Companion: <a href="lead-run-2026-11-20-analysis.md">lead-run-2026-11-20-analysis.md</a>.
+  </p>
+
+</div>
+
+<script>
+  // People emailed for the first time EVER, by Pacific day, 11-12 to 11-19. Counted off each
+  // person's own earliest row in leads.outreach_sends, which is what first_touch_by_day
+  // publishes. 11-14 and 11-15 are the weekend: siege-plan.timer runs Mon to Fri. 11-19 is a
+  // weekday zero, which is a different thing from a weekend zero: the send program crashed.
+  var days = ['11-12','11-13','11-14','11-15','11-16','11-17','11-18','11-19'];
+  var newPeople = [3, 2, 0, 0, 1, 3, 4, 0];
+  var top = 4;
+  var strip = document.getElementById('strip');
+  days.forEach(function (d, i) {
+    var col = document.createElement('div');
+    col.className = 'col';
+    var v = newPeople[i];
+    var vn = document.createElement('div');
+    vn.className = 'vn';
+    vn.textContent = v;
+    var b = document.createElement('div');
+    b.className = 'bar' + (v === 0 ? ' zero' : '');
+    // Square-root scale, kept from the day the 210-person spike was still in the window so the
+    // charts across mornings read the same way.
+    b.style.height = Math.max(2, Math.round(Math.sqrt(v / top) * 100)) + '%';
+    b.title = d + ', ' + v + ' people reached for the first time ever';
+    var cap = document.createElement('div');
+    cap.className = 'cap';
+    cap.textContent = d;
+    col.appendChild(vn);
+    col.appendChild(b);
+    col.appendChild(cap);
+    strip.appendChild(col);
+  });
+</script>
+</html>
