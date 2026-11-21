@@ -1,0 +1,388 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lead Run Debrief 2026-11-20</title>
+<style>
+  :root {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+      --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+      --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+    --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+    --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 40px 22px 80px; }
+  .eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); font-weight: 600; }
+  h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.12; margin: 10px 0 6px; text-wrap: balance; letter-spacing: -.02em; }
+  h2 { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); margin: 44px 0 16px; font-weight: 700; }
+  h3 { font-size: 18px; margin: 0 0 6px; letter-spacing: -.01em; }
+  p { margin: 0 0 14px; }
+  .lede { font-size: 18px; color: var(--ink-soft); max-width: 68ch; }
+  .tag { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--amber-soft); color: var(--amber); letter-spacing: .02em; }
+  .tag.red { background: var(--red-soft); color: var(--red); }
+  .tag.good { background: var(--teal-soft); color: var(--teal); }
+  .grid { display: grid; gap: 14px; }
+  .stats { grid-template-columns: repeat(4, 1fr); margin-top: 26px; }
+  @media (max-width: 720px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; box-shadow: var(--shadow); }
+  .stat .n { font-size: 30px; font-weight: 750; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .stat .l { font-size: 12.5px; color: var(--ink-soft); margin-top: 3px; }
+  .stat .s { font-size: 12px; margin-top: 8px; font-weight: 600; }
+  .up { color: var(--good); } .down { color: var(--red); } .warn { color: var(--amber); }
+  .accent-red { border-left: 3px solid var(--red); }
+  .accent-teal { border-left: 3px solid var(--teal); }
+  .accent-amber { border-left: 3px solid var(--amber); }
+
+  .strip { display: flex; align-items: flex-end; gap: 6px; height: 150px; padding: 14px 14px 10px; overflow-x: auto; }
+  .col { flex: 1 0 44px; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; height: 100%; }
+  .bar { width: 100%; border-radius: 3px 3px 0 0; background: var(--teal); opacity: .9; }
+  .bar.zero { background: var(--line); height: 4px !important; }
+  .bar.bad { background: var(--amber); }
+  .col .cap { font-size: 11px; color: var(--ink-soft); margin-top: 6px; font-variant-numeric: tabular-nums; }
+  .col .vn { font-size: 12px; font-weight: 700; margin-bottom: 4px; font-variant-numeric: tabular-nums; }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-soft); padding: 0 14px 14px; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+
+  .q { border-radius: 14px; padding: 20px 22px; margin-bottom: 14px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); }
+  .q .ask { font-size: 17px; font-weight: 700; color: var(--ink); margin-bottom: 10px; display: flex; gap: 10px; align-items: baseline; }
+  .q .ask .qn { color: var(--red); font-weight: 800; flex: 0 0 auto; }
+  .q p { color: var(--ink-soft); }
+  .q b { color: var(--ink); }
+  .pill { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink); background: var(--panel-2); padding: 1px 7px; border-radius: 6px; border: 1px solid var(--line); white-space: nowrap; }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; background: var(--panel-2); padding: 1px 5px; border-radius: 5px; border: 1px solid var(--line); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+  th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); }
+  td .num { font-variant-numeric: tabular-nums; font-weight: 650; }
+  tr.total td { background: var(--panel-2); font-weight: 700; }
+  .fix td:first-child { color: var(--good); font-weight: 650; }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); box-shadow: var(--shadow); margin-bottom: 14px; }
+  ol.recs { padding-left: 0; list-style: none; counter-reset: r; margin: 0; }
+  ol.recs li { counter-increment: r; position: relative; padding: 14px 16px 14px 52px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 10px; box-shadow: var(--shadow); }
+  ol.recs li::before { content: counter(r); position: absolute; left: 14px; top: 14px; width: 26px; height: 26px; border-radius: 8px; background: var(--teal-soft); color: var(--teal); font-weight: 800; font-size: 14px; display: grid; place-items: center; }
+  ol.recs b { color: var(--ink); }
+  .foot { margin-top: 46px; padding: 16px 18px; border-radius: 12px; background: var(--amber-soft); border: 1px solid var(--line); font-size: 14px; color: var(--ink-soft); }
+  .foot b { color: var(--ink); }
+  .muted { color: var(--ink-soft); font-size: 13.5px; }
+  pre { background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 14px; overflow-x: auto; font-size: 13px; line-height: 1.5; margin: 0 0 14px; }
+</style>
+
+
+
+<div class="wrap">
+
+  <div class="eyebrow">Lead Run Debrief &middot; YouTube outreach</div>
+  <h1>2026-11-20: 246 emails went out, one of them to somebody new, and the biggest reason people got nothing was that we had run out of things to say to them</h1>
+
+  <p class="lede">
+    Friday worked. The send program ran, the plan held, 246 people were loaded into a
+    campaign. Then two numbers sit underneath that: exactly one of those 246 had never
+    heard from us before, and 40 of the 288 people the plan named ended the day with no
+    email. Twenty-one of those 40 were filed as unexplained. The log explained twelve of
+    them in plain words, and the largest group, ten people, was the writer saying it had
+    no offer left to make them.
+  </p>
+
+  <p>
+    <span class="tag good">246 emails loaded, the program ran clean</span>
+    <span class="tag red">1 new person reached</span>
+    <span class="tag red">40 of 288 planned got nothing</span>
+    <span class="tag">fleet 39 to 35 clear, none returned</span>
+    <span class="tag good">8 new addresses recovered, double the prior week</span>
+  </p>
+
+  <div class="grid stats">
+    <div class="card stat">
+      <div class="n">246</div>
+      <div class="l">people loaded into a campaign</div>
+      <div class="s up">the push ran and reported success</div>
+    </div>
+    <div class="card stat accent-red">
+      <div class="n">1</div>
+      <div class="l">reached for the first time ever</div>
+      <div class="s down">243 of 244 were repeat offers</div>
+    </div>
+    <div class="card stat accent-red">
+      <div class="n">40</div>
+      <div class="l">planned people who got no email</div>
+      <div class="s down">32 of them lost on an earlier day too</div>
+    </div>
+    <div class="card stat accent-teal">
+      <div class="n">8</div>
+      <div class="l">new addresses the recovery lane found</div>
+      <div class="s up">it found 4 in the whole prior week</div>
+    </div>
+  </div>
+
+  <h2>The shape of the day</h2>
+
+  <div class="card">
+    <p>
+      This was a working day, which is worth saying first because the last two were not.
+      The send program started, got through all six of its steps, wrote a plan for 288
+      people and pushed. No crash, no missing settings file, no approval wait. It reported
+      success and the hourly health check raised nothing: <b>zero fatal errors all cycle</b>,
+      no halt, <b>$0 of Anthropic spend</b>.
+    </p>
+    <p>
+      So the day has to be judged on what the emails did rather than on whether they went,
+      and on that it looks like the days before it. <b>244 people were written to and one of
+      them had never been contacted before.</b> The other 243 were repeat offers to people
+      already in the book, which is deliberate since 2026-10-07 and is not a fault. It is
+      also the eleventh single-digit day in a row.
+    </p>
+    <p class="muted">
+      People reached for the very first time, by Pacific day. Read the series, not the
+      weekly average: one big day on 11-09 still sets that average and makes every day
+      since look like a dip from a healthy week.
+    </p>
+  </div>
+
+  <div class="card" style="margin-top:14px;padding:0">
+    <div class="strip">
+      <div class="col"><div class="vn">2</div><div class="bar" style="height:14%"></div><div class="cap">11-13</div></div>
+      <div class="col"><div class="vn">0</div><div class="bar zero"></div><div class="cap">11-14</div></div>
+      <div class="col"><div class="vn">0</div><div class="bar zero"></div><div class="cap">11-15</div></div>
+      <div class="col"><div class="vn">1</div><div class="bar" style="height:7%"></div><div class="cap">11-16</div></div>
+      <div class="col"><div class="vn">3</div><div class="bar" style="height:21%"></div><div class="cap">11-17</div></div>
+      <div class="col"><div class="vn">4</div><div class="bar" style="height:28%"></div><div class="cap">11-18</div></div>
+      <div class="col"><div class="vn">0</div><div class="bar zero"></div><div class="cap">11-19</div></div>
+      <div class="col"><div class="vn">1</div><div class="bar bad" style="height:7%"></div><div class="cap">11-20</div></div>
+    </div>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--teal)"></span>new people reached</span>
+      <span><span class="dot" style="background:var(--line)"></span>a day that reached nobody</span>
+      <span><span class="dot" style="background:var(--amber)"></span>this cycle</span>
+    </div>
+  </div>
+
+  <h2>The three questions</h2>
+
+  <div class="q">
+    <div class="ask"><span class="qn">Q1</span><span>Why did 40 of the 288 planned people get no email?</span></div>
+    <p>
+      Twelve bounced: SmartLead already had a failed delivery on file for the address and
+      refused to take the lead. Three were people who had unsubscribed. One had no clean job
+      title, so the writer produced nothing. One was held by the approval gate for the next
+      morning, which is not a loss. That accounted for 17 of them, and <b>21 were filed as
+      <code>lost_silently</code></b>, a field whose entire meaning is that the log never
+      mentioned those people.
+    </p>
+    <p>
+      The log mentioned twelve of them. <b>Ten carried one line each saying the writer had
+      tried every offer it could and had none left:</b>
+    </p>
+    <pre>recX7aWDreNdF9T5m: love-your-channel-short wrote nothing and there is no
+  other offer for them today (every offer that can run has already been
+  made to them)</pre>
+    <p>
+      That is the single largest loss cause of the day. It is bigger than the twelve
+      bounces that led the published table, and it was in no field anywhere. The other two
+      were leads whose YouTube channel no longer exists, printing a verdict a reader of this
+      file could not see. <b>Both gaps are now closed</b>, and the day really reads: 12
+      bounces, <b>10 people we have nothing left to say to</b>, 3 unsubscribes, 2 dead
+      channels, 1 with no job title, 1 manifest miss, and 9 genuinely unexplained.
+    </p>
+  </div>
+
+  <div class="q">
+    <div class="ask"><span class="qn">Q2</span><span>Is the loss growing, or is it the same people every day?</span></div>
+    <p>
+      The same people. <b>32 of the 40 had already been lost on an earlier day</b>, 8 were
+      new, and the worst of them has now been lost on <b>ten consecutive sending days</b>.
+      The split is complete this time, covering all 40, so that is the whole picture rather
+      than a capped sample.
+    </p>
+    <p>
+      Part of this is already healing. A fix shipped two days ago makes the push write a
+      bounce down on the lead row, which takes that address out of circulation, and
+      <b>it is working</b>: all three bounced leads checked in the database now read
+      <code>email_bounced = true</code> and <code>invalid</code>, stamped yesterday. The
+      twelve-person bounce group should drain from here.
+    </p>
+    <p>
+      The two dead-channel leads will not drain. Their channels are gone from YouTube,
+      the research step correctly refuses to spend anything on them, and <b>nothing marks
+      them so the plan will keep naming them every day forever.</b> That gate is in the
+      send program itself, which this pipeline does not own.
+    </p>
+  </div>
+
+  <div class="q">
+    <div class="ask"><span class="qn">Q3</span><span>Did anything new get into the pipeline?</span></div>
+    <p>
+      Yes, in the one lane that is allowed to produce. Discovery of new channels stays off
+      by Casey's order from 2026-09-08, so <b>0 new channels</b> is the intended reading and
+      not a fault. The contact-recovery lane, which goes looking for addresses for people we
+      already have, had its best day in weeks: <b>8 new email addresses on 8 people, against
+      4 addresses in the whole prior week.</b> Every one came from the domain-registration
+      method, which has been quiet for most of a month.
+    </p>
+    <p>
+      Nobody was parked onto the shelf, though, so those 8 have not become writable emails
+      yet. The shelf itself holds <b>4,852 finished emails nobody has asked for</b>, and
+      1,330 people are waiting for a sending slot. Bundling sits at 99.8%, so the enrichment
+      chain correctly reports itself idle for want of new work rather than stuck.
+    </p>
+  </div>
+
+  <h2>The fleet</h2>
+
+  <div class="card accent-amber">
+    <p>
+      <b>35 mailboxes clear to send, down from 39.</b> Four left the clear band and none came
+      back. The gate ran every hour with no partial readings, so that is a real move and not
+      an instrument artefact, and the day's peak equals yesterday's reading, which means
+      there was no rise-and-fall hidden inside it either.
+    </p>
+    <p>
+      <b>12 of the held mailboxes are healthy</b> and will lift themselves without anyone
+      touching a setting: 8 are waiting out a recovery clock with the nearest one 4 hours
+      from clearing, and 4 are held only because other addresses on their domain are sick.
+      That is capacity returning for free.
+    </p>
+    <p>
+      At plan time only 38 of the 124 mailboxes were live. The most common reason, named by
+      69 of the 86 that sat out, is a SmartLead suspension, and <b>39 of those carry it as
+      their only reason</b>, which is the figure that means real lost slots. The plan still
+      wrote 288 slots against a 570-message capacity, because 282 of that capacity is
+      reserved for follow-ups already owed to the 541 people mid-sequence.
+    </p>
+  </div>
+
+  <h2>Everything else, in one place</h2>
+
+  <div class="tablewrap">
+  <table>
+    <tr><th>Lane</th><th>Reading</th><th>Verdict</th></tr>
+    <tr><td>Send</td><td class="num">246 emailed, 288 planned, 286 approved, 40 lost</td><td>Ran clean; the loss is the story</td></tr>
+    <tr><td>New people reached</td><td class="num">1</td><td>Eleventh single-digit day running</td></tr>
+    <tr><td>Shelf</td><td class="num">4,852 ready, 7,378 bundled (99.8%), 2,525 emailed</td><td>Inventory healthy, demand is the wall</td></tr>
+    <tr><td>Parked today</td><td class="num">0</td><td>Pool flat at 7,390</td></tr>
+    <tr><td>Recovery lane (its own half)</td><td class="num">23 points, 8 addresses, 8 people; lap 19 of 1,770</td><td>Best address day in weeks</td></tr>
+    <tr><td>Site resolution</td><td class="num">1 no-site of 150, 0 search refusals</td><td>Working; 579 of 579 methods already on file</td></tr>
+    <tr><td>Enrichment chain</td><td class="num">idling, no inflow</td><td>Correct at 99.8% bundled</td></tr>
+    <tr><td>Apify email recovery</td><td class="num">215.6h with no work, 401 bad token</td><td class="down">Seventh morning; $21.06 expires 11-30</td></tr>
+    <tr><td>Replies</td><td class="num">4 people read, 0 yes</td><td>2 not interested, 2 unclear; 0 failures</td></tr>
+    <tr><td>Discovery</td><td class="num">0 new channels</td><td>Paused by order, not a fault</td></tr>
+    <tr><td>YouTube keys</td><td class="num">15 working of 66</td><td>Settled 09-16, quota cut on 50 projects</td></tr>
+    <tr><td>Spend</td><td class="num">$0 Anthropic; OpenRouter $298.68 at 18&cent;/day</td><td>No concern</td></tr>
+    <tr class="total"><td>Errors</td><td class="num">0 fatal signatures, no halt</td><td>Clean cycle</td></tr>
+  </table>
+  </div>
+
+  <h2>Why people got nothing, ranked by the people it cost</h2>
+
+  <div class="tablewrap">
+  <table>
+    <tr><th>Reason</th><th>People lost</th><th>Lines it printed</th></tr>
+    <tr><td>SmartLead already had a bounce on the address</td><td class="num">12</td><td class="num">12</td></tr>
+    <tr class="fix"><td>Every offer that can run has already been made to them</td><td class="num">10</td><td class="num">10 (was invisible)</td></tr>
+    <tr><td>They had unsubscribed</td><td class="num">3</td><td class="num">3</td></tr>
+    <tr class="fix"><td>YouTube no longer has their channel</td><td class="num">2</td><td class="num">2 (was invisible)</td></tr>
+    <tr><td>No clean job title, so no draft was written</td><td class="num">1</td><td class="num">1</td></tr>
+    <tr><td>Absent from this batch's manifest</td><td class="num">1</td><td class="num">16</td></tr>
+    <tr><td>Still unexplained</td><td class="num">9</td><td class="num">no line at all</td></tr>
+    <tr class="total"><td>Total</td><td class="num">40</td><td class="num">of 288 planned</td></tr>
+  </table>
+  </div>
+
+  <p class="muted">
+    The manifest row is the standing lesson about this table: it printed the most lines and
+    cost one person, because 15 of its 16 leads were written again in another batch and sent
+    in the same run. Lines are not people.
+  </p>
+
+  <h2>Fixes shipped this cycle</h2>
+
+  <div class="card accent-teal">
+    <h3>The reader stopped matching labels, because labels change</h3>
+    <p>
+      Both of the checks that explain a loss before the push were pinned to the exact wording
+      one log happened to use on 2026-11-06. One of them went blind when a single word moved:
+      the summary line for a lead is its final status in capitals, and a lead with a deleted
+      YouTube channel stopped reporting <code>failed</code> once it got a status of its own
+      called <code>channel_gone</code>. <b>The same lead the old comment names by name was
+      silently unreadable.</b>
+    </p>
+    <p>
+      So the status is read off the line now and judged against a short list of the four
+      statuses that mean the lead is fine. A status nobody has seen before gets a row naming
+      itself instead of disappearing, which is safe because this only ever speaks for people
+      already known to be lost. The next relabelling cannot blind it.
+    </p>
+    <p>
+      The second fix reads the writer running out of offers for one person, taking care to
+      ignore the near-identical line it prints when it still has an offer left to try.
+    </p>
+    <p class="muted">
+      Verified against the real log and plan: unexplained losses 21 to 9, explained-before-the-push
+      1 to 13. Four new test assertions, full suite passing, type check clean.
+      Committed in <code>youtube-outreach-orchestrator-v1</code> as <code>2ea45b1</code>
+      (the two-minute sync timer claimed the commit before the agent could, which is normal).
+    </p>
+  </div>
+
+  <h2>What to do next</h2>
+
+  <ol class="recs">
+    <li>
+      <b>Decide what to say to the people we have run out of things to say to.</b> Ten people
+      lost a slot on Friday because every one of the fourteen offers has already been sent to
+      them, and 1,330 are queued behind them. This is the same wall as the one-new-person
+      number: the book is being re-offered rather than extended. Either a new offer goes into
+      the library or those people come out of the queue. Casey's call, and it is now a number
+      on a page instead of a silence.
+    </li>
+    <li>
+      <b>Stop planning the two dead channels.</b> Their YouTube channels are gone, the
+      research step already refuses to spend money on them, and nothing writes that down, so
+      they take a slot every single day and one is now on a ten-day streak. The bounce fix
+      from 11-19 is the exact shape that works, and this needs the same thing one level up, in
+      the send program's own person query. Not this pipeline's to change.
+    </li>
+    <li>
+      <b>Replace the Apify token.</b> Seventh morning. It has answered "user or token not
+      found" since 2026-11-12 and the lane has done no work for 215 hours. $21.06 of this
+      month's allowance expires on 11-30. Operator-only, since it lives in the settings bank.
+    </li>
+    <li>
+      <b>Leave the fleet alone today.</b> Four mailboxes left the clear band and 12 of the
+      held ones are healthy with the nearest 4 hours from lifting itself. Watch Monday's plan
+      before changing any setting.
+    </li>
+  </ol>
+
+  <div class="foot">
+    <b>What was verified, not assumed.</b> Every figure comes from the grounded snapshot
+    for this cycle. The loss diagnosis was checked by hand against the send program's own
+    log and its plan file for 11-20, classifying all 40 lost people individually. The bounce
+    fix was confirmed by reading three of those leads back out of the database. The reader
+    fix was re-run against that real log to produce the corrected 12-and-9 split, so those
+    two numbers are measured rather than projected. The published snapshot still carries the
+    old 1-and-21 split, because it was written before the fix.
+  </div>
+
+</div>
