@@ -2521,7 +2521,55 @@ export function sendPlanHealth(
  *  matcher cannot see. `lost_before_push` is that group, each of them earns a row in
  *  `reasons`, and `lost_silently` goes back to meaning what it says. Read only for people
  *  the join already found lost and never into `failed` or `skipped`, so like the ledger it
- *  can only move somebody out of a worse answer. */
+ *  can only move somebody out of a worse answer.
+ *
+ *  AND IT MUST NOT MATCH A LABEL, BECAUSE A LABEL CHANGES (2026-11-21). Both shapes above
+ *  were pinned to the exact wording the 11-06 log happened to use, and on 2026-11-20 the
+ *  larger half of a 21-person silent group was explained in the log in two shapes neither
+ *  could read:
+ *
+ *    | [CHANNEL_GONE      ] GET CUT WITH GLASS -> recYIzI1wmtvWAfyc__GET_CUT_WITH_GLASS.md
+ *    recX7aWDreNdF9T5m: love-your-channel-short wrote nothing and there is no other offer
+ *      for them today (every offer that can run has already been made to them)
+ *
+ *  The first is the SAME EVENT and the SAME LEAD the 11-07 comment above cites by id: that
+ *  summary line is `[<finalStatus>.toUpperCase().padEnd(18)]` in the email repo
+ *  (src/cli/outreach.ts), and a dead-channel lead stopped reporting `failed` when it got a
+ *  `channel_gone` status of its own. One word moved and the matcher went blind, which is
+ *  the 10-12 lesson (a key pinned to a per-run token) in the field built to end a mystery.
+ *  So read the status tag itself and decide off a DENY list of the statuses that mean the
+ *  lead is fine (`PREPUSH_OK_STATUSES`): a tag nobody here has seen is claimed verbatim
+ *  rather than ignored, because claiming happens only for people the join ALREADY found
+ *  lost, so it can never invent a loss — and the next relabelling cannot blind this again.
+ *
+ *  The second is the offer library running out for one person, and it was the day's single
+ *  largest loss cause at 10 people, bigger than the 12 SmartLead bounces that led the
+ *  `reasons` table. It names itself in plain words and no counter could read it, which is
+ *  the 10-09 lesson a third time. Only the TERMINAL wording is claimed: the same writer
+ *  prints `wrote nothing; trying <other> instead` when it still has an offer left, and that
+ *  person is not lost yet. */
+/** Research-summary statuses that leave the lead perfectly fine, so a lost person carrying
+ *  one of them was lost by something else and this must not speak for them. `ALREADY_DONE`
+ *  is the one that matters: two of the 2026-11-20 losses had a finished bundle on file.
+ *  Every other status the email repo can print (src/cli/outreach.ts `LeadResult`) means no
+ *  draft exists, and anything not on this list is claimed. */
+const PREPUSH_OK_STATUSES = new Set([
+  'SENT_TO_SMARTLEAD',
+  'ALREADY_DONE',
+  'FIND_ONLY_COMPLETE',
+  'STOPPED_EARLY',
+]);
+/** Plain-words wording for the statuses that do lose somebody. A status missing from here
+ *  still earns a row off its own name, so this table is for readability and never for
+ *  coverage. */
+const PREPUSH_STATUS_REASONS: Record<string, string> = {
+  FAILED: 'the research stage could not build a bundle',
+  CHANNEL_GONE: 'YouTube no longer has their channel',
+  NO_EMAIL_FOUND: 'no email address could be found for them',
+  NO_EMAIL_RETRIED: 'no email address could be found for them',
+  EMAIL_INVALID: 'their email address did not verify',
+  SUPPRESSED: 'they are on the do-not-contact registry',
+};
 export function siegePushOutcome(
   log: string,
   sinceISO: string,
@@ -2634,10 +2682,32 @@ export function siegePushOutcome(
     // FAILs out of the push's tally for exactly that reason, and this keeps the same rule.
     // The first reason per lead wins, so one lost person charges one row however many
     // offers were tried for them.
-    const research = /\[FAILED\s*\].*?\b(rec[A-Za-z0-9]{8,})__/.exec(line);
+    // Any status tag, not the one word the 11-06 log used — see the 2026-11-21 block on
+    // this function. A tag on the OK list means the lead is fine and whatever lost them is
+    // elsewhere, so it is never claimed; anything else is, including a tag this reader has
+    // never seen, which earns a row naming itself.
+    const research = /\[([A-Z_]{4,24})\s*\]\s.*?\b(rec[A-Za-z0-9]{8,})__/.exec(line);
     if (research) {
-      if (!prePushReason.has(research[1]!)) {
-        prePushReason.set(research[1]!, 'the research stage could not build a bundle');
+      const status = research[1]!;
+      if (!prePushReason.has(research[2]!) && !PREPUSH_OK_STATUSES.has(status)) {
+        prePushReason.set(
+          research[2]!,
+          PREPUSH_STATUS_REASONS[status] ?? `the research stage ended at ${status.toLowerCase()}`,
+        );
+      }
+      continue;
+    }
+    // The writer running out of offers for one person. Terminal only: the `trying <other>
+    // instead` variant is a retry and that person may still be sent.
+    const exhausted =
+      /\b(rec[A-Za-z0-9]{8,}):\s.*\bwrote nothing and there is no other offer for them today/
+        .exec(line);
+    if (exhausted) {
+      if (!prePushReason.has(exhausted[1]!)) {
+        prePushReason.set(
+          exhausted[1]!,
+          'every offer that can run has already been made to them',
+        );
       }
       continue;
     }

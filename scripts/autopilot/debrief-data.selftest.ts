@@ -1653,6 +1653,45 @@ ok('a person who was emailed in the end is not charged with the draft that faile
     return [p.people_emailed, p.people_lost, p.lost_before_push]; })(),
   [1, 4, 2]);
 
+// 2026-11-21: both shapes above were pinned to the wording the 11-06 log used, and on
+// 2026-11-20 eleven of a 21-person silent group were explained by two shapes neither could
+// read. Live lines, verbatim but for the ids.
+const RELABEL_LOG = [
+  // The SAME event and the same lead the 11-07 fixture names: the summary tag is the lead's
+  // finalStatus, and a dead channel got a status of its own.
+  '[2026-11-20T11:21:25Z]   | [CHANNEL_GONE      ] GET CUT → recGONE1AAAAAAAAA__GET_CUT.md',
+  // A finished bundle. This lead was lost by something else and this line must not speak.
+  '[2026-11-20T11:21:25Z]   | [ALREADY_DONE      ] BOOKKEEPING → recDONE2BBBBBBBBB__BOOKKEEPING.md',
+  // A status no reader here has seen. Claimed off its own name rather than ignored.
+  '[2026-11-20T11:21:25Z]   | [SOME_NEW_VERDICT  ] WHOEVER → recNEWTAG3CCCCCCC__WHOEVER.md',
+  // The offer library running out — the day's largest single cause at 10 people.
+  "[2026-11-20T13:18:23Z]   recOUT4DDDDDDDDD: love-your-channel-short wrote nothing and " +
+    'there is no other offer for them today (every offer that can run has already been made to them)',
+  // The retry variant. Same writer, same opening words, and this person is not lost yet.
+  '[2026-11-20T13:18:23Z]   recRETRY5EEEEEEEE: love-your-channel-short wrote nothing; trying ' +
+    'short-save-time instead from the same mailbox (casey@x.com)',
+  '[2026-11-20T13:19:02Z]   |   SENT  recRETRY5EEEEEEEE    a@b.com  smartlead_lead=1',
+].join('\n');
+const RELABEL_PLANNED = ['recGONE1AAAAAAAAA', 'recDONE2BBBBBBBBB', 'recNEWTAG3CCCCCCC',
+  'recOUT4DDDDDDDDD', 'recRETRY5EEEEEEEE'];
+const RELABELLED = siegePushOutcome(RELABEL_LOG, '2026-11-20T08:00:00.000Z',
+  '2026-11-21T08:00:00.000Z', RELABEL_PLANNED, RELABEL_PLANNED, []);
+ok('a relabelled research verdict and an exhausted offer library are not silent losses',
+  [RELABELLED.people_lost, RELABELLED.lost_before_push, RELABELLED.lost_silently],
+  // recDONE2BBBBBBBBB is the one real silent loss: it had a bundle and nothing says why.
+  [4, 3, 1]);
+ok('a lost person carrying an OK status is not charged with it, and an unseen tag names itself',
+  RELABELLED.reasons.map((r) => [r.reason, r.leads, r.lost]),
+  [
+    // Tied on people and lines throughout, so the existing tiebreak is the reason text.
+    ['every offer that can run has already been made to them', 1, 1],
+    ['the research stage ended at some_new_verdict', 1, 1],
+    ['YouTube no longer has their channel', 1, 1],
+  ]);
+ok('the retry wording is not a loss and does not become a push event',
+  [RELABELLED.people_emailed, RELABELLED.failed, RELABELLED.skipped],
+  [1, 0, 0]);
+
 // 2026-10-22: the approval trim. The push run rebuilds the plan, so plan.json can hold
 // people the morning's approval never covered; Siege holds those for tomorrow and they
 // print no line at all, which read as lost_silently. Live 10-21 shape: 149 on disk, 131
