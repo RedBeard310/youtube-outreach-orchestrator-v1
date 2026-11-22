@@ -133,12 +133,12 @@ Other pairs from the same log, unqueried, that look like the same shape:
 
 The gate now records every hop it examines and which of its own screens refused it:
 
-- `hostScreen` — a redirector or link-in-bio host. Working as intended, never the creator.
-- `domainLabel` — the destination domain does not read like the creator's name. This is the
+- `hostScreen`: a redirector or link-in-bio host. Working as intended, never the creator.
+- `domainLabel`: the destination domain does not read like the creator's name. This is the
   branded-shortener bucket, and it is the one the decision hangs on.
-- `pageEvidence` — the domain reads like them and the landed page does not name them. A
+- `pageEvidence`: the domain reads like them and the landed page does not name them. A
   parked domain or a real miss.
-- `unreadableDestination` — the final URL would not parse.
+- `unreadableDestination`: the final URL would not parse.
 
 Each bucket keeps one untouched example, in the style of the plan's not-live rows: a condensed
 key drops the thing a reader decides on. One line prints **per lead**, not per method, which
