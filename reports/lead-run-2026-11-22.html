@@ -1,0 +1,402 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lead Run Debrief 2026-11-21</title>
+<style>
+  :root {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+      --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+      --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+    --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+    --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 40px 22px 80px; }
+  .eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); font-weight: 600; }
+  h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.12; margin: 10px 0 6px; text-wrap: balance; letter-spacing: -.02em; }
+  h2 { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); margin: 44px 0 16px; font-weight: 700; }
+  h3 { font-size: 18px; margin: 0 0 6px; letter-spacing: -.01em; }
+  p { margin: 0 0 14px; }
+  .lede { font-size: 18px; color: var(--ink-soft); max-width: 68ch; }
+  .tag { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--amber-soft); color: var(--amber); letter-spacing: .02em; }
+  .tag.red { background: var(--red-soft); color: var(--red); }
+  .tag.good { background: var(--teal-soft); color: var(--teal); }
+  .grid { display: grid; gap: 14px; }
+  .stats { grid-template-columns: repeat(4, 1fr); margin-top: 26px; }
+  @media (max-width: 720px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; box-shadow: var(--shadow); }
+  .stat .n { font-size: 30px; font-weight: 750; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .stat .l { font-size: 12.5px; color: var(--ink-soft); margin-top: 3px; }
+  .stat .s { font-size: 12px; margin-top: 8px; font-weight: 600; }
+  .up { color: var(--good); } .down { color: var(--red); } .warn { color: var(--amber); }
+  .accent-red { border-left: 3px solid var(--red); }
+  .accent-teal { border-left: 3px solid var(--teal); }
+  .accent-amber { border-left: 3px solid var(--amber); }
+
+  .strip { display: flex; align-items: flex-end; gap: 6px; height: 150px; padding: 14px 14px 10px; overflow-x: auto; }
+  .col { flex: 1 0 44px; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; height: 100%; }
+  .bar { width: 100%; border-radius: 3px 3px 0 0; background: var(--teal); opacity: .9; }
+  .bar.zero { background: var(--line); height: 4px !important; }
+  .bar.bad { background: var(--amber); }
+  .col .cap { font-size: 11px; color: var(--ink-soft); margin-top: 6px; font-variant-numeric: tabular-nums; }
+  .col .vn { font-size: 12px; font-weight: 700; margin-bottom: 4px; font-variant-numeric: tabular-nums; }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-soft); padding: 0 14px 14px; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+
+  .q { border-radius: 14px; padding: 20px 22px; margin-bottom: 14px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); }
+  .q .ask { font-size: 17px; font-weight: 700; color: var(--ink); margin-bottom: 10px; display: flex; gap: 10px; align-items: baseline; }
+  .q .ask .qn { color: var(--red); font-weight: 800; flex: 0 0 auto; }
+  .q p { color: var(--ink-soft); }
+  .q b { color: var(--ink); }
+  .pill { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink); background: var(--panel-2); padding: 1px 7px; border-radius: 6px; border: 1px solid var(--line); white-space: nowrap; }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; background: var(--panel-2); padding: 1px 5px; border-radius: 5px; border: 1px solid var(--line); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+  th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); }
+  td .num { font-variant-numeric: tabular-nums; font-weight: 650; }
+  tr.total td { background: var(--panel-2); font-weight: 700; }
+  .fix td:first-child { color: var(--good); font-weight: 650; }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); box-shadow: var(--shadow); margin-bottom: 14px; }
+  ol.recs { padding-left: 0; list-style: none; counter-reset: r; margin: 0; }
+  ol.recs li { counter-increment: r; position: relative; padding: 14px 16px 14px 52px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 10px; box-shadow: var(--shadow); }
+  ol.recs li::before { content: counter(r); position: absolute; left: 14px; top: 14px; width: 26px; height: 26px; border-radius: 8px; background: var(--teal-soft); color: var(--teal); font-weight: 800; font-size: 14px; display: grid; place-items: center; }
+  ol.recs b { color: var(--ink); }
+  .foot { margin-top: 46px; padding: 16px 18px; border-radius: 12px; background: var(--amber-soft); border: 1px solid var(--line); font-size: 14px; color: var(--ink-soft); }
+  .foot b { color: var(--ink); }
+  .muted { color: var(--ink-soft); font-size: 13.5px; }
+  pre { background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 14px; overflow-x: auto; font-size: 13px; line-height: 1.5; margin: 0 0 14px; }
+</style>
+
+
+
+<div class="wrap">
+
+  <div class="eyebrow">Lead Run Debrief &middot; YouTube outreach</div>
+  <h1>2026-11-21: a quiet Saturday, and the one lane still allowed to produce found a single email address</h1>
+
+  <p class="lede">
+    Nothing was sent, which is correct for a Saturday. So the day comes down to the
+    contact-recovery lane, the only thing that can still add a person we can write to.
+    It walked 600 lead-slots and found <b>one</b> new email address. Part of that is a
+    book it has now read nineteen times. The other part is new: about 14 leads in every
+    150-lead pass lose all nine of their website methods to one gate, every pass, forever,
+    and a fix shipped on 2026-11-08 to rescue exactly those leads has never once been
+    measured. It rescues almost none of them.
+  </p>
+
+  <p>
+    <span class="tag">Saturday, no sending by design</span>
+    <span class="tag red">1 new email address recovered</span>
+    <span class="tag good">fleet 35 to 43 clear</span>
+    <span class="tag good">1 creator said yes</span>
+    <span class="tag red">Apify dead 10 days</span>
+  </p>
+
+  <div class="grid stats">
+    <div class="card stat accent-red">
+      <div class="n">1</div>
+      <div class="l">new email addresses recovered</div>
+      <div class="s down">12 in the whole prior week</div>
+    </div>
+    <div class="card stat accent-red">
+      <div class="n">0</div>
+      <div class="l">people parked onto the shelf</div>
+      <div class="s down">pool flat at 7,390</div>
+    </div>
+    <div class="card stat accent-teal">
+      <div class="n">43</div>
+      <div class="l">mailboxes clear to send</div>
+      <div class="s up">up 8, six came back and stayed</div>
+    </div>
+    <div class="card stat accent-amber">
+      <div class="n">9%</div>
+      <div class="l">of each pass blocked by one gate</div>
+      <div class="s warn">about 14 leads of 150, every lap</div>
+    </div>
+  </div>
+
+  <h2>The shape of the day</h2>
+
+  <div class="card">
+    <p>
+      This was a weekend cycle. The send program runs Monday to Friday, so no plan was
+      written and nobody was emailed, and the snapshot says so in plain words
+      (<code>not_a_sending_day</code>). That is the whole explanation for a zero in the
+      send column. Nothing is wrong there.
+    </p>
+    <p>
+      The cycle was also clean by every other mechanical measure: <b>zero fatal errors</b>,
+      no halt flag, <b>$0 of Anthropic spend</b>, and the reply reader ran twenty times
+      without a single failure. The enrichment chain reports itself idle for want of new
+      work, which is the right answer when 99.8% of the shelf is already finished.
+    </p>
+    <p>
+      So the day is judged on the recovery lane, and on that it was the worst week-on-week
+      reading in a while. <b>The lane's own half added 11 contact points on 8 people and
+      exactly 1 email address</b>, against 77 points and 12 addresses over the prior seven
+      days. Four collect passes ran, 600 lead-slots were walked, and the methods turned up
+      2,390 things of which 2,379 were already on file.
+    </p>
+    <p class="muted">
+      People reached for the first time ever, by Pacific day. Saturday is a zero by design,
+      and the point of the series is the five sending days before it.
+    </p>
+  </div>
+
+  <div class="card" style="margin-top:14px;padding:0">
+    <div class="strip">
+      <div class="col"><div class="vn">0</div><div class="bar zero"></div><div class="cap">11-14</div></div>
+      <div class="col"><div class="vn">0</div><div class="bar zero"></div><div class="cap">11-15</div></div>
+      <div class="col"><div class="vn">1</div><div class="bar" style="height:7%"></div><div class="cap">11-16</div></div>
+      <div class="col"><div class="vn">3</div><div class="bar" style="height:21%"></div><div class="cap">11-17</div></div>
+      <div class="col"><div class="vn">4</div><div class="bar" style="height:28%"></div><div class="cap">11-18</div></div>
+      <div class="col"><div class="vn">0</div><div class="bar zero"></div><div class="cap">11-19</div></div>
+      <div class="col"><div class="vn">1</div><div class="bar" style="height:7%"></div><div class="cap">11-20</div></div>
+      <div class="col"><div class="vn">0</div><div class="bar bad zero"></div><div class="cap">11-21</div></div>
+    </div>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--teal)"></span>new people reached</span>
+      <span><span class="dot" style="background:var(--line)"></span>a day that reached nobody</span>
+      <span><span class="dot" style="background:var(--amber)"></span>this cycle, a Saturday</span>
+    </div>
+  </div>
+
+  <h2>The three questions</h2>
+
+  <div class="q">
+    <div class="ask"><span class="qn">Q1</span><span>Why did 600 lead-slots produce one email address?</span></div>
+    <p>
+      Two reasons, and only one of them is a fault.
+    </p>
+    <p>
+      The benign one is a picked-over book. The lane has 1,769 leads left to walk and it is
+      on <b>lap 19</b>, so almost everybody it reads today it has already read eighteen
+      times. The pass summary says this out loud: the methods found 632 things and
+      <b>625 of them were already on file</b>. Website resolution is healthy (3 leads of 150
+      had no site, no search refusals at all), so this is not the search plan and not a
+      configuration fault.
+    </p>
+    <p>
+      The fault is underneath it. The largest single thing going wrong in the pass is a
+      <b>cross-domain redirect</b>: the lead's own declared website sends us to a different
+      domain, and the fetch refuses to read it, correctly, because otherwise we would file
+      a stranger's contacts under this creator. That refusal was <b>282 of the cycle's 758
+      method errors, 37%</b>, and it is rising across the day: 80, then 50, then 58, then 94.
+    </p>
+    <p>
+      The number looks like a web-wide problem and it is not. Nine collection methods start
+      from the lead's website, so <b>one refused redirect arrives in the roll-up as six
+      separate faults under six method names</b>. Counting back from the method that fetches
+      the homepage once, it is about <b>14 leads of 150</b>. Those 14 lose their entire page
+      half, on every lap, for good. At four passes a day that is roughly 56 lead-slots a day
+      spent on leads that cannot possibly produce.
+    </p>
+  </div>
+
+  <div class="q">
+    <div class="ask"><span class="qn">Q2</span><span>There was a fix for that two weeks ago. Did it work?</span></div>
+    <p>
+      Nobody could tell, and the honest answer now is: almost not at all.
+    </p>
+    <p>
+      On 2026-11-08 a gate shipped to rescue exactly these leads. When a creator's declared
+      link hops to another domain, it reads the page it lands on and follows the hop if the
+      destination plainly belongs to that creator. It <b>logged a line when it followed one
+      and said nothing at all when it refused</b>, so two weeks of passes could not say
+      whether it had helped anybody, and the symptom stayed the biggest condition in the
+      roll-up.
+    </p>
+    <p>
+      The gate asks two things: does the destination domain read like the creator's name,
+      and does the page name them. Its own notes argue that a link the creator declared
+      themselves is stronger evidence than a search result, and then it applies the
+      identical bar a search result has to clear. That is the gap, and it is checkable.
+      The gate's own notes name <code>cme.sh -&gt; www.bigdaddydigital.com</code> as one of
+      the hops it was built to rescue. <b>The real lead behind that hop has
+      <code>channel_name</code> "Steven Thompson"</b>, so the domain does not read like the
+      channel at all and the hop is refused one step before the page is ever considered.
+      The test written alongside the fix passes the channel name "Big Daddy Digital", which
+      no lead in the database carries.
+    </p>
+    <p>
+      This is the common shape. A creator's branded shortener points at their firm: the
+      channel carries the person's name and the domain carries the company's. The gate
+      cannot see that those are the same business.
+    </p>
+  </div>
+
+  <div class="q">
+    <div class="ask"><span class="qn">Q3</span><span>Did anything good happen?</span></div>
+    <p>
+      Three things. <b>A creator agreed to talk.</b> The reply reader classified three people
+      and one of them is a clear yes. The draft is held, not sent, because the sender has
+      been paused since 2026-09-17 by Casey's own decision, and separately because the
+      drafter cannot work out which mailbox that thread sends from and so cannot sign the
+      reply. Casey answers these by hand off his own lanes, and this file cannot see that,
+      so treat it as one name worth checking rather than a missed reply.
+    </p>
+    <p>
+      <b>The sending fleet recovered.</b> 43 mailboxes are clear to send, up from 35, with
+      six named mailboxes back in the clear band and all six still clear at the last reading.
+      No revolving door this time. Four more are held but healthy and will lift themselves,
+      the nearest about two hours out. One caveat: a single band reading at 03:05Z covered
+      fewer mailboxes than the ones around it, so the move counts for the day are not
+      trustworthy. The band totals are.
+    </p>
+    <p>
+      <b>The shelf is intact.</b> 4,852 finished emails are ready and nobody has asked for
+      them, 99.8% of the pool is bundled, and 2,525 people have really been emailed. One lead
+      still carries a sent stamp with no send behind it, standing since 2026-10-07, which is
+      the same single lead as yesterday and not a growing gap.
+    </p>
+  </div>
+
+  <h2>Everything else, in one place</h2>
+
+  <div class="tablewrap">
+  <table>
+    <tr><th>Lane</th><th>Reading</th><th>Verdict</th></tr>
+    <tr><td>Send</td><td class="num">0 emails, no plan written</td><td>Saturday; the timer is Mon-Fri</td></tr>
+    <tr><td>New people reached</td><td class="num">0</td><td>Correct for a weekend</td></tr>
+    <tr><td>Shelf</td><td class="num">4,852 ready, 7,378 bundled (99.8%), 2,525 emailed</td><td>Inventory healthy</td></tr>
+    <tr><td>Parked today</td><td class="num">0</td><td>Pool flat at 7,390</td></tr>
+    <tr><td>Recovery lane (its own half)</td><td class="num">11 points, 1 address, 8 people; lap 19 of 1,769</td><td class="down">Worst week-on-week reading in a while</td></tr>
+    <tr><td>Site resolution</td><td class="num">3 no-site of 150, 0 search refusals</td><td>Working; 625 of 632 already on file</td></tr>
+    <tr><td>Redirect gate</td><td class="num">282 of 758 method errors, 37%</td><td class="down">About 14 leads of 150 blocked, every lap</td></tr>
+    <tr><td>Enrichment chain</td><td class="num">idling, no inflow</td><td>Correct at 99.8% bundled</td></tr>
+    <tr><td>Apify email recovery</td><td class="num">239.6h with no work, 401 bad token</td><td class="down">Eighth morning; $21.06 expires 11-30</td></tr>
+    <tr><td>Replies</td><td class="num">3 people read, 1 yes</td><td class="up">Held, cannot be signed</td></tr>
+    <tr><td>Fleet</td><td class="num">43 clear, 5 watch, 46 stopped</td><td class="up">Up 8; move counts not comparable</td></tr>
+    <tr><td>Discovery</td><td class="num">0 new channels</td><td>Paused by order, not a fault</td></tr>
+    <tr><td>YouTube keys</td><td class="num">15 working of 66</td><td>Settled 09-16, quota cut on 50 projects</td></tr>
+    <tr><td>Spend</td><td class="num">$0 Anthropic; OpenRouter $298.54 at 14&cent;/day</td><td>No concern</td></tr>
+    <tr class="total"><td>Errors</td><td class="num">0 fatal signatures, no halt</td><td>Clean cycle</td></tr>
+  </table>
+  </div>
+
+  <h2>Where the cycle's method errors really went</h2>
+
+  <div class="tablewrap">
+  <table>
+    <tr><th>Condition</th><th>Faults</th><th>What it really is</th></tr>
+    <tr class="fix"><td>Cross-domain redirect</td><td class="num">282</td><td>About 14 leads of 150 losing nine methods each. One cause wearing six method names</td></tr>
+    <tr><td>Fetch failed</td><td class="num">150</td><td>Dead and unreachable sites. The web being the web</td></tr>
+    <tr><td>HTTP code with no body</td><td class="num">31</td><td>A guessed path that is not there</td></tr>
+    <tr class="total"><td>Covered</td><td class="num">463 of 758</td><td>The roll-up sees 66% of the pass; every count is a floor</td></tr>
+  </table>
+  </div>
+
+  <p class="muted">
+    By pass, oldest first, the redirect condition ran 80, 50, 58, 94. The newest pass is the
+    worst of the four, which is why reading any single pass as the day would have been wrong
+    in either direction.
+  </p>
+
+  <h2>Fixes shipped this cycle</h2>
+
+  <div class="card accent-teal">
+    <h3>The refusal that costs the most leads now names itself</h3>
+    <p>
+      The redirect gate printed a line when it followed a hop and nothing when it refused
+      one. So the single largest fault in every pass had a symptom and no cause, and the fix
+      meant to cure it could not be measured two weeks after it shipped.
+    </p>
+    <p>
+      It now records every hop it examines and which of its own three screens said no:
+      the destination is a redirector or a link-in-bio host (working as intended, those are
+      never the creator's site); the destination domain does not read like the creator's name
+      (the branded-shortener case above); or the domain reads like them and the page does not
+      name them (a parked domain, or a real miss). Each bucket keeps one untouched example,
+      and one line prints per <b>lead</b>, not per method, which is the whole point. A pass
+      footer sums it up beside the existing error roll-up it explains.
+    </p>
+    <p>
+      Counting changed no verdict. Nothing about which contacts get filed moved, because
+      whether to loosen that middle screen is an ownership decision and the 2026-08-18 audit's
+      house rule stands: nothing gets filed that cannot be tied to this creator. This measures
+      the size of the decision instead of taking it.
+    </p>
+    <p>
+      The test written alongside the 11-08 fix was also corrected. It asserted that
+      <code>cme.sh -&gt; www.bigdaddydigital.com</code> is rescued using a channel name the
+      lead does not have. The real lead's name is now a case of its own, asserting the live
+      behaviour, so the fixture can no longer read as proof the gate works on that lead.
+    </p>
+    <p class="muted">
+      Verified: type check clean, both bloodhound selftests pass including the new case, and
+      the real channel names were read out of <code>leads.lead_candidates</code> rather than
+      assumed. Committed in <code>youtube-email-outreach-v1</code>.
+    </p>
+  </div>
+
+  <h2>What to do next</h2>
+
+  <ol class="recs">
+    <li>
+      <b>Replace the Apify token.</b> Eighth morning running. It has answered "user or token
+      not found" since 2026-11-12 and the lane has done no work for <b>239 hours</b>, ten
+      days. $21.06 of this month's allowance expires on 2026-11-30 and cannot carry over.
+      This lane found 2,376 addresses in its life and it is the only one that works at size
+      while the free lane re-reads a book it has finished. The token lives in the settings
+      bank, so this is operator-only.
+    </li>
+    <li>
+      <b>Decide whether a link the creator declared can stand on page evidence alone.</b>
+      This is the 14-leads-a-pass question, and from tomorrow the pass footer will say how
+      many leads each half of the gate costs. Today the choice is: keep demanding that the
+      destination domain read like the creator's name, which blocks every branded shortener
+      pointing at the creator's own firm, or accept a declared hop when the page it lands on
+      names them. The second is looser, so it is Casey's call and not a fix an agent should
+      ship on its own.
+    </li>
+    <li>
+      <b>Look at the one creator who said yes.</b> One of three replies read this cycle is a
+      clear agreement to talk. The reply drafter is holding it because it cannot tell which
+      mailbox the thread sends from, which is a real defect and sits in the send program, not
+      here. Eleven replies have been held that way since 2026-10-07, eight of them clear
+      yeses.
+    </li>
+    <li>
+      <b>Leave the fleet alone.</b> It went 35 to 43 clear with six mailboxes back and none
+      falling out again, and four more will lift themselves. The day's move counts are not
+      comparable because one band reading covered a short fleet, so wait for Monday's plan
+      before changing any setting.
+    </li>
+  </ol>
+
+  <div class="foot">
+    <b>What was verified, not assumed.</b> Every figure comes from the grounded snapshot for
+    this cycle. The redirect diagnosis was checked by hand: the real redirect pairs were read
+    out of the collect log, and the channel names behind two of them were queried from
+    <code>leads.lead_candidates</code>, which is how the gate's own named example turned out
+    to fail on a screen its test does not cover. The 14-leads-of-150 figure is a count back
+    from the one method that fetches the homepage once per lead, so it is an estimate of leads
+    from a count of faults, not a measured lead count. That is the thing the new counter will
+    measure directly from tomorrow. Discovery being off, enrichment idling and the weekend
+    zero in the send column are all the intended state and none of them was treated as a
+    fault.
+  </div>
+
+</div>
