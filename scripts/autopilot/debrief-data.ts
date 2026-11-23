@@ -797,6 +797,37 @@ export type FleetFacts = {
   band_stop_prev: number | null;
   band_normal_change: number | null;
   band_stop_change: number | null;
+  /** HOW MANY MAILBOXES EACH READING COVERED (2026-11-23). The band counts above are a
+   *  tally over whatever roster InboxKit handed the gate that hour, and the gate bands
+   *  only the mailboxes it has a warmup record for — so two readings can describe two
+   *  different fleets and the subtraction between them is the 2026-10-16 fault one more
+   *  level up. The 2026-11-10 fix saw this as a ONE-RUN blip and guarded the move counts
+   *  with `band_moves_comparable`; a roster that drops and STAYS down is short exactly
+   *  once and then reads as normal, which is what happened here.
+   *
+   *  At 2026-11-22T14:05Z InboxKit's warmup list fell 94 subscriptions to 28 and held
+   *  there for 19 straight hourly runs. The snapshot published band_normal_change -24 and
+   *  band_stop_change -40 beside band_delta_comparable:true, which reads as 40 mailboxes
+   *  coming off suspension on the morning of a sending day. Nothing recovered: 66
+   *  mailboxes fell out of the instrument while staying exactly as suspended as they were.
+   *
+   *  `band_roster` is normal + watch + stop at the newest reading, `band_roster_prev` the
+   *  same for the reading `band_normal_prev` comes from, and `band_roster_comparable` is
+   *  whether they cover the same number of mailboxes. READ IT BEFORE EITHER CHANGE: a
+   *  false there makes both of them a comparison between two fleets. */
+  band_roster: number | null;
+  band_roster_prev: number | null;
+  band_roster_change: number | null;
+  band_roster_comparable: boolean | null;
+  /** Mailboxes the gate holds suspended in its own name that are NOT in its current
+   *  roster (2026-11-23). `actions()` in automator's inbox_health.py walks `records`,
+   *  which is built from the warmup readings alone, so a mailbox that leaves the roster
+   *  can never earn a resume: it stays suspended in SmartLead with nothing watching it.
+   *  67 of the 72 owned mailboxes were in that state on 2026-11-23. A standing nonzero is
+   *  capacity the fleet has lost with no gate able to give it back, and the repair is in
+   *  automator, which owns the send path and is not this repo's to edit. */
+  band_owned_offline: number | null;
+  band_owned_offline_ids: string[];
   /** Hours between the two band readings, and whether that makes them a day's move. */
   band_gap_hours: number | null;
   band_delta_comparable: boolean | null;
@@ -939,6 +970,12 @@ const NO_FLEET: FleetFacts = {
   band_stop_prev: null,
   band_normal_change: null,
   band_stop_change: null,
+  band_roster: null,
+  band_roster_prev: null,
+  band_roster_change: null,
+  band_roster_comparable: null,
+  band_owned_offline: null,
+  band_owned_offline_ids: [],
   band_gap_hours: null,
   band_delta_comparable: null,
   band_moved_to_normal: null,
@@ -1047,6 +1084,8 @@ export function bandGateFacts(
   | 'band_gate_run_at' | 'band_normal' | 'band_watch' | 'band_stop' | 'band_gate_owned'
   | 'band_prev_at' | 'band_normal_prev' | 'band_watch_prev' | 'band_stop_prev'
   | 'band_normal_change' | 'band_stop_change' | 'band_gap_hours' | 'band_delta_comparable'
+  | 'band_roster' | 'band_roster_prev' | 'band_roster_change' | 'band_roster_comparable'
+  | 'band_owned_offline' | 'band_owned_offline_ids'
   | 'band_moved_to_normal' | 'band_moved_to_watch' | 'band_moved_to_stop' | 'band_returned'
   | 'band_left_normal' | 'band_left_normal_unknown'
   | 'band_short_readings' | 'band_short_reading_at' | 'band_moves_comparable'
@@ -1060,6 +1099,9 @@ export function bandGateFacts(
     band_stop: null, band_gate_owned: null, reasons: {},
     band_prev_at: null, band_normal_prev: null, band_watch_prev: null, band_stop_prev: null,
     band_normal_change: null, band_stop_change: null,
+    band_roster: null, band_roster_prev: null, band_roster_change: null,
+    band_roster_comparable: null,
+    band_owned_offline: null, band_owned_offline_ids: [],
     band_gap_hours: null, band_delta_comparable: null,
     band_moved_to_normal: null, band_moved_to_watch: null, band_moved_to_stop: null,
     band_left_normal: null, band_left_normal_unknown: null,
@@ -1155,6 +1197,15 @@ export function bandGateFacts(
     if (parts.some((p) => p === null)) return null;
     return (parts as number[]).reduce((t, p) => t + p, 0);
   };
+  // HOW MANY MAILBOXES EACH OF THE TWO READINGS COVERED (2026-11-23). The 2026-11-10 fix
+  // below treats a short read as a one-run blip, which it was that day; a roster that
+  // drops and stays down reads as short exactly once and then looks like a steady fleet,
+  // so the step-down ages out of the window and the shrink becomes invisible. These two
+  // sizes sit beside the counts a reader subtracts, and their equality is what makes the
+  // subtraction mean anything.
+  const roster = fleetSize(last);
+  const rosterPrev = fleetSize(prev);
+  const rosterComparable = roster !== null && rosterPrev !== null ? roster === rosterPrev : null;
   const shortRuns = new Set<string>();
   {
     let prevSize: number | null = null;
@@ -1282,13 +1333,29 @@ export function bandGateFacts(
       }
       roundTrips = fellBack.size;
       for (const e of fellBack) if (roundTripIds.length < 12) roundTripIds.push(e);
-      movesComparable = (shortInSpan ?? 0) === 0;
+      // A roster that is simply a different size at the two ends of the span breaks the
+      // move counts the same way a short read does, and does it without ever being short
+      // inside the span once the step-down has aged out.
+      movesComparable = (shortInSpan ?? 0) === 0 && rosterComparable !== false;
     }
   }
 
   // Where the returners actually ended up, and which held mailboxes are already well.
   // Both read the gate's own per-mailbox map, so both are null when it is absent.
   const boxes = s.mailboxes && typeof s.mailboxes === 'object' ? s.mailboxes : null;
+  // Mailboxes this gate suspended and can no longer reach: it owns them, and they are not
+  // in the roster it bands, so no run of it will ever generate a resume for them. Both
+  // maps are needed, so this is null rather than 0 when either is missing.
+  let ownedOffline: number | null = null;
+  const ownedOfflineIds: string[] = [];
+  if (owned && boxes) {
+    ownedOffline = 0;
+    for (const email of Object.keys(owned)) {
+      if (Object.prototype.hasOwnProperty.call(boxes, email)) continue;
+      ownedOffline++;
+      if (ownedOfflineIds.length < 12) ownedOfflineIds.push(email);
+    }
+  }
   let stillNormal: number | null = null;
   let healthy: number | null = null;
   let onClock: number | null = null;
@@ -1347,8 +1414,17 @@ export function bandGateFacts(
     band_stop_prev: stopPrev,
     band_normal_change: normal !== null && normalPrev !== null ? normal - normalPrev : null,
     band_stop_change: stop !== null && stopPrev !== null ? stop - stopPrev : null,
+    band_roster: roster,
+    band_roster_prev: rosterPrev,
+    band_roster_change: roster !== null && rosterPrev !== null ? roster - rosterPrev : null,
+    band_roster_comparable: rosterComparable,
+    band_owned_offline: ownedOffline,
+    band_owned_offline_ids: ownedOfflineIds,
     band_gap_hours: prevGap === null ? null : Number(prevGap.toFixed(1)),
-    band_delta_comparable: Number.isFinite(lastMs) && runs.length > 0 ? prev !== null : null,
+    // Two readings of two different rosters are not a day's move, however well spaced.
+    band_delta_comparable: Number.isFinite(lastMs) && runs.length > 0
+      ? prev !== null && rosterComparable !== false
+      : null,
     band_moved_to_normal: toNormal,
     band_moved_to_watch: toWatch,
     band_moved_to_stop: toStop,
@@ -1444,6 +1520,12 @@ export function fleetFacts(
     band_stop_prev: band.band_stop_prev,
     band_normal_change: band.band_normal_change,
     band_stop_change: band.band_stop_change,
+    band_roster: band.band_roster,
+    band_roster_prev: band.band_roster_prev,
+    band_roster_change: band.band_roster_change,
+    band_roster_comparable: band.band_roster_comparable,
+    band_owned_offline: band.band_owned_offline,
+    band_owned_offline_ids: band.band_owned_offline_ids,
     band_gap_hours: band.band_gap_hours,
     band_delta_comparable: band.band_delta_comparable,
     band_moved_to_normal: band.band_moved_to_normal,
@@ -2393,7 +2475,29 @@ export function sendPlanHealth(
       'moved them from, so the prior band is reconstructed by walking every retained run ' +
       'in order, including the ones behind the window. band_left_normal_unknown is the ' +
       'movers no retained run can place, and a nonzero one makes band_left_normal a LOWER ' +
-      'bound. Both null without a window, like the counts they correct.',
+      'bound. Both null without a window, like the counts they correct. ' +
+      'AND READ band_roster_comparable BEFORE BOTH CHANGES, NOT JUST THE MOVES ' +
+      '(2026-11-23): the 11-10 fix guarded the move counts against a short read and left ' +
+      'band_normal_change and band_stop_change alone, because that day the roster came ' +
+      'back an hour later. A roster that drops and STAYS down is short exactly once, so ' +
+      'the step-down ages out of the window and a fleet half the size of yesterday\'s ' +
+      'reads as steady. At 2026-11-22T14:05Z InboxKit\'s warmup list fell 94 subscriptions ' +
+      'to 28 and held there for 19 straight hourly runs; the gate bands only mailboxes it ' +
+      'has a warmup record for, so this snapshot published band_normal_change -24 and ' +
+      'band_stop_change -40 beside band_delta_comparable:true — which reads as 40 ' +
+      'mailboxes coming off suspension on the morning of a sending day. Not one ' +
+      'recovered. band_roster is how many mailboxes the newest reading covered, ' +
+      'band_roster_prev the same for the reading band_normal_prev comes from, and ' +
+      'band_roster_comparable is whether the two describe the same fleet; ' +
+      'band_delta_comparable and band_moves_comparable are both false when it is false, ' +
+      'so the field a reader opens first cannot say yes to a comparison across two ' +
+      'rosters. AND READ band_owned_offline AS CAPACITY NOBODY CAN GIVE BACK: automator\'s ' +
+      'actions() walks the warmup readings alone, so a mailbox the gate suspended in its ' +
+      'own name that then leaves the roster can never earn a resume — it sits suspended ' +
+      'in SmartLead with nothing watching it. 67 of the 72 owned mailboxes were in that ' +
+      'state on 2026-11-23. The repair is in automator, which owns the send path and is ' +
+      'not this repo\'s to edit. Both null, not 0, when the gate\'s roster or its ' +
+      'ownership ledger is missing.',
   };
 }
 

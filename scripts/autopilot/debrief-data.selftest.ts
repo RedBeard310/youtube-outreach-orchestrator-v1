@@ -2203,6 +2203,64 @@ ok('the day still reads as comparable, because no run read a short fleet',
     return [b.band_short_readings, b.band_moves_comparable, b.band_normal_change];
   })(),
   [0, true, 0]);
+ok('and both readings covered the same roster, so the subtraction means something',
+  (() => {
+    const b = bandGateFacts(BAND_SIDEWAYS, SIDEWAYS_WINDOW);
+    return [b.band_roster, b.band_roster_prev, b.band_roster_change, b.band_roster_comparable,
+      b.band_delta_comparable];
+  })(),
+  [94, 94, 0, true, true]);
+
+// The 2026-11-23 fault: InboxKit's warmup list fell 94 subscriptions to 28 at 14:05Z and
+// stayed there, so the roster the gate bands halved and STAYED halved. It reads short
+// exactly once, which is why the 11-10 guard could not see it the next morning — and the
+// published figures were band_normal_change -24 and band_stop_change -40, a fleet that
+// looked like it had come off suspension overnight. Numbers and shape are the real ones.
+const BAND_ROSTER_FELL = {
+  generated_at: '2026-11-23T08:05:04Z',
+  owned: { 'gone@x.com': { reasons: ['health stop'] }, 'here@x.com': { reasons: ['health stop'] } },
+  mailboxes: { 'here@x.com': { band: 'stop', score: 40 } },
+  runs: [
+    { at: '2026-11-22T07:05:29Z', counts: { normal: 43, watch: 5, stop: 46 }, to_normal: [], to_watch: [], to_stop: [] },
+    { at: '2026-11-22T08:05:15Z', counts: { normal: 43, watch: 5, stop: 46 }, to_normal: [], to_watch: [], to_stop: [] },
+    // InboxKit hands back 28 subscriptions instead of 94. Nothing moved; 66 mailboxes
+    // simply left the instrument, still suspended wherever they were.
+    { at: '2026-11-22T14:05:05Z', counts: { normal: 20, watch: 3, stop: 5 }, to_normal: [], to_watch: [], to_stop: [] },
+    { at: '2026-11-23T08:05:04Z', counts: { normal: 19, watch: 3, stop: 6 }, to_normal: [], to_watch: [], to_stop: [] },
+  ],
+};
+const ROSTER_WINDOW = { sinceISO: '2026-11-22T08:00:00.000Z', untilISO: '2026-11-23T08:00:00.000Z' };
+ok('a roster that halved is not a fleet that recovered, and says so on both changes',
+  (() => {
+    const b = bandGateFacts(BAND_ROSTER_FELL, ROSTER_WINDOW);
+    return [b.band_roster, b.band_roster_prev, b.band_roster_change, b.band_roster_comparable,
+      b.band_normal_change, b.band_stop_change, b.band_delta_comparable, b.band_moves_comparable];
+  })(),
+  [28, 94, -66, false, -24, -40, false, false]);
+ok('and once the step-down sits outside the window, the roster sizes still carry it',
+  (() => {
+    // Nothing inside this span is short — the drop happened before it — so the 11-10
+    // guard reads clean and only band_roster_comparable can still name the fault. This
+    // is the shape that would otherwise go quiet on the SECOND morning and stay quiet.
+    const b = bandGateFacts(BAND_ROSTER_FELL, {
+      sinceISO: '2026-11-23T00:00:00.000Z', untilISO: '2026-11-23T08:00:00.000Z',
+    });
+    return [b.band_short_readings, b.band_roster_comparable, b.band_delta_comparable,
+      b.band_moves_comparable];
+  })(),
+  [0, false, false, false]);
+ok('a mailbox the gate owns and no longer bands is capacity it cannot give back',
+  (() => {
+    const b = bandGateFacts(BAND_ROSTER_FELL, ROSTER_WINDOW);
+    return [b.band_gate_owned, b.band_owned_offline, b.band_owned_offline_ids];
+  })(),
+  [2, 1, ['gone@x.com']]);
+ok('and it is unknown, not zero, when the gate kept no roster map',
+  (() => {
+    const b = bandGateFacts({ ...BAND_ROSTER_FELL, mailboxes: undefined }, ROSTER_WINDOW);
+    return [b.band_owned_offline, b.band_owned_offline_ids];
+  })(),
+  [null, []]);
 // The prior band comes from the runs BEHIND the window as well — `slider` was handed
 // watch twelve hours before the cycle began, and that is the only line that places it.
 // Drop that line and the run's own band deltas still settle it: the clear count did not
