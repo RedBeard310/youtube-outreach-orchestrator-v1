@@ -1,0 +1,402 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lead Run Debrief 2026-11-22</title>
+<style>
+  :root {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+      --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+      --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+    --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+    --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 40px 22px 80px; }
+  .eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); font-weight: 600; }
+  h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.12; margin: 10px 0 6px; text-wrap: balance; letter-spacing: -.02em; }
+  h2 { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); margin: 44px 0 16px; font-weight: 700; }
+  h3 { font-size: 18px; margin: 0 0 6px; letter-spacing: -.01em; }
+  p { margin: 0 0 14px; }
+  .lede { font-size: 18px; color: var(--ink-soft); max-width: 68ch; }
+  .tag { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--amber-soft); color: var(--amber); letter-spacing: .02em; }
+  .tag.red { background: var(--red-soft); color: var(--red); }
+  .tag.good { background: var(--teal-soft); color: var(--teal); }
+  .grid { display: grid; gap: 14px; }
+  .stats { grid-template-columns: repeat(4, 1fr); margin-top: 26px; }
+  @media (max-width: 720px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; box-shadow: var(--shadow); }
+  .stat .n { font-size: 30px; font-weight: 750; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .stat .l { font-size: 12.5px; color: var(--ink-soft); margin-top: 3px; }
+  .stat .s { font-size: 12px; margin-top: 8px; font-weight: 600; }
+  .up { color: var(--good); } .down { color: var(--red); } .warn { color: var(--amber); }
+  .accent-red { border-left: 3px solid var(--red); }
+  .accent-teal { border-left: 3px solid var(--teal); }
+  .accent-amber { border-left: 3px solid var(--amber); }
+
+  .strip { display: flex; align-items: flex-end; gap: 6px; height: 150px; padding: 14px 14px 10px; overflow-x: auto; }
+  .col { flex: 1 0 44px; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; height: 100%; }
+  .bar { width: 100%; border-radius: 3px 3px 0 0; background: var(--teal); opacity: .9; }
+  .bar.zero { background: var(--line); height: 4px !important; }
+  .bar.bad { background: var(--amber); }
+  .col .cap { font-size: 11px; color: var(--ink-soft); margin-top: 6px; font-variant-numeric: tabular-nums; }
+  .col .vn { font-size: 12px; font-weight: 700; margin-bottom: 4px; font-variant-numeric: tabular-nums; }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-soft); padding: 0 14px 14px; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+
+  .q { border-radius: 14px; padding: 20px 22px; margin-bottom: 14px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); }
+  .q .ask { font-size: 17px; font-weight: 700; color: var(--ink); margin-bottom: 10px; display: flex; gap: 10px; align-items: baseline; }
+  .q .ask .qn { color: var(--red); font-weight: 800; flex: 0 0 auto; }
+  .q p { color: var(--ink-soft); }
+  .q b { color: var(--ink); }
+  .pill { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink); background: var(--panel-2); padding: 1px 7px; border-radius: 6px; border: 1px solid var(--line); white-space: nowrap; }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; background: var(--panel-2); padding: 1px 5px; border-radius: 5px; border: 1px solid var(--line); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+  th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); }
+  td .num { font-variant-numeric: tabular-nums; font-weight: 650; }
+  tr.total td { background: var(--panel-2); font-weight: 700; }
+  .fix td:first-child { color: var(--good); font-weight: 650; }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); box-shadow: var(--shadow); margin-bottom: 14px; }
+  ol.recs { padding-left: 0; list-style: none; counter-reset: r; margin: 0; }
+  ol.recs li { counter-increment: r; position: relative; padding: 14px 16px 14px 52px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 10px; box-shadow: var(--shadow); }
+  ol.recs li::before { content: counter(r); position: absolute; left: 14px; top: 14px; width: 26px; height: 26px; border-radius: 8px; background: var(--teal-soft); color: var(--teal); font-weight: 800; font-size: 14px; display: grid; place-items: center; }
+  ol.recs b { color: var(--ink); }
+  .foot { margin-top: 46px; padding: 16px 18px; border-radius: 12px; background: var(--amber-soft); border: 1px solid var(--line); font-size: 14px; color: var(--ink-soft); }
+  .foot b { color: var(--ink); }
+  .muted { color: var(--ink-soft); font-size: 13.5px; }
+  pre { background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 14px; overflow-x: auto; font-size: 13px; line-height: 1.5; margin: 0 0 14px; }
+</style>
+
+
+
+<div class="wrap">
+
+  <div class="eyebrow">Lead Run Debrief &middot; YouTube outreach</div>
+  <h1>2026-11-22: two thirds of the mailbox fleet dropped out of view, and the report said the fleet got better</h1>
+
+  <p class="lede">
+    Sunday, so nothing was sent and that is correct. The thing worth reading happened
+    quietly at 14:05 UTC: the warmup service that the health gate reads went from
+    reporting 94 mailboxes to reporting 28, and stayed there for nineteen hours. The gate
+    only judges mailboxes it can see, so 66 of them left the count. This morning's numbers
+    showed the stopped band dropping from 46 to 6, which reads like most of a suspended
+    fleet coming back the night before a sending Monday. None of it came back.
+  </p>
+
+  <p>
+    <span class="tag">Sunday, no sending by design</span>
+    <span class="tag red">fleet roster 94 to 28</span>
+    <span class="tag red">67 mailboxes suspended with nothing watching them</span>
+    <span class="tag">1 person parked</span>
+    <span class="tag red">Apify dead 11 days</span>
+  </p>
+
+  <div class="grid stats">
+    <div class="card stat accent-red">
+      <div class="n">28</div>
+      <div class="l">mailboxes the health gate can still see</div>
+      <div class="s down">94 the morning before</div>
+    </div>
+    <div class="card stat accent-red">
+      <div class="n">67</div>
+      <div class="l">suspended mailboxes it cannot resume</div>
+      <div class="s down">of the 72 it suspended itself</div>
+    </div>
+    <div class="card stat accent-amber">
+      <div class="n">1</div>
+      <div class="l">person parked onto the shelf</div>
+      <div class="s warn">pool 7,390 to 7,391</div>
+    </div>
+    <div class="card stat accent-teal">
+      <div class="n">4,853</div>
+      <div class="l">finished emails waiting to be sent</div>
+      <div class="s up">99.8% of the pool is bundled</div>
+    </div>
+  </div>
+
+  <h2>The shape of the day</h2>
+
+  <div class="card">
+    <p>
+      This was a Sunday. The send program runs Monday to Friday, so no plan was written,
+      nobody was emailed, and the snapshot says so in plain words
+      (<code>not_a_sending_day</code>). That zero needs no explanation.
+    </p>
+    <p>
+      Everything mechanical was clean: <b>zero fatal errors</b>, no halt flag,
+      <b>$0 of Anthropic spend</b>, 43 cents a day on OpenRouter against a $298 balance,
+      and the reply reader ran nine times without a failure. The enrichment chain reports
+      itself idle for want of new work, which is the right answer when 99.8% of the shelf
+      is already finished. Discovery produced no new channels, which is Casey's standing
+      order and not a fault.
+    </p>
+    <p>
+      One person was parked. The free recovery lane walked 578 lead-slots across four
+      passes and its own half of the work produced <b>one contact point and no email
+      address</b>, against 85 points and 13 addresses over the prior week. The book is on
+      <b>lap 20</b>, so it is reading people it has already read nineteen times.
+    </p>
+    <p>
+      The weekly floor sweep also ran, at 06:49 to 06:52 UTC: 34,835 rows restamped
+      <code>below_threshold</code> across 145 batches. That is the 3,000-subscriber
+      graduate check doing its weekly pass, not a demotion. It moved the population by
+      31 rows and produced nobody sendable, which is the same answer it gave on 11-16.
+    </p>
+    <p class="muted">
+      People reached for the first time ever, by Pacific day. The weekend zeros are by
+      design; the point of the series is the weekdays in it.
+    </p>
+  </div>
+
+  <div class="card" style="margin-top:14px;padding:0">
+    <div class="strip">
+      <div class="col"><div class="vn">0</div><div class="bar zero"></div><div class="cap">11-15</div></div>
+      <div class="col"><div class="vn">1</div><div class="bar" style="height:7%"></div><div class="cap">11-16</div></div>
+      <div class="col"><div class="vn">3</div><div class="bar" style="height:21%"></div><div class="cap">11-17</div></div>
+      <div class="col"><div class="vn">4</div><div class="bar" style="height:28%"></div><div class="cap">11-18</div></div>
+      <div class="col"><div class="vn">0</div><div class="bar zero"></div><div class="cap">11-19</div></div>
+      <div class="col"><div class="vn">1</div><div class="bar" style="height:7%"></div><div class="cap">11-20</div></div>
+      <div class="col"><div class="vn">0</div><div class="bar zero"></div><div class="cap">11-21</div></div>
+      <div class="col"><div class="vn">0</div><div class="bar bad zero"></div><div class="cap">11-22</div></div>
+    </div>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--teal)"></span>new people reached</span>
+      <span><span class="dot" style="background:var(--line)"></span>a day that reached nobody</span>
+      <span><span class="dot" style="background:var(--amber)"></span>this cycle, a Sunday</span>
+    </div>
+  </div>
+
+  <h2>The three questions</h2>
+
+  <div class="q">
+    <div class="ask"><span class="qn">Q1</span><span>What happened to the mailbox fleet?</span></div>
+    <p>
+      Nothing happened to the mailboxes. Something happened to the instrument.
+    </p>
+    <p>
+      The health gate runs every hour. It asks the warmup service for every live warmup
+      subscription, matches those to sending accounts, and gives each one a band: clear to
+      send, on watch, or stopped. At <b>14:05 UTC on Sunday</b> that list came back with
+      <b>28 subscriptions instead of 94</b>, and it has come back with 28 on every one of
+      the nineteen hourly runs since.
+    </p>
+    <p>
+      A mailbox with no warmup record gets no band at all. So the bands this morning
+      describe 28 mailboxes, and yesterday's described 94, and the report subtracted one
+      from the other: <b>clear 43 to 19, stopped 46 to 6</b>. Read as a day's move, that
+      says 40 mailboxes came off suspension overnight. Read correctly, it says 66
+      mailboxes fell out of the instrument while staying exactly as suspended as they
+      already were.
+    </p>
+    <p>
+      The drop is domain-shaped, which is the part worth acting on. <b>Nineteen sending
+      domains lost all three of their mailboxes at the same moment</b>, with a handful of
+      singles alongside. The gate asks for live subscriptions only, so a cancelled or
+      lapsed one simply stops being returned and nothing raises an error. That pattern
+      reads like a subscription or billing event at the warmup provider rather than a
+      flaky read, but this file cannot see the provider's account and will not guess at
+      it.
+    </p>
+  </div>
+
+  <div class="q">
+    <div class="ask"><span class="qn">Q2</span><span>Does that cost sending capacity on Monday?</span></div>
+    <p>
+      Some of it, and one part is stuck in a way nothing in the pipeline can undo on its
+      own.
+    </p>
+    <p>
+      The gate keeps a ledger of mailboxes it suspended in its own name, so it knows which
+      ones are its to release. It holds <b>72</b> of those. Only <b>5</b> are still in the
+      roster it can see. The other <b>67 are suspended in SmartLead by this gate, and the
+      gate will never generate a resume for them</b>, because the code that decides on
+      resumes walks the warmup readings and a mailbox with no reading is not in that walk.
+      They sit suspended with no instrument watching them and no clock running out.
+    </p>
+    <p>
+      That repair belongs in the send program, which owns suspend and resume. This repo
+      does not touch that lever, on purpose.
+    </p>
+    <p>
+      The second effect shows up in this morning's send plan, written around 11:15 UTC,
+      which is after this cycle closed. A mailbox missing from the warmup list already has
+      a reason of its own in that plan: its warmup age is unknown. Expect that row to jump.
+      <b>Read its <code>only</code> count, not its <code>count</code></b>: a mailbox
+      blocked by something else as well picks the reason up and proves nothing. That rule
+      cost the 11-04 debrief its top recommendation and it applies here exactly.
+    </p>
+  </div>
+
+  <div class="q">
+    <div class="ask"><span class="qn">Q3</span><span>Why did 578 lead-slots produce one contact point?</span></div>
+    <p>
+      A picked-over book, plus an ownership rule throwing out almost every website the
+      search found. Neither is bought with money.
+    </p>
+    <p>
+      The book half is plain. The lane has 1,771 leads to walk and it is on lap 20. Across
+      the cycle the methods turned up 1,227 things and <b>1,226 of them were already on
+      file</b>. One was new.
+    </p>
+    <p>
+      The other half swung hard from yesterday. In the newest pass, <b>120 of 128 leads
+      resolved no website at all</b>, and the cause is not a dead search plan: the search
+      ran 128 times, refused twice, and handed back <b>110 candidate sites</b>. The
+      ownership rule rejected <b>102</b> of those 110, and 16 more were social profiles
+      rather than sites. Nine of the lane's collection methods need a website first, so
+      those 120 leads lost their page half before any method ran.
+    </p>
+    <p>
+      Yesterday the same reading was three leads of 150. A swing that size between two
+      days is the cursor reaching a different slice of the book, not a change in the rule.
+      The rule itself is deliberate and has been since the 2026-08-18 audit: nothing gets
+      filed that cannot be tied to this creator. <b>More search credit buys nothing here.</b>
+      The redirect fault that led the last two debriefs went to zero in the two newest
+      passes for the same reason, because a lead with no resolved site has no link to
+      follow.
+    </p>
+  </div>
+
+  <h2>Everything else, in one place</h2>
+
+  <div class="tablewrap">
+  <table>
+    <tr><th>Lane</th><th>Reading</th><th>Verdict</th></tr>
+    <tr><td>Send</td><td class="num">0 emails, no plan written</td><td>Sunday; the timer is Mon-Fri</td></tr>
+    <tr><td>New people reached</td><td class="num">0</td><td>Correct for a weekend</td></tr>
+    <tr><td>Fleet roster</td><td class="num">28 mailboxes banded, 94 the day before</td><td class="down">The instrument shrank, not the fleet</td></tr>
+    <tr><td>Fleet bands</td><td class="num">19 clear, 3 watch, 6 stopped</td><td class="down">Not comparable to yesterday's 43 / 5 / 46</td></tr>
+    <tr><td>Gate-owned suspensions</td><td class="num">72 owned, 67 outside the roster</td><td class="down">It cannot resume them</td></tr>
+    <tr><td>Shelf</td><td class="num">4,853 ready, 7,379 bundled (99.8%), 2,525 emailed</td><td>Inventory healthy</td></tr>
+    <tr><td>Parked today</td><td class="num">1</td><td>Pool 7,390 to 7,391</td></tr>
+    <tr><td>Recovery lane (its own half)</td><td class="num">1 point, 0 addresses, 1 person; lap 20 of 1,771</td><td class="down">85 points and 13 addresses the prior week</td></tr>
+    <tr><td>Site resolution</td><td class="num">120 no-site of 128; gate threw out 102 of 110 candidates</td><td class="warn">Ownership rule, not a dead search plan</td></tr>
+    <tr><td>Floor sweep</td><td class="num">34,835 rows restamped, population down 31</td><td>Weekly graduate check; nobody sendable</td></tr>
+    <tr><td>Enrichment chain</td><td class="num">idling, no inflow</td><td>Correct at 99.8% bundled</td></tr>
+    <tr><td>Apify email recovery</td><td class="num">263.6h with no work, 401 bad token since 11-19</td><td class="down">Ninth morning; $21.06 expires 11-30</td></tr>
+    <tr><td>Replies</td><td class="num">2 people read, 0 yes, 0 failures</td><td>Quiet, not broken</td></tr>
+    <tr><td>Discovery</td><td class="num">0 new channels</td><td>Paused by order, not a fault</td></tr>
+    <tr><td>YouTube keys</td><td class="num">15 working of 66</td><td>Settled 09-16, quota cut on 50 projects</td></tr>
+    <tr><td>Spend</td><td class="num">$0 Anthropic; OpenRouter $298.11 at 43&cent;/day</td><td>No concern</td></tr>
+    <tr class="total"><td>Errors</td><td class="num">0 fatal signatures, no halt</td><td>Clean cycle</td></tr>
+  </table>
+  </div>
+
+  <h2>Where the cycle's method errors went</h2>
+
+  <div class="tablewrap">
+  <table>
+    <tr><th>Condition</th><th>Faults</th><th>What it really is</th></tr>
+    <tr><td>Page rendered with no outbound links</td><td class="num">155</td><td>The creator genuinely links nothing. A content outcome, not a fault</td></tr>
+    <tr class="fix"><td>Cross-domain redirect</td><td class="num">95</td><td>By pass: 62, 33, 0, 0. It stopped because the later passes resolved almost no sites to redirect from</td></tr>
+    <tr><td>Fetch failed</td><td class="num">48</td><td>Dead and unreachable sites. The web being the web</td></tr>
+    <tr><td>Podcast directory refused or throttled</td><td class="num">20</td><td>Apple meters its search API per address</td></tr>
+    <tr class="total"><td>Measured</td><td class="num">427 across 4 passes</td><td>578 lead-slots, 1,226 of 1,227 findings already on file</td></tr>
+  </table>
+  </div>
+
+  <h2>Fixes shipped this cycle</h2>
+
+  <div class="card accent-teal">
+    <h3>A fleet that halved and stayed halved now says so on the figures a reader opens first</h3>
+    <p>
+      On 2026-11-10 a short reading of the fleet was caught and the move counts were
+      guarded against it. That day the roster came back an hour later, so the guard was
+      built for a blip: it marks a run that read fewer mailboxes than the run before it.
+      A roster that drops and <b>stays</b> down is short exactly once. The step-down ages
+      out of the window within a day, and from then on a fleet half the size of
+      yesterday's reads as a steady one.
+    </p>
+    <p>
+      That is this cycle, and the guard was the wrong shape for it. The two change figures
+      were never covered at all, so the snapshot published clear down 24 and stopped down
+      40 beside a flag saying the comparison was sound.
+    </p>
+    <p>
+      The report now records <b>how many mailboxes each of the two readings covered</b>,
+      the difference between them, and whether they describe the same fleet. When they do
+      not, both the day-over-day flag and the move-count flag read false, so the field a
+      reader opens first cannot say yes to a comparison across two different rosters. It
+      also now counts the mailboxes the gate suspended in its own name that have left its
+      roster, which is the 67 above: capacity nobody can give back.
+    </p>
+    <p class="muted">
+      Verified: ran against the live gate state and it reproduces 28 against 94, a
+      difference of 66, both flags false, and 67 stranded suspensions. Five new test cases
+      cover the day of the drop and the morning after, when nothing in the window is short
+      any more and only the roster sizes carry the fault. Full suite passes, type check
+      clean. Committed in <code>youtube-outreach-orchestrator-v1</code> as
+      <code>a4759d3</code>.
+    </p>
+  </div>
+
+  <h2>What to do next</h2>
+
+  <ol class="recs">
+    <li>
+      <b>Find out why the warmup list went from 94 subscriptions to 28.</b> Nineteen
+      sending domains lost all three of their mailboxes in the same hour, which looks like
+      a plan or billing event at the warmup provider rather than a glitch. Check the
+      account. This is the Monday capacity question and everything else on this list is
+      smaller than it.
+    </li>
+    <li>
+      <b>Release the 67 mailboxes the health gate can no longer reach.</b> They are
+      suspended in SmartLead in the gate's name, and the gate only considers mailboxes it
+      has a warmup reading for, so no future run of it will ever resume them. Either the
+      warmup records come back, which fixes it for free, or the resume path needs to
+      handle a mailbox it owns and cannot read. That code is in the send program, not
+      here.
+    </li>
+    <li>
+      <b>Replace the Apify token.</b> Ninth morning. It has answered "user or token not
+      found" since 2026-11-19 and the lane has done no work for <b>263 hours</b>, eleven
+      days. $21.06 of this month's allowance expires on 2026-11-30 and does not carry
+      over. The token lives in the settings bank, so this is operator-only.
+    </li>
+    <li>
+      <b>Leave the free recovery lane alone this week.</b> It is on lap 20 of a book where
+      1,226 of 1,227 findings are already on file, and the newest pass lost 120 of 128
+      leads to the ownership rule before any method ran. More search credit buys nothing
+      there. Whether that rule should accept a website the creator declared themselves is
+      still Casey's open call from the 11-22 debrief, and the per-lead counters shipped
+      that day will have a week of readings by Friday.
+    </li>
+  </ol>
+
+  <div class="foot">
+    <b>What was verified, not assumed.</b> Every figure comes from the grounded snapshot
+    for this cycle, except the fleet diagnosis, which was checked by hand: the health
+    gate's own log shows the subscription count stepping 94 to 28 at 2026-11-22T14:05Z and
+    holding for nineteen runs, and the 72 owned against 28 banded mailboxes were counted
+    straight out of the gate's state file, along with the domains behind them. Whether the
+    warmup subscriptions were cancelled, lapsed, or dropped by the provider is <b>not</b>
+    established here and needs the provider's account. The claim that the gate cannot
+    resume the 67 was read off the resume code itself, which walks the warmup readings
+    only. Discovery being off, enrichment idling and the weekend zero in the send column
+    are all the intended state and none of them was treated as a fault.
+  </div>
+
+</div>
