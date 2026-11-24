@@ -1,0 +1,440 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lead Run Debrief 2026-11-23</title>
+<style>
+  :root {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+      --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+      --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+    --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+    --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 40px 22px 80px; }
+  .eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); font-weight: 600; }
+  h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.12; margin: 10px 0 6px; text-wrap: balance; letter-spacing: -.02em; }
+  h2 { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); margin: 44px 0 16px; font-weight: 700; }
+  h3 { font-size: 18px; margin: 0 0 6px; letter-spacing: -.01em; }
+  p { margin: 0 0 14px; }
+  .lede { font-size: 18px; color: var(--ink-soft); max-width: 68ch; }
+  .tag { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--amber-soft); color: var(--amber); letter-spacing: .02em; }
+  .tag.red { background: var(--red-soft); color: var(--red); }
+  .tag.good { background: var(--teal-soft); color: var(--teal); }
+  .grid { display: grid; gap: 14px; }
+  .stats { grid-template-columns: repeat(4, 1fr); margin-top: 26px; }
+  @media (max-width: 720px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; box-shadow: var(--shadow); }
+  .stat .n { font-size: 30px; font-weight: 750; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .stat .l { font-size: 12.5px; color: var(--ink-soft); margin-top: 3px; }
+  .stat .s { font-size: 12px; margin-top: 8px; font-weight: 600; }
+  .up { color: var(--good); } .down { color: var(--red); } .warn { color: var(--amber); }
+  .accent-red { border-left: 3px solid var(--red); }
+  .accent-teal { border-left: 3px solid var(--teal); }
+  .accent-amber { border-left: 3px solid var(--amber); }
+
+  .strip { display: flex; align-items: flex-end; gap: 6px; height: 150px; padding: 14px 14px 10px; overflow-x: auto; }
+  .col { flex: 1 0 44px; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; height: 100%; }
+  .bar { width: 100%; border-radius: 3px 3px 0 0; background: var(--teal); opacity: .9; }
+  .bar.zero { background: var(--line); height: 4px !important; }
+  .bar.bad { background: var(--amber); }
+  .col .cap { font-size: 11px; color: var(--ink-soft); margin-top: 6px; font-variant-numeric: tabular-nums; }
+  .col .vn { font-size: 12px; font-weight: 700; margin-bottom: 4px; font-variant-numeric: tabular-nums; }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-soft); padding: 0 14px 14px; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+
+  .q { border-radius: 14px; padding: 20px 22px; margin-bottom: 14px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); }
+  .q .ask { font-size: 17px; font-weight: 700; color: var(--ink); margin-bottom: 10px; display: flex; gap: 10px; align-items: baseline; }
+  .q .ask .qn { color: var(--red); font-weight: 800; flex: 0 0 auto; }
+  .q p { color: var(--ink-soft); }
+  .q b { color: var(--ink); }
+  .pill { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink); background: var(--panel-2); padding: 1px 7px; border-radius: 6px; border: 1px solid var(--line); white-space: nowrap; }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; background: var(--panel-2); padding: 1px 5px; border-radius: 5px; border: 1px solid var(--line); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+  th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); }
+  td .num { font-variant-numeric: tabular-nums; font-weight: 650; }
+  tr.total td { background: var(--panel-2); font-weight: 700; }
+  .fix td:first-child { color: var(--good); font-weight: 650; }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); box-shadow: var(--shadow); margin-bottom: 14px; }
+  ol.recs { padding-left: 0; list-style: none; counter-reset: r; margin: 0; }
+  ol.recs li { counter-increment: r; position: relative; padding: 14px 16px 14px 52px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 10px; box-shadow: var(--shadow); }
+  ol.recs li::before { content: counter(r); position: absolute; left: 14px; top: 14px; width: 26px; height: 26px; border-radius: 8px; background: var(--teal-soft); color: var(--teal); font-weight: 800; font-size: 14px; display: grid; place-items: center; }
+  ol.recs b { color: var(--ink); }
+  .foot { margin-top: 46px; padding: 16px 18px; border-radius: 12px; background: var(--amber-soft); border: 1px solid var(--line); font-size: 14px; color: var(--ink-soft); }
+  .foot b { color: var(--ink); }
+  .muted { color: var(--ink-soft); font-size: 13.5px; }
+  pre { background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 14px; overflow-x: auto; font-size: 13px; line-height: 1.5; margin: 0 0 14px; }
+</style>
+
+
+
+<div class="wrap">
+
+  <div class="eyebrow">Lead Run Debrief &middot; YouTube outreach</div>
+  <h1>2026-11-23: the biggest loss on the board said the offer library ran out. One empty research file did it</h1>
+
+  <p class="lede">
+    A real sending Monday. Sixty-five emails went out and not one of them reached a person
+    who had never heard from us. Twenty-three of the eighty-five approved people got no
+    email at all, and the single largest cause, ten of them, was reported as "every offer
+    that can run has already been made to them." The offer library is fine. Those ten
+    people each have one offer left in their rotation, that offer needs a line siding with
+    the creator against something they argue with, and their research file has no such line
+    in it.
+  </p>
+
+  <p>
+    <span class="tag">Monday, 65 emails</span>
+    <span class="tag red">0 new people reached, 4th day running</span>
+    <span class="tag red">10 lost to an empty research file</span>
+    <span class="tag red">Apify dead 12 days</span>
+    <span class="tag">1 person parked</span>
+  </p>
+
+  <div class="grid stats">
+    <div class="card stat accent-red">
+      <div class="n">0</div>
+      <div class="l">people reached for the first time</div>
+      <div class="s down">of 60 people emailed, all repeats</div>
+    </div>
+    <div class="card stat accent-red">
+      <div class="n">10</div>
+      <div class="l">lost because one offer had nothing to write</div>
+      <div class="s down">of 23 people lost, the largest cause</div>
+    </div>
+    <div class="card stat accent-amber">
+      <div class="n">17</div>
+      <div class="l">mailboxes able to send on Monday</div>
+      <div class="s warn">of 124 in the fleet</div>
+    </div>
+    <div class="card stat accent-teal">
+      <div class="n">4,854</div>
+      <div class="l">finished emails waiting to be sent</div>
+      <div class="s up">nobody has ever written to them</div>
+    </div>
+  </div>
+
+  <h2>The shape of the day</h2>
+
+  <div class="card">
+    <p>
+      Monday ran. Siege wrote a plan at 11:27 UTC, the push unit reported success, and
+      <b>65 emails</b> went out: 62 from the send program and 3 from a run this repo
+      launched. The mechanics were clean. <b>Zero fatal errors</b>, no halt flag,
+      <b>$0 of Anthropic spend</b>, 13 cents a day on OpenRouter against a $298 balance,
+      and the reply reader ran fifteen times without a single failure.
+    </p>
+    <p>
+      The day's two real readings are both about who got written to. Sixty people were
+      emailed and <b>all sixty had heard from us before</b>. The shelf holds <b>4,854
+      finished emails for people nobody has ever written to</b>, and none of them went.
+      That is the fourth consecutive day reaching nobody new and the sixth sending day in
+      a row at one person or zero.
+    </p>
+    <p>
+      Twenty-three of the eighty-five people the push was asked for ended the day with no
+      email. <b>Twenty-one of the twenty-three had been lost before</b>, and one of them
+      has now been lost on ten consecutive snapshot days. Two were new. Nothing about this
+      is a fresh leak; it is the same people being planned and dropped every morning.
+    </p>
+    <p>
+      Everything else behaved. One person was parked. The free recovery lane walked 450
+      lead-slots across three passes and its own half produced <b>five contact points and
+      no email address</b>, against 77 points and 13 addresses over the prior week. The
+      enrichment chain reports itself idle for want of new work, which is the right answer
+      when 99.8% of the shelf is finished. Discovery produced no new channels, which is
+      Casey's standing order and not a fault.
+    </p>
+    <p class="muted">
+      People reached for the first time ever, by Pacific day. Saturday and Sunday are zero
+      by design; the weekdays are the point.
+    </p>
+  </div>
+
+  <div class="card" style="margin-top:14px;padding:0">
+    <div class="strip">
+      <div class="col"><div class="vn">1</div><div class="bar" style="height:25%"></div><div class="cap">11-16</div></div>
+      <div class="col"><div class="vn">3</div><div class="bar" style="height:75%"></div><div class="cap">11-17</div></div>
+      <div class="col"><div class="vn">4</div><div class="bar" style="height:100%"></div><div class="cap">11-18</div></div>
+      <div class="col"><div class="vn">0</div><div class="bar zero"></div><div class="cap">11-19</div></div>
+      <div class="col"><div class="vn">1</div><div class="bar" style="height:25%"></div><div class="cap">11-20</div></div>
+      <div class="col"><div class="vn">0</div><div class="bar zero"></div><div class="cap">11-21</div></div>
+      <div class="col"><div class="vn">0</div><div class="bar zero"></div><div class="cap">11-22</div></div>
+      <div class="col"><div class="vn">0</div><div class="bar bad zero"></div><div class="cap">11-23</div></div>
+    </div>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--teal)"></span>new people reached</span>
+      <span><span class="dot" style="background:var(--line)"></span>a day that reached nobody</span>
+      <span><span class="dot" style="background:var(--amber)"></span>this cycle, a Monday</span>
+    </div>
+  </div>
+
+  <h2>The three questions</h2>
+
+  <div class="q">
+    <div class="ask"><span class="qn">Q1</span><span>What really lost the ten people?</span></div>
+    <p>
+      An empty file, not an empty library. The wording on the board is the send program's
+      summary after the last offer in a person's rotation declined to write, and the writer
+      had already said why, two lines earlier in the same log.
+    </p>
+    <p>
+      Every one of the ten was turned down by the same offer,
+      <code>love-your-channel-short</code>, for the same stated reason: <b>no safe enemy in
+      the bank</b>. That offer opens by siding with the creator against something they push
+      back on, and it reads that from the <b>enemies bank</b> in the creator's research
+      bundle, a short file listing the people, ideas and practices the creator argues
+      against, each with a quote. No enemy in the file, no opening line, no email.
+    </p>
+    <p>
+      Eleven people have now been named this way since 11-11, and it is the same eleven
+      each time, not a growing leak. Reading their files by hand:
+    </p>
+    <div class="tablewrap" style="margin-top:4px">
+    <table>
+      <tr><th>What their enemies bank holds</th><th>People</th><th>What would fix it</th></tr>
+      <tr><td>No enemies, on full transcript coverage</td><td class="num">7</td><td>Re-run the mining, or accept a weaker enemy</td></tr>
+      <tr><td>No enemies, and no transcripts were mined at all</td><td class="num">2</td><td>Get transcripts first</td></tr>
+      <tr><td>Enemies on file, all of them ruled out by the offer's own safety filter</td><td class="num">2</td><td>Nothing. The filter is doing its job</td></tr>
+      <tr class="total"><td>Named since 11-11</td><td class="num">11</td><td>Ten of them were lost again on Monday</td></tr>
+    </table>
+    </div>
+    <p>
+      The two with no transcripts are the clearest: their research never had anything to
+      mine, so nothing downstream could have worked. The seven with full coverage are the
+      interesting group, because the mining ran across every transcript they have and came
+      back with nothing. One is a plastic surgeon who explains procedures, which may simply
+      be a creator who picks no fights. <b>Whether these people are worth another pass of
+      research or should stop being planned is a judgment call and it is Casey's</b>, and
+      either way the repair is their research or the rotation order, never a new offer.
+    </p>
+    <p>
+      The report no longer misdirects: the loss row now reads "every offer that can run has
+      already been made to them (love-your-channel-short: no safe enemy in the bank)" and
+      carries the breakdown beside it. That fix is below.
+    </p>
+  </div>
+
+  <div class="q">
+    <div class="ask"><span class="qn">Q2</span><span>Why did 65 emails reach nobody new?</span></div>
+    <p>
+      Because the plan is still spending every slot on people we have already contacted,
+      and there were only 89 slots to spend.
+    </p>
+    <p>
+      Repeat offers are deliberate and have been since 2026-10-07, so this is not a fault
+      on its own. The number that makes it worth reading is the pairing: <b>60 people
+      emailed, 60 of them repeats, and 4,854 finished emails sitting unsent for people
+      nobody has ever contacted</b>. The send program fills slots by tier, and the top tier
+      ran out of never-emailed people back on 10-13, so its re-offer queue takes the room.
+      <b>1,346 people were ready and waiting for a slot</b>: 219 in the top tier, 714 in the
+      next, 413 below that.
+    </p>
+    <p>
+      The slot ceiling is the other half. Monday had <b>89 slots across 17 live
+      mailboxes</b> out of a fleet of 124, against a warmup allowance of 870. So the
+      constraint is not the ramp and not the shelf. It is how few mailboxes can send and
+      which people the queue puts in front of them. Both of those levers live in the send
+      program, which this repo does not touch on purpose.
+    </p>
+  </div>
+
+  <div class="q">
+    <div class="ask"><span class="qn">Q3</span><span>Did Sunday's fleet collapse cost Monday anything?</span></div>
+    <p>
+      Yes, and this time the measurement is trustworthy. Yesterday's fix did its job.
+    </p>
+    <p>
+      The warmup list is still reporting <b>28 mailboxes</b>, the same 28 it dropped to on
+      Sunday afternoon, so both readings describe the same fleet and the day-over-day move
+      is real rather than an artefact: <b>clear to send went 19 to 16, stopped went 6 to
+      8</b>. The gate moved nobody back to clear all day, moved one to watch and two to
+      stop, and the three mailboxes it is holding that are already healthy are all just
+      waiting out a clock, the nearest with 24 hours left.
+    </p>
+    <p>
+      The cost shows up in Monday's plan. The reason "not in the warmup list, so its age is
+      unknown" is attached to <b>96 mailboxes</b>, and the figure that matters is that
+      <b>23 of them carry nothing else</b>. Those 23 are blocked only by the missing warmup
+      record. That is a change worth noting: on 11-04 the same row was a passenger, with
+      every mailbox on it blocked by something else too, and the 11-04 debrief's top
+      recommendation was wrong for exactly that reason. It is not a passenger now.
+      Restoring the warmup records would hand back about 23 mailboxes.
+    </p>
+    <p>
+      Unchanged from yesterday: <b>67 mailboxes are suspended in the health gate's own name
+      and have left the list it reads</b>, so no future run of it will ever resume them. The
+      repair is in the send program. Day-over-day fleet numbers from the plan itself are
+      unavailable this morning, because yesterday was a Sunday and no plan was written, so
+      17 live mailboxes is stated on its own and not compared.
+    </p>
+  </div>
+
+  <h2>Everything else, in one place</h2>
+
+  <div class="tablewrap">
+  <table>
+    <tr><th>Lane</th><th>Reading</th><th>Verdict</th></tr>
+    <tr><td>Send</td><td class="num">65 emails; 62 by the send program, 3 by this repo</td><td>Plan written, push reported success</td></tr>
+    <tr><td>New people reached</td><td class="num">0 of 60 people emailed</td><td class="down">4th day running; 6 sending days at 1 or 0</td></tr>
+    <tr><td>People lost</td><td class="num">23 of 85 asked for; 7 refused, 13 before the push, 3 unexplained</td><td class="down">21 of 23 were lost before, streak now 10 days</td></tr>
+    <tr class="fix"><td>Largest loss cause</td><td class="num">10 people, one offer, an empty enemies bank</td><td>Reported as an exhausted offer library until today</td></tr>
+    <tr><td>Push-level skips</td><td class="num">13 skipped, all 13 rewritten and sent</td><td>Cost nobody; not a shortfall</td></tr>
+    <tr><td>Deferred by the approval gate</td><td class="num">4 people held for the next day</td><td>Not a loss, by design</td></tr>
+    <tr><td>Slots</td><td class="num">89 slots, 17 live mailboxes of 124, 1,346 waiting</td><td class="warn">Allowance was 870; mailboxes are the ceiling</td></tr>
+    <tr><td>Fleet bands</td><td class="num">16 clear, 4 watch, 8 stop, roster 28 both days</td><td class="down">Clear down 3; comparison is sound</td></tr>
+    <tr><td>Warmup record missing</td><td class="num">96 mailboxes name it, 23 carry nothing else</td><td class="down">23 recoverable slots, unlike 11-04</td></tr>
+    <tr><td>Gate-owned suspensions</td><td class="num">74 owned, 67 outside the roster</td><td class="down">Second morning; it cannot resume them</td></tr>
+    <tr><td>Shelf</td><td class="num">4,854 ready, 7,380 bundled (99.8%), 2,525 emailed</td><td>Inventory healthy</td></tr>
+    <tr><td>Parked today</td><td class="num">1</td><td>Pool 7,391 to 7,392</td></tr>
+    <tr><td>Recovery lane (its own half)</td><td class="num">5 points, 0 addresses, 2 people; lap 20 of 1,770</td><td class="down">77 points and 13 addresses the prior week</td></tr>
+    <tr><td>Site resolution</td><td class="num">4 no-site of 150 in the newest pass</td><td>Healthy; the 11-22 swing was the book's slice</td></tr>
+    <tr><td>Enrichment chain</td><td class="num">idling, no inflow; 1 lead finished</td><td>Correct at 99.8% bundled</td></tr>
+    <tr><td>Apify email recovery</td><td class="num">287.6h with no work; token refused since 11-12</td><td class="down">Tenth morning; $21.06 expires 11-30</td></tr>
+    <tr><td>Replies</td><td class="num">7 people read, 0 yes, 0 failures</td><td>5 unsubscribes, 1 no, 1 other</td></tr>
+    <tr><td>Discovery</td><td class="num">0 new channels</td><td>Paused by order, not a fault</td></tr>
+    <tr><td>YouTube keys</td><td class="num">15 working of 66</td><td>Settled 09-16; quota cut on 50 projects</td></tr>
+    <tr><td>Spend</td><td class="num">$0 Anthropic; OpenRouter $297.98 at 13&cent;/day</td><td>No concern</td></tr>
+    <tr class="total"><td>Errors</td><td class="num">0 fatal signatures, no halt</td><td>Clean cycle</td></tr>
+  </table>
+  </div>
+
+  <h2>Where the cycle's recovery-lane errors went</h2>
+
+  <div class="tablewrap">
+  <table>
+    <tr><th>Condition</th><th>Faults</th><th>What it really is</th></tr>
+    <tr><td>Cross-domain redirect</td><td class="num">150</td><td>By pass: 62, 66, 22. Steady, and the three passes disagree by threefold, so no single pass can carry it</td></tr>
+    <tr><td>Fetch failed</td><td class="num">137</td><td>Dead and unreachable sites. The web being the web</td></tr>
+    <tr><td>Reply with no body</td><td class="num">35</td><td>A server answering without content</td></tr>
+    <tr><td>Page rendered with no outbound links</td><td class="num">12</td><td>The creator genuinely links nothing. A content outcome, not a fault</td></tr>
+    <tr class="total"><td>Measured</td><td class="num">523 across 3 passes</td><td>450 lead-slots; 1,621 of 1,627 findings already on file</td></tr>
+  </table>
+  </div>
+
+  <h2>Fixes shipped this cycle</h2>
+
+  <div class="card accent-teal">
+    <h3>The biggest loss on the board now names its cause instead of its conclusion</h3>
+    <p>
+      The row "every offer that can run has already been made to them" shipped on 11-21 and
+      led the loss table on all three sending days since. It reads as an offer library with
+      nothing left to say, which sends a reader straight at writing more offers. That is the
+      wrong repair. The phrase is the send program's own summary <b>after</b> the last offer
+      in someone's rotation declined to write, so it states a conclusion and never a cause.
+    </p>
+    <p>
+      The cause was in the log the whole time, in a column format nothing here could read:
+    </p>
+    <pre>| Doctor Carl Truesdale    skipped    no safe enemy in the bank (0 found, all ruled out)
+rectI4slX3LejGPG7: love-your-channel-short wrote nothing and there is no other offer
+  for them today (every offer that can run has already been made to them)</pre>
+    <p>
+      Both lines are the same person at the same moment. The loss row now carries the offer
+      that ran dry and the precondition it failed on, and a new <code>offer_exhaustion</code>
+      block holds the full verdict, which offer it belongs to, and how many leads that offer
+      said it about, so a thin reading shows as thin instead of confident.
+    </p>
+    <p>
+      The pairing is per offer and not per person, deliberately. The writer keys its refusal
+      by channel name, the summary line keys by lead id, and the summary lines print in one
+      group at the end of the planning phase rather than beside the batch that caused them.
+      No honest per-person join exists in that file, so the offer's dominant verdict inside
+      the day is what gets claimed, <b>and an offer with no verdict in the window keeps the
+      bare old wording rather than borrowing somebody else's reason</b>. The verdict has its
+      per-lead count collapsed to N, because "(0 found, all ruled out)" would otherwise split
+      one precondition into a row per lead.
+    </p>
+    <p class="muted">
+      Verified: ran against Monday's live log and plan and it reproduces the published
+      figures exactly, 89 planned, 85 approved, 23 lost, 13 lost before the push, with the
+      top row now naming <code>love-your-channel-short</code> and its empty bank. Seven new
+      test cases cover an offer with no verdict, two spellings of one precondition, a person
+      emailed by a later batch, the batch summary lines that hold the word "skipped" and are
+      not verdicts, and an unreadable plan reading unknown rather than zero. Full suite
+      passes at 438 cases, type check clean. Committed in
+      <code>youtube-outreach-orchestrator-v1</code> as <code>4aedb7e</code>, with
+      <code>295b7f4</code> correcting the bank count in the notes after reading all eleven
+      files by hand.
+    </p>
+  </div>
+
+  <h2>What to do next</h2>
+
+  <ol class="recs">
+    <li>
+      <b>Decide what happens to the eleven people whose last offer cannot write to them.</b>
+      Two have no transcripts and were never researchable. Seven have full coverage and the
+      mining still found no enemy, so either their research gets another pass or they stop
+      being planned. Two are blocked by the offer's safety filter and should simply be left
+      alone. Right now all ten of the reachable ones are planned and dropped every sending
+      morning, and one of them has been lost ten days in a row. This is a judgment call, not
+      a bug, which is why it is first.
+    </li>
+    <li>
+      <b>Get the warmup records back for the 23 mailboxes blocked by nothing else.</b> The
+      warmup list fell from 94 subscriptions to 28 on Sunday and has held there. Monday's
+      plan shows 96 mailboxes naming the missing record and 23 of them carrying no other
+      block, so those 23 are slots the gap really costs. That is a different answer from
+      11-04, when the same row freed nobody. Check the warmup provider's account.
+    </li>
+    <li>
+      <b>Replace the Apify token.</b> Tenth morning. It has answered "user or token not
+      found" since 2026-11-12 and the lane has done <b>no work for 287 hours</b>, twelve
+      days. $21.06 of this month's allowance expires on 2026-11-30 and does not carry over,
+      so there are six days left to spend it. The token lives in the settings bank, so this
+      is operator-only.
+    </li>
+    <li>
+      <b>Ask why the queue sends to repeats while 4,854 never-contacted emails sit
+      finished.</b> Repeat offers are the standing decision and the shelf is not the
+      problem. The top tier has had no never-emailed people since 10-13, so its re-offer
+      queue takes the slots and 1,346 ready people wait. One day's worth of slots pointed at
+      the untouched shelf would reach more new people than the last six sending days
+      combined. The tier order is in the send program.
+    </li>
+    <li>
+      <b>Leave the free recovery lane alone.</b> It is on lap 20 of a 1,770-lead book where
+      1,621 of 1,627 findings were already on file. Website resolution was healthy this time,
+      4 misses in 150, so the quiet is a picked-over book and not a broken lane. More search
+      credit buys nothing.
+    </li>
+  </ol>
+
+  <div class="foot">
+    <b>What was verified, not assumed.</b> Every figure comes from the grounded snapshot for
+    this cycle, except the enemies-bank diagnosis, which was checked by hand: the eleven
+    lead ids were pulled from the send program's log, each one's <code>enemies-bank.md</code>
+    was opened in the enrichment bundle, and the counts in the Q1 table are a direct read of
+    those files and their stated transcript coverage. The claim that the offer needs an enemy
+    was read off the offer's own code. <b>Not</b> established here: whether another research
+    pass would find an enemy for the seven with full coverage, and whether the warmup
+    subscriptions were cancelled, lapsed, or dropped by the provider. Both need somebody
+    outside this file. Discovery being off, enrichment idling and the parked count of one are
+    the intended state and none was treated as a fault.
+  </div>
+
+</div>
