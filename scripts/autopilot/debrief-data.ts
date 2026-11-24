@@ -2362,9 +2362,11 @@ export function sendPlanHealth(
       'already said why, two lines up, in a column format nothing here read: "| Doctor Carl ' +
       'Truesdale  skipped  no safe enemy in the bank (0 found, all ruled out)". Of the ' +
       'eleven people the terminal wording has named since 11-11, ALL eleven were skipped by ' +
-      'love-your-channel-short for that precondition and ten of their enrichment bundles ' +
-      'hold an enemies bank with no enemies in it on full transcript coverage, so the ' +
-      'repair is the bank or the rotation and never "write more offers". The reason row now ' +
+      'love-your-channel-short for that precondition: nine hold an enemies bank with no ' +
+      'enemies in it (seven on full transcript coverage, two with no transcripts mined) and ' +
+      'the other two hold enemies the skill\'s own safety filter ruled out, so the repair is ' +
+      'the bank, the transcripts or the rotation and never "write more offers". ' +
+      'The reason row now ' +
       'carries the offer that ran dry and the precondition it failed on, and ' +
       'offer_exhaustion.offers holds the breakdown with the full verdict. The pairing is per ' +
       'OFFER, not per person: the writer keys its skip by channel name, the terminal line ' +
@@ -2703,10 +2705,12 @@ export function sendPlanHealth(
  *  Both lines are about the same person and the same moment. `love-your-channel-short`
  *  needs one line siding with the creator against an enemy, so an empty enemies bank in the
  *  bundle stops it dead; of the eleven people the terminal wording has named since 11-11,
- *  every single one was skipped by that offer for that precondition, and ten of their banks
- *  hold no enemies at all on full transcript coverage. So the repair is the bank or the
- *  rotation, never "write more offers" — and the row now carries the offer that ran dry and
- *  the precondition it failed on, with `offer_exhaustion` holding the breakdown.
+ *  every single one was skipped by that offer for that precondition. Nine of their banks
+ *  hold no enemies at all — seven on full transcript coverage, two with no transcripts
+ *  mined — and the other two hold enemies the skill's own safety filter ruled out. So the
+ *  repair is the bank, the transcripts or the rotation, never "write more offers" — and the
+ *  row now carries the offer that ran dry and the precondition it failed on, with
+ *  `offer_exhaustion` holding the breakdown.
  *
  *  The pairing is per OFFER and not per person on purpose: the writer's skip line is keyed
  *  by channel name while the terminal line is keyed by lead id, and the terminal lines are
