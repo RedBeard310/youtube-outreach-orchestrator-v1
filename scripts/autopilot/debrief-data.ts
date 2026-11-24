@@ -1664,6 +1664,19 @@ export type SiegePushOutcome = {
   /** Which offer's writer produced the skipped drafts, so the fix has an address.
    *  Empty when nothing was skipped. See siegePushOutcome(). */
   skipped_by_offer: Array<{ offer: string; leads: number }>;
+  /** The people whose last remaining offer wrote nothing, and the precondition that offer
+   *  failed on. `people` is null when the plan could not be read; `precondition` is null
+   *  when the window holds no writer verdict for that offer, which is unknown and NOT a
+   *  missing reason. See the offer-exhaustion block on siegePushOutcome(). */
+  offer_exhaustion: {
+    people: number | null;
+    offers: Array<{
+      offer: string;
+      people: number;
+      precondition: string | null;
+      precondition_leads: number | null;
+    }>;
+  };
   /** The plan's own lead list joined against the lines above, so the counters answer
    *  "how many PEOPLE got no email" instead of "how many events happened". Every field
    *  here is null when the plan could not be read: unknown, never zero. See the
@@ -1758,6 +1771,7 @@ export const NO_PUSH_OUTCOME: SiegePushOutcome = {
   escalations: null,
   reasons: [],
   skipped_by_offer: [],
+  offer_exhaustion: { people: null, offers: [] },
   planned_leads: null,
   people_emailed: null,
   people_lost: null,
@@ -2339,6 +2353,28 @@ export function sendPlanHealth(
       'that batch\'s block in automator/logs/siege.log. It is additive on purpose — the ' +
       'ledger can only move somebody out of the loss, never into it — and null when the ' +
       'ledger cannot be read, which is the log-only join that shipped before this date. ' +
+      'AND READ offer_exhaustion, NOT THE REASON ROW ALONE, WHEN THE OFFER LIBRARY RUNS ' +
+      'OUT (2026-11-24): "every offer that can run has already been made to them" is ' +
+      'Siege\'s own summary AFTER the last offer in a person\'s rotation declined to write, ' +
+      'so it names a conclusion and not a cause, and it reads as a library with nothing ' +
+      'left to say. The library was fine. That row led the loss table on all three sending ' +
+      'days after it shipped on 11-21 (10 of 23 people lost this cycle) and the writer had ' +
+      'already said why, two lines up, in a column format nothing here read: "| Doctor Carl ' +
+      'Truesdale  skipped  no safe enemy in the bank (0 found, all ruled out)". Of the ' +
+      'eleven people the terminal wording has named since 11-11, ALL eleven were skipped by ' +
+      'love-your-channel-short for that precondition and ten of their enrichment bundles ' +
+      'hold an enemies bank with no enemies in it on full transcript coverage, so the ' +
+      'repair is the bank or the rotation and never "write more offers". The reason row now ' +
+      'carries the offer that ran dry and the precondition it failed on, and ' +
+      'offer_exhaustion.offers holds the breakdown with the full verdict. The pairing is per ' +
+      'OFFER, not per person: the writer keys its skip by channel name, the terminal line ' +
+      'keys by lead id, and the terminal lines print in one group at the end of the planning ' +
+      'phase rather than beside the batch that caused them, so no honest per-person join ' +
+      'exists in this log. precondition is that offer\'s dominant verdict inside the window ' +
+      'and precondition_leads is how many leads it was said about, so a thin reading is ' +
+      'visible rather than confident; an offer with no verdict in the window keeps the bare ' +
+      '11-21 wording and precondition reads null, which is unknown and NOT a missing reason. ' +
+      'people is null, not 0, when the plan could not be read. ' +
       'AND READ send_plan.fleet BEFORE READING ANY OF THE ABOVE AS A SHORTFALL (2026-10-15): ' +
       'it carries the fleet\'s day-over-day move, which nothing did until then. Over the ' +
       'three cycles after the record 782-email push the plan read 57 live inboxes and an ' +
@@ -2651,7 +2687,36 @@ export function sendPlanHealth(
  *  `reasons` table. It names itself in plain words and no counter could read it, which is
  *  the 10-09 lesson a third time. Only the TERMINAL wording is claimed: the same writer
  *  prints `wrote nothing; trying <other> instead` when it still has an offer left, and that
- *  person is not lost yet. */
+ *  person is not lost yet.
+ *
+ *  AND "EVERY OFFER HAS BEEN MADE" IS SIEGE'S CONCLUSION, NOT THE CAUSE (2026-11-24). The
+ *  row that shipped on 11-21 led the loss table three sending days running and sent a
+ *  reader to the wrong repair every time, because it reads as an offer library with nothing
+ *  left to say. The library was fine. The wording is the rotation's own summary after the
+ *  LAST offer in a person's rotation declined to write, and the writer had already said why
+ *  two lines further up, in a different column format that nothing here read:
+ *
+ *    | Doctor Carl Truesdale         skipped        no safe enemy in the bank (0 found, all ruled out)
+ *    rectI4slX3LejGPG7: love-your-channel-short wrote nothing and there is no other offer
+ *      for them today (every offer that can run has already been made to them)
+ *
+ *  Both lines are about the same person and the same moment. `love-your-channel-short`
+ *  needs one line siding with the creator against an enemy, so an empty enemies bank in the
+ *  bundle stops it dead; of the eleven people the terminal wording has named since 11-11,
+ *  every single one was skipped by that offer for that precondition, and ten of their banks
+ *  hold no enemies at all on full transcript coverage. So the repair is the bank or the
+ *  rotation, never "write more offers" — and the row now carries the offer that ran dry and
+ *  the precondition it failed on, with `offer_exhaustion` holding the breakdown.
+ *
+ *  The pairing is per OFFER and not per person on purpose: the writer's skip line is keyed
+ *  by channel name while the terminal line is keyed by lead id, and the terminal lines are
+ *  printed in one group at the end of the planning phase rather than beside the batch that
+ *  caused them, so no honest per-person join exists in this file. The offer's dominant
+ *  verdict inside the window is what is claimed, the count behind it is published beside it
+ *  so a thin one is visible, and an offer with no verdict in the window keeps the bare
+ *  11-21 wording rather than inventing one. The verdict is condensed the way every other
+ *  reason here is (digits to N), because `(0 found, all ruled out)` is per-lead and would
+ *  otherwise split one precondition into a row per lead, which is the 10-12 lesson. */
 /** Research-summary statuses that leave the lead perfectly fine, so a lost person carrying
  *  one of them was lost by something else and this must not speak for them. `ALREADY_DONE`
  *  is the one that matters: two of the 2026-11-20 losses had a finished bundle on file.
@@ -2698,6 +2763,13 @@ export function siegePushOutcome(
   // writer's `still broken:` lines; drained in order by that batch's SKIP lines.
   const gateReasons = new Map<string, string[]>();
   const gateUsed = new Map<string, number>();
+  // The writers' own skip verdicts in the window, offer -> condensed verdict -> leads, so
+  // an offer that ran dry for somebody can name the precondition it failed on.
+  const writerSkips = new Map<string, Map<string, number>>();
+  // Who the offer library ran out for, and which offer printed it. Kept apart from
+  // `prePushReason` because the precondition is only knowable once the whole window is
+  // read. See the offer-exhaustion block on this function.
+  const exhaustedOffer = new Map<string, string>();
   // Why a planned person never reached SmartLead at all, keyed by lead id. Two shapes, see
   // the pre-push block in the loop. Claimed in the join below ONLY for people it finds lost
   // and only when nothing else spoke for them, so this can move somebody OUT of
@@ -2730,6 +2802,23 @@ export function siegePushOutcome(
       const list = gateReasons.get(batch) ?? [];
       list.push(broken[1]!.trim());
       gateReasons.set(batch, list);
+      continue;
+    }
+    // The writers' own column-format skip verdict, which is a different shape from the
+    // push's `SKIP <id> <reason>` and from the writers' lowercase `failed <reason>`:
+    //   |   Doctor Carl Truesdale     skipped      no safe enemy in the bank (0 found, ...)
+    // Two or more spaces either side of the verdict is what keeps the batch's own summary
+    // line (`| 3 leads: 0 ready, 0 failed, 3 skipped, 0 errors`) and the push's footer
+    // (`| sent=0  skipped=0  failed=1`) out of this.
+    const writerSkip = /\|\s+\S.*?\s{2,}skipped\s{2,}(\S.*)$/.exec(line);
+    if (writerSkip && batch) {
+      const offer = offerFromBatchId(batch);
+      if (offer) {
+        const by = writerSkips.get(offer) ?? new Map<string, number>();
+        const verdict = condenseWriterSkip(writerSkip[1]!);
+        by.set(verdict, (by.get(verdict) ?? 0) + 1);
+        writerSkips.set(offer, by);
+      }
       continue;
     }
 
@@ -2804,14 +2893,12 @@ export function siegePushOutcome(
     // The writer running out of offers for one person. Terminal only: the `trying <other>
     // instead` variant is a retry and that person may still be sent.
     const exhausted =
-      /\b(rec[A-Za-z0-9]{8,}):\s.*\bwrote nothing and there is no other offer for them today/
+      /\b(rec[A-Za-z0-9]{8,}):\s+(\S+)\s+wrote nothing and there is no other offer for them today/
         .exec(line);
     if (exhausted) {
+      if (!exhaustedOffer.has(exhausted[1]!)) exhaustedOffer.set(exhausted[1]!, exhausted[2]!);
       if (!prePushReason.has(exhausted[1]!)) {
-        prePushReason.set(
-          exhausted[1]!,
-          'every offer that can run has already been made to them',
-        );
+        prePushReason.set(exhausted[1]!, OFFERS_EXHAUSTED);
       }
       continue;
     }
@@ -2836,6 +2923,27 @@ export function siegePushOutcome(
       // The driver prints its own JSON payload; "pushed": 0 is the batch that moved nothing.
       if (/"pushed":\s*0\b/.test(line)) deadBatches++;
     }
+  }
+
+  // Name the precondition behind "every offer that can run has already been made to them".
+  // Done here rather than in the loop because the offer's verdicts are only all in once
+  // the window has been read — see the offer-exhaustion block on this function.
+  const precondition = (offer: string): { verdict: string; leads: number } | null => {
+    const by = writerSkips.get(offer);
+    if (!by || by.size === 0) return null;
+    const [verdict, leads] = [...by.entries()]
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0]!;
+    return { verdict, leads };
+  };
+  for (const [id, offer] of exhaustedOffer) {
+    // Only the people this cause really speaks for: a later verdict for the same person
+    // took precedence in the loop and must keep it.
+    if (prePushReason.get(id) !== OFFERS_EXHAUSTED) continue;
+    const p = precondition(offer);
+    // Unknown stays unknown: with no verdict for that offer in the window the bare 11-21
+    // wording is the honest minimum, and a guess here would point a fix at the wrong skill.
+    if (!p) continue;
+    prePushReason.set(id, `${OFFERS_EXHAUSTED} (${offer}: ${headlineOf(p.verdict)})`);
   }
 
   // The per-person join. A planned lead with a SENT anywhere in the run got an email,
@@ -2972,7 +3080,57 @@ export function siegePushOutcome(
       .map(([offer, leads]) => ({ offer, leads }))
       .sort((a, b) => b.leads - a.leads || a.offer.localeCompare(b.offer))
       .slice(0, 8),
+    offer_exhaustion: (() => {
+      // Only people the join found lost AND whose charged reason is this one. A person the
+      // rotation gave up on who was emailed by an earlier batch cost nobody anything, and
+      // one who also collected a FAIL is SmartLead's loss and not the library's.
+      const ids = [...exhaustedOffer.keys()].filter(
+        (id) => preIds.has(id) && (prePushReason.get(id) ?? '').startsWith(OFFERS_EXHAUSTED),
+      );
+      // Null, not zero: with no readable plan nobody is known to be lost, so `preIds` is
+      // empty for want of a denominator rather than because the library held up.
+      if (lost === null) return { people: null, offers: [] };
+      const tally = new Map<string, number>();
+      for (const id of ids) {
+        const offer = exhaustedOffer.get(id)!;
+        tally.set(offer, (tally.get(offer) ?? 0) + 1);
+      }
+      return {
+        people: ids.length,
+        offers: [...tally.entries()]
+          .map(([offer, people]) => {
+            const p = precondition(offer);
+            return {
+              offer,
+              people,
+              precondition: p?.verdict ?? null,
+              precondition_leads: p?.leads ?? null,
+            };
+          })
+          .sort((a, b) => b.people - a.people || a.offer.localeCompare(b.offer))
+          .slice(0, 6),
+      };
+    })(),
   };
+}
+
+/** Siege's own summary when the last offer in a person's rotation declines to write. Kept
+ *  as a constant because it is both a published reason and the marker that says this person
+ *  is still waiting for their precondition to be named. */
+const OFFERS_EXHAUSTED = 'every offer that can run has already been made to them';
+
+/** A writer's skip verdict, reduced to its shape. The per-lead count inside
+ *  `no safe enemy in the bank (0 found, all ruled out)` would otherwise split one
+ *  precondition into a row per lead, which is the 10-12 lesson, so digits collapse to N the
+ *  way every other condenser in this file does. */
+export function condenseWriterSkip(raw: string): string {
+  return raw.trim().replace(/\d[\d,]*/g, 'N').replace(/\s+/g, ' ').slice(0, 72);
+}
+
+/** The verdict without its trailing detail, for the one place it has to share a 120-char
+ *  reason row with the wording above. The full verdict stays in `offer_exhaustion`. */
+function headlineOf(verdict: string): string {
+  return verdict.replace(/\s*\([^)]*\)\s*$/, '').trim() || verdict;
 }
 
 /** The offer name inside a Siege batch id.

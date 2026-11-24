@@ -1,4 +1,4 @@
-import { apifyTickFacts, bulkRewriteShape, bandGateFacts, condenseInboxReason, notLiveReasonMoves, notLiveReasonTally, splitInboxReasons, fleetFacts, inboxGateFacts, apifyBatchFacts, apifyIdleCause, apifyLedgerLine, NO_PUSH_OUTCOME, normalizePushReason, offerFromBatchId, openRouterRunwayAlarm, OPENROUTER_RATE_MAX_AGE_H, siegeApprovedLeadIds, siegePlanLeadIds, siegePushOutcome, classifyKeyProbe, cyclePacificDay, costWindows, enrichmentChainFacts, enrichmentChainState, isSendingDay, perEnrichedLeadCost, PER_LEAD_SAMPLE_FLOOR, projectRecoveryBudget, MAX_MISSING_DEBRIEFS, missingDebriefs, NO_UNIT, pushRunVerdict, siegeRunAlarm, unitStartedAt, sendPlanHealth, siegePlanFacts, followupReserveRate, summarizeSendLines, isVerifiedOrBeyond, laneYield, priorAdvanceSource, priorSeedsAdvanced, priorSeedsWalked, reconcileAdvanced, sessionSeedsAdvanced, sessionStartMs, walkRateTrend } from './debrief-data.ts';
+import { apifyTickFacts, bulkRewriteShape, bandGateFacts, condenseInboxReason, condenseWriterSkip, notLiveReasonMoves, notLiveReasonTally, splitInboxReasons, fleetFacts, inboxGateFacts, apifyBatchFacts, apifyIdleCause, apifyLedgerLine, NO_PUSH_OUTCOME, normalizePushReason, offerFromBatchId, openRouterRunwayAlarm, OPENROUTER_RATE_MAX_AGE_H, siegeApprovedLeadIds, siegePlanLeadIds, siegePushOutcome, classifyKeyProbe, cyclePacificDay, costWindows, enrichmentChainFacts, enrichmentChainState, isSendingDay, perEnrichedLeadCost, PER_LEAD_SAMPLE_FLOOR, projectRecoveryBudget, MAX_MISSING_DEBRIEFS, missingDebriefs, NO_UNIT, pushRunVerdict, siegeRunAlarm, unitStartedAt, sendPlanHealth, siegePlanFacts, followupReserveRate, summarizeSendLines, isVerifiedOrBeyond, laneYield, priorAdvanceSource, priorSeedsAdvanced, priorSeedsWalked, reconcileAdvanced, sessionSeedsAdvanced, sessionStartMs, walkRateTrend } from './debrief-data.ts';
 import { lostCohort, replyLaneFacts } from './debrief-data.ts';
 import { aggregateCollectPasses, collectPasses } from '../../src/recovery/bloodhound-lane.ts';
 import { MAX_SHELF_STRANDED_IDS, recoveredTally, shelfTally, type ShelfRow } from '../../src/db.ts';
@@ -1691,6 +1691,77 @@ ok('a lost person carrying an OK status is not charged with it, and an unseen ta
 ok('the retry wording is not a loss and does not become a push event',
   [RELABELLED.people_emailed, RELABELLED.failed, RELABELLED.skipped],
   [1, 0, 0]);
+// The offer library's own wording carries no precondition, so the bare 11-21 row stands.
+ok('an exhausted offer with no writer verdict in the window keeps the bare wording',
+  [RELABELLED.offer_exhaustion.people,
+    RELABELLED.offer_exhaustion.offers.map((o) => [o.offer, o.people, o.precondition])],
+  [1, [['love-your-channel-short', 1, null]]]);
+
+// 2026-11-24: the row above led the loss table for three sending days and named a
+// conclusion, not a cause. The writer had already said why in a column format nothing read.
+// Live 11-23 shape, verbatim but for the ids.
+const DRY_OFFER_LOG = [
+  '[2026-11-23T11:21:16Z] $ node /home/casey/.claude/skills/cold-email-love-your-channel-short-v1/scripts/run-batch.mjs --leads /home/casey/repos/automator/state/siege/2026-11-23/siege-2026-11-23-25787188-love-your-channel-short-87dca1/leads.json ...',
+  // Keyed by channel name, and the count inside the brackets is per lead — two spellings
+  // of one precondition must not become two rows.
+  '[2026-11-23T11:21:16Z]   | Doctor Carl Truesdale         skipped               no safe enemy in the bank (0 found, all ruled out)',
+  '[2026-11-23T11:21:16Z]   | HIMALAYA ACU CLINIC           skipped               no safe enemy in the bank (2 found, all ruled out)',
+  // The batch's own summary line and the push's footer both hold the word and neither is a
+  // verdict about anybody.
+  '[2026-11-23T11:21:16Z]   | 2 leads: 0 ready, 0 failed, 2 skipped, 0 errors',
+  '[2026-11-23T11:21:16Z]   |   sent=0  skipped=0  failed=0  blocked=0',
+  // Printed in one group at the end of the planning phase, nowhere near the batch above.
+  '[2026-11-23T11:21:29Z]   recDRY1AAAAAAAAAA: love-your-channel-short wrote nothing and ' +
+    'there is no other offer for them today (every offer that can run has already been made to them)',
+  '[2026-11-23T11:21:29Z]   recDRY2BBBBBBBBBB: love-your-channel-short wrote nothing and ' +
+    'there is no other offer for them today (every offer that can run has already been made to them)',
+  // A different offer that ran dry and never skipped anybody in this window.
+  '[2026-11-23T11:21:29Z]   recDRY3CCCCCCCCCC: short-save-time wrote nothing and ' +
+    'there is no other offer for them today (every offer that can run has already been made to them)',
+].join('\n');
+const DRY_PLANNED = ['recDRY1AAAAAAAAAA', 'recDRY2BBBBBBBBBB', 'recDRY3CCCCCCCCCC'];
+const DRY_OUT = siegePushOutcome(DRY_OFFER_LOG, '2026-11-23T08:00:00.000Z',
+  '2026-11-24T08:00:00.000Z', DRY_PLANNED, DRY_PLANNED, []);
+ok('a dry offer names the precondition it failed on, and an unmeasured one does not guess',
+  DRY_OUT.offer_exhaustion,
+  {
+    people: 3,
+    offers: [
+      {
+        offer: 'love-your-channel-short',
+        people: 2,
+        precondition: 'no safe enemy in the bank (N found, all ruled out)',
+        precondition_leads: 2,
+      },
+      { offer: 'short-save-time', people: 1, precondition: null, precondition_leads: null },
+    ],
+  });
+ok('the reason row carries the offer and its precondition, under the 120-char cap',
+  DRY_OUT.reasons.map((r) => [r.reason, r.lost]),
+  [
+    ['every offer that can run has already been made to them ' +
+      '(love-your-channel-short: no safe enemy in the bank)', 2],
+    ['every offer that can run has already been made to them', 1],
+  ]);
+ok('a writer skip is not a push skip and the summary lines are not verdicts',
+  [DRY_OUT.skipped, DRY_OUT.failed, DRY_OUT.sent, DRY_OUT.lost_before_push],
+  [0, 0, 0, 3]);
+// The condenser, on its own: one precondition however many leads it was said about.
+ok('a per-lead count inside a verdict collapses to N',
+  condenseWriterSkip('  no safe enemy in the bank (12 found, all ruled out)  '),
+  'no safe enemy in the bank (N found, all ruled out)');
+// Emailed in the end by another batch, so the library cost nobody.
+ok('an exhausted person who was emailed anyway is not charged to the library',
+  (() => { const p = siegePushOutcome(
+    DRY_OFFER_LOG + '\n[2026-11-23T11:30:00Z]   |   SENT  recDRY1AAAAAAAAAA    a@b.com  smartlead_lead=9',
+    '2026-11-23T08:00:00.000Z', '2026-11-24T08:00:00.000Z', DRY_PLANNED, DRY_PLANNED, []);
+    return [p.offer_exhaustion.people, p.offer_exhaustion.offers.map((o) => o.people)]; })(),
+  [2, [1, 1]]);
+// An unreadable plan makes the loss unknowable, so this cannot read as a healthy library.
+ok('no plan means the exhaustion count is unknown, not zero',
+  siegePushOutcome(DRY_OFFER_LOG, '2026-11-23T08:00:00.000Z', '2026-11-24T08:00:00.000Z',
+    null, null, []).offer_exhaustion,
+  { people: null, offers: [] });
 
 // 2026-10-22: the approval trim. The push run rebuilds the plan, so plan.json can hold
 // people the morning's approval never covered; Siege holds those for tomorrow and they
