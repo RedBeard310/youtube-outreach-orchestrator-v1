@@ -1667,7 +1667,9 @@ export type SiegePushOutcome = {
   /** The people whose last remaining offer wrote nothing, and the precondition that offer
    *  failed on. `people` is null when the plan could not be read; `precondition` is null
    *  when the window holds no writer verdict for that offer, which is unknown and NOT a
-   *  missing reason. See the offer-exhaustion block on siegePushOutcome(). */
+   *  missing reason. `precondition` is condensed (digits to N) so one precondition stays one
+   *  row, so read `precondition_variants` for the numbers a repair is chosen on — see the
+   *  offer-exhaustion block on siegePushOutcome(). */
   offer_exhaustion: {
     people: number | null;
     offers: Array<{
@@ -1675,6 +1677,17 @@ export type SiegePushOutcome = {
       people: number;
       precondition: string | null;
       precondition_leads: number | null;
+      /** One untouched verdict behind `precondition`, exactly as the writer printed it: the
+       *  most common of the variants below. Null with `precondition`. */
+      precondition_example: string | null;
+      /** The distinct untouched verdicts the condensed one covers, with the leads each was
+       *  said about, largest first. This is where "the bank is empty" and "the bank has
+       *  enemies and the filter refused them" stop reading the same. Empty with
+       *  `precondition`. */
+      precondition_variants: Array<{ verdict: string; leads: number }>;
+      /** Whether the published variants are all of them, or a capped view of more. Null with
+       *  `precondition`. */
+      precondition_variants_complete: boolean | null;
     }>;
   };
   /** The plan's own lead list joined against the lines above, so the counters answer
@@ -2377,6 +2390,21 @@ export function sendPlanHealth(
       'visible rather than confident; an offer with no verdict in the window keeps the bare ' +
       '11-21 wording and precondition reads null, which is unknown and NOT a missing reason. ' +
       'people is null, not 0, when the plan could not be read. ' +
+      'AND READ precondition_variants, NOT precondition, FOR WHICH REPAIR THE DAY WANTS ' +
+      '(2026-11-25): the verdict is condensed digits-to-N so one precondition stays one row, ' +
+      'and the digit it drops is the only thing that picks the fix — which is the 11-04 ' +
+      'lesson (read the row\'s untouched example, never the condensed key, before deciding) ' +
+      'landing twenty days later in the field built to end this exact mystery. ' +
+      '"no safe enemy in the bank (0 found, all ruled out)" is an EMPTY bank, so the repair ' +
+      'is re-mining the transcripts or no longer planning that person; "(2 found, all ruled ' +
+      'out)" is a bank that HAS enemies and a safety filter that refused them, so the repair ' +
+      'is the enemy bar and it is Casey\'s call. Both published as one row reading "(N ' +
+      'found)". Across the whole send log the split is 83 leads to 16, and the 11-24 debrief ' +
+      'could only state it by opening eleven bundle files by hand; this cycle it was 8 and ' +
+      '1 of 9. precondition_example is one untouched wording and precondition_variants is ' +
+      'every distinct one with the leads it was said about, largest first, with ' +
+      'precondition_variants_complete false when more exist than are shown. All three are ' +
+      'null (variants empty) exactly when precondition is: unknown, and NOT one clean shape. ' +
       'AND READ send_plan.fleet BEFORE READING ANY OF THE ABOVE AS A SHORTFALL (2026-10-15): ' +
       'it carries the fleet\'s day-over-day move, which nothing did until then. Over the ' +
       'three cycles after the record 782-email push the plan read 57 live inboxes and an ' +
@@ -2720,7 +2748,27 @@ export function sendPlanHealth(
  *  so a thin one is visible, and an offer with no verdict in the window keeps the bare
  *  11-21 wording rather than inventing one. The verdict is condensed the way every other
  *  reason here is (digits to N), because `(0 found, all ruled out)` is per-lead and would
- *  otherwise split one precondition into a row per lead, which is the 10-12 lesson. */
+ *  otherwise split one precondition into a row per lead, which is the 10-12 lesson.
+ *
+ *  AND THE CONDENSER DROPPED THE ONE NUMBER THE REPAIR TURNS ON (2026-11-25). That is the
+ *  11-04 lesson — read the row's untouched `example`, never the condensed key, before
+ *  deciding what to do — in a field shipped twenty days after it was written down, and it
+ *  landed in the field built to end this exact mystery. The published precondition reads
+ *  `no safe enemy in the bank (N found, all ruled out)`, and the two shapes that N hides are
+ *  OPPOSITE repairs:
+ *
+ *    (0 found, all ruled out)   the bundle's enemies bank is empty -> re-mine the
+ *                               transcripts, or stop planning that person
+ *    (2 found, all ruled out)   the bank HAS enemies and the skill's safety filter refused
+ *                               them -> the enemy bar is the question, and it is Casey's
+ *
+ *  Across the whole send log that split is 83 leads to 16, and the 11-24 debrief could only
+ *  state it by opening eleven bundle files by hand. So the condensed key still groups, and
+ *  `precondition_example` carries one untouched wording beside it while
+ *  `precondition_variants` carries every distinct wording with the leads each was said
+ *  about, largest first. `precondition_variants_complete` is whether those are all of them,
+ *  because a capped view that reads as complete is the 11-12 lesson. All three are null (and
+ *  the variants empty) exactly when `precondition` is: unknown, and NOT one clean shape. */
 /** Research-summary statuses that leave the lead perfectly fine, so a lost person carrying
  *  one of them was lost by something else and this must not speak for them. `ALREADY_DONE`
  *  is the one that matters: two of the 2026-11-20 losses had a finished bundle on file.
@@ -2767,9 +2815,10 @@ export function siegePushOutcome(
   // writer's `still broken:` lines; drained in order by that batch's SKIP lines.
   const gateReasons = new Map<string, string[]>();
   const gateUsed = new Map<string, number>();
-  // The writers' own skip verdicts in the window, offer -> condensed verdict -> leads, so
-  // an offer that ran dry for somebody can name the precondition it failed on.
-  const writerSkips = new Map<string, Map<string, number>>();
+  // The writers' own skip verdicts in the window, offer -> condensed verdict -> the leads it
+  // was said about AND the untouched wordings behind it, so an offer that ran dry for
+  // somebody can name the precondition it failed on without losing the numbers inside it.
+  const writerSkips = new Map<string, Map<string, WriterVerdict>>();
   // Who the offer library ran out for, and which offer printed it. Kept apart from
   // `prePushReason` because the precondition is only knowable once the whole window is
   // read. See the offer-exhaustion block on this function.
@@ -2818,9 +2867,15 @@ export function siegePushOutcome(
     if (writerSkip && batch) {
       const offer = offerFromBatchId(batch);
       if (offer) {
-        const by = writerSkips.get(offer) ?? new Map<string, number>();
-        const verdict = condenseWriterSkip(writerSkip[1]!);
-        by.set(verdict, (by.get(verdict) ?? 0) + 1);
+        const by = writerSkips.get(offer) ?? new Map<string, WriterVerdict>();
+        // Untouched but for whitespace and a length cap: the digits inside it are the whole
+        // reason this is kept beside the condensed key. See condenseWriterSkip().
+        const raw = writerSkip[1]!.trim().replace(/\s+/g, ' ').slice(0, 120);
+        const verdict = condenseWriterSkip(raw);
+        const seen = by.get(verdict) ?? { leads: 0, raw: new Map<string, number>() };
+        seen.leads++;
+        seen.raw.set(raw, (seen.raw.get(raw) ?? 0) + 1);
+        by.set(verdict, seen);
         writerSkips.set(offer, by);
       }
       continue;
@@ -2932,12 +2987,29 @@ export function siegePushOutcome(
   // Name the precondition behind "every offer that can run has already been made to them".
   // Done here rather than in the loop because the offer's verdicts are only all in once
   // the window has been read — see the offer-exhaustion block on this function.
-  const precondition = (offer: string): { verdict: string; leads: number } | null => {
+  const precondition = (offer: string): {
+    verdict: string;
+    leads: number;
+    example: string;
+    variants: Array<{ verdict: string; leads: number }>;
+    variantsComplete: boolean;
+  } | null => {
     const by = writerSkips.get(offer);
     if (!by || by.size === 0) return null;
-    const [verdict, leads] = [...by.entries()]
-      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0]!;
-    return { verdict, leads };
+    const [verdict, seen] = [...by.entries()]
+      .sort((a, b) => b[1].leads - a[1].leads || a[0].localeCompare(b[0]))[0]!;
+    // The untouched wordings the condensed key covers, largest first. The numbers inside
+    // them are what the repair is chosen on, so a capped view says it is capped.
+    const variants = [...seen.raw.entries()]
+      .map(([v, leads]) => ({ verdict: v, leads }))
+      .sort((a, b) => b.leads - a.leads || a.verdict.localeCompare(b.verdict));
+    return {
+      verdict,
+      leads: seen.leads,
+      example: variants[0]!.verdict,
+      variants: variants.slice(0, PRECONDITION_VARIANTS_CAP),
+      variantsComplete: variants.length <= PRECONDITION_VARIANTS_CAP,
+    };
   };
   for (const [id, offer] of exhaustedOffer) {
     // Only the people this cause really speaks for: a later verdict for the same person
@@ -3109,6 +3181,9 @@ export function siegePushOutcome(
               people,
               precondition: p?.verdict ?? null,
               precondition_leads: p?.leads ?? null,
+              precondition_example: p?.example ?? null,
+              precondition_variants: p?.variants ?? [],
+              precondition_variants_complete: p?.variantsComplete ?? null,
             };
           })
           .sort((a, b) => b.people - a.people || a.offer.localeCompare(b.offer))
@@ -3123,10 +3198,22 @@ export function siegePushOutcome(
  *  is still waiting for their precondition to be named. */
 const OFFERS_EXHAUSTED = 'every offer that can run has already been made to them';
 
+/** One condensed writer verdict: the leads it was said about, and the untouched wordings
+ *  behind it. Kept together because the condensed key is what groups and the raw wordings
+ *  are what a reader decides on — see the 2026-11-25 paragraph on siegePushOutcome(). */
+type WriterVerdict = { leads: number; raw: Map<string, number> };
+
+/** How many untouched variants of one precondition get published. Four covers every shape
+ *  the enemy verdict has taken; a fifth would be a tail, and
+ *  `precondition_variants_complete` says so rather than truncating in silence. */
+const PRECONDITION_VARIANTS_CAP = 4;
+
 /** A writer's skip verdict, reduced to its shape. The per-lead count inside
  *  `no safe enemy in the bank (0 found, all ruled out)` would otherwise split one
  *  precondition into a row per lead, which is the 10-12 lesson, so digits collapse to N the
- *  way every other condenser in this file does. */
+ *  way every other condenser in this file does. The numbers it drops are kept beside it in
+ *  `precondition_variants`, because dropping them cost the 11-24 debrief its leading number
+ *  (the 11-04 lesson). */
 export function condenseWriterSkip(raw: string): string {
   return raw.trim().replace(/\d[\d,]*/g, 'N').replace(/\s+/g, ' ').slice(0, 72);
 }

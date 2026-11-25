@@ -1732,10 +1732,58 @@ ok('a dry offer names the precondition it failed on, and an unmeasured one does 
         people: 2,
         precondition: 'no safe enemy in the bank (N found, all ruled out)',
         precondition_leads: 2,
+        // 2026-11-25: the condensed key groups and these carry the digit it drops. Tied on
+        // one lead each, so the tiebreak is the wording, which puts "0 found" first.
+        precondition_example: 'no safe enemy in the bank (0 found, all ruled out)',
+        precondition_variants: [
+          { verdict: 'no safe enemy in the bank (0 found, all ruled out)', leads: 1 },
+          { verdict: 'no safe enemy in the bank (2 found, all ruled out)', leads: 1 },
+        ],
+        precondition_variants_complete: true,
       },
-      { offer: 'short-save-time', people: 1, precondition: null, precondition_leads: null },
+      {
+        offer: 'short-save-time',
+        people: 1,
+        precondition: null,
+        precondition_leads: null,
+        // Unknown stays unknown in all three, together, so a null key cannot sit beside a
+        // confident-looking example.
+        precondition_example: null,
+        precondition_variants: [],
+        precondition_variants_complete: null,
+      },
     ],
   });
+// 2026-11-25: the empty bank and the filter refusing real enemies are opposite repairs, and
+// the condensed verdict reads the same for both. The live log splits 83 leads to 16, so the
+// dominant wording must win the example and the tail must still be visible.
+ok('an empty bank and a filter-refused bank are different rows, ranked by leads',
+  (() => { const p = siegePushOutcome(
+    [DRY_OFFER_LOG,
+      '[2026-11-23T11:21:16Z]   | SECOND EMPTY ONE             skipped               no safe enemy in the bank (0 found, all ruled out)',
+      '[2026-11-23T11:21:16Z]   | THIRD EMPTY ONE              skipped               no safe enemy in the bank (0 found, all ruled out)',
+    ].join('\n'),
+    '2026-11-23T08:00:00.000Z', '2026-11-24T08:00:00.000Z', DRY_PLANNED, DRY_PLANNED, []);
+    const o = p.offer_exhaustion.offers[0]!;
+    return [o.precondition, o.precondition_leads, o.precondition_example,
+      o.precondition_variants, o.precondition_variants_complete]; })(),
+  ['no safe enemy in the bank (N found, all ruled out)', 4,
+    'no safe enemy in the bank (0 found, all ruled out)',
+    [{ verdict: 'no safe enemy in the bank (0 found, all ruled out)', leads: 3 },
+      { verdict: 'no safe enemy in the bank (2 found, all ruled out)', leads: 1 }],
+    true]);
+// A capped view that reads as complete is the 11-12 lesson, so it says it is capped.
+ok('more variants than the cap publishes the largest and says it is not all of them',
+  (() => { const p = siegePushOutcome(
+    [DRY_OFFER_LOG,
+      ...[1, 3, 4, 5].map((n) =>
+        `[2026-11-23T11:21:16Z]   | CHANNEL ${n}                   skipped               no safe enemy in the bank (${n} found, all ruled out)`),
+    ].join('\n'),
+    '2026-11-23T08:00:00.000Z', '2026-11-24T08:00:00.000Z', DRY_PLANNED, DRY_PLANNED, []);
+    const o = p.offer_exhaustion.offers[0]!;
+    return [o.precondition_leads, o.precondition_variants.length,
+      o.precondition_variants_complete]; })(),
+  [6, 4, false]);
 ok('the reason row carries the offer and its precondition, under the 120-char cap',
   DRY_OUT.reasons.map((r) => [r.reason, r.lost]),
   [
