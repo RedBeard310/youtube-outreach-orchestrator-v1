@@ -2326,7 +2326,7 @@ export function sendPlanHealth(
       'changes every morning. Across the last four sending cycles the published losses fell ' +
       'every single day — 40, 23, 18, 17, of which 32, 21, 18, 17 were the same people again ' +
       '— which reads as a leak closing. As a share of what the push was driving those four ' +
-      'days read 11.1%, 23.6%, 18.4% and 68.0%. This cycle the live inboxes fell 16 to 4 and ' +
+      'days read 11.2%, 24.7%, 20.0% and 68.0%. This cycle the live inboxes fell 16 to 4 and ' +
       'the plan fell with them, 98 people to 25, so SEVENTEEN of 25 slots on the scarcest ' +
       'sending day in weeks went to people an earlier push had already refused, five of them ' +
       'on a ten-day streak, and the count that describes it went DOWN by one. The 11-07 note ' +
@@ -4221,7 +4221,7 @@ export function priorSendPlan(
  *  they are a share of moves every day. Across the last four sending cycles the published
  *  counts fell every single morning — 40, 23, 18, 17 lost, of which 32, 21, 18, 17 recurring
  *  — which reads as a leak closing. As a share of what the push was driving the same four
- *  days read 11.1%, 23.6%, 18.4% and 68.0%. On 2026-11-26 the fleet's live inboxes fell 16 to
+ *  days read 11.2%, 24.7%, 20.0% and 68.0%. On 2026-11-26 the fleet's live inboxes fell 16 to
  *  4 and the plan with them, 98 people to 25, so SEVENTEEN of 25 slots on the scarcest
  *  sending day in weeks went to people an earlier push had already refused, five of them on a
  *  ten-day streak. The 11-07 note that introduced these fields priced the then-cohort of nine
