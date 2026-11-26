@@ -1700,6 +1700,12 @@ export type SiegePushOutcome = {
   people_emailed: number | null;
   /** Planned people who ended the run with no email. This is the shortfall. */
   people_lost: number | null;
+  /** ...as a share of the people the push was really driving, which is
+   *  `people_emailed + people_lost` (the plan minus anybody the approval gate deferred).
+   *  Read THIS, not `people_lost`, when the plan size moves: a constant leak against a
+   *  shrinking fleet reads as an improving day in the count. See the share block on
+   *  siegePushOutcome(). Null when the loss is unknown or the push drove nobody. */
+  people_lost_pct: number | null;
   /** ...of which SmartLead refused them (a FAIL and no SENT anywhere). */
   lost_to_fail: number | null;
   /** ...of which we declined to offer them (a SKIP and no SENT anywhere). */
@@ -1729,6 +1735,11 @@ export type SiegePushOutcome = {
    *  standing cohort and a fresh loss read identically in `people_lost`, and five debriefs
    *  running read one as the other — see the cohort block on lostCohort(). */
   lost_recurring: number | null;
+  /** ...as a share of the people the push was really driving, so the capacity a standing
+   *  cohort eats can be read directly. This is the number that says whether re-planning
+   *  the same refused people is a rounding error or the whole day. A lower bound whenever
+   *  `lost_split_complete` is false, like every other figure off that list. */
+  lost_recurring_pct: number | null;
   /** ...and how many had never been lost before. This is the day's new damage. */
   lost_new: number | null;
   /** The most consecutive snapshot days any one of them has been lost, today included. 1
@@ -1788,6 +1799,7 @@ export const NO_PUSH_OUTCOME: SiegePushOutcome = {
   planned_leads: null,
   people_emailed: null,
   people_lost: null,
+  people_lost_pct: null,
   lost_to_fail: null,
   lost_to_skip: null,
   lost_before_push: null,
@@ -1796,6 +1808,7 @@ export const NO_PUSH_OUTCOME: SiegePushOutcome = {
   emailed_unlogged_ids: [],
   lost_ids: [],
   lost_recurring: null,
+  lost_recurring_pct: null,
   lost_new: null,
   lost_longest_streak: null,
   lost_recurring_ids: [],
@@ -2308,6 +2321,22 @@ export function sendPlanHealth(
       'and five carry a bounce already on SmartLead\'s file, so the repair is to stop ' +
       'planning them, not to re-count them. Measured over lost_ids. Null, not 0, when no ' +
       'earlier snapshot carries a readable list: unknown, and NOT a cohort of new people. ' +
+      'AND READ people_lost_pct AND lost_recurring_pct, NOT THE COUNTS, WHEN THE PLAN SIZE ' +
+      'MOVES (2026-11-26): both counts are numerators, and the thing they are a share of ' +
+      'changes every morning. Across the last four sending cycles the published losses fell ' +
+      'every single day — 40, 23, 18, 17, of which 32, 21, 18, 17 were the same people again ' +
+      '— which reads as a leak closing. As a share of what the push was driving those four ' +
+      'days read 11.1%, 23.6%, 18.4% and 68.0%. This cycle the live inboxes fell 16 to 4 and ' +
+      'the plan fell with them, 98 people to 25, so SEVENTEEN of 25 slots on the scarcest ' +
+      'sending day in weeks went to people an earlier push had already refused, five of them ' +
+      'on a ten-day streak, and the count that describes it went DOWN by one. The 11-07 note ' +
+      'above priced the then-cohort of nine at "about 9% of a 101-slot day" by hand and no ' +
+      'field carried that arithmetic. Both shares are over people_emailed + people_lost (the ' +
+      'plan minus anybody the approval gate deferred, so a person held for tomorrow cannot ' +
+      'size a loss), which means the denominator is checkable from the fields beside them. ' +
+      'lost_recurring_pct inherits lost_split_complete: false makes it a LOWER bound. Null, ' +
+      'not 0, when the loss is unknown or the push drove nobody — 0% of nothing is the one ' +
+      'reading that would make a collapsed plan look clean. ' +
       'AND READ lost_split_complete BEFORE READING lost_new AS THE DAY\'S DAMAGE ' +
       '(2026-11-12): that denominator was a list capped at 12, the cap was documented in the ' +
       'code and nowhere a reader looks, and it had already truncated this field twice ' +
@@ -3058,6 +3087,9 @@ export function siegePushOutcome(
   const join = planned === null || asked === null || lost === null
     ? {
       planned_leads: null, people_emailed: null, people_lost: null,
+      // Unknown, not zero, for the same reason the count above it is: a share of a
+      // denominator nobody could read is not 0%.
+      people_lost_pct: null,
       lost_to_fail: null, lost_to_skip: null, lost_silently: null,
       // Null, not absent. Every sibling in this branch is spelled out as null because an
       // unreadable plan makes the whole split unknowable, and `lost_before_push` was the
@@ -3077,6 +3109,13 @@ export function siegePushOutcome(
       deferred_ids: (deferred ?? []).slice(0, 12),
       people_emailed: asked.length - lost.length,
       people_lost: lost.length,
+      // The share of what the push was really driving. The denominator is `asked`, which is
+      // `people_emailed + people_lost` and so checkable from the published fields, and it
+      // is the plan minus the people the approval gate held for tomorrow — those are not a
+      // loss and must not size one. Null on an empty push: no share exists.
+      people_lost_pct: asked.length === 0
+        ? null
+        : Math.round((1000 * lost.length) / asked.length) / 10,
       lost_to_fail: lost.filter((id) => failedIds.has(id)).length,
       lost_to_skip: lost.filter((id) => !failedIds.has(id) && skippedIds.has(id)).length,
       lost_before_push: preIds.size,
@@ -3122,6 +3161,7 @@ export function siegePushOutcome(
     // lostCohort(). Null here so this function stays a pure read of one log and one plan,
     // which is what the selftests exercise.
     lost_recurring: null,
+    lost_recurring_pct: null,
     lost_new: null,
     lost_longest_streak: null,
     lost_recurring_ids: [],
@@ -4174,7 +4214,22 @@ export function priorSendPlan(
  *  and would have reset the figure to 1 whatever the cohort was doing. The discriminator is
  *  the per-person join's own verdict — `people_lost` is a number only when there was a push
  *  to lose anybody on, and null is unknown, which is the 10-22 rule everywhere else in this
- *  file. So a prior day counts as clear only when it says so. */
+ *  file. So a prior day counts as clear only when it says so.
+ *
+ *  AND READ THE COHORT AS A SHARE OF THE PLAN, NOT AS A COUNT (2026-11-26). `lost_recurring`
+ *  answers "is this the same people again" and cannot say what they cost, because the thing
+ *  they are a share of moves every day. Across the last four sending cycles the published
+ *  counts fell every single morning — 40, 23, 18, 17 lost, of which 32, 21, 18, 17 recurring
+ *  — which reads as a leak closing. As a share of what the push was driving the same four
+ *  days read 11.1%, 23.6%, 18.4% and 68.0%. On 2026-11-26 the fleet's live inboxes fell 16 to
+ *  4 and the plan with them, 98 people to 25, so SEVENTEEN of 25 slots on the scarcest
+ *  sending day in weeks went to people an earlier push had already refused, five of them on a
+ *  ten-day streak. The 11-07 note that introduced these fields priced the then-cohort of nine
+ *  at "about 9% of a 101-slot day" by hand, and no field has carried that arithmetic since.
+ *  It is the same fault as 10-16 and 11-23 one level in: a numerator read without its
+ *  denominator. `people_lost_pct` and `lost_recurring_pct` are both over
+ *  `people_emailed + people_lost`, so the denominator is checkable from the published fields,
+ *  and `lost_recurring_pct` inherits `lost_split_complete` — false makes it a lower bound. */
 export function lostCohort(
   lostIds: string[],
   priorDates: string[],
@@ -4182,8 +4237,13 @@ export function lostCohort(
   /** The join's own count of people lost, which is what the list is measured against.
    *  Null means the push's loss was never computed, and nothing below is knowable. */
   peopleLost: number | null = null,
+  /** The people the push was really driving (`people_emailed + people_lost`), which is what
+   *  the recurring cohort is priced against. Null or 0 leaves the share unknown rather than
+   *  answering 0%. */
+  drivenLeads: number | null = null,
 ): {
   lost_recurring: number | null;
+  lost_recurring_pct: number | null;
   lost_new: number | null;
   lost_longest_streak: number | null;
   lost_recurring_ids: string[];
@@ -4192,7 +4252,8 @@ export function lostCohort(
   lost_history_capped_days: number | null;
 } {
   const unknown = {
-    lost_recurring: null, lost_new: null, lost_longest_streak: null,
+    lost_recurring: null, lost_recurring_pct: null, lost_new: null,
+    lost_longest_streak: null,
     lost_recurring_ids: [] as string[],
     lost_split_covered: null, lost_split_complete: null,
     lost_history_capped_days: null,
@@ -4242,6 +4303,12 @@ export function lostCohort(
   }
   return {
     lost_recurring: recurring.length,
+    // Priced against the push's own driven set, never against the display list: a share of
+    // the losses is not a share of the day. Null on a missing or empty denominator, because
+    // "0% of nothing" is the one reading that would make a collapsed plan look clean.
+    lost_recurring_pct: drivenLeads === null || drivenLeads === 0
+      ? null
+      : Math.round((1000 * recurring.length) / drivenLeads) / 10,
     lost_new: today.length - recurring.length,
     lost_longest_streak: longest,
     lost_recurring_ids: recurring.slice(0, 60),
@@ -6637,6 +6704,12 @@ async function main(): Promise<void> {
         // The denominator the split is measured against, so a list that could not cover the
         // whole loss says so instead of answering for the part it saw.
         sendPlan.push_outcome.people_lost,
+        // And the people the push was really driving, so the standing cohort can be priced
+        // against the day instead of counted on its own — see the share block on lostCohort().
+        // Both halves must be real numbers: a null either side leaves the share unknown.
+        sendPlan.push_outcome.people_emailed === null || sendPlan.push_outcome.people_lost === null
+          ? null
+          : sendPlan.push_outcome.people_emailed + sendPlan.push_outcome.people_lost,
       ),
     };
   }

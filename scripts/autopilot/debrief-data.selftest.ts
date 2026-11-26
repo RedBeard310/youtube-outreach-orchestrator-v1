@@ -1526,6 +1526,17 @@ ok('a lead planned into two batches is one person, counted once',
 ok('NO_PUSH_OUTCOME carries the join as unmeasured too',
   [NO_PUSH_OUTCOME.planned_leads, NO_PUSH_OUTCOME.people_lost, NO_PUSH_OUTCOME.lost_ids],
   [null, null, []]);
+// 2026-11-26. The count is a numerator and the plan it is a share of moves every morning:
+// three of four people lost here is the same event as 3 of 300 in the count's own terms.
+ok('the shortfall is published as a share of what the push was driving',
+  JOINED.people_lost_pct, 75);
+ok('a push that drove nobody has no share, which is unknown and not 0%',
+  [
+    siegePushOutcome(JOIN_LOG, '2026-10-20T07:00:00.000Z', '2026-10-21T07:00:00.000Z', [])
+      .people_lost_pct,
+    NO_PUSH_OUTCOME.people_lost_pct,
+  ],
+  [null, null]);
 
 // 2026-11-03: the log is the push's narration, not its record. On 11-02 a whole
 // push-batch block printed no header and no SENT lines, and six people with real send
@@ -2737,7 +2748,8 @@ ok('a push that ran and lost nobody is a clear day and ends the streak',
 ok('no readable prior snapshot is unknown, not a cohort of new people',
   lostCohort(FIVE, ['2026-10-01'], COHORT_DIR, 5),
   {
-    lost_recurring: null, lost_new: null, lost_longest_streak: null, lost_recurring_ids: [],
+    lost_recurring: null, lost_recurring_pct: null, lost_new: null,
+    lost_longest_streak: null, lost_recurring_ids: [],
     lost_split_covered: null, lost_split_complete: null, lost_history_capped_days: null,
   });
 ok('a day that lost nobody is a real zero with no streak',
@@ -2771,9 +2783,34 @@ ok('...and a window of complete prior days reads 0',
 ok('a push whose loss was never computed is unknown, not a loss of nobody',
   lostCohort([], PRIOR, COHORT_DIR, null),
   {
-    lost_recurring: null, lost_new: null, lost_longest_streak: null, lost_recurring_ids: [],
+    lost_recurring: null, lost_recurring_pct: null, lost_new: null,
+    lost_longest_streak: null, lost_recurring_ids: [],
     lost_split_covered: null, lost_split_complete: null, lost_history_capped_days: null,
   });
+
+// 2026-11-26. The standing cohort has to be priced against the day, not counted on its own.
+// The live shape: 17 of 25 people driven were losses an earlier push had already named, on a
+// plan that fell 98 → 25 with the fleet, so the COUNT fell by one off 11-25's 18 of 98 while
+// the share went 18.4% → 68.0%.
+ok('the recurring cohort is priced against the people the push was driving',
+  lostCohort([...FIVE, 'recF', 'recG', 'recH', 'recI'], PRIOR, COHORT_DIR, 9, 25)
+    .lost_recurring_pct,
+  36);
+ok('...so the same cohort on a bigger plan reads as a smaller share of it',
+  lostCohort([...FIVE, 'recF', 'recG', 'recH', 'recI'], PRIOR, COHORT_DIR, 9, 98)
+    .lost_recurring_pct,
+  9.2);
+// Null, never 0: a share of a denominator nobody could read would make a collapsed plan
+// look clean, which is the one reading this field exists to prevent.
+ok('an unknown or empty driven set leaves the share unknown rather than 0%',
+  [
+    lostCohort(FIVE, PRIOR, COHORT_DIR, 5, null).lost_recurring_pct,
+    lostCohort(FIVE, PRIOR, COHORT_DIR, 5, 0).lost_recurring_pct,
+  ],
+  [null, null]);
+// A day that really lost nobody is a real 0%, not unknown — same rule the counts follow.
+ok('a push that lost nobody is a real zero share',
+  lostCohort([], PRIOR, COHORT_DIR, 0, 25).lost_recurring_pct, 0);
 rmSync(COHORT_DIR, { recursive: true, force: true });
 // The parser itself must stay a pure read: the cohort is the caller's to fill in.
 ok('the push parser leaves the cohort unknown for the caller',
