@@ -1,0 +1,514 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lead Run Debrief 2026-11-26</title>
+<style>
+  :root {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+      --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+      --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f6f8; --panel: #ffffff; --panel-2: #eef2f5; --ink: #16202a; --ink-soft: #4a5b69;
+    --line: #d8e0e6; --teal: #0d7d7d; --teal-soft: #0d7d7d22; --amber: #b8760a; --amber-soft: #b8760a1a;
+    --red: #b23b3b; --red-soft: #b23b3b18; --good: #1f8a5b; --shadow: 0 1px 2px #16202a0d, 0 8px 24px #16202a0a;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e141a; --panel: #161f28; --panel-2: #1c2731; --ink: #e7edf2; --ink-soft: #9fb0bd;
+    --line: #263442; --teal: #3fc3c3; --teal-soft: #3fc3c31f; --amber: #e0a94a; --amber-soft: #e0a94a1c;
+    --red: #e07a7a; --red-soft: #e07a7a1c; --good: #55c48c; --shadow: 0 1px 2px #0006, 0 10px 30px #0004;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 40px 22px 80px; }
+  .eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); font-weight: 600; }
+  h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.12; margin: 10px 0 6px; text-wrap: balance; letter-spacing: -.02em; }
+  h2 { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); margin: 44px 0 16px; font-weight: 700; }
+  h3 { font-size: 18px; margin: 0 0 6px; letter-spacing: -.01em; }
+  p { margin: 0 0 14px; }
+  .lede { font-size: 18px; color: var(--ink-soft); max-width: 68ch; }
+  .tag { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--amber-soft); color: var(--amber); letter-spacing: .02em; }
+  .tag.red { background: var(--red-soft); color: var(--red); }
+  .tag.good { background: var(--teal-soft); color: var(--teal); }
+  .grid { display: grid; gap: 14px; }
+  .stats { grid-template-columns: repeat(4, 1fr); margin-top: 26px; }
+  @media (max-width: 720px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; box-shadow: var(--shadow); }
+  .stat .n { font-size: 30px; font-weight: 750; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .stat .l { font-size: 12.5px; color: var(--ink-soft); margin-top: 3px; }
+  .stat .s { font-size: 12px; margin-top: 8px; font-weight: 600; }
+  .up { color: var(--good); } .down { color: var(--red); } .warn { color: var(--amber); }
+  .accent-red { border-left: 3px solid var(--red); }
+  .accent-teal { border-left: 3px solid var(--teal); }
+  .accent-amber { border-left: 3px solid var(--amber); }
+
+  .strip { display: flex; align-items: flex-end; gap: 6px; height: 150px; padding: 14px 14px 10px; overflow-x: auto; }
+  .col { flex: 1 0 44px; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; height: 100%; }
+  .bar { width: 100%; border-radius: 3px 3px 0 0; background: var(--teal); opacity: .9; }
+  .bar.zero { background: var(--line); height: 4px !important; }
+  .bar.bad { background: var(--amber); }
+  .col .cap { font-size: 11px; color: var(--ink-soft); margin-top: 6px; font-variant-numeric: tabular-nums; }
+  .col .vn { font-size: 12px; font-weight: 700; margin-bottom: 4px; font-variant-numeric: tabular-nums; }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-soft); padding: 0 14px 14px; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+
+  .q { border-radius: 14px; padding: 20px 22px; margin-bottom: 14px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); }
+  .q .ask { font-size: 17px; font-weight: 700; color: var(--ink); margin-bottom: 10px; display: flex; gap: 10px; align-items: baseline; }
+  .q .ask .qn { color: var(--red); font-weight: 800; flex: 0 0 auto; }
+  .q p { color: var(--ink-soft); }
+  .q b { color: var(--ink); }
+  .pill { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink); background: var(--panel-2); padding: 1px 7px; border-radius: 6px; border: 1px solid var(--line); white-space: nowrap; }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; background: var(--panel-2); padding: 1px 5px; border-radius: 5px; border: 1px solid var(--line); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+  th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); }
+  td .num { font-variant-numeric: tabular-nums; font-weight: 650; }
+  tr.total td { background: var(--panel-2); font-weight: 700; }
+  .fix td:first-child { color: var(--good); font-weight: 650; }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); box-shadow: var(--shadow); margin-bottom: 14px; }
+  ol.recs { padding-left: 0; list-style: none; counter-reset: r; margin: 0; }
+  ol.recs li { counter-increment: r; position: relative; padding: 14px 16px 14px 52px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 10px; box-shadow: var(--shadow); }
+  ol.recs li::before { content: counter(r); position: absolute; left: 14px; top: 14px; width: 26px; height: 26px; border-radius: 8px; background: var(--teal-soft); color: var(--teal); font-weight: 800; font-size: 14px; display: grid; place-items: center; }
+  ol.recs b { color: var(--ink); }
+  .foot { margin-top: 46px; padding: 16px 18px; border-radius: 12px; background: var(--amber-soft); border: 1px solid var(--line); font-size: 14px; color: var(--ink-soft); }
+  .foot b { color: var(--ink); }
+  .muted { color: var(--ink-soft); font-size: 13.5px; }
+  pre { background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 14px; overflow-x: auto; font-size: 13px; line-height: 1.5; margin: 0 0 14px; }
+</style>
+
+
+<div class="wrap">
+
+  <div class="eyebrow">Lead Run Debrief &middot; YouTube outreach</div>
+  <h1>2026-11-26: the fleet came back, the plan more than doubled, and not one of the 44 emails reached somebody new</h1>
+
+  <p class="lede">
+    Thanksgiving Thursday, and the thing everybody has been blaming eased. Live mailboxes went
+    from 4 to 6, capacity from 60 messages to 90, and the plan from 25 people to <b>61</b>.
+    Forty-four people were emailed, the best day in a week. Every single one of them had heard
+    from us before. People reached for the first time ever over the last eight days is now
+    <b>one</b>. The extra 36 slots went to repeat offers, which is the answer to a question
+    this report has asked five mornings running.
+  </p>
+
+  <p>
+    <span class="tag">Thursday, 44 emails</span>
+    <span class="tag red">0 new people reached, 6th day</span>
+    <span class="tag red">1 new person in eight days</span>
+    <span class="tag good">Fleet up: 4 to 6 live, band 5 to 7</span>
+    <span class="tag red">17 of 61 lost, all repeats</span>
+    <span class="tag good">2 people said yes</span>
+  </p>
+
+  <div class="grid stats">
+    <div class="card stat accent-teal">
+      <div class="n">44</div>
+      <div class="l">emails loaded into SmartLead</div>
+      <div class="s up">Up from 8; 0 by this repo</div>
+    </div>
+    <div class="card stat accent-red">
+      <div class="n">0</div>
+      <div class="l">people reached for the first time</div>
+      <div class="s down">1 in the last eight days</div>
+    </div>
+    <div class="card stat accent-red">
+      <div class="n">27.9%</div>
+      <div class="l">of the push lost to repeat refusals</div>
+      <div class="s down">17 of 61, every one lost before</div>
+    </div>
+    <div class="card stat accent-teal">
+      <div class="n">7</div>
+      <div class="l">mailboxes clear to send</div>
+      <div class="s up">Up 2, same 28-mailbox roster</div>
+    </div>
+  </div>
+
+  <h2>The shape of the day</h2>
+
+  <div class="card">
+    <p>
+      Everything ran. Siege wrote its plan at 11:27 UTC, the push unit reported success,
+      <b>44 people were emailed</b> and 43 of them appear in the week's reach ledger as
+      repeats. Zero fatal error signatures, no halt flag, <b>$0 of Anthropic spend</b>, a cent
+      and a half a day on OpenRouter against a $298 balance, and the reply reader ran 85 times
+      with no failures. This repo's own send command fired once, found nothing parked and
+      ready, and sent nothing, so all 44 came from the send program.
+    </p>
+    <p>
+      The fleet got better, which is new. The health gate's clear band went <b>5 to 7</b> on a
+      roster that covered 28 mailboxes on both mornings, so the two readings describe the same
+      fleet rather than two different ones. Siege then saw <b>6 live mailboxes of 124</b>
+      against 4 yesterday, worth <b>90 messages</b> of capacity against 60, and planned
+      <b>61 people</b> against 25. Nobody was held back by the approval gate: all 61 planned
+      were approved.
+    </p>
+    <p>
+      Then the day spent its new capacity on people who already know us. <b>Forty-four
+      emailed, zero reached for the first time ever.</b> That is the sixth sending day in a
+      row at zero, and the eight-day window now holds <b>one</b> person, down from five
+      yesterday, because the four-person day of 11-18 aged out of it. Meanwhile
+      <b>4,855 finished emails</b> sit on the shelf addressed to people nobody has ever
+      written to, and <b>1,857 people are waiting for a slot</b> (whale 374, strong7 728,
+      other7 755).
+    </p>
+    <p>
+      Seventeen of the 61 got no email, and all 17 were people an earlier push had already
+      refused. None were new, and today that is a fact rather than a floor: the loss split
+      covered all 17 and no earlier day in the window under-reported its own. One of them has
+      now been dropped on <b>ten consecutive snapshot days</b>. As a share of the plan the
+      loss fell from 68.0% to <b>27.9%</b>, which is the same cohort against a bigger
+      denominator and not a leak closing.
+    </p>
+    <p>
+      Two small bright spots. <b>Two people replied yes</b>, one a plain yes and one a yes with
+      a personal note, the first agreements in the reply log for several days. The auto-sender
+      is paused by order since 09-17, so those two need a human. And the recovery lane's
+      site-resolution reading came back clean at <b>2.7% no site</b>, because this pass walked
+      leads that mostly already have a website on file.
+    </p>
+    <p>
+      Quiet by design: <b>nothing was parked</b> (pool flat at 7,393, 99.8% bundled),
+      enrichment ran no batches because nothing is arriving to enrich, and discovery stayed
+      off per the standing order of 2026-09-08, so zero new channels. The podcast lane woke,
+      read the flag and halted, which is the flag working.
+    </p>
+  </div>
+
+  <h2>People reached for the first time ever, by Pacific day</h2>
+
+  <div class="card" style="padding:0">
+    <div class="strip">
+      <div class="col"><div class="vn">0</div><div class="bar zero"></div><div class="cap">11-19</div></div>
+      <div class="col"><div class="vn">1</div><div class="bar bad" style="height:100%"></div><div class="cap">11-20</div></div>
+      <div class="col"><div class="vn">0</div><div class="bar zero"></div><div class="cap">11-21</div></div>
+      <div class="col"><div class="vn">0</div><div class="bar zero"></div><div class="cap">11-22</div></div>
+      <div class="col"><div class="vn">0</div><div class="bar zero"></div><div class="cap">11-23</div></div>
+      <div class="col"><div class="vn">0</div><div class="bar zero"></div><div class="cap">11-24</div></div>
+      <div class="col"><div class="vn">0</div><div class="bar zero"></div><div class="cap">11-25</div></div>
+      <div class="col"><div class="vn">0</div><div class="bar zero"></div><div class="cap">11-26</div></div>
+    </div>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--amber)"></span>People who had never heard from us</span>
+      <span><span class="dot" style="background:var(--red)"></span>A day that reached nobody</span>
+      <span>11-21 and 11-22 are a weekend, when the sender does not run.</span>
+    </div>
+  </div>
+
+  <p class="muted">
+    Read this series, not the weekly percentage beside it. The prior-week ratio reads 0.3%,
+    which sounds like a small number getting slightly smaller. It is not a trend at all: one
+    person in eight days, on a day that sent 44 emails. The series is what says so, because a
+    single good day sets that ratio for a week afterwards.
+  </p>
+
+  <h2>The three questions</h2>
+
+  <div class="q">
+    <div class="ask"><span class="qn">Q1</span><span>The fleet recovered. Why did reach not move at all?</span></div>
+    <p>
+      <b>Because capacity was never what was stopping reach.</b> This cycle is as close to a
+      controlled test as this pipeline gets. The only thing that changed was the number of
+      slots: 25 people planned yesterday, <span class="pill">61</span> today, a plan 144%
+      bigger, driven by 2 more live mailboxes and 30 more messages of allowance. Emails went
+      from 8 to 44. People reached for the first time ever went from 0 to <b>0</b>.
+    </p>
+    <p>
+      Every one of the 36 extra slots went to somebody who had already been emailed. That is
+      what the tier queue does: Siege fills slots by tier, the whale tier ran out of
+      never-emailed people on the 10-13 push, and its re-offer queue takes every slot before a
+      ready lower-tier person is reached. There are <b>374 whale-tier people waiting</b>, 728
+      strong and 755 other, and <b>4,855 finished emails</b> on the shelf for people who have
+      never been contacted.
+    </p>
+    <p>
+      So the recommendation this report has led with for five mornings, restore the fleet, has
+      now been partly granted and bought nothing in reach. The ordering of that queue is the
+      lever, and it is a setting in the send path. Fleet repair is still worth doing, because
+      it is worth doing for follow-ups and for volume. It just cannot be the answer to "we
+      have reached one new person in eight days."
+    </p>
+  </div>
+
+  <div class="q">
+    <div class="ask"><span class="qn">Q2</span><span>The loss share fell from 68% to 28%. Did anything actually improve?</span></div>
+    <p>
+      <b>No. The cohort is identical and the denominator tripled.</b> Seventeen people lost
+      yesterday, seventeen today, all of them repeats both mornings, with the longest streak
+      now ten snapshot days. Yesterday that was 68.0% of a 25-person plan; today it is
+      <b>27.9%</b> of a 61-person one. The share is the honest unit, which is exactly why it
+      shipped two days ago, and it reads the arithmetic in both directions: a shrinking plan
+      makes a flat leak look like a flood, and a growing plan makes it look like a repair.
+    </p>
+    <p>
+      One thing is genuinely better than yesterday, and it is the confidence rather than the
+      number. Yesterday <code>lost_new: 0</code> was a lower bound, because an earlier day in
+      the window had named fewer people than it lost. Today the split covered all 17 and no
+      day in the window is capped, so <b>"nobody new was lost" is exact</b>.
+    </p>
+    <p>
+      The causes do not change overnight because they cannot. Two of these people have
+      channels YouTube no longer has. Three were refused because SmartLead already holds them
+      as unsubscribed. Seven have run out of offers. One got no draft at all. None of that
+      improves by being planned again tomorrow, and a lead whose channel is deleted will be
+      refused on every future push forever.
+    </p>
+  </div>
+
+  <div class="q">
+    <div class="ask"><span class="qn">Q3</span><span>What took the 17, and what is fixable where?</span></div>
+    <p>
+      Five were refused by SmartLead, ten never reached the push at all, two left no trace in
+      the log, and one person the log forgot entirely was emailed anyway (the send ledger
+      caught that, so it was not counted as a loss). Four push skips cost nobody: all four were
+      <code>voice-objection-proof</code> drafts that were rewritten and sent in the same run.
+    </p>
+    <p>
+      By cause: <b>7 people ran out of offers</b>, 3 are unsubscribed at SmartLead, 2 have
+      channels YouTube no longer has, 1 got no draft because the writer could not find a clean
+      job title for a plain business owner. The seven offer-exhausted were all turned down by
+      <code>love-your-channel-short</code> for one precondition, no safe enemy in the research
+      bank, and the per-variant split published yesterday reads it without opening a single
+      bundle file: <b>7 of the 9 leads hold a bank with zero enemies in it</b>, and 2 hold
+      enemies the skill's safety filter ruled out. Those are opposite repairs. An empty bank is
+      a research pass or a decision to stop planning that person; a filtered bank is a question
+      about how strict the filter should be, and that one is Casey's.
+    </p>
+    <p>
+      None of the 17 is fixable in this repo. Dead channels, unsubscribes and the offer
+      rotation live in the send path; empty research banks are a research decision.
+    </p>
+  </div>
+
+  <h2>Everything else, in one place</h2>
+
+  <div class="tablewrap">
+    <table>
+      <tr><th>Thing</th><th>Reading</th><th>What it means</th></tr>
+      <tr>
+        <td>Fleet</td>
+        <td><span class="num">6</span> live of 124</td>
+        <td>Up from 4; capacity 60 to 90 messages against an 870 allowance. Band 5 to 7 clear,
+            watch emptied 6 to 0, stopped 17 to 21. Two mailboxes returned and both held.
+            No round trips.</td>
+      </tr>
+      <tr>
+        <td>Recoverable slots</td>
+        <td><span class="num">20</span> mailboxes</td>
+        <td>Blocked by nothing except a missing warmup record. 96 mailboxes name that reason,
+            only 20 carry it alone. Read the 20, never the 96. Suspended-in-SmartLead-alone
+            rose 12 to 18.</td>
+      </tr>
+      <tr>
+        <td>Stranded suspensions</td>
+        <td><span class="num">67</span> of 86</td>
+        <td>Fifth morning. The gate suspended them in its own name and they have since left
+            its roster, so nothing can resume them. Repair lives in the send path.</td>
+      </tr>
+      <tr>
+        <td>Shelf</td>
+        <td><span class="num">4,855</span> ready to write</td>
+        <td>7,381 of 7,393 bundled (99.8%). 2,525 people emailed. One lead has carried a sent
+            stamp with no email since 10-07.</td>
+      </tr>
+      <tr>
+        <td>Parked</td>
+        <td><span class="num">0</span> leads</td>
+        <td>Pool flat at 7,393, needs_contact 2,875. Nothing arriving, which is expected with
+            discovery off.</td>
+      </tr>
+      <tr>
+        <td>Replies</td>
+        <td><span class="num">2</span> people said yes</td>
+        <td>Seven read: 2 yes, 2 unsubscribe, 3 other. Zero classifier failures. The
+            auto-sender stays paused by order since 09-17, so both yeses need a human.</td>
+      </tr>
+      <tr>
+        <td>Recovery lane, its own half</td>
+        <td><span class="num">5</span> points, 2 addresses</td>
+        <td>4 people, against 93 points and 10 addresses the prior week. Lap 21 of a
+            1,765-lead book, 1,626 of 1,633 findings already on file, stranded flat at 3. The
+            other 17 points came from automator's own lookup timer.</td>
+      </tr>
+      <tr>
+        <td>Site resolution</td>
+        <td><span class="num">2.7%</span> no site</td>
+        <td>Clean, and a different slice from yesterday's 91%: 146 of 150 leads already had a
+            site on file, so only 6 Brave searches ran and none were refused.</td>
+      </tr>
+      <tr>
+        <td>Apify email recovery</td>
+        <td><span class="num">360</span> hours idle</td>
+        <td>The token has been rejected as "user or token not found" for fifteen days.
+            <b>$21.06 of the November allowance expires on 11-30</b>, so three days left.</td>
+      </tr>
+      <tr>
+        <td>Enrichment</td>
+        <td>Idle, 0 batches</td>
+        <td>Correct with nothing arriving. The chain was active and unrestarted since 11-14,
+            but the snapshot could not say so, which is what shipped this cycle.</td>
+      </tr>
+      <tr>
+        <td>Spend</td>
+        <td><span class="num">$0</span> Anthropic</td>
+        <td>OpenRouter 1.5 cents in 24 hours against a $297.85 balance. 12 cents per enriched
+            lead over the last 564.</td>
+      </tr>
+      <tr>
+        <td>YouTube keys</td>
+        <td><span class="num">15</span> of 66 working</td>
+        <td>Settled on 09-16: the quota on 50 projects was cut. Not an incident, and more keys
+            are not the answer for those accounts.</td>
+      </tr>
+      <tr>
+        <td>Discovery</td>
+        <td><span class="num">0</span> new channels</td>
+        <td>Paused by Casey on 2026-09-08. The podcast lane woke, read the flag and halted.</td>
+      </tr>
+      <tr class="total">
+        <td>Faults</td>
+        <td><span class="num">0</span> fatal signatures</td>
+        <td>No halt flag, one push escalation, and the loop is left running for the next
+            cycle.</td>
+      </tr>
+    </table>
+  </div>
+
+  <h2>Fix shipped this cycle</h2>
+
+  <div class="card accent-teal" style="margin-bottom:14px">
+    <h3>A chain that is silent because it is idle no longer reads like one that stopped</h3>
+    <p class="muted">
+      <code>youtube-outreach-orchestrator-v1</code> &middot; <code>7f0499a</code>
+    </p>
+    <p>
+      With discovery paused, enrichment is the only thing that turns a recovered address into
+      a lead anybody can write to, so "is the chain running" is the question that matters most
+      in this snapshot. This morning it could not be answered. The chain published
+      <code>gate_cleared_transcripts</code> with <b>12.4 hours of silence behind it</b>, which
+      reads as a chain that announced it was resuming batches and then stopped.
+    </p>
+    <p>
+      It had not stopped. The transcripts gate opened at 19:37:08 UTC onto a pool holding no
+      inflow, and the chain says its idle line once and is then quiet on purpose until work
+      arrives. That latch is only reset where a batch really runs, so a gate opening onto an
+      empty pool left a promise standing as the newest line in the log. Two repairs, because
+      the field was wrong in two places. The chain now resets that latch whenever any of its
+      three gates clears, so it re-states <code>idling_no_inflow</code> instead of leaving the
+      promise. And the snapshot now carries <code>chain_unit_state</code>,
+      <code>chain_unit_result</code> and <code>chain_unit_started</code>, read straight from
+      systemd, the same local-only probe the send path has used since 10-30.
+    </p>
+    <p>
+      The distinction is the point. An idling chain and a chain that died while idling publish
+      the same silence and the same four zeros, and this is the second time in ten days this
+      block has had to learn that a lane quiet by design cannot be measured by how long it has
+      been quiet. A silent chain whose unit is <code>active</code> is idling; a silent chain
+      whose unit is anything else is an outage; and a <code>chain_unit_started</code> that
+      moves is a restart nobody ordered. All three read null when systemd cannot be read,
+      which is unknown and never a dead chain.
+    </p>
+    <p>
+      Verified: shell syntax clean, typecheck clean, the 446-assertion snapshot suite all
+      pass, and systemd returns <code>active</code> / <code>success</code> /
+      2026-11-14T06:13:41Z for the live unit. No enrichment, send or research behaviour was
+      touched; the chain logs one extra line per gate clearance and nothing else.
+    </p>
+  </div>
+
+  <div class="card accent-teal">
+    <h3>Confirmed working: the loss share shipped two days ago</h3>
+    <p>
+      <code>people_lost_pct</code> and <code>lost_recurring_pct</code> earned their keep on
+      their second morning, in the opposite direction from the one they were built for. The
+      same 17-person cohort read 68.0% yesterday and <b>27.9%</b> today, purely because the
+      plan went from 25 people to 61. Read as counts it is 17 against 17 and looks like
+      stalemate; read as shares it correctly says the leak is flat and the day got bigger.
+      Yesterday's per-variant offer field also held up, splitting the seven offer-exhausted
+      into 7 empty banks and 2 filtered ones with no bundle files opened by hand.
+    </p>
+  </div>
+
+  <h2>What to do next</h2>
+
+  <ol class="recs">
+    <li>
+      <b>Point one day of slots at the shelf.</b> This cycle settled the argument: 36 extra
+      slots produced 36 extra emails and zero extra people reached. There are 4,855 finished
+      emails waiting for people who have never been contacted, and the tier queue sends none
+      of them while the whale re-offer queue has anybody left in it. One day of first touches
+      would beat the last six sending days combined. The ordering is a setting in the send
+      path, unchanged for over three weeks.
+    </li>
+    <li>
+      <b>Stop planning the people no push can send.</b> Seventeen of 61 slots went to repeat
+      refusals, one for the tenth consecutive snapshot day. Two have deleted YouTube channels
+      and three are unsubscribed at SmartLead, and neither condition improves by being
+      re-planned. That is 28% of the day returned for one gate in the send path.
+    </li>
+    <li>
+      <b>Answer the two people who said yes.</b> A plain yes and a yes with a personal note,
+      the first agreements in days. The auto-sender has been paused since 09-17 by order, so
+      nothing replies to them on its own. One of the two cannot even be signed automatically
+      because the thread's sending mailbox cannot be identified.
+    </li>
+    <li>
+      <b>Replace the Apify token.</b> Fifteenth morning, <b>360 hours with no work done</b>,
+      still "user or token not found". <b>$21.06 expires on 11-30</b>, so three days are left
+      to spend it. Operator-only; no repo can fix a credential.
+    </li>
+    <li>
+      <b>Keep repairing the fleet, but for volume, not reach.</b> 20 mailboxes are blocked by
+      nothing except a missing warmup record, which is a restore at the warmup provider, and
+      67 gate-owned suspensions have left the roster so nothing can ever resume them. Both are
+      real capacity. Neither will reach a single new person on its own, which is what today
+      demonstrated.
+    </li>
+    <li>
+      <b>Decide what happens to the seven offer-exhausted.</b> Seven of their nine leads have
+      a research file with no enemies in it, so they need another research pass or they should
+      leave the queue. Two hold enemies the safety filter refused, which is a question about
+      how strict that filter should be. They have cost a slot every sending day since 11-11.
+    </li>
+    <li>
+      <b>Leave the recovery lane and enrichment alone.</b> Lap 21 of a 1,765-lead book with
+      99.6% of findings already on file; 5 points and 2 addresses is what a picked-over book
+      pays. Enrichment is idle because a 99.8%-bundled shelf has nothing arriving. Neither is
+      broken.
+    </li>
+  </ol>
+
+  <div class="foot">
+    <b>Verified, not assumed.</b> The enrichment finding was checked against the chain's own
+    log and against systemd: the gate cleared at 2026-11-26T19:37:08Z, no line follows it, and
+    the unit has been active since 2026-11-14T06:13:41Z with no restarts. The latch that
+    suppressed the idle line was read in the script. The fix was syntax-checked, typechecked
+    and run against the full snapshot suite. The eight-day reach series, the loss split and
+    the two band readings come from this cycle's snapshot, whose own fields say the two gate
+    readings covered the same 28 mailboxes and that the loss split was complete.
+    <br><br>
+    <b>Not established.</b> Why the tier queue still has no first touches to give out, which
+    is a send-path question nothing here can read. Whether the seven empty research banks are
+    empty because transcripts were never mined or because those creators argue with nothing.
+    Whether the 2.7% no-site reading means resolution improved or simply that this pass walked
+    an easier slice of the book; the fields support the second reading and cannot rule out the
+    first.
+    <br><br>
+    <b>Untouched by design.</b> Discovery stayed off, per Casey's standing order of
+    2026-09-08. No credential, no send-path behaviour and no research or filter rule was
+    changed.
+  </div>
+
+</div>
