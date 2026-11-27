@@ -303,6 +303,20 @@ while true; do
       sleep 1800
     done
     log "transcripts back ($TRANSCRIPT_STATE) — resuming batches"
+    # Clearing a gate ends the idle silence too (2026-11-27). The idle line is
+    # said once and then suppressed by `idle_logged` until a batch actually
+    # runs, and `idle_logged` is only reset where count>0 — so a gate that
+    # opens onto an empty pool logs "resuming batches" and then NOTHING, and
+    # the newest line in the log is a transition rather than a resting state.
+    # That is what this log said for the whole 2026-11-26 cycle: the gate
+    # cleared at 19:37:08Z, the pool held no inflow (pool=6, excluded=5), and
+    # 12.4 hours of silence followed a line promising batches. The debrief
+    # reads its chain state off the newest line, so it published
+    # `gate_cleared_transcripts` with `chain_silent_hours: 12.4` where the
+    # honest answer was `idling_no_inflow` — the benign shape a 99.8% bundled
+    # shelf produces. Resetting the latch here costs one line a gate and makes
+    # the chain re-state where it really is. Same reason after the other two.
+    idle_logged=0
   fi
 
   # Fail-open is the right rule for ENTERING the wait and the wrong rule for
@@ -334,6 +348,7 @@ while true; do
       sleep 1800
     done
     log "openrouter credits are back (${OPENROUTER_STATE}) — resuming batches"
+    idle_logged=0   # see the transcripts gate above
   fi
 
   # YouTube quota gate (2026-08-10, generalized same day for backend=auto):
@@ -383,6 +398,7 @@ for(let i=1;i<=500;i++){const v=process.env[`YOUTUBE_API_KEY_${i}`]; if(v){gap=0
       sleep 1800
     done
     log "youtube quota is back — resuming batches"
+    idle_logged=0   # see the transcripts gate above
   fi
 
   # The enrichment-base capacity gate was removed on 2026-08-12. It waited while
